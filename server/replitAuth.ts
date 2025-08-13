@@ -57,13 +57,33 @@ function updateUserSession(
 async function upsertUser(
   claims: any,
 ) {
-  await storage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
-  });
+  try {
+    await storage.upsertUser({
+      id: claims["sub"],
+      email: claims["email"],
+      firstName: claims["first_name"],
+      lastName: claims["last_name"],
+      profileImageUrl: claims["profile_image_url"],
+    });
+  } catch (error: any) {
+    // If it's a unique constraint error on email, try to find existing user by email
+    if (error.code === '23505' && error.constraint === 'users_email_unique') {
+      const existingUser = await storage.getUserByEmail(claims["email"]);
+      if (existingUser) {
+        // Update the existing user with the Replit ID
+        await storage.updateUser(existingUser.id, {
+          id: claims["sub"], // Update with Replit ID
+          firstName: claims["first_name"] || existingUser.firstName,
+          lastName: claims["last_name"] || existingUser.lastName,
+          profileImageUrl: claims["profile_image_url"] || existingUser.profileImageUrl,
+        });
+      } else {
+        throw error; // Re-throw if we can't find the user
+      }
+    } else {
+      throw error; // Re-throw other errors
+    }
+  }
 }
 
 export async function setupAuth(app: Express) {
