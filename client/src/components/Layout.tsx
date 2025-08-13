@@ -52,6 +52,7 @@ export default function Layout({ children }: LayoutProps) {
           ...baseItems,
           { href: '/company', icon: Settings, label: 'Company Dashboard' },
           { href: '/company/tutors', icon: Users, label: 'Tutors' },
+          { href: '/company/students', icon: Users, label: 'Students' },
           { href: '/company/reports', icon: BookOpen, label: 'Reports' },
         ];
       default:
@@ -158,6 +159,7 @@ export default function Layout({ children }: LayoutProps) {
                       <>
                         <li><Link href="/company" className="text-gray-600 hover:text-black">Company Dashboard</Link></li>
                         <li><Link href="/company/tutors" className="text-gray-600 hover:text-black">Tutors</Link></li>
+                        <li><Link href="/company/students" className="text-gray-600 hover:text-black">Students</Link></li>
                       </>
                     )}
                   </ul>

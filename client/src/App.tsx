@@ -15,6 +15,7 @@ import TestUserCreation from "@/pages/admin/TestUserCreation";
 import Companies from "@/pages/admin/Companies";
 import CompanyManagement from "@/pages/admin/CompanyManagement";
 import CompanyDashboard from "@/pages/admin/CompanyDashboard";
+import CompanyStudents from "@/pages/admin/CompanyStudents";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -53,6 +54,7 @@ function Router() {
           <Route path="/admin/companies/:id" component={CompanyManagement} />
           <Route path="/admin/test" component={TestUserCreation} />
           <Route path="/company" component={CompanyDashboard} />
+          <Route path="/company/students" component={CompanyStudents} />
         </>
       )}
       <Route component={NotFound} />

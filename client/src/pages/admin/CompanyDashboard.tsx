@@ -444,7 +444,7 @@ export default function CompanyDashboard() {
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 <Users className="w-5 h-5" />
-                <span>Company Tutors ({tutors?.length || 0})</span>
+                <span>{company?.name || 'Company'} Tutors ({tutors?.length || 0})</span>
               </div>
               <div className="flex space-x-2">
                 <Button
@@ -536,7 +536,7 @@ export default function CompanyDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <GraduationCap className="w-5 h-5" />
-              <span>Company Students ({companyStudents.length})</span>
+              <span>{company?.name || 'Company'} Students ({companyStudents.length})</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
