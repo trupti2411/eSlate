@@ -370,9 +370,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/users', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      console.log("Creating user, admin ID:", userId);
+      console.log("Request body:", req.body);
+      
       const user = await storage.getUser(userId);
       
       if (!user || user.role !== 'admin') {
+        console.log("Access denied - user:", user);
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -385,26 +389,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: true,
       };
 
+      console.log("Creating user with data:", userData);
       const newUser = await storage.createUserWithRole(userData);
+      console.log("Created user:", newUser);
 
       // Create role-specific records
       if (req.body.role === 'student') {
-        await storage.createStudent({
+        console.log("Creating student profile");
+        const studentData = {
           userId: newUser.id,
-          gradeLevel: req.body.gradeLevel,
-          parentId: req.body.parentId,
-          tutorId: req.body.tutorId,
-        });
+          gradeLevel: req.body.gradeLevel || null,
+          parentId: req.body.parentId || null,
+          tutorId: req.body.tutorId || null,
+        };
+        await storage.createStudent(studentData);
       } else if (req.body.role === 'parent') {
+        console.log("Creating parent profile");
         await storage.createParent({
           userId: newUser.id,
-          phoneNumber: req.body.phoneNumber,
+          phoneNumber: req.body.phoneNumber || null,
         });
       } else if (req.body.role === 'tutor') {
+        console.log("Creating tutor profile");
         await storage.createTutor({
           userId: newUser.id,
-          specialization: req.body.specialization,
-          qualifications: req.body.qualifications,
+          specialization: req.body.specialization || null,
+          qualifications: req.body.qualifications || null,
           isVerified: false,
         });
       }
@@ -412,7 +422,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(newUser);
     } catch (error) {
       console.error("Error creating user:", error);
-      res.status(500).json({ message: "Failed to create user" });
+      res.status(500).json({ message: "Failed to create user", error: (error as Error).message });
     }
   });
 
@@ -468,6 +478,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Error granting admin access:", error);
         res.status(500).json({ message: "Failed to grant admin access" });
+      }
+    });
+
+    // Test endpoint to create a user directly
+    app.post('/api/dev/test-create-user', isAuthenticated, async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const user = await storage.getUser(userId);
+        
+        if (!user || user.role !== 'admin') {
+          return res.status(403).json({ message: "Admin access required" });
+        }
+
+        // Create a test student user
+        const testUserData = {
+          email: `test${Date.now()}@example.com`,
+          firstName: "Test",
+          lastName: "Student",
+          role: "student",
+          isActive: true,
+        };
+
+        const newUser = await storage.createUserWithRole(testUserData);
+        
+        // Create student profile
+        const studentData = {
+          userId: newUser.id,
+          gradeLevel: "5th Grade",
+          parentId: null,
+          tutorId: null,
+        };
+        
+        const studentProfile = await storage.createStudent(studentData);
+
+        res.json({ user: newUser, studentProfile });
+      } catch (error) {
+        console.error("Error in test create user:", error);
+        res.status(500).json({ message: "Test failed", error: (error as Error).message });
       }
     });
   }

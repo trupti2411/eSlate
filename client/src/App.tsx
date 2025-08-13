@@ -10,6 +10,7 @@ import ParentDashboard from "@/pages/parent/Dashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
+import TestUserCreation from "@/pages/admin/TestUserCreation";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -43,6 +44,7 @@ function Router() {
           <Route path="/tutor" component={TutorDashboard} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={UserManagement} />
+          <Route path="/admin/test" component={TestUserCreation} />
         </>
       )}
       <Route component={NotFound} />

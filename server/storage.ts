@@ -84,6 +84,12 @@ export interface IStorage {
   createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
   getCalendarEventsByTutor(tutorId: string): Promise<CalendarEvent[]>;
   getCalendarEventsByStudent(studentId: string): Promise<CalendarEvent[]>;
+  
+  // Admin user management methods
+  getAllUsers(): Promise<User[]>;
+  getUsersByRole(role: string): Promise<User[]>;
+  createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User>;
+  updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
 }
 
 export class DatabaseStorage implements IStorage {
