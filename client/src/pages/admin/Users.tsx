@@ -269,14 +269,15 @@ export default function UsersManagement() {
         </div>
 
         {/* Users List */}
-        <Card className="eink-card">
-          <CardHeader>
-            <CardTitle>
-              {selectedRole === "all" ? "All Users" : `${selectedRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}s`} 
-              ({filteredUsers.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <div className="space-y-6">
+          <Card className="eink-card">
+            <CardHeader>
+              <CardTitle>
+                {selectedRole === "all" ? "All Users" : `${selectedRole.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}s`} 
+                ({filteredUsers.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
             {usersLoading ? (
               <p>Loading users...</p>
             ) : filteredUsers.length > 0 ? (
@@ -300,27 +301,31 @@ export default function UsersManagement() {
                           </Badge>
                         </div>
                         
-                        <div className="flex justify-between items-center pt-2 border-t">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => toggleUserStatus.mutate({ userId: user.id, isActive: !user.isActive })}
-                            disabled={toggleUserStatus.isPending}
-                          >
-                            {user.isActive ? (
-                              <>
-                                <PowerOff className="w-3 h-3 mr-1" />
-                                Deactivate
-                              </>
-                            ) : (
-                              <>
-                                <Power className="w-3 h-3 mr-1" />
-                                Activate
-                              </>
-                            )}
-                          </Button>
+                        <div className="flex justify-end items-center pt-2 border-t space-x-2">
+                          {/* Only show activate/deactivate for non-master admins */}
+                          {user.role !== 'admin' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => toggleUserStatus.mutate({ userId: user.id, isActive: !user.isActive })}
+                              disabled={toggleUserStatus.isPending}
+                            >
+                              {user.isActive ? (
+                                <>
+                                  <PowerOff className="w-3 h-3 mr-1" />
+                                  Deactivate
+                                </>
+                              ) : (
+                                <>
+                                  <Power className="w-3 h-3 mr-1" />
+                                  Activate
+                                </>
+                              )}
+                            </Button>
+                          )}
                           
-                          {currentUser?.role === 'admin' && user.id !== currentUser?.id && (
+                          {/* Only show delete for non-master admins and non-self */}
+                          {currentUser?.role === 'admin' && user.role !== 'admin' && user.id !== currentUser?.id && (
                             <Button
                               size="sm"
                               variant="destructive"
@@ -343,7 +348,31 @@ export default function UsersManagement() {
               </p>
             )}
           </CardContent>
-        </Card>
+          </Card>
+
+          {/* Recently Deleted Users Section */}
+          <Card className="eink-card border-red-200">
+            <CardHeader>
+              <CardTitle className="text-red-700 flex items-center">
+                <Trash2 className="w-5 h-5 mr-2" />
+                Recently Deleted Users
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Users deleted by master admins are permanently removed from the system along with all their associated data.
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <div className="flex items-center text-red-700">
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  <span className="text-sm font-medium">
+                    Deleted users cannot be recovered. All assignments, submissions, progress, and messages are permanently removed.
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </Layout>
   );

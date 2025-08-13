@@ -835,6 +835,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
+      const targetUser = await storage.getUser(req.params.id);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Prevent deactivating master admins
+      if (targetUser.role === 'admin') {
+        return res.status(403).json({ message: "Cannot deactivate master admin accounts" });
+      }
+
       const updatedUser = await storage.updateUser(req.params.id, {
         isActive: req.body.isActive,
       });
@@ -865,6 +875,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const targetUser = await storage.getUser(targetUserId);
       if (!targetUser) {
         return res.status(404).json({ message: "User not found" });
+      }
+
+      // Prevent deletion of master admins
+      if (targetUser.role === 'admin') {
+        return res.status(403).json({ message: "Cannot delete master admin accounts" });
       }
 
       // Delete user and all related records

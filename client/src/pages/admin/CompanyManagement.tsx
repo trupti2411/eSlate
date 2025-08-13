@@ -439,7 +439,8 @@ export default function CompanyManagement() {
                                   <Badge variant={user.isActive ? "default" : "secondary"}>
                                     {user.isActive ? "Active" : "Inactive"}
                                   </Badge>
-                                  {currentUser?.role === 'admin' && (
+                                  {/* Only show delete for non-master admins and non-self */}
+                                  {currentUser?.role === 'admin' && user.role !== 'admin' && user.id !== currentUser?.id && (
                                     <Button
                                       size="sm"
                                       variant="destructive"
