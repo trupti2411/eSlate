@@ -34,7 +34,7 @@ import {
   type InsertCalendarEvent,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -432,6 +432,41 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, userId));
   }
 
+  // Tutor assignment operations
+  async assignTutorToCompany(tutorId: string, companyId: string): Promise<void> {
+    await db
+      .update(tutors)
+      .set({ companyId })
+      .where(eq(tutors.id, tutorId));
+  }
+
+  async unassignTutorFromCompany(tutorId: string): Promise<void> {
+    await db
+      .update(tutors)
+      .set({ companyId: null })
+      .where(eq(tutors.id, tutorId));
+  }
+
+  async getUnassignedTutors(): Promise<any[]> {
+    const tutorData = await db
+      .select({
+        id: tutors.id,
+        userId: tutors.userId,
+        specialization: tutors.specialization,
+        qualifications: tutors.qualifications,
+        isVerified: tutors.isVerified,
+        user: {
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+        },
+      })
+      .from(tutors)
+      .leftJoin(users, eq(tutors.userId, users.id))
+      .where(isNull(tutors.companyId));
+
+    return tutorData;
+  }
 
 }
 

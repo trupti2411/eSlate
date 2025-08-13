@@ -434,6 +434,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Assign existing tutor to company
+  app.patch('/api/companies/:companyId/assign-tutor/:tutorId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { companyId, tutorId } = req.params;
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Company admins can only assign tutors to their own company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Can only assign tutors to your own company" });
+        }
+      }
+
+      // Check if tutor exists and is not already assigned
+      const tutor = await storage.getTutor(tutorId);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      if (tutor.companyId) {
+        return res.status(400).json({ message: "Tutor is already assigned to a company" });
+      }
+
+      // Assign tutor to company
+      await storage.assignTutorToCompany(tutorId, companyId);
+      
+      res.json({ success: true, message: "Tutor assigned to company successfully" });
+    } catch (error) {
+      console.error("Error assigning tutor to company:", error);
+      res.status(500).json({ message: "Failed to assign tutor to company" });
+    }
+  });
+
+  // Unassign tutor from company
+  app.patch('/api/companies/:companyId/unassign-tutor/:tutorId', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const { companyId, tutorId } = req.params;
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Company admins can only unassign tutors from their own company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Can only manage tutors in your own company" });
+        }
+      }
+
+      // Check if tutor exists and is assigned to this company
+      const tutor = await storage.getTutor(tutorId);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      if (tutor.companyId !== companyId) {
+        return res.status(400).json({ message: "Tutor is not assigned to this company" });
+      }
+
+      // Unassign tutor from company
+      await storage.unassignTutorFromCompany(tutorId);
+      
+      res.json({ success: true, message: "Tutor removed from company successfully" });
+    } catch (error) {
+      console.error("Error unassigning tutor from company:", error);
+      res.status(500).json({ message: "Failed to remove tutor from company" });
+    }
+  });
+
+  // Get unassigned tutors (for assignment)
+  app.get('/api/admin/unassigned-tutors', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const tutors = await storage.getUnassignedTutors();
+      res.json(tutors);
+    } catch (error) {
+      console.error("Error fetching unassigned tutors:", error);
+      res.status(500).json({ message: "Failed to fetch unassigned tutors" });
+    }
+  });
+
   // Company admin specific route
   app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: any, res) => {
     try {

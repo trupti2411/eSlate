@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
@@ -47,6 +47,7 @@ export default function CompanyDashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isCreateTutorOpen, setIsCreateTutorOpen] = useState(false);
+  const [isAssignTutorOpen, setIsAssignTutorOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
 
   const [tutorFormData, setTutorFormData] = useState({
@@ -105,6 +106,12 @@ export default function CompanyDashboard() {
     enabled: !!companyAdmin?.companyId,
   });
 
+  // Fetch unassigned tutors for assignment
+  const { data: unassignedTutors } = useQuery<CompanyTutor[]>({
+    queryKey: ["/api/admin/unassigned-tutors"],
+    enabled: !!companyAdmin?.companyId,
+  });
+
   // Create tutor mutation
   const createTutorMutation = useMutation({
     mutationFn: async (tutorData: typeof tutorFormData) => {
@@ -135,6 +142,33 @@ export default function CompanyDashboard() {
       toast({
         title: "Error",
         description: error.message || "Failed to create tutor",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Assign existing tutor mutation
+  const assignTutorMutation = useMutation({
+    mutationFn: async (tutorId: string) => {
+      return await apiRequest(`/api/companies/${companyAdmin?.companyId}/assign-tutor/${tutorId}`, "PATCH");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Tutor assigned successfully",
+      });
+      setIsAssignTutorOpen(false);
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/companies", companyAdmin?.companyId, "tutors"] 
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ["/api/admin/unassigned-tutors"] 
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign tutor",
         variant: "destructive",
       });
     },
@@ -182,13 +216,68 @@ export default function CompanyDashboard() {
             <p className="text-gray-600">Manage your tutoring company's staff and operations</p>
           </div>
           
+          <div className="flex space-x-2">
+            <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
+              <DialogTrigger asChild>
+                <Button className="eink-button">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create New Tutor
+                </Button>
+              </DialogTrigger>
+            </Dialog>
+            
+            <Dialog open={isAssignTutorOpen} onOpenChange={setIsAssignTutorOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="eink-button">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Assign Existing Tutor
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Assign Existing Tutor to {company?.name}</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  {unassignedTutors && unassignedTutors.length > 0 ? (
+                    <div className="space-y-2">
+                      <p className="text-sm text-gray-600">
+                        Select a tutor to assign to your company:
+                      </p>
+                      {unassignedTutors.map((tutor) => (
+                        <Card key={tutor.id} className="border p-4">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <h4 className="font-medium">
+                                {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : `Tutor #${tutor.id.slice(-6)}`}
+                              </h4>
+                              <p className="text-sm text-gray-600">{tutor.user?.email}</p>
+                              {tutor.specialization && (
+                                <p className="text-sm text-gray-500">
+                                  Specialization: {tutor.specialization}
+                                </p>
+                              )}
+                            </div>
+                            <Button
+                              onClick={() => assignTutorMutation.mutate(tutor.id)}
+                              disabled={assignTutorMutation.isPending}
+                            >
+                              Assign
+                            </Button>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-gray-500 py-4">
+                      No unassigned tutors available
+                    </p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+          
           <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
-            <DialogTrigger asChild>
-              <Button className="eink-button">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Tutor
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Add New Tutor to {company.name}</DialogTitle>
@@ -282,14 +371,24 @@ export default function CompanyDashboard() {
                 <Users className="w-5 h-5" />
                 <span>Company Tutors ({tutors?.length || 0})</span>
               </div>
-              <Button
-                variant="outline"
-                onClick={() => setIsCreateTutorOpen(true)}
-                className="text-sm"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Tutor
-              </Button>
+              <div className="flex space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCreateTutorOpen(true)}
+                  className="text-sm"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAssignTutorOpen(true)}
+                  className="text-sm"
+                >
+                  <UserPlus className="w-4 h-4 mr-2" />
+                  Assign Existing
+                </Button>
+              </div>
             </CardTitle>
           </CardHeader>
           <CardContent>
