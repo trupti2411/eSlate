@@ -299,15 +299,11 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                                 <Clock className="w-3 h-3 mr-1" />
                                                 {formatTime(cls.startTime)} - {formatTime(cls.endTime)}
                                               </div>
-                                              {cls.daysOfWeek && cls.daysOfWeek.length > 0 && (
-                                                <div className="flex flex-wrap gap-1 mt-2">
-                                                  {cls.daysOfWeek.map((day: string) => (
-                                                    <Badge key={day} variant="outline" className="text-xs px-1 py-0">
-                                                      {day.slice(0, 3)}
-                                                    </Badge>
-                                                  ))}
-                                                </div>
-                                              )}
+                                              <div className="flex flex-wrap gap-1 mt-2">
+                                                <Badge variant="outline" className="text-xs px-1 py-0">
+                                                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][cls.dayOfWeek]}
+                                                </Badge>
+                                              </div>
                                             </div>
                                             <Badge variant={cls.isActive ? "default" : "secondary"} className="text-xs">
                                               {cls.isActive ? "Active" : "Inactive"}
@@ -364,12 +360,16 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 <Card key={year.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div 
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors flex-1"
+                        onClick={() => handleYearClick(year.id, year.name)}
+                        title="Click to view terms for this year"
+                      >
                         <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
                           {year.name}
                         </CardTitle>
                         <CardDescription>
-                          Year {year.yearNumber}
+                          Year {year.yearNumber} • Click to view terms
                         </CardDescription>
                       </div>
                       <DropdownMenu>
