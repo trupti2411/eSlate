@@ -75,8 +75,11 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
 
+  // Debug log
+  console.log('AcademicManagement component loaded with:', { companyId, companyName });
+
   // Fetch academic years
-  const { data: academicYears = [], isLoading: yearsLoading } = useQuery({
+  const { data: academicYears = [], isLoading: yearsLoading, error: yearsError } = useQuery({
     queryKey: [`/api/companies/${companyId}/academic-years`],
     enabled: !!companyId,
   });
@@ -173,6 +176,12 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           {yearsLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : yearsError ? (
+            <div className="flex justify-center py-8">
+              <p className="text-red-600 dark:text-red-400">
+                Error loading academic years: {(yearsError as Error).message}
+              </p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
