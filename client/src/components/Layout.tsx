@@ -44,8 +44,14 @@ export default function Layout({ children }: LayoutProps) {
       case 'admin':
         return [
           ...baseItems,
-          { href: '/users', icon: Users, label: 'Users' },
-          { href: '/system', icon: Settings, label: 'System' },
+          { href: '/admin/users', icon: Users, label: 'Users' },
+          { href: '/admin/companies', icon: Settings, label: 'Companies' },
+        ];
+      case 'company_admin':
+        return [
+          ...baseItems,
+          { href: '/company/tutors', icon: Users, label: 'Tutors' },
+          { href: '/company/reports', icon: BookOpen, label: 'Reports' },
         ];
       default:
         return baseItems;
