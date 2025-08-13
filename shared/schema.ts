@@ -1,0 +1,323 @@
+import { sql } from 'drizzle-orm';
+import { relations } from 'drizzle-orm';
+import {
+  index,
+  jsonb,
+  pgTable,
+  timestamp,
+  varchar,
+  text,
+  integer,
+  boolean,
+  pgEnum,
+} from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod";
+
+// Session storage table (required for Replit Auth)
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
+// Enums for user roles and status
+export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', 'admin']);
+export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed']);
+export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
+
+// User storage table (required for Replit Auth)
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  role: userRoleEnum("role").notNull().default('student'),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Students table for additional student-specific data
+export const students = pgTable("students", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  gradeLevel: varchar("grade_level"),
+  parentId: varchar("parent_id").references(() => parents.id),
+  tutorId: varchar("tutor_id").references(() => tutors.id),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Parents table
+export const parents = pgTable("parents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  phoneNumber: varchar("phone_number"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Tutors table
+export const tutors = pgTable("tutors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  specialization: text("specialization"),
+  qualifications: text("qualifications"),
+  isVerified: boolean("is_verified").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Assignments table
+export const assignments = pgTable("assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  instructions: text("instructions"),
+  dueDate: timestamp("due_date"),
+  tutorId: varchar("tutor_id").notNull().references(() => tutors.id),
+  studentId: varchar("student_id").notNull().references(() => students.id),
+  status: assignmentStatusEnum("status").notNull().default('assigned'),
+  maxPoints: integer("max_points").default(100),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Submissions table
+export const submissions = pgTable("submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  assignmentId: varchar("assignment_id").notNull().references(() => assignments.id),
+  studentId: varchar("student_id").notNull().references(() => students.id),
+  content: text("content"),
+  filePath: varchar("file_path"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  isVerifiedByParent: boolean("is_verified_by_parent").notNull().default(false),
+  parentVerifiedAt: timestamp("parent_verified_at"),
+  score: integer("score"),
+  feedback: text("feedback"),
+  gradedAt: timestamp("graded_at"),
+  gradedBy: varchar("graded_by").references(() => tutors.id),
+});
+
+// Messages table for real-time communication
+export const messages = pgTable("messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  senderId: varchar("sender_id").notNull().references(() => users.id),
+  receiverId: varchar("receiver_id").notNull().references(() => users.id),
+  content: text("content").notNull(),
+  messageType: messageTypeEnum("message_type").notNull().default('text'),
+  isRead: boolean("is_read").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Progress tracking table
+export const progress = pgTable("progress", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull().references(() => students.id),
+  assignmentId: varchar("assignment_id").notNull().references(() => assignments.id),
+  completionPercentage: integer("completion_percentage").notNull().default(0),
+  timeSpent: integer("time_spent_minutes").default(0),
+  lastAccessedAt: timestamp("last_accessed_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Calendar events table
+export const calendarEvents = pgTable("calendar_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  startTime: timestamp("start_time").notNull(),
+  endTime: timestamp("end_time").notNull(),
+  tutorId: varchar("tutor_id").references(() => tutors.id),
+  studentId: varchar("student_id").references(() => students.id),
+  eventType: varchar("event_type").notNull(), // 'class', 'makeup', 'meeting'
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Relations
+export const usersRelations = relations(users, ({ one }) => ({
+  student: one(students, {
+    fields: [users.id],
+    references: [students.userId],
+  }),
+  parent: one(parents, {
+    fields: [users.id],
+    references: [parents.userId],
+  }),
+  tutor: one(tutors, {
+    fields: [users.id],
+    references: [tutors.userId],
+  }),
+}));
+
+export const studentsRelations = relations(students, ({ one, many }) => ({
+  user: one(users, {
+    fields: [students.userId],
+    references: [users.id],
+  }),
+  parent: one(parents, {
+    fields: [students.parentId],
+    references: [parents.id],
+  }),
+  tutor: one(tutors, {
+    fields: [students.tutorId],
+    references: [tutors.id],
+  }),
+  assignments: many(assignments),
+  submissions: many(submissions),
+  progress: many(progress),
+  calendarEvents: many(calendarEvents),
+}));
+
+export const parentsRelations = relations(parents, ({ one, many }) => ({
+  user: one(users, {
+    fields: [parents.userId],
+    references: [users.id],
+  }),
+  students: many(students),
+}));
+
+export const tutorsRelations = relations(tutors, ({ one, many }) => ({
+  user: one(users, {
+    fields: [tutors.userId],
+    references: [users.id],
+  }),
+  students: many(students),
+  assignments: many(assignments),
+  calendarEvents: many(calendarEvents),
+}));
+
+export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
+  tutor: one(tutors, {
+    fields: [assignments.tutorId],
+    references: [tutors.id],
+  }),
+  student: one(students, {
+    fields: [assignments.studentId],
+    references: [students.id],
+  }),
+  submissions: many(submissions),
+  progress: many(progress),
+}));
+
+export const submissionsRelations = relations(submissions, ({ one }) => ({
+  assignment: one(assignments, {
+    fields: [submissions.assignmentId],
+    references: [assignments.id],
+  }),
+  student: one(students, {
+    fields: [submissions.studentId],
+    references: [students.id],
+  }),
+  grader: one(tutors, {
+    fields: [submissions.gradedBy],
+    references: [tutors.id],
+  }),
+}));
+
+export const messagesRelations = relations(messages, ({ one }) => ({
+  sender: one(users, {
+    fields: [messages.senderId],
+    references: [users.id],
+  }),
+  receiver: one(users, {
+    fields: [messages.receiverId],
+    references: [users.id],
+  }),
+}));
+
+export const progressRelations = relations(progress, ({ one }) => ({
+  student: one(students, {
+    fields: [progress.studentId],
+    references: [students.id],
+  }),
+  assignment: one(assignments, {
+    fields: [progress.assignmentId],
+    references: [assignments.id],
+  }),
+}));
+
+export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
+  tutor: one(tutors, {
+    fields: [calendarEvents.tutorId],
+    references: [tutors.id],
+  }),
+  student: one(students, {
+    fields: [calendarEvents.studentId],
+    references: [students.id],
+  }),
+}));
+
+// Insert schemas
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertStudentSchema = createInsertSchema(students).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertParentSchema = createInsertSchema(parents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTutorSchema = createInsertSchema(tutors).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAssignmentSchema = createInsertSchema(assignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSubmissionSchema = createInsertSchema(submissions).omit({
+  id: true,
+  submittedAt: true,
+  parentVerifiedAt: true,
+  gradedAt: true,
+});
+
+export const insertMessageSchema = createInsertSchema(messages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertProgressSchema = createInsertSchema(progress).omit({
+  id: true,
+  lastAccessedAt: true,
+  updatedAt: true,
+});
+
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type UpsertUser = typeof users.$inferInsert;
+export type User = typeof users.$inferSelect;
+export type InsertStudent = z.infer<typeof insertStudentSchema>;
+export type Student = typeof students.$inferSelect;
+export type InsertParent = z.infer<typeof insertParentSchema>;
+export type Parent = typeof parents.$inferSelect;
+export type InsertTutor = z.infer<typeof insertTutorSchema>;
+export type Tutor = typeof tutors.$inferSelect;
+export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+export type Assignment = typeof assignments.$inferSelect;
+export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
+export type Submission = typeof submissions.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertProgress = z.infer<typeof insertProgressSchema>;
+export type Progress = typeof progress.$inferSelect;
+export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
