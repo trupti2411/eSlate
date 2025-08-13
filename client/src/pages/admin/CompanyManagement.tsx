@@ -1,12 +1,18 @@
+import { useState } from "react";
 import { useParams } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft } from "lucide-react";
+import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin } from "lucide-react";
 import { Link } from "wouter";
 
 interface TutoringCompany {
@@ -33,10 +39,26 @@ interface CompanyTutor {
   };
 }
 
+interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  isActive: boolean;
+}
+
 export default function CompanyManagement() {
   const { toast } = useToast();
   const params = useParams();
   const companyId = params.id;
+  const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
+  const [newUserData, setNewUserData] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    role: "",
+  });
 
   // Fetch company details
   const { data: company, isLoading: companyLoading } = useQuery<TutoringCompany>({
@@ -47,6 +69,12 @@ export default function CompanyManagement() {
   // Fetch company tutors
   const { data: tutors, isLoading: tutorsLoading } = useQuery<CompanyTutor[]>({
     queryKey: ["/api/companies", companyId, "tutors"],
+    enabled: !!companyId,
+  });
+
+  // Fetch all users within company
+  const { data: companyUsers, isLoading: usersLoading } = useQuery<User[]>({
+    queryKey: ["/api/companies", companyId, "users"],
     enabled: !!companyId,
   });
 
@@ -88,6 +116,7 @@ export default function CompanyManagement() {
         description: "Tutor assigned successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "tutors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "users"] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/unassigned-tutors"] });
     },
     onError: (error: Error) => {
@@ -99,27 +128,45 @@ export default function CompanyManagement() {
     },
   });
 
-  // Unassign tutor mutation
-  const unassignTutorMutation = useMutation({
-    mutationFn: async (tutorId: string) => {
-      return await apiRequest(`/api/companies/${companyId}/unassign-tutor/${tutorId}`, "PATCH");
+  // Create user mutation
+  const createUserMutation = useMutation({
+    mutationFn: async (userData: typeof newUserData) => {
+      return await apiRequest("/api/admin/create-user", "POST", {
+        ...userData,
+        companyId: userData.role === 'tutor' || userData.role === 'company_admin' ? companyId : undefined,
+      });
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Tutor removed from company successfully",
+        description: "User created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "tutors"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/unassigned-tutors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "users"] });
+      setIsCreateUserDialogOpen(false);
+      setNewUserData({ email: "", firstName: "", lastName: "", role: "" });
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to remove tutor",
+        description: error.message || "Failed to create user",
         variant: "destructive",
       });
     },
   });
+
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newUserData.email || !newUserData.firstName || !newUserData.role) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+    createUserMutation.mutate(newUserData);
+  };
 
   if (companyLoading) {
     return (
@@ -140,6 +187,14 @@ export default function CompanyManagement() {
       </Layout>
     );
   }
+
+  const usersByRole = companyUsers?.reduce((acc: Record<string, User[]>, user) => {
+    if (!acc[user.role]) {
+      acc[user.role] = [];
+    }
+    acc[user.role].push(user);
+    return acc;
+  }, {}) || {};
 
   return (
     <Layout>
@@ -165,24 +220,95 @@ export default function CompanyManagement() {
             </div>
           </div>
           
-          <Button
-            variant="outline"
-            onClick={() => toggleCompanyStatus.mutate(!company.isActive)}
-            disabled={toggleCompanyStatus.isPending}
-            className="flex items-center space-x-2"
-          >
-            {company.isActive ? (
-              <>
-                <PowerOff className="w-4 h-4 text-red-600" />
-                <span>Deactivate</span>
-              </>
-            ) : (
-              <>
-                <Power className="w-4 h-4 text-green-600" />
-                <span>Activate</span>
-              </>
-            )}
-          </Button>
+          <div className="flex items-center space-x-2">
+            <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create User
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New User for {company.name}</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateUser} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input
+                        id="firstName"
+                        value={newUserData.firstName}
+                        onChange={(e) => setNewUserData(prev => ({ ...prev, firstName: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input
+                        id="lastName"
+                        value={newUserData.lastName}
+                        onChange={(e) => setNewUserData(prev => ({ ...prev, lastName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={newUserData.email}
+                      onChange={(e) => setNewUserData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="role">Role</Label>
+                    <Select value={newUserData.role} onValueChange={(value) => setNewUserData(prev => ({ ...prev, role: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tutor">Tutor</SelectItem>
+                        <SelectItem value="student">Student</SelectItem>
+                        <SelectItem value="parent">Parent</SelectItem>
+                        <SelectItem value="company_admin">Company Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createUserMutation.isPending}>
+                      {createUserMutation.isPending ? "Creating..." : "Create User"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              variant="outline"
+              onClick={() => toggleCompanyStatus.mutate(!company.isActive)}
+              disabled={toggleCompanyStatus.isPending}
+            >
+              {company.isActive ? (
+                <>
+                  <PowerOff className="w-4 h-4 mr-2 text-red-600" />
+                  Deactivate
+                </>
+              ) : (
+                <>
+                  <Power className="w-4 h-4 mr-2 text-green-600" />
+                  Activate
+                </>
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* Company Details */}
@@ -193,36 +319,86 @@ export default function CompanyManagement() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <h3 className="font-semibold text-sm text-gray-600">Description</h3>
+                <h3 className="font-semibold text-sm text-gray-600 mb-1">Description</h3>
                 <p>{company.description || "No description provided"}</p>
               </div>
-              <div>
-                <h3 className="font-semibold text-sm text-gray-600">Contact Email</h3>
-                <p>{company.contactEmail || "Not provided"}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-gray-600">Contact Phone</h3>
-                <p>{company.contactPhone || "Not provided"}</p>
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm text-gray-600">Address</h3>
-                <p>{company.address || "Not provided"}</p>
+              <div className="space-y-2">
+                {company.contactEmail && (
+                  <div className="flex items-center space-x-2">
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span>{company.contactEmail}</span>
+                  </div>
+                )}
+                {company.contactPhone && (
+                  <div className="flex items-center space-x-2">
+                    <Phone className="w-4 h-4 text-gray-500" />
+                    <span>{company.contactPhone}</span>
+                  </div>
+                )}
+                {company.address && (
+                  <div className="flex items-center space-x-2">
+                    <MapPin className="w-4 h-4 text-gray-500" />
+                    <span>{company.address}</span>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Current Tutors */}
-        <Card className="eink-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>Current Tutors ({tutors?.length || 0})</span>
+        {/* Tabs for different sections */}
+        <Tabs defaultValue="users" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="users">All Users ({companyUsers?.length || 0})</TabsTrigger>
+            <TabsTrigger value="tutors">Current Tutors ({tutors?.length || 0})</TabsTrigger>
+            <TabsTrigger value="assign">Assign Tutors ({unassignedTutors?.length || 0})</TabsTrigger>
+          </TabsList>
+
+          {/* All Users Tab */}
+          <TabsContent value="users" className="space-y-6">
+            {usersLoading ? (
+              <p>Loading users...</p>
+            ) : companyUsers && companyUsers.length > 0 ? (
+              <div className="space-y-6">
+                {Object.entries(usersByRole).map(([role, users]) => (
+                  <Card key={role} className="eink-card">
+                    <CardHeader>
+                      <CardTitle className="capitalize flex items-center space-x-2">
+                        <Users className="w-5 h-5" />
+                        <span>{role.replace('_', ' ')}s ({users.length})</span>
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {users.map((user) => (
+                          <Card key={user.id} className="border">
+                            <CardContent className="p-4">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <h4 className="font-semibold">
+                                    {user.firstName} {user.lastName}
+                                  </h4>
+                                  <p className="text-sm text-gray-600">{user.email}</p>
+                                </div>
+                                <Badge variant={user.isActive ? "default" : "secondary"}>
+                                  {user.isActive ? "Active" : "Inactive"}
+                                </Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
               </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+            ) : (
+              <p className="text-center text-gray-500 py-8">No users found in this company.</p>
+            )}
+          </TabsContent>
+
+          {/* Current Tutors Tab */}
+          <TabsContent value="tutors" className="space-y-6">
             {tutorsLoading ? (
               <p>Loading tutors...</p>
             ) : tutors && tutors.length > 0 ? (
@@ -255,16 +431,6 @@ export default function CompanyManagement() {
                           <strong>Qualifications:</strong> {tutor.qualifications}
                         </p>
                       )}
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => unassignTutorMutation.mutate(tutor.id)}
-                        disabled={unassignTutorMutation.isPending}
-                        className="w-full text-red-600 hover:bg-red-50"
-                      >
-                        Remove from Company
-                      </Button>
                     </CardContent>
                   </Card>
                 ))}
@@ -272,19 +438,11 @@ export default function CompanyManagement() {
             ) : (
               <p className="text-center text-gray-500 py-8">No tutors assigned to this company yet.</p>
             )}
-          </CardContent>
-        </Card>
+          </TabsContent>
 
-        {/* Available Tutors */}
-        {unassignedTutors && unassignedTutors.length > 0 && (
-          <Card className="eink-card">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <UserPlus className="w-5 h-5" />
-                <span>Available Tutors ({unassignedTutors.length})</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
+          {/* Assign Tutors Tab */}
+          <TabsContent value="assign" className="space-y-6">
+            {unassignedTutors && unassignedTutors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {unassignedTutors.map((tutor) => (
                   <Card key={tutor.id} className="border">
@@ -328,9 +486,11 @@ export default function CompanyManagement() {
                   </Card>
                 ))}
               </div>
-            </CardContent>
-          </Card>
-        )}
+            ) : (
+              <p className="text-center text-gray-500 py-8">No unassigned tutors available.</p>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
     </Layout>
   );

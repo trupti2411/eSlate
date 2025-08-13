@@ -345,6 +345,71 @@ export class DatabaseStorage implements IStorage {
     return company;
   }
 
+  async getTutoringCompanyById(id: string): Promise<TutoringCompany | undefined> {
+    const [company] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, id));
+    return company;
+  }
+
+  async getUsersByCompany(companyId: string): Promise<User[]> {
+    try {
+      // Get all tutors for this company
+      const companyTutors = await db.select({
+        user: users
+      })
+      .from(tutors)
+      .innerJoin(users, eq(tutors.userId, users.id))
+      .where(eq(tutors.companyId, companyId));
+
+      // Get all company admins for this company
+      const companyAdminsQuery = await db.select({
+        user: users
+      })
+      .from(companyAdmins)
+      .innerJoin(users, eq(companyAdmins.userId, users.id))
+      .where(eq(companyAdmins.companyId, companyId));
+
+      // Get all students assigned to tutors in this company
+      const companyStudents = await db.select({
+        user: users
+      })
+      .from(students)
+      .innerJoin(users, eq(students.userId, users.id))
+      .innerJoin(tutors, eq(students.tutorId, tutors.id))
+      .where(eq(tutors.companyId, companyId));
+
+      // Get all parents of students in this company
+      const companyParents = await db.select({
+        user: users
+      })
+      .from(parents)
+      .innerJoin(users, eq(parents.userId, users.id))
+      .innerJoin(students, eq(parents.id, students.parentId))
+      .innerJoin(tutors, eq(students.tutorId, tutors.id))
+      .where(eq(tutors.companyId, companyId));
+
+      // Combine all users and remove duplicates
+      const allUsers = [
+        ...companyTutors.map((t: any) => t.user),
+        ...companyAdminsQuery.map((ca: any) => ca.user),
+        ...companyStudents.map((s: any) => s.user),
+        ...companyParents.map((p: any) => p.user)
+      ];
+
+      // Remove duplicates by id
+      const uniqueUsers = allUsers.reduce((acc: User[], user: User) => {
+        if (!acc.find(u => u.id === user.id)) {
+          acc.push(user);
+        }
+        return acc;
+      }, []);
+
+      return uniqueUsers;
+    } catch (error) {
+      console.error("Error fetching company users:", error);
+      return [];
+    }
+  }
+
   async createTutoringCompany(companyData: InsertTutoringCompany): Promise<TutoringCompany> {
     const [company] = await db.insert(tutoringCompanies).values(companyData).returning();
     return company;

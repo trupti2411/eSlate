@@ -326,6 +326,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get individual company details
+  app.get('/api/companies/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const companyId = req.params.id;
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Check if user is company admin for this company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      }
+
+      const company = await storage.getTutoringCompanyById(companyId);
+      if (!company) {
+        return res.status(404).json({ message: "Company not found" });
+      }
+      
+      res.json(company);
+    } catch (error) {
+      console.error("Error fetching company:", error);
+      res.status(500).json({ message: "Failed to fetch company" });
+    }
+  });
+
+  // Get all users within a company
+  app.get('/api/companies/:id/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const companyId = req.params.id;
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Check if user is company admin for this company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      }
+
+      const users = await storage.getUsersByCompany(companyId);
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching company users:", error);
+      res.status(500).json({ message: "Failed to fetch company users" });
+    }
+  });
+
   app.post('/api/companies', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -668,6 +726,76 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
+      res.json(newUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user", error: (error as Error).message });
+    }
+  });
+
+  // Create new user within a company context
+  app.post('/api/admin/create-user', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { role, email, firstName, lastName, companyId } = req.body;
+      
+      if (!role || !email) {
+        return res.status(400).json({ message: "Role and email are required" });
+      }
+
+      // If company admin, verify they can only create for their company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        if (!companyAdmin || (companyId && companyAdmin.companyId !== companyId)) {
+          return res.status(403).json({ message: "Can only create users for your company" });
+        }
+      }
+
+      const userData = {
+        email,
+        firstName: firstName || '',
+        lastName: lastName || '',
+        role,
+        isActive: true,
+      };
+
+      const newUser = await storage.createUserWithRole(userData);
+      
+      // Create role-specific records
+      if (role === 'student') {
+        await storage.createStudent({
+          userId: newUser.id,
+          gradeLevel: null,
+          parentId: null,
+          tutorId: null,
+        });
+      } else if (role === 'parent') {
+        await storage.createParent({
+          userId: newUser.id,
+          phoneNumber: null,
+        });
+      } else if (role === 'tutor') {
+        await storage.createTutor({
+          userId: newUser.id,
+          companyId: companyId || null,
+          specialization: null,
+          qualifications: null,
+          isVerified: false,
+        });
+      } else if (role === 'company_admin' && companyId) {
+        await storage.createCompanyAdmin({
+          userId: newUser.id,
+          companyId,
+          permissions: ['manage_tutors', 'view_reports'],
+        });
+      }
+      
       res.json(newUser);
     } catch (error) {
       console.error("Error creating user:", error);
