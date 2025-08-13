@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Building2, Users, Phone, Mail, MapPin } from "lucide-react";
+import { Plus, Building2, Users, Phone, Mail, MapPin, Power, PowerOff } from "lucide-react";
 
 interface TutoringCompany {
   id: string;
@@ -78,6 +78,27 @@ export default function Companies() {
       toast({
         title: "Error",
         description: error.message || "Failed to create company",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Toggle company status mutation
+  const toggleCompanyStatusMutation = useMutation({
+    mutationFn: async ({ companyId, isActive }: { companyId: string; isActive: boolean }) => {
+      return await apiRequest(`/api/companies/${companyId}/status`, "PATCH", { isActive });
+    },
+    onSuccess: (_, { isActive }) => {
+      toast({
+        title: "Success",
+        description: `Company ${isActive ? 'activated' : 'deactivated'} successfully`,
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update company status",
         variant: "destructive",
       });
     },
@@ -182,17 +203,35 @@ export default function Companies() {
       {/* Companies Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {companies?.map((company) => (
-          <Card key={company.id} className="cursor-pointer hover:shadow-lg transition-shadow"
-                onClick={() => setSelectedCompany(company.id)}>
+          <Card key={company.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-2 cursor-pointer" 
+                     onClick={() => setSelectedCompany(company.id)}>
                   <Building2 className="w-5 h-5 text-blue-600" />
                   <CardTitle className="text-lg">{company.name}</CardTitle>
                 </div>
-                <Badge variant={company.isActive ? "default" : "secondary"}>
-                  {company.isActive ? "Active" : "Inactive"}
-                </Badge>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={company.isActive ? "default" : "secondary"}>
+                    {company.isActive ? "Active" : "Inactive"}
+                  </Badge>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => toggleCompanyStatusMutation.mutate({
+                      companyId: company.id,
+                      isActive: !company.isActive
+                    })}
+                    disabled={toggleCompanyStatusMutation.isPending}
+                    className="p-1 h-8 w-8"
+                  >
+                    {company.isActive ? (
+                      <PowerOff className="w-4 h-4 text-red-600" />
+                    ) : (
+                      <Power className="w-4 h-4 text-green-600" />
+                    )}
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
@@ -219,6 +258,18 @@ export default function Companies() {
                     <span className="line-clamp-1">{company.address}</span>
                   </div>
                 )}
+              </div>
+              
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setSelectedCompany(company.id)}
+                  className="w-full"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  View Tutors
+                </Button>
               </div>
             </CardContent>
           </Card>

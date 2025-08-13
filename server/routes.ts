@@ -379,6 +379,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Deactivate/activate company
+  app.patch('/api/companies/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const companyId = req.params.id;
+      const { isActive } = req.body;
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.updateCompanyStatus(companyId, isActive);
+      res.json({ success: true, message: `Company ${isActive ? 'activated' : 'deactivated'} successfully` });
+    } catch (error) {
+      console.error("Error updating company status:", error);
+      res.status(500).json({ message: "Failed to update company status" });
+    }
+  });
+
+  // Deactivate/activate user
+  app.patch('/api/admin/users/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const targetUserId = req.params.id;
+      const { isActive } = req.body;
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Company admins can only deactivate tutors in their company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        const targetUser = await storage.getUser(targetUserId);
+        
+        if (!companyAdmin || !targetUser || targetUser.role !== 'tutor') {
+          return res.status(403).json({ message: "Can only manage tutors in your company" });
+        }
+
+        const tutor = await storage.getTutorByUserId(targetUserId);
+        if (!tutor || tutor.companyId !== companyAdmin.companyId) {
+          return res.status(403).json({ message: "Tutor not in your company" });
+        }
+      }
+
+      await storage.updateUserStatus(targetUserId, isActive);
+      res.json({ success: true, message: `User ${isActive ? 'activated' : 'deactivated'} successfully` });
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).json({ message: "Failed to update user status" });
+    }
+  });
+
   // Company admin specific route
   app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: any, res) => {
     try {
@@ -594,7 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           email: `test${Date.now()}@example.com`,
           firstName: "Test",
           lastName: "Student",
-          role: "student",
+          role: "student" as const,
           isActive: true,
         };
 

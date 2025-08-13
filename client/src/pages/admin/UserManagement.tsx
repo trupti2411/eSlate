@@ -15,7 +15,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Users, UserCheck, UserX, Edit } from "lucide-react";
+import { Plus, Users, UserCheck, UserX, Edit, Power, PowerOff } from "lucide-react";
 import type { User } from "@shared/schema";
 
 // Form schemas for user creation
@@ -23,7 +23,7 @@ const createUserSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  role: z.enum(["student", "parent", "tutor", "admin"], {
+  role: z.enum(["student", "parent", "tutor", "company_admin", "admin"], {
     required_error: "Please select a role",
   }),
   gradeLevel: z.string().optional(),
@@ -40,7 +40,7 @@ const updateUserSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   email: z.string().email("Please enter a valid email address"),
-  role: z.enum(["student", "parent", "tutor", "admin"]),
+  role: z.enum(["student", "parent", "tutor", "company_admin", "admin"]),
   isActive: z.boolean(),
 });
 
@@ -522,6 +522,21 @@ export default function UserManagement() {
                           onClick={() => handleEditUser(user)}
                         >
                           <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => toggleUserStatus.mutate({
+                            id: user.id,
+                            isActive: !user.isActive
+                          })}
+                          disabled={toggleUserStatus.isPending}
+                        >
+                          {user.isActive ? (
+                            <PowerOff className="h-4 w-4 text-red-600" />
+                          ) : (
+                            <Power className="h-4 w-4 text-green-600" />
+                          )}
                         </Button>
                         <Button
                           size="sm"

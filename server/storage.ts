@@ -415,6 +415,24 @@ export class DatabaseStorage implements IStorage {
       .returning();
     return user;
   }
+
+  // Company status operations
+  async updateCompanyStatus(companyId: string, isActive: boolean): Promise<void> {
+    await db
+      .update(tutoringCompanies)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(tutoringCompanies.id, companyId));
+  }
+
+  // User status operations
+  async updateUserStatus(userId: string, isActive: boolean): Promise<void> {
+    await db
+      .update(users)
+      .set({ isActive, updatedAt: new Date() })
+      .where(eq(users.id, userId));
+  }
+
+
 }
 
 export const storage = new DatabaseStorage();
