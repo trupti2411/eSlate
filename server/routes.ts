@@ -338,9 +338,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get individual company details
   app.get('/api/companies/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
       const companyId = req.params.id;
+      
+      // Get requesting user (try by Replit ID first, then by email)
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
       
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
@@ -348,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is company admin for this company
       if (user.role === 'company_admin') {
-        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (!companyAdmin || companyAdmin.companyId !== companyId) {
           return res.status(403).json({ message: "Access denied to this company" });
         }
@@ -420,9 +426,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/companies/:id/tutors', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
       const companyId = req.params.id;
+      
+      // Get requesting user (try by Replit ID first, then by email)
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
       
       if (!user) {
         return res.status(401).json({ message: "Unauthorized" });
@@ -430,7 +442,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Check if user is company admin for this company or system admin
       if (user.role === 'company_admin') {
-        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (!companyAdmin || companyAdmin.companyId !== companyId) {
           return res.status(403).json({ message: "Access denied to this company" });
         }
@@ -582,8 +594,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get unassigned tutors (for assignment)
   app.get('/api/admin/unassigned-tutors', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      // Get requesting user (try by Replit ID first, then by email)
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
       
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
