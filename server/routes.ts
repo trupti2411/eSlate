@@ -18,23 +18,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth routes
   app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const replitUserId = req.user.claims.sub;
+      const userEmail = req.user.claims.email;
+      
+      // First try to get user by Replit ID
+      let user = await storage.getUser(replitUserId);
+      
+      // If not found by Replit ID, try by email (for existing users created manually)
+      if (!user && userEmail) {
+        user = await storage.getUserByEmail(userEmail);
+      }
+      
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
       
-      // Get role-specific data
+      // Get role-specific data using the actual user ID (not Replit ID)
       let roleData = null;
       switch (user.role) {
         case 'student':
-          roleData = await storage.getStudentByUserId(userId);
+          roleData = await storage.getStudentByUserId(user.id);
           break;
         case 'parent':
-          roleData = await storage.getParentByUserId(userId);
+          roleData = await storage.getParentByUserId(user.id);
           break;
         case 'tutor':
-          roleData = await storage.getTutorByUserId(userId);
+          roleData = await storage.getTutorByUserId(user.id);
           break;
       }
 

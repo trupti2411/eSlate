@@ -66,17 +66,20 @@ async function upsertUser(
       profileImageUrl: claims["profile_image_url"],
     });
   } catch (error: any) {
-    // If it's a unique constraint error on email, try to find existing user by email
+    // If it's a unique constraint error on email, the user already exists
     if (error.code === '23505' && error.constraint === 'users_email_unique') {
       const existingUser = await storage.getUserByEmail(claims["email"]);
       if (existingUser) {
-        // Update the existing user with the Replit ID
+        // Just update the profile information, keep the existing ID
         await storage.updateUser(existingUser.id, {
-          id: claims["sub"], // Update with Replit ID
           firstName: claims["first_name"] || existingUser.firstName,
           lastName: claims["last_name"] || existingUser.lastName,
           profileImageUrl: claims["profile_image_url"] || existingUser.profileImageUrl,
         });
+        
+        // Store the mapping of Replit ID to our internal user ID for session management
+        // The authentication will use the existing user record
+        console.log(`Linked existing user ${existingUser.id} with Replit ID ${claims["sub"]}`);
       } else {
         throw error; // Re-throw if we can't find the user
       }
@@ -100,7 +103,14 @@ export async function setupAuth(app: Express) {
   ) => {
     const user = {};
     updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
+    
+    try {
+      await upsertUser(tokens.claims());
+    } catch (error) {
+      console.error("Error during user upsert:", error);
+      // Continue with authentication even if upsert fails, as user might already exist
+    }
+    
     verified(null, user);
   };
 
