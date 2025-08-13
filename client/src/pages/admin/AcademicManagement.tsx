@@ -176,7 +176,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {academicYears.map((year: AcademicYear) => (
+              {(academicYears as AcademicYear[]).map((year: AcademicYear) => (
                 <Card key={year.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
@@ -242,7 +242,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {academicTerms.map((term: AcademicTerm) => (
+              {(academicTerms as AcademicTerm[]).map((term: AcademicTerm) => (
                 <Card key={term.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
@@ -308,7 +308,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </div>
           ) : (
             <div className="grid gap-4">
-              {classes.map((classItem: Class) => (
+              {(classes as Class[]).map((classItem: Class) => (
                 <Card key={classItem.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">

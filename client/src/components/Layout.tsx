@@ -1,7 +1,7 @@
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tablet, LogOut, User, Home, BookOpen, Users, Settings } from "lucide-react";
+import { Tablet, LogOut, User, Home, BookOpen, Users, Settings, Calendar } from "lucide-react";
 import { Link, useLocation } from "wouter";
 
 interface LayoutProps {
