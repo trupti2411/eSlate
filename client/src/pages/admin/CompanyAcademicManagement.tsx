@@ -52,24 +52,39 @@ export default function CompanyAcademicManagement() {
   }
 
   if (!companyAdmin || companyLoading) {
+    console.log('Loading state triggered:', { companyAdmin, companyAdminLoading, companyLoading });
     return (
       <Layout>
         <div className="flex justify-center items-center h-64">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="ml-4 text-gray-600">Loading company data...</p>
         </div>
       </Layout>
     );
   }
 
   if (!company) {
+    console.log('Company not found state:', { company, companyLoading, companyError });
     return (
       <Layout>
         <div className="flex justify-center items-center h-64">
-          <p className="text-gray-600 dark:text-gray-300">Company not found.</p>
+          <div>
+            <p className="text-gray-600 dark:text-gray-300">Company not found.</p>
+            {companyError && (
+              <p className="text-red-600 text-sm mt-2">
+                Error: {(companyError as Error).message}
+              </p>
+            )}
+          </div>
         </div>
       </Layout>
     );
   }
+
+  console.log('Rendering AcademicManagement with:', { 
+    companyId: companyAdmin.companyId, 
+    companyName: company.name 
+  });
 
   return (
     <Layout>
