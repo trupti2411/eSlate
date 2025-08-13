@@ -452,6 +452,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Development-only endpoint to grant admin access
+  if (process.env.NODE_ENV === 'development') {
+    app.post('/api/dev/make-admin', isAuthenticated, async (req: any, res) => {
+      try {
+        const userId = req.user.claims.sub;
+        const user = await storage.getUser(userId);
+        
+        if (!user) {
+          return res.status(404).json({ message: "User not found" });
+        }
+
+        const updatedUser = await storage.updateUser(userId, { role: 'admin' });
+        res.json({ message: "Admin access granted", user: updatedUser });
+      } catch (error) {
+        console.error("Error granting admin access:", error);
+        res.status(500).json({ message: "Failed to grant admin access" });
+      }
+    });
+  }
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging
