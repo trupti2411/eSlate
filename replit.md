@@ -6,6 +6,14 @@ eSlate is a secure educational platform designed specifically for e-ink devices 
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes
+
+**August 13, 2025 - Academic Management System Fixed**
+- Fixed critical API endpoint issue: Frontend was calling incorrect `/api/company-admin/` instead of `/api/admin/company-admin/`
+- Resolved date formatting crashes in Academic Management interface by adding proper null checks
+- Academic Management system now fully functional with proper data loading for years, terms, and classes
+- User nish1882@outlook.com successfully authenticated and associated with "Homework and Study Academy"
+
 ## System Architecture
 
 ### Frontend Architecture
@@ -30,7 +38,7 @@ The client-side application is built using React with TypeScript, leveraging a c
 
 **Session Storage**: PostgreSQL-backed session store using connect-pg-simple for persistent user sessions.
 
-**API Design**: RESTful endpoints organized by feature domain (assignments, submissions, messages, progress, calendar events) with consistent error handling and response formats.
+**API Design**: RESTful endpoints organized by feature domain (assignments, submissions, messages, progress, calendar events, academic management) with consistent error handling and response formats. Company admin endpoints use `/api/admin/company-admin/` structure.
 
 **Real-time Communication**: WebSocket integration for live messaging between users.
 
