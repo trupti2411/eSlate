@@ -107,17 +107,15 @@ export default function Layout({ children }: LayoutProps) {
               const Icon = item.icon;
               
               return (
-                <Link key={item.href} href={item.href}>
-                  <a className={`
-                    flex items-center space-x-3 px-4 py-3 text-sm font-medium rounded border-2 transition-colors
-                    ${isActive 
-                      ? 'bg-black text-white border-black' 
-                      : 'bg-white text-black border-black hover:bg-gray-50'
-                    }
-                  `}>
-                    <Icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </a>
+                <Link key={item.href} href={item.href} className={`
+                  flex items-center space-x-3 px-4 py-3 text-sm font-medium rounded border-2 transition-colors
+                  ${isActive 
+                    ? 'bg-black text-white border-black' 
+                    : 'bg-white text-black border-black hover:bg-gray-50'
+                  }
+                `}>
+                  <Icon className="h-5 w-5" />
+                  <span>{item.label}</span>
                 </Link>
               );
             })}

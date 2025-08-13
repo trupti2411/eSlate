@@ -1,0 +1,26 @@
+client:536 WebSocket connection to 'wss://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/?token=FWV9Y-_qZNY-' failed: 
+
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=FWV9Y-_qZNY-' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+chunk-RPCDYKBN.js?v=d569c1d3:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+chunk-RPCDYKBN.js?v=d569c1d3:521 Warning: validateDOMNesting(...): <a> cannot appear as a descendant of <a>.
+    at a
+    at a
+    at https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=d569c1d3:337:18
+    at nav
+    at aside
+    at div
+    at div
+    at Layout (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/src/components/Layout.tsx:22:34)
+    at CompanyDashboard (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/src/pages/admin/CompanyDashboard.tsx:33:21)
+    at Route (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=d569c1d3:323:16)
+    at Switch (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=d569c1d3:379:17)
+    at Router (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/src/App.tsx?v=BJbJGNt_OzuhYDkInMUOj:39:48)
+    at Provider (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…unner/workspace/node_modules/.vite/deps/chunk-S34NKWM7.js?v=d569c1d3:48:15)
+    at TooltipProvider (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…rkspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=d569c1d3:60:5)
+    at QueryClientProvider (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…rkspace/node_modules/.vite/deps/@tanstack_react-query.js?v=d569c1d3:2805:3)
+    at App
+﻿
+

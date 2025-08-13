@@ -22,18 +22,24 @@ interface TutoringCompany {
 
 export default function CompanyAcademicManagement() {
   const { user } = useAuth();
+  
+  console.log('CompanyAcademicManagement loaded. User:', user);
 
   // Fetch company admin data
-  const { data: companyAdmin } = useQuery<CompanyAdmin>({
+  const { data: companyAdmin, isLoading: companyAdminLoading, error: companyAdminError } = useQuery<CompanyAdmin>({
     queryKey: [`/api/company-admin/${user?.id}`],
     enabled: !!user?.id && user?.role === 'company_admin',
   });
+  
+  console.log('Company admin query state:', { companyAdmin, companyAdminLoading, companyAdminError });
 
   // Fetch company details
-  const { data: company, isLoading: companyLoading } = useQuery<TutoringCompany>({
+  const { data: company, isLoading: companyLoading, error: companyError } = useQuery<TutoringCompany>({
     queryKey: [`/api/companies/${companyAdmin?.companyId}`],
     enabled: !!companyAdmin?.companyId,
   });
+  
+  console.log('Company query state:', { company, companyLoading, companyError });
 
   if (!user || user.role !== 'company_admin') {
     return (
