@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      let assignments = [];
+      let assignments: any[] = [];
       if (user.role === 'student') {
         const student = await storage.getStudentByUserId(userId);
         if (student) {
@@ -112,7 +112,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      let submissions = [];
+      let submissions: any[] = [];
       if (user.role === 'student') {
         const student = await storage.getStudentByUserId(userId);
         if (student) {
@@ -213,7 +213,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      let progress = [];
+      let progress: any[] = [];
       if (user.role === 'student') {
         const student = await storage.getStudentByUserId(userId);
         if (student) {
@@ -238,7 +238,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      let events = [];
+      let events: any[] = [];
       if (user.role === 'tutor') {
         const tutor = await storage.getTutorByUserId(userId);
         if (tutor) {
@@ -295,7 +295,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "User not found" });
       }
 
-      let students = [];
+      let students: any[] = [];
       if (user.role === 'tutor') {
         const tutor = await storage.getTutorByUserId(userId);
         if (tutor) {
@@ -312,6 +312,143 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching students:", error);
       res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  // Admin routes for user management
+  app.get('/api/admin/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const users = await storage.getAllUsers();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ message: "Failed to fetch users" });
+    }
+  });
+
+  app.get('/api/admin/parents', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const parents = await storage.getUsersByRole('parent');
+      res.json(parents);
+    } catch (error) {
+      console.error("Error fetching parents:", error);
+      res.status(500).json({ message: "Failed to fetch parents" });
+    }
+  });
+
+  app.get('/api/admin/tutors', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const tutors = await storage.getUsersByRole('tutor');
+      res.json(tutors);
+    } catch (error) {
+      console.error("Error fetching tutors:", error);
+      res.status(500).json({ message: "Failed to fetch tutors" });
+    }
+  });
+
+  app.post('/api/admin/users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Create the user first
+      const userData = {
+        email: req.body.email,
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
+        role: req.body.role,
+        isActive: true,
+      };
+
+      const newUser = await storage.createUserWithRole(userData);
+
+      // Create role-specific records
+      if (req.body.role === 'student') {
+        await storage.createStudent({
+          userId: newUser.id,
+          gradeLevel: req.body.gradeLevel,
+          parentId: req.body.parentId,
+          tutorId: req.body.tutorId,
+        });
+      } else if (req.body.role === 'parent') {
+        await storage.createParent({
+          userId: newUser.id,
+          phoneNumber: req.body.phoneNumber,
+        });
+      } else if (req.body.role === 'tutor') {
+        await storage.createTutor({
+          userId: newUser.id,
+          specialization: req.body.specialization,
+          qualifications: req.body.qualifications,
+          isVerified: false,
+        });
+      }
+
+      res.json(newUser);
+    } catch (error) {
+      console.error("Error creating user:", error);
+      res.status(500).json({ message: "Failed to create user" });
+    }
+  });
+
+  app.patch('/api/admin/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const updatedUser = await storage.updateUser(req.params.id, req.body);
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user" });
+    }
+  });
+
+  app.patch('/api/admin/users/:id/status', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const updatedUser = await storage.updateUser(req.params.id, {
+        isActive: req.body.isActive,
+      });
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user status:", error);
+      res.status(500).json({ message: "Failed to update user status" });
     }
   });
 

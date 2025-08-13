@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Layout from "@/components/Layout";
@@ -45,10 +46,12 @@ export default function AdminDashboard() {
             <p className="text-gray-600">Manage users, system settings, and platform overview</p>
           </div>
           <div className="flex space-x-3">
-            <Button className="eink-button">
-              <UserPlus className="h-4 w-4 mr-2" />
-              Add User
-            </Button>
+            <Link href="/admin/users">
+              <Button className="eink-button">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Manage Users
+              </Button>
+            </Link>
             <Button className="eink-button">
               <Settings className="h-4 w-4 mr-2" />
               Settings

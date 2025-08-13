@@ -9,6 +9,7 @@ import StudentDashboard from "@/pages/student/Dashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
+import UserManagement from "@/pages/admin/UserManagement";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -41,6 +42,7 @@ function Router() {
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
           <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin/users" component={UserManagement} />
         </>
       )}
       <Route component={NotFound} />

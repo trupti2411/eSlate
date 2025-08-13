@@ -269,13 +269,13 @@ export class DatabaseStorage implements IStorage {
 
   // Progress operations
   async getProgress(id: string): Promise<Progress | undefined> {
-    const [progress] = await db.select().from(progress).where(eq(progress.id, id));
-    return progress;
+    const [progressRecord] = await db.select().from(progress).where(eq(progress.id, id));
+    return progressRecord;
   }
 
   async createProgress(progressData: InsertProgress): Promise<Progress> {
-    const [progress] = await db.insert(progress).values(progressData).returning();
-    return progress;
+    const [progressRecord] = await db.insert(progress).values(progressData).returning();
+    return progressRecord;
   }
 
   async getProgressByStudent(studentId: string): Promise<Progress[]> {
@@ -285,11 +285,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateProgress(id: string, updates: Partial<InsertProgress>): Promise<Progress> {
-    const [progress] = await db.update(progress)
+    const [progressRecord] = await db.update(progress)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(progress.id, id))
       .returning();
-    return progress;
+    return progressRecord;
   }
 
   // Calendar operations
@@ -313,6 +313,38 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(calendarEvents)
       .where(eq(calendarEvents.studentId, studentId))
       .orderBy(calendarEvents.startTime);
+  }
+
+  // Admin user management methods
+  async getAllUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async getUsersByRole(role: string): Promise<User[]> {
+    return await db.select().from(users)
+      .where(eq(users.role, role as any))
+      .orderBy(desc(users.createdAt));
+  }
+
+  async createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User> {
+    const [user] = await db.insert(users).values({
+      id: userData.id,
+      email: userData.email,
+      firstName: userData.firstName,
+      lastName: userData.lastName,
+      profileImageUrl: userData.profileImageUrl,
+      role: userData.role as any,
+      isActive: userData.isActive ?? true,
+    }).returning();
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<UpsertUser>): Promise<User> {
+    const [user] = await db.update(users)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(users.id, id))
+      .returning();
+    return user;
   }
 }
 
