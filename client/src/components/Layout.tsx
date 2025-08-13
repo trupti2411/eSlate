@@ -50,6 +50,7 @@ export default function Layout({ children }: LayoutProps) {
       case 'company_admin':
         return [
           ...baseItems,
+          { href: '/company', icon: Settings, label: 'Company Dashboard' },
           { href: '/company/tutors', icon: Users, label: 'Tutors' },
           { href: '/company/reports', icon: BookOpen, label: 'Reports' },
         ];
@@ -123,7 +124,93 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Main Content */}
         <main className="flex-1">
-          {children}
+          <div className="min-h-[calc(100vh-200px)]">
+            {children}
+          </div>
+          
+          {/* Footer */}
+          <footer className="border-t-2 border-black bg-white mt-8">
+            <div className="container py-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+                {/* About */}
+                <div>
+                  <h3 className="font-bold text-black mb-3">About eSlate</h3>
+                  <p className="text-sm text-gray-600 mb-2">
+                    A secure educational platform designed for e-ink devices, focusing on accessibility and learning excellence.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Optimized for high contrast displays and simplified interfaces.
+                  </p>
+                </div>
+
+                {/* Quick Links */}
+                <div>
+                  <h3 className="font-bold text-black mb-3">Quick Links</h3>
+                  <ul className="space-y-1 text-sm">
+                    <li><Link href="/" className="text-gray-600 hover:text-black">Dashboard</Link></li>
+                    {user?.role === 'admin' && (
+                      <>
+                        <li><Link href="/admin/users" className="text-gray-600 hover:text-black">User Management</Link></li>
+                        <li><Link href="/admin/companies" className="text-gray-600 hover:text-black">Companies</Link></li>
+                      </>
+                    )}
+                    {user?.role === 'company_admin' && (
+                      <>
+                        <li><Link href="/company" className="text-gray-600 hover:text-black">Company Dashboard</Link></li>
+                        <li><Link href="/company/tutors" className="text-gray-600 hover:text-black">Tutors</Link></li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+
+                {/* User Info */}
+                <div>
+                  <h3 className="font-bold text-black mb-3">Account</h3>
+                  <div className="text-sm space-y-1">
+                    <p className="text-gray-600">Logged in as:</p>
+                    <p className="font-medium">{user?.firstName || user?.email || 'User'}</p>
+                    <p className="text-xs text-gray-500 capitalize">
+                      {user?.role?.replace('_', ' ')} Account
+                    </p>
+                  </div>
+                </div>
+
+                {/* System Status */}
+                <div>
+                  <h3 className="font-bold text-black mb-3">System</h3>
+                  <div className="text-sm space-y-1">
+                    <div className="flex items-center space-x-2">
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span className="text-gray-600">System Online</span>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Tablet className="w-3 h-3 text-gray-600" />
+                      <span className="text-gray-600">E-ink Optimized</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Version 1.0.0
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Bar */}
+              <div className="border-t border-gray-200 mt-6 pt-4">
+                <div className="flex flex-col md:flex-row justify-between items-center">
+                  <p className="text-xs text-gray-500 mb-2 md:mb-0">
+                    © 2024 eSlate Educational Platform. Designed for accessibility and learning.
+                  </p>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-xs text-gray-500">Built with</span>
+                    <div className="flex items-center space-x-1">
+                      <Tablet className="w-3 h-3 text-gray-600" />
+                      <span className="text-xs text-gray-500">E-ink Technology</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </footer>
         </main>
       </div>
     </div>

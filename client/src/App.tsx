@@ -12,6 +12,7 @@ import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
 import TestUserCreation from "@/pages/admin/TestUserCreation";
 import Companies from "@/pages/admin/Companies";
+import CompanyManagement from "@/pages/admin/CompanyManagement";
 import CompanyDashboard from "@/pages/admin/CompanyDashboard";
 import NotFound from "@/pages/not-found";
 
@@ -48,6 +49,7 @@ function Router() {
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={UserManagement} />
           <Route path="/admin/companies" component={Companies} />
+          <Route path="/admin/companies/:id" component={CompanyManagement} />
           <Route path="/admin/test" component={TestUserCreation} />
           <Route path="/company" component={CompanyDashboard} />
         </>

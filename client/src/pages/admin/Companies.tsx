@@ -9,7 +9,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Building2, Users, Phone, Mail, MapPin, Power, PowerOff } from "lucide-react";
+import { Plus, Building2, Users, Phone, Mail, MapPin, Power, PowerOff, Settings } from "lucide-react";
+import { Link } from "wouter";
 
 interface TutoringCompany {
   id: string;
@@ -206,8 +207,7 @@ export default function Companies() {
           <Card key={company.id} className="hover:shadow-lg transition-shadow">
             <CardHeader>
               <div className="flex items-start justify-between">
-                <div className="flex items-center space-x-2 cursor-pointer" 
-                     onClick={() => setSelectedCompany(company.id)}>
+                <div className="flex items-center space-x-2">
                   <Building2 className="w-5 h-5 text-blue-600" />
                   <CardTitle className="text-lg">{company.name}</CardTitle>
                 </div>
@@ -260,7 +260,7 @@ export default function Companies() {
                 )}
               </div>
               
-              <div className="pt-2">
+              <div className="pt-2 space-y-2">
                 <Button
                   variant="outline"
                   size="sm"
@@ -270,6 +270,15 @@ export default function Companies() {
                   <Users className="w-4 h-4 mr-2" />
                   View Tutors
                 </Button>
+                <Link href={`/admin/companies/${company.id}`}>
+                  <Button
+                    size="sm"
+                    className="w-full"
+                  >
+                    <Settings className="w-4 h-4 mr-2" />
+                    Manage Company
+                  </Button>
+                </Link>
               </div>
             </CardContent>
           </Card>
