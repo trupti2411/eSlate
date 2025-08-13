@@ -32,6 +32,18 @@ import {
   type InsertProgress,
   type CalendarEvent,
   type InsertCalendarEvent,
+  academicYears,
+  academicTerms,
+  classes,
+  studentClassAssignments,
+  type AcademicYear,
+  type InsertAcademicYear,
+  type AcademicTerm,
+  type InsertAcademicTerm,
+  type Class,
+  type InsertClass,
+  type StudentClassAssignment,
+  type InsertStudentClassAssignment,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, isNull } from "drizzle-orm";
@@ -111,6 +123,37 @@ export interface IStorage {
   createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User>;
   updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
   deleteUser(id: string, deletedBy: string): Promise<void>;
+
+  // Academic management methods
+  // Academic Years
+  createAcademicYear(academicYear: InsertAcademicYear): Promise<AcademicYear>;
+  getAcademicYearsByCompany(companyId: string): Promise<AcademicYear[]>;
+  getAcademicYear(id: string): Promise<AcademicYear | undefined>;
+  updateAcademicYear(id: string, updates: Partial<InsertAcademicYear>): Promise<AcademicYear>;
+  deleteAcademicYear(id: string): Promise<void>;
+
+  // Academic Terms
+  createAcademicTerm(term: InsertAcademicTerm): Promise<AcademicTerm>;
+  getAcademicTermsByYear(academicYearId: string): Promise<AcademicTerm[]>;
+  getAcademicTermsByCompany(companyId: string): Promise<AcademicTerm[]>;
+  getAcademicTerm(id: string): Promise<AcademicTerm | undefined>;
+  updateAcademicTerm(id: string, updates: Partial<InsertAcademicTerm>): Promise<AcademicTerm>;
+  deleteAcademicTerm(id: string): Promise<void>;
+
+  // Classes
+  createClass(classData: InsertClass): Promise<Class>;
+  getClassesByTerm(termId: string): Promise<Class[]>;
+  getClassesByCompany(companyId: string): Promise<Class[]>;
+  getClassesByTutor(tutorId: string): Promise<Class[]>;
+  getClass(id: string): Promise<Class | undefined>;
+  updateClass(id: string, updates: Partial<InsertClass>): Promise<Class>;
+  deleteClass(id: string): Promise<void>;
+
+  // Student Class Assignments
+  assignStudentToClass(assignment: InsertStudentClassAssignment): Promise<StudentClassAssignment>;
+  getStudentsByClass(classId: string): Promise<StudentClassAssignment[]>;
+  getClassesByStudent(studentId: string): Promise<StudentClassAssignment[]>;
+  removeStudentFromClass(studentId: string, classId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -645,6 +688,146 @@ export class DatabaseStorage implements IStorage {
       .where(isNull(tutors.companyId));
 
     return tutorData;
+  }
+
+  // Academic management methods implementation
+
+  // Academic Years
+  async createAcademicYear(academicYear: InsertAcademicYear): Promise<AcademicYear> {
+    const [year] = await db.insert(academicYears).values(academicYear).returning();
+    return year;
+  }
+
+  async getAcademicYearsByCompany(companyId: string): Promise<AcademicYear[]> {
+    return await db.select().from(academicYears)
+      .where(and(eq(academicYears.companyId, companyId), eq(academicYears.isActive, true)))
+      .orderBy(academicYears.yearNumber);
+  }
+
+  async getAcademicYear(id: string): Promise<AcademicYear | undefined> {
+    const [year] = await db.select().from(academicYears).where(eq(academicYears.id, id));
+    return year;
+  }
+
+  async updateAcademicYear(id: string, updates: Partial<InsertAcademicYear>): Promise<AcademicYear> {
+    const [year] = await db.update(academicYears)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(academicYears.id, id))
+      .returning();
+    return year;
+  }
+
+  async deleteAcademicYear(id: string): Promise<void> {
+    await db.update(academicYears)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(academicYears.id, id));
+  }
+
+  // Academic Terms
+  async createAcademicTerm(term: InsertAcademicTerm): Promise<AcademicTerm> {
+    const [newTerm] = await db.insert(academicTerms).values(term).returning();
+    return newTerm;
+  }
+
+  async getAcademicTermsByYear(academicYearId: string): Promise<AcademicTerm[]> {
+    return await db.select().from(academicTerms)
+      .where(and(eq(academicTerms.academicYearId, academicYearId), eq(academicTerms.isActive, true)))
+      .orderBy(academicTerms.startDate);
+  }
+
+  async getAcademicTermsByCompany(companyId: string): Promise<AcademicTerm[]> {
+    return await db.select().from(academicTerms)
+      .where(and(eq(academicTerms.companyId, companyId), eq(academicTerms.isActive, true)))
+      .orderBy(academicTerms.startDate);
+  }
+
+  async getAcademicTerm(id: string): Promise<AcademicTerm | undefined> {
+    const [term] = await db.select().from(academicTerms).where(eq(academicTerms.id, id));
+    return term;
+  }
+
+  async updateAcademicTerm(id: string, updates: Partial<InsertAcademicTerm>): Promise<AcademicTerm> {
+    const [term] = await db.update(academicTerms)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(academicTerms.id, id))
+      .returning();
+    return term;
+  }
+
+  async deleteAcademicTerm(id: string): Promise<void> {
+    await db.update(academicTerms)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(academicTerms.id, id));
+  }
+
+  // Classes
+  async createClass(classData: InsertClass): Promise<Class> {
+    const [newClass] = await db.insert(classes).values(classData).returning();
+    return newClass;
+  }
+
+  async getClassesByTerm(termId: string): Promise<Class[]> {
+    return await db.select().from(classes)
+      .where(and(eq(classes.termId, termId), eq(classes.isActive, true)))
+      .orderBy(classes.name);
+  }
+
+  async getClassesByCompany(companyId: string): Promise<Class[]> {
+    return await db.select().from(classes)
+      .where(and(eq(classes.companyId, companyId), eq(classes.isActive, true)))
+      .orderBy(classes.name);
+  }
+
+  async getClassesByTutor(tutorId: string): Promise<Class[]> {
+    return await db.select().from(classes)
+      .where(and(eq(classes.tutorId, tutorId), eq(classes.isActive, true)))
+      .orderBy(classes.name);
+  }
+
+  async getClass(id: string): Promise<Class | undefined> {
+    const [classItem] = await db.select().from(classes).where(eq(classes.id, id));
+    return classItem;
+  }
+
+  async updateClass(id: string, updates: Partial<InsertClass>): Promise<Class> {
+    const [classItem] = await db.update(classes)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(classes.id, id))
+      .returning();
+    return classItem;
+  }
+
+  async deleteClass(id: string): Promise<void> {
+    await db.update(classes)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(classes.id, id));
+  }
+
+  // Student Class Assignments
+  async assignStudentToClass(assignment: InsertStudentClassAssignment): Promise<StudentClassAssignment> {
+    const [newAssignment] = await db.insert(studentClassAssignments).values(assignment).returning();
+    return newAssignment;
+  }
+
+  async getStudentsByClass(classId: string): Promise<StudentClassAssignment[]> {
+    return await db.select().from(studentClassAssignments)
+      .where(and(eq(studentClassAssignments.classId, classId), eq(studentClassAssignments.isActive, true)))
+      .orderBy(studentClassAssignments.assignedDate);
+  }
+
+  async getClassesByStudent(studentId: string): Promise<StudentClassAssignment[]> {
+    return await db.select().from(studentClassAssignments)
+      .where(and(eq(studentClassAssignments.studentId, studentId), eq(studentClassAssignments.isActive, true)))
+      .orderBy(studentClassAssignments.assignedDate);
+  }
+
+  async removeStudentFromClass(studentId: string, classId: string): Promise<void> {
+    await db.update(studentClassAssignments)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(and(
+        eq(studentClassAssignments.studentId, studentId),
+        eq(studentClassAssignments.classId, classId)
+      ));
   }
 
 }

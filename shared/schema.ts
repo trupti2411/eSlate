@@ -348,6 +348,8 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
   createdAt: true,
 });
 
+// Academic management insert schemas will be added after table definitions
+
 export const insertTutoringCompanySchema = createInsertSchema(tutoringCompanies).omit({
   id: true,
   createdAt: true,
@@ -362,6 +364,149 @@ export const insertCompanyAdminSchema = createInsertSchema(companyAdmins).omit({
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
+
+// Academic Years table
+export const academicYears = pgTable("academic_years", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  yearNumber: integer("year_number").notNull(), // 1-12
+  name: varchar("name").notNull(), // e.g., "Year 7", "Grade 10"
+  description: varchar("description"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Academic Terms table
+export const academicTerms = pgTable("academic_terms", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  academicYearId: varchar("academic_year_id").notNull().references(() => academicYears.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(), // e.g., "Term 1", "Fall Semester"
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Classes table
+export const classes = pgTable("classes", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  termId: varchar("term_id").notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(), // e.g., "Mathematics A", "English Literature"
+  subject: varchar("subject").notNull(),
+  tutorId: varchar("tutor_id").references(() => tutors.id, { onDelete: "set null" }),
+  startTime: varchar("start_time").notNull(), // e.g., "09:00"
+  endTime: varchar("end_time").notNull(), // e.g., "10:30"
+  daysOfWeek: varchar("days_of_week").array().notNull(), // e.g., ["Monday", "Wednesday", "Friday"]
+  maxStudents: integer("max_students").default(20),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Student Class Assignments table
+export const studentClassAssignments = pgTable("student_class_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
+  assignedDate: timestamp("assigned_date").defaultNow(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Define relations
+export const academicYearsRelations = relations(academicYears, ({ one, many }) => ({
+  company: one(tutoringCompanies, {
+    fields: [academicYears.companyId],
+    references: [tutoringCompanies.id],
+  }),
+  terms: many(academicTerms),
+}));
+
+export const academicTermsRelations = relations(academicTerms, ({ one, many }) => ({
+  academicYear: one(academicYears, {
+    fields: [academicTerms.academicYearId],
+    references: [academicYears.id],
+  }),
+  company: one(tutoringCompanies, {
+    fields: [academicTerms.companyId],
+    references: [tutoringCompanies.id],
+  }),
+  classes: many(classes),
+}));
+
+export const classesRelations = relations(classes, ({ one, many }) => ({
+  term: one(academicTerms, {
+    fields: [classes.termId],
+    references: [academicTerms.id],
+  }),
+  company: one(tutoringCompanies, {
+    fields: [classes.companyId],
+    references: [tutoringCompanies.id],
+  }),
+  tutor: one(tutors, {
+    fields: [classes.tutorId],
+    references: [tutors.id],
+  }),
+  studentAssignments: many(studentClassAssignments),
+}));
+
+export const studentClassAssignmentsRelations = relations(studentClassAssignments, ({ one }) => ({
+  student: one(students, {
+    fields: [studentClassAssignments.studentId],
+    references: [students.id],
+  }),
+  class: one(classes, {
+    fields: [studentClassAssignments.classId],
+    references: [classes.id],
+  }),
+}));
+
+// Type exports
+export type AcademicYear = typeof academicYears.$inferSelect;
+export type InsertAcademicYear = typeof academicYears.$inferInsert;
+export type AcademicTerm = typeof academicTerms.$inferSelect;
+export type InsertAcademicTerm = typeof academicTerms.$inferInsert;
+export type Class = typeof classes.$inferSelect;
+export type InsertClass = typeof classes.$inferInsert;
+export type StudentClassAssignment = typeof studentClassAssignments.$inferSelect;
+export type InsertStudentClassAssignment = typeof studentClassAssignments.$inferInsert;
+
+// Academic management insert schemas
+export const insertAcademicYearSchema = createInsertSchema(academicYears).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAcademicTermSchema = createInsertSchema(academicTerms).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertClassSchema = createInsertSchema(classes).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertStudentClassAssignmentSchema = createInsertSchema(studentClassAssignments).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+// Insert types for academic management
+export type InsertAcademicYear = z.infer<typeof insertAcademicYearSchema>;
+export type InsertAcademicTerm = z.infer<typeof insertAcademicTermSchema>;
+export type InsertClass = z.infer<typeof insertClassSchema>;
+export type InsertStudentAssignment = z.infer<typeof insertStudentClassAssignmentSchema>;
+
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
 export type Student = typeof students.$inferSelect;
 export type InsertParent = z.infer<typeof insertParentSchema>;
