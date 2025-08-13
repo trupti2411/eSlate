@@ -1,0 +1,39 @@
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=7a_cVGPK_EW4' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+chunk-RPCDYKBN.js?v=d569c1d3:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: 
+{id: 'e2127a4d-816f-425a-b070-bfacbc47287c', email: 'nish1882@outlook.com', firstName: 'Nirav', lastName: 'Shah', profileImageUrl: null, …}
+CompanyAcademicManagement.tsx:34 Company admin query state: 
+{companyAdmin: undefined, companyAdminLoading: true, companyAdminError: null}
+CompanyAcademicManagement.tsx:42 Company query state: 
+{company: undefined, companyLoading: false, companyError: null}
+CompanyAcademicManagement.tsx:55 Loading state triggered: 
+{companyAdmin: undefined, companyAdminLoading: true, companyLoading: false}
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: 
+{id: 'e2127a4d-816f-425a-b070-bfacbc47287c', email: 'nish1882@outlook.com', firstName: 'Nirav', lastName: 'Shah', profileImageUrl: null, …}
+CompanyAcademicManagement.tsx:34 Company admin query state: 
+{companyAdmin: undefined, companyAdminLoading: false, companyAdminError: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON}
+CompanyAcademicManagement.tsx:42 Company query state: 
+{company: undefined, companyLoading: false, companyError: null}
+CompanyAcademicManagement.tsx:55 Loading state triggered: 
+{companyAdmin: undefined, companyAdminLoading: false, companyLoading: false}
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: 
+{id: 'e2127a4d-816f-425a-b070-bfacbc47287c', email: 'nish1882@outlook.com', firstName: 'Nirav', lastName: 'Shah', profileImageUrl: null, …}
+CompanyAcademicManagement.tsx:34 Company admin query state: 
+{companyAdmin: undefined, companyAdminLoading: true, companyAdminError: null}
+CompanyAcademicManagement.tsx:42 Company query state: 
+{company: undefined, companyLoading: false, companyError: null}
+CompanyAcademicManagement.tsx:55 Loading state triggered: 
+{companyAdmin: undefined, companyAdminLoading: true, companyLoading: false}
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: 
+{id: 'e2127a4d-816f-425a-b070-bfacbc47287c', email: 'nish1882@outlook.com', firstName: 'Nirav', lastName: 'Shah', profileImageUrl: null, …}
+CompanyAcademicManagement.tsx:34 Company admin query state: 
+{companyAdmin: undefined, companyAdminLoading: false, companyAdminError: SyntaxError: Unexpected token '<', "<!DOCTYPE "... is not valid JSON}
+CompanyAcademicManagement.tsx:42 Company query state: 
+{company: undefined, companyLoading: false, companyError: null}
+CompanyAcademicManagement.tsx:55 Loading state triggered: 
+{companyAdmin: undefined, companyAdminLoading: false, companyLoading: false}
+﻿
+

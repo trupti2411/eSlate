@@ -27,7 +27,7 @@ export default function CompanyAcademicManagement() {
 
   // Fetch company admin data
   const { data: companyAdmin, isLoading: companyAdminLoading, error: companyAdminError } = useQuery<CompanyAdmin>({
-    queryKey: [`/api/company-admin/${user?.id}`],
+    queryKey: [`/api/admin/company-admin/${user?.id}`],
     enabled: !!user?.id && user?.role === 'company_admin',
   });
   

@@ -39,7 +39,7 @@ export default function CompanyStudents() {
 
   // Fetch company admin data
   const { data: companyAdmin } = useQuery<CompanyAdmin>({
-    queryKey: [`/api/company-admin/${user?.id}`],
+    queryKey: [`/api/admin/company-admin/${user?.id}`],
     enabled: !!user?.id && user?.role === 'company_admin',
   });
 
