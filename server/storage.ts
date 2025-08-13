@@ -503,51 +503,57 @@ export class DatabaseStorage implements IStorage {
       throw new Error("User not found");
     }
 
-    // Delete role-specific records first (due to foreign key constraints)
-    if (user.role === 'student') {
-      const student = await this.getStudentByUserId(userId);
-      if (student) {
-        // Delete assignments, submissions, progress, and calendar events
-        await db.delete(assignments).where(eq(assignments.studentId, student.id));
-        await db.delete(submissions).where(eq(submissions.studentId, student.id));
-        await db.delete(progress).where(eq(progress.studentId, student.id));
-        await db.delete(calendarEvents).where(eq(calendarEvents.studentId, student.id));
-        // Delete student record
-        await db.delete(students).where(eq(students.id, student.id));
+    try {
+      // Step 1: Delete messages sent by or to this user (no foreign key dependencies)
+      await db.delete(messages).where(eq(messages.senderId, userId));
+      await db.delete(messages).where(eq(messages.receiverId, userId));
+
+      // Step 2: Handle role-specific records and their dependencies
+      if (user.role === 'student') {
+        const student = await this.getStudentByUserId(userId);
+        if (student) {
+          // Delete all records that reference this student
+          await db.delete(assignments).where(eq(assignments.studentId, student.id));
+          await db.delete(submissions).where(eq(submissions.studentId, student.id));
+          await db.delete(progress).where(eq(progress.studentId, student.id));
+          await db.delete(calendarEvents).where(eq(calendarEvents.studentId, student.id));
+          // Delete the student record itself
+          await db.delete(students).where(eq(students.id, student.id));
+        }
+      } else if (user.role === 'tutor') {
+        const tutor = await this.getTutorByUserId(userId);
+        if (tutor) {
+          // Update students to remove tutor assignment (set to null)
+          await db.update(students).set({ tutorId: null }).where(eq(students.tutorId, tutor.id));
+          // Delete assignments and calendar events created by this tutor
+          await db.delete(assignments).where(eq(assignments.tutorId, tutor.id));
+          await db.delete(calendarEvents).where(eq(calendarEvents.tutorId, tutor.id));
+          // Delete the tutor record itself
+          await db.delete(tutors).where(eq(tutors.id, tutor.id));
+        }
+      } else if (user.role === 'parent') {
+        const parent = await this.getParentByUserId(userId);
+        if (parent) {
+          // Update students to remove parent assignment (set to null)
+          await db.update(students).set({ parentId: null }).where(eq(students.parentId, parent.id));
+          // Delete the parent record itself
+          await db.delete(parents).where(eq(parents.id, parent.id));
+        }
+      } else if (user.role === 'company_admin') {
+        const companyAdmin = await this.getCompanyAdminByUserId(userId);
+        if (companyAdmin) {
+          // Delete the company admin record
+          await db.delete(companyAdmins).where(eq(companyAdmins.id, companyAdmin.id));
+        }
       }
-    } else if (user.role === 'tutor') {
-      const tutor = await this.getTutorByUserId(userId);
-      if (tutor) {
-        // Update students to remove tutor assignment
-        await db.update(students).set({ tutorId: null }).where(eq(students.tutorId, tutor.id));
-        // Delete assignments and calendar events created by this tutor
-        await db.delete(assignments).where(eq(assignments.tutorId, tutor.id));
-        await db.delete(calendarEvents).where(eq(calendarEvents.tutorId, tutor.id));
-        // Delete tutor record
-        await db.delete(tutors).where(eq(tutors.id, tutor.id));
-      }
-    } else if (user.role === 'parent') {
-      const parent = await this.getParentByUserId(userId);
-      if (parent) {
-        // Update students to remove parent assignment
-        await db.update(students).set({ parentId: null }).where(eq(students.parentId, parent.id));
-        // Delete parent record
-        await db.delete(parents).where(eq(parents.id, parent.id));
-      }
-    } else if (user.role === 'company_admin') {
-      const companyAdmin = await this.getCompanyAdminByUserId(userId);
-      if (companyAdmin) {
-        // Delete company admin record
-        await db.delete(companyAdmins).where(eq(companyAdmins.id, companyAdmin.id));
-      }
+
+      // Step 3: Delete the user record itself (this should be last)
+      await db.delete(users).where(eq(users.id, userId));
+      
+    } catch (error) {
+      console.error("Detailed error during user deletion:", error);
+      throw new Error(`Failed to delete user: ${error.message}`);
     }
-
-    // Delete messages sent by or to this user
-    await db.delete(messages).where(eq(messages.senderId, userId));
-    await db.delete(messages).where(eq(messages.receiverId, userId));
-
-    // Finally delete the user record
-    await db.delete(users).where(eq(users.id, userId));
   }
 
   // User status operations
