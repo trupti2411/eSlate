@@ -106,10 +106,11 @@ export interface IStorage {
 
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
+  getDeletedUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
   createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User>;
   updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
-  deleteUser(id: string): Promise<void>;
+  deleteUser(id: string, deletedBy: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -458,7 +459,11 @@ export class DatabaseStorage implements IStorage {
 
   // Admin user management methods
   async getAllUsers(): Promise<User[]> {
-    return await db.select().from(users).orderBy(desc(users.createdAt));
+    return await db.select().from(users).where(eq(users.isDeleted, false)).orderBy(desc(users.createdAt));
+  }
+
+  async getDeletedUsers(): Promise<User[]> {
+    return await db.select().from(users).where(eq(users.isDeleted, true)).orderBy(desc(users.deletedAt));
   }
 
   async getUsersByRole(role: string): Promise<User[]> {
@@ -496,19 +501,15 @@ export class DatabaseStorage implements IStorage {
       .where(eq(tutoringCompanies.id, companyId));
   }
 
-  // Delete user and all related records
-  async deleteUser(userId: string): Promise<void> {
+  // Soft delete user and clean up related records
+  async deleteUser(userId: string, deletedBy: string): Promise<void> {
     const user = await this.getUser(userId);
     if (!user) {
       throw new Error("User not found");
     }
 
     try {
-      // Step 1: Delete messages sent by or to this user (no foreign key dependencies)
-      await db.delete(messages).where(eq(messages.senderId, userId));
-      await db.delete(messages).where(eq(messages.receiverId, userId));
-
-      // Step 2: Handle role-specific records and their dependencies
+      // Step 1: Clean up role-specific records and their dependencies
       if (user.role === 'student') {
         const student = await this.getStudentByUserId(userId);
         if (student) {
@@ -547,12 +548,27 @@ export class DatabaseStorage implements IStorage {
         }
       }
 
-      // Step 3: Delete the user record itself (this should be last)
-      await db.delete(users).where(eq(users.id, userId));
+      // Step 2: Delete messages sent by or to this user
+      await db.delete(messages).where(eq(messages.senderId, userId));
+      await db.delete(messages).where(eq(messages.receiverId, userId));
+
+      // Step 3: Mark user as deleted (soft delete)
+      await db
+        .update(users)
+        .set({
+          isDeleted: true,
+          deletedAt: new Date(),
+          deletedBy: deletedBy,
+          isActive: false,
+          email: `deleted_${userId}@deleted.com`, // Change email to avoid conflicts
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, userId));
       
     } catch (error) {
       console.error("Detailed error during user deletion:", error);
-      throw new Error(`Failed to delete user: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to delete user: ${errorMessage}`);
     }
   }
 

@@ -20,6 +20,9 @@ interface User {
   lastName: string;
   role: string;
   isActive: boolean;
+  isDeleted?: boolean;
+  deletedAt?: string;
+  deletedBy?: string;
   createdAt: string;
 }
 
@@ -42,6 +45,11 @@ export default function UsersManagement() {
   // Fetch all users
   const { data: users = [], isLoading: usersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  // Fetch deleted users
+  const { data: deletedUsers = [], isLoading: deletedUsersLoading } = useQuery<User[]>({
+    queryKey: ["/api/admin/deleted-users"],
   });
 
   // Filter users by role
@@ -355,21 +363,54 @@ export default function UsersManagement() {
             <CardHeader>
               <CardTitle className="text-red-700 flex items-center">
                 <Trash2 className="w-5 h-5 mr-2" />
-                Recently Deleted Users
+                Recently Deleted Users ({deletedUsers.length})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-4">
-                Users deleted by master admins are permanently removed from the system along with all their associated data.
+                Users deleted by master admins. All their associated data has been permanently removed.
               </p>
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <div className="flex items-center text-red-700">
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  <span className="text-sm font-medium">
-                    Deleted users cannot be recovered. All assignments, submissions, progress, and messages are permanently removed.
-                  </span>
+              
+              {deletedUsersLoading ? (
+                <p className="text-sm text-gray-500">Loading deleted users...</p>
+              ) : deletedUsers.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {deletedUsers.map((user) => (
+                    <Card key={user.id} className="border border-red-200 bg-red-50">
+                      <CardContent className="p-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-red-800">
+                                {user.firstName} {user.lastName}
+                              </h4>
+                              <p className="text-xs text-red-600 capitalize">
+                                {user.role.replace('_', ' ')}
+                              </p>
+                            </div>
+                            <Badge variant="destructive">Deleted</Badge>
+                          </div>
+                          
+                          <div className="pt-2 border-t border-red-200">
+                            <p className="text-xs text-red-600">
+                              Deleted: {user.deletedAt ? new Date(user.deletedAt).toLocaleDateString() : 'Unknown'}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
-              </div>
+              ) : (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-center text-red-700">
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    <span className="text-sm font-medium">
+                      No users have been deleted recently.
+                    </span>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

@@ -615,6 +615,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Admin routes for user management
+  // Get deleted users
+  app.get('/api/admin/deleted-users', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const deletedUsers = await storage.getDeletedUsers();
+      res.json(deletedUsers);
+    } catch (error) {
+      console.error("Error fetching deleted users:", error);
+      res.status(500).json({ message: "Failed to fetch deleted users" });
+    }
+  });
+
   app.get('/api/admin/users', isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
@@ -883,7 +901,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Delete user and all related records
-      await storage.deleteUser(targetUserId);
+      await storage.deleteUser(targetUserId, userId);
       
       res.json({ success: true, message: "User deleted successfully" });
     } catch (error) {
