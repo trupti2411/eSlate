@@ -77,6 +77,19 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
 
+  // Function to handle year selection - switches to terms tab and filters by year
+  const handleYearClick = (yearId: string, yearName: string) => {
+    setSelectedYearId(yearId);
+    setSelectedTermId(null); // Reset term selection
+    setActiveTab('terms');
+  };
+
+  // Function to handle term selection - switches to classes tab and filters by term
+  const handleTermClick = (termId: string, termName: string) => {
+    setSelectedTermId(termId);
+    setActiveTab('classes');
+  };
+
   // Debug log
   console.log('AcademicManagement component loaded with:', { companyId, companyName });
 
@@ -86,15 +99,27 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     enabled: !!companyId,
   });
 
-  // Fetch academic terms
+  // Fetch academic terms (with optional year filter)
   const { data: academicTerms = [], isLoading: termsLoading } = useQuery({
-    queryKey: [`/api/companies/${companyId}/academic-terms`],
+    queryKey: [`/api/companies/${companyId}/academic-terms`, selectedYearId],
+    queryFn: () => {
+      const url = selectedYearId 
+        ? `/api/companies/${companyId}/academic-terms?yearId=${selectedYearId}`
+        : `/api/companies/${companyId}/academic-terms`;
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!companyId && activeTab === 'terms',
   });
 
-  // Fetch classes
+  // Fetch classes (with optional term filter)
   const { data: classes = [], isLoading: classesLoading } = useQuery({
-    queryKey: [`/api/companies/${companyId}/classes`],
+    queryKey: [`/api/companies/${companyId}/classes`, selectedTermId],
+    queryFn: () => {
+      const url = selectedTermId 
+        ? `/api/companies/${companyId}/classes?termId=${selectedTermId}`
+        : `/api/companies/${companyId}/classes`;
+      return fetch(url).then(res => res.json());
+    },
     enabled: !!companyId && activeTab === 'classes',
   });
 
@@ -210,13 +235,17 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                   <Card key={year.id} className="border-2 border-blue-100 dark:border-blue-900">
                     <CardHeader className="bg-blue-50 dark:bg-blue-950">
                       <div className="flex items-center justify-between">
-                        <div>
+                        <div 
+                          className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 p-2 rounded-md transition-colors"
+                          onClick={() => handleYearClick(year.id, year.name)}
+                          title="Click to view terms for this year"
+                        >
                           <CardTitle className="text-xl text-blue-900 dark:text-blue-100 flex items-center">
                             <Calendar className="w-5 h-5 mr-2" />
                             {year.name}
                           </CardTitle>
                           <CardDescription className="text-blue-700 dark:text-blue-200">
-                            Year {year.yearNumber} • {year.terms?.length || 0} Terms
+                            Year {year.yearNumber} • {year.terms?.length || 0} Terms • Click to view terms
                           </CardDescription>
                         </div>
                         <Badge variant={year.isActive ? "default" : "secondary"}>
@@ -231,7 +260,11 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                             <Card key={term.id} className="border border-gray-200 dark:border-gray-700">
                               <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
-                                  <div>
+                                  <div 
+                                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors flex-1"
+                                    onClick={() => handleTermClick(term.id, term.name)}
+                                    title="Click to view classes for this term"
+                                  >
                                     <CardTitle className="text-lg text-gray-900 dark:text-white flex items-center">
                                       <Clock className="w-4 h-4 mr-2" />
                                       {term.name}
@@ -239,7 +272,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                     <CardDescription>
                                       {term.startDate && term.endDate ? (
                                         `${format(new Date(term.startDate), 'MMM dd, yyyy')} - ${format(new Date(term.endDate), 'MMM dd, yyyy')}`
-                                      ) : 'Dates not set'} • {term.classes?.length || 0} Classes
+                                      ) : 'Dates not set'} • {term.classes?.length || 0} Classes • Click to view classes
                                     </CardDescription>
                                   </div>
                                   <Badge variant={term.isActive ? "default" : "secondary"}>
@@ -268,7 +301,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                               </div>
                                               {cls.daysOfWeek && cls.daysOfWeek.length > 0 && (
                                                 <div className="flex flex-wrap gap-1 mt-2">
-                                                  {cls.daysOfWeek.map((day) => (
+                                                  {cls.daysOfWeek.map((day: string) => (
                                                     <Badge key={day} variant="outline" className="text-xs px-1 py-0">
                                                       {day.slice(0, 3)}
                                                     </Badge>
@@ -382,7 +415,19 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       {activeTab === 'terms' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Academic Terms</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Academic Terms</h2>
+              {selectedYearId && (
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Filtered by academic year • <button 
+                    onClick={() => setSelectedYearId(null)}
+                    className="text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Show all terms
+                  </button>
+                </p>
+              )}
+            </div>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white">
               <Plus className="w-4 h-4 mr-2" />
               Add Term
@@ -399,12 +444,16 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 <Card key={term.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
-                      <div>
+                      <div 
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors flex-1"
+                        onClick={() => handleTermClick(term.id, term.name)}
+                        title="Click to view classes for this term"
+                      >
                         <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
                           {term.name}
                         </CardTitle>
                         <CardDescription>
-                          Term {term.termNumber}
+                          Term {term.termNumber} • Click to view classes
                         </CardDescription>
                       </div>
                       <DropdownMenu>
@@ -450,7 +499,19 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       {activeTab === 'classes' && (
         <div className="space-y-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Classes</h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Classes</h2>
+              {selectedTermId && (
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  Filtered by academic term • <button 
+                    onClick={() => setSelectedTermId(null)}
+                    className="text-blue-600 hover:text-blue-700 underline"
+                  >
+                    Show all classes
+                  </button>
+                </p>
+              )}
+            </div>
             <Button className="bg-blue-600 hover:bg-blue-700 text-white">
               <Plus className="w-4 h-4 mr-2" />
               Add Class
