@@ -1074,9 +1074,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create sample data if none exists
       if (academicYears.length === 0) {
         const sampleYears = [
-          { companyId, year: 1, name: "Year 1", description: "Foundation Year", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') },
-          { companyId, year: 2, name: "Year 2", description: "Building Skills", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') },
-          { companyId, year: 3, name: "Year 3", description: "Advanced Learning", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') }
+          { companyId, yearNumber: 1, name: "Year 1", description: "Foundation Year", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') },
+          { companyId, yearNumber: 2, name: "Year 2", description: "Building Skills", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') },
+          { companyId, yearNumber: 3, name: "Year 3", description: "Advanced Learning", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') }
         ];
         
         for (const yearData of sampleYears) {
@@ -1261,7 +1261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const sampleClasses = [
             { 
               companyId, 
-              academicTermId: academicTerms[0].id, 
+              termId: academicTerms[0].id, 
               name: "Mathematics 101", 
               subject: "Mathematics",
               description: "Basic mathematics for beginners",
@@ -1272,7 +1272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             },
             { 
               companyId, 
-              academicTermId: academicTerms[0].id, 
+              termId: academicTerms[0].id, 
               name: "English Literature", 
               subject: "English",
               description: "Introduction to classic literature",
@@ -1283,7 +1283,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             },
             { 
               companyId, 
-              academicTermId: academicTerms[0].id, 
+              termId: academicTerms[0].id, 
               name: "Science Lab", 
               subject: "Science",
               description: "Hands-on science experiments",
