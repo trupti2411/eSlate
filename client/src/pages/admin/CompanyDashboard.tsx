@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus, Eye, Mail, Phone, MapPin } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
@@ -37,9 +37,27 @@ interface CompanyTutor {
   qualifications: string;
   isVerified: boolean;
   user?: {
+    id: string;
     email: string;
     firstName: string;
     lastName: string;
+    isActive: boolean;
+  };
+}
+
+interface CompanyStudent {
+  id: string;
+  userId: string;
+  gradeLevel: string | null;
+  parentId: string | null;
+  tutorId: string | null;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isActive: boolean;
+    createdAt: string;
   };
 }
 
@@ -109,6 +127,12 @@ export default function CompanyDashboard() {
   // Fetch unassigned tutors for assignment
   const { data: unassignedTutors } = useQuery<CompanyTutor[]>({
     queryKey: ["/api/admin/unassigned-tutors"],
+    enabled: !!companyAdmin?.companyId,
+  });
+
+  // Fetch company students
+  const { data: companyStudents = [], isLoading: studentsLoading } = useQuery<CompanyStudent[]>({
+    queryKey: ["/api/companies", companyAdmin?.companyId, "students"],
     enabled: !!companyAdmin?.companyId,
   });
 
@@ -353,13 +377,64 @@ export default function CompanyDashboard() {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Building2 className="w-5 h-5" />
-              <span>Company Overview</span>
+              <span>Company Details</span>
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <p><strong>Description:</strong> {company.description}</p>
-            <p><strong>Contact:</strong> {company.contactEmail} | {company.contactPhone}</p>
-            <p><strong>Address:</strong> {company.address}</p>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <div className="flex items-start space-x-2">
+                  <Building2 className="w-4 h-4 mt-1 text-gray-500" />
+                  <div>
+                    <p className="text-sm text-gray-600">Company Name</p>
+                    <p className="font-semibold">{company.name}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-2">
+                  <Mail className="w-4 h-4 mt-1 text-gray-500" />
+                  <div>
+                    <p className="text-sm text-gray-600">Contact Email</p>
+                    <p className="font-semibold">{company.contactEmail}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-2">
+                  <Phone className="w-4 h-4 mt-1 text-gray-500" />
+                  <div>
+                    <p className="text-sm text-gray-600">Contact Phone</p>
+                    <p className="font-semibold">{company.contactPhone || 'Not provided'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <div className="flex items-start space-x-2">
+                  <MapPin className="w-4 h-4 mt-1 text-gray-500" />
+                  <div>
+                    <p className="text-sm text-gray-600">Address</p>
+                    <p className="font-semibold">{company.address || 'Not provided'}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-2">
+                  <CheckCircle className="w-4 h-4 mt-1 text-gray-500" />
+                  <div>
+                    <p className="text-sm text-gray-600">Status</p>
+                    <Badge variant={company.isActive ? "default" : "destructive"}>
+                      {company.isActive ? "Active" : "Inactive"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            {company.description && (
+              <div className="mt-4 pt-4 border-t">
+                <p className="text-sm text-gray-600">Description</p>
+                <p className="mt-1">{company.description}</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -451,6 +526,92 @@ export default function CompanyDashboard() {
                   <Plus className="w-4 h-4 mr-2" />
                   Add First Tutor
                 </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Students Section */}
+        <Card className="eink-card mt-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <GraduationCap className="w-5 h-5" />
+              <span>Company Students ({companyStudents.length})</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {studentsLoading ? (
+              <p>Loading students...</p>
+            ) : companyStudents.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-50">
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Name</th>
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Email</th>
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Grade Level</th>
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Status</th>
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Joined</th>
+                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {companyStudents.map((student) => (
+                      <tr key={student.id} className="hover:bg-gray-50">
+                        <td className="border border-gray-300 px-4 py-2">
+                          <div className="font-medium">
+                            {student.user.firstName} {student.user.lastName}
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <div className="text-sm text-gray-600">
+                            {student.user.email}
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <div className="text-sm">
+                            {student.gradeLevel || 'Not set'}
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <Badge 
+                            variant={student.user.isActive ? "default" : "destructive"}
+                            className="text-xs"
+                          >
+                            {student.user.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <div className="text-sm text-gray-600">
+                            {new Date(student.user.createdAt).toLocaleDateString()}
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-4 py-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              // TODO: Implement student profile view
+                              toast({
+                                title: "Student Profile",
+                                description: `Viewing profile for ${student.user.firstName} ${student.user.lastName}`,
+                              });
+                            }}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View Profile
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8">
+                <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-600 mb-2">No Students Yet</h3>
+                <p className="text-gray-500">Students will appear here once they are assigned to your company's tutors.</p>
               </div>
             )}
           </CardContent>

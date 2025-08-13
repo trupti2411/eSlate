@@ -418,6 +418,37 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
+  async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
+    try {
+      // Get all students assigned to tutors in this company
+      const companyStudents = await db.select({
+        id: students.id,
+        userId: students.userId,
+        gradeLevel: students.gradeLevel,
+        parentId: students.parentId,
+        tutorId: students.tutorId,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          isActive: users.isActive,
+          createdAt: users.createdAt
+        }
+      })
+      .from(students)
+      .innerJoin(users, eq(students.userId, users.id))
+      .innerJoin(tutors, eq(students.tutorId, tutors.id))
+      .where(and(eq(tutors.companyId, companyId), eq(users.isDeleted, false)))
+      .orderBy(users.firstName, users.lastName);
+
+      return companyStudents;
+    } catch (error) {
+      console.error("Error fetching company students:", error);
+      return [];
+    }
+  }
+
   async createTutoringCompany(companyData: InsertTutoringCompany): Promise<TutoringCompany> {
     const [company] = await db.insert(tutoringCompanies).values(companyData).returning();
     return company;

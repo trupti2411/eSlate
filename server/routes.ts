@@ -600,15 +600,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Company admin specific route
   app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: any, res) => {
     try {
-      const requestingUserId = req.user.claims.sub;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
       const targetUserId = req.params.userId;
       
-      // Only allow users to fetch their own company admin data or system admins
-      if (requestingUserId !== targetUserId) {
-        const requestingUser = await storage.getUser(requestingUserId);
-        if (!requestingUser || requestingUser.role !== 'admin') {
-          return res.status(403).json({ message: "Access denied" });
-        }
+      // Get requesting user (try by Replit ID first, then by email)
+      let requestingUser = await storage.getUser(requestingReplitId);
+      if (!requestingUser && requestingEmail) {
+        requestingUser = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!requestingUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Allow users to fetch their own company admin data or system admins
+      if (requestingUser.id !== targetUserId && requestingUser.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       const companyAdmin = await storage.getCompanyAdminByUserId(targetUserId);
@@ -620,6 +628,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching company admin:", error);
       res.status(500).json({ message: "Failed to fetch company admin data" });
+    }
+  });
+
+  // Get company students 
+  app.get('/api/companies/:id/students', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      const companyId = req.params.id;
+      
+      // Get requesting user
+      let requestingUser = await storage.getUser(requestingReplitId);
+      if (!requestingUser && requestingEmail) {
+        requestingUser = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!requestingUser) {
+        return res.status(401).json({ message: "User not found" });
+      }
+      
+      // Check if user has access to this company
+      if (requestingUser.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(requestingUser.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (requestingUser.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const students = await storage.getCompanyStudentsByCompanyId(companyId);
+      res.json(students);
+    } catch (error) {
+      console.error("Error fetching company students:", error);
+      res.status(500).json({ message: "Failed to fetch company students" });
     }
   });
 
