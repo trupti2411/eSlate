@@ -147,9 +147,18 @@ export default function CompanyManagement() {
       setNewUserData({ email: "", firstName: "", lastName: "", role: "" });
     },
     onError: (error: Error) => {
+      let errorMessage = "Failed to create user";
+      if (error.message.includes("email already exists")) {
+        errorMessage = "A user with this email address already exists. Please use a different email.";
+      } else if (error.message.includes("duplicate key")) {
+        errorMessage = "This email address is already registered. Please use a different email.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "Failed to create user",
+        description: errorMessage,
         variant: "destructive",
       });
     },
@@ -160,11 +169,23 @@ export default function CompanyManagement() {
     if (!newUserData.email || !newUserData.firstName || !newUserData.role) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (Email, First Name, and Role are required)",
         variant: "destructive",
       });
       return;
     }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(newUserData.email)) {
+      toast({
+        title: "Error",
+        description: "Please enter a valid email address",
+        variant: "destructive",
+      });
+      return;
+    }
+
     createUserMutation.mutate(newUserData);
   };
 

@@ -757,6 +757,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Check if email already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "A user with this email already exists" });
+      }
+
       const userData = {
         email,
         firstName: firstName || '',
