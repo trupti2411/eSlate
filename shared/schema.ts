@@ -26,7 +26,7 @@ export const sessions = pgTable(
 );
 
 // Enums for user roles and status
-export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', 'admin']);
+export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', 'admin', 'company_admin']);
 export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
 
@@ -61,10 +61,33 @@ export const parents = pgTable("parents", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Tutoring Companies table
+export const tutoringCompanies = pgTable("tutoring_companies", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  contactEmail: varchar("contact_email"),
+  contactPhone: varchar("contact_phone"),
+  address: text("address"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Company Admins table
+export const companyAdmins = pgTable("company_admins", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
+  permissions: text("permissions").array(), // Array of permission strings
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Tutors table
 export const tutors = pgTable("tutors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
+  companyId: varchar("company_id").references(() => tutoringCompanies.id), // Associate tutor with company
   specialization: text("specialization"),
   qualifications: text("qualifications"),
   isVerified: boolean("is_verified").notNull().default(false),
@@ -180,10 +203,30 @@ export const parentsRelations = relations(parents, ({ one, many }) => ({
   students: many(students),
 }));
 
+export const tutoringCompaniesRelations = relations(tutoringCompanies, ({ many }) => ({
+  admins: many(companyAdmins),
+  tutors: many(tutors),
+}));
+
+export const companyAdminsRelations = relations(companyAdmins, ({ one }) => ({
+  user: one(users, {
+    fields: [companyAdmins.userId],
+    references: [users.id],
+  }),
+  company: one(tutoringCompanies, {
+    fields: [companyAdmins.companyId],
+    references: [tutoringCompanies.id],
+  }),
+}));
+
 export const tutorsRelations = relations(tutors, ({ one, many }) => ({
   user: one(users, {
     fields: [tutors.userId],
     references: [users.id],
+  }),
+  company: one(tutoringCompanies, {
+    fields: [tutors.companyId],
+    references: [tutoringCompanies.id],
   }),
   students: many(students),
   assignments: many(assignments),
@@ -302,6 +345,17 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
   createdAt: true,
 });
 
+export const insertTutoringCompanySchema = createInsertSchema(tutoringCompanies).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertCompanyAdminSchema = createInsertSchema(companyAdmins).omit({
+  id: true,
+  createdAt: true,
+});
+
 // Types
 export type UpsertUser = typeof users.$inferInsert;
 export type User = typeof users.$inferSelect;
@@ -321,3 +375,7 @@ export type InsertProgress = z.infer<typeof insertProgressSchema>;
 export type Progress = typeof progress.$inferSelect;
 export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
+export type InsertTutoringCompany = z.infer<typeof insertTutoringCompanySchema>;
+export type TutoringCompany = typeof tutoringCompanies.$inferSelect;
+export type InsertCompanyAdmin = z.infer<typeof insertCompanyAdminSchema>;
+export type CompanyAdmin = typeof companyAdmins.$inferSelect;

@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, BookOpen, Settings, BarChart3, UserPlus, Shield } from "lucide-react";
+import { Users, BookOpen, Settings, BarChart3, UserPlus, Shield, Building2 } from "lucide-react";
 
 export default function AdminDashboard() {
   const { toast } = useToast();
@@ -50,6 +50,12 @@ export default function AdminDashboard() {
               <Button className="eink-button">
                 <UserPlus className="h-4 w-4 mr-2" />
                 Manage Users
+              </Button>
+            </Link>
+            <Link href="/admin/companies">
+              <Button className="eink-button">
+                <Building2 className="h-4 w-4 mr-2" />
+                Companies
               </Button>
             </Link>
             <Button className="eink-button">

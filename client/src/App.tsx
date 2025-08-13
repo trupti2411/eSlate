@@ -11,6 +11,8 @@ import TutorDashboard from "@/pages/tutor/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
 import TestUserCreation from "@/pages/admin/TestUserCreation";
+import Companies from "@/pages/admin/Companies";
+import CompanyDashboard from "@/pages/admin/CompanyDashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -38,13 +40,16 @@ function Router() {
             {user?.role === 'parent' && <ParentDashboard />}
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
+            {user?.role === 'company_admin' && <CompanyDashboard />}
           </Route>
           <Route path="/student" component={StudentDashboard} />
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={UserManagement} />
+          <Route path="/admin/companies" component={Companies} />
           <Route path="/admin/test" component={TestUserCreation} />
+          <Route path="/company" component={CompanyDashboard} />
         </>
       )}
       <Route component={NotFound} />

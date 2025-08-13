@@ -39,7 +39,8 @@ The client-side application is built using React with TypeScript, leveraging a c
 **Primary Database**: PostgreSQL with Drizzle ORM for type-safe database operations and schema management.
 
 **Database Schema**: Comprehensive relational model supporting:
-- User management with role-based access (student, parent, tutor, admin)
+- User management with role-based access (student, parent, tutor, company_admin, admin)
+- Tutoring company management with company-specific admin roles
 - Assignment and submission tracking with status management
 - Real-time messaging system with read receipts
 - Progress tracking with completion percentages and time spent
@@ -53,11 +54,12 @@ The client-side application is built using React with TypeScript, leveraging a c
 
 **Session Management**: Server-side sessions stored in PostgreSQL with configurable TTL and security settings.
 
-**Role-Based Access**: Four distinct user roles with different permissions and dashboard experiences:
+**Role-Based Access**: Five distinct user roles with different permissions and dashboard experiences:
 - Students: Access assignments, track progress, communicate with tutors
 - Parents: Monitor children's progress, verify completed work
 - Tutors: Manage students, create assignments, track class progress
-- Admins: System administration and user management
+- Company Admins: Manage tutoring company staff and operations
+- System Admins: Full system administration and user management
 
 **Security Features**: HTTPS enforcement, secure cookie settings, and CSRF protection through session-based authentication.
 

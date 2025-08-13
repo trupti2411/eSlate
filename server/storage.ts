@@ -3,6 +3,8 @@ import {
   students,
   parents,
   tutors,
+  tutoringCompanies,
+  companyAdmins,
   assignments,
   submissions,
   messages,
@@ -16,6 +18,10 @@ import {
   type InsertParent,
   type Tutor,
   type InsertTutor,
+  type TutoringCompany,
+  type InsertTutoringCompany,
+  type CompanyAdmin,
+  type InsertCompanyAdmin,
   type Assignment,
   type InsertAssignment,
   type Submission,
@@ -85,6 +91,18 @@ export interface IStorage {
   getCalendarEventsByTutor(tutorId: string): Promise<CalendarEvent[]>;
   getCalendarEventsByStudent(studentId: string): Promise<CalendarEvent[]>;
   
+  // Company operations
+  getTutoringCompany(id: string): Promise<TutoringCompany | undefined>;
+  createTutoringCompany(company: InsertTutoringCompany): Promise<TutoringCompany>;
+  getAllTutoringCompanies(): Promise<TutoringCompany[]>;
+  updateTutoringCompany(id: string, updates: Partial<InsertTutoringCompany>): Promise<TutoringCompany>;
+  
+  // Company Admin operations
+  getCompanyAdmin(id: string): Promise<CompanyAdmin | undefined>;
+  getCompanyAdminByUserId(userId: string): Promise<CompanyAdmin | undefined>;
+  createCompanyAdmin(admin: InsertCompanyAdmin): Promise<CompanyAdmin>;
+  getTutorsByCompany(companyId: string): Promise<Tutor[]>;
+
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
@@ -319,6 +337,51 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(calendarEvents)
       .where(eq(calendarEvents.studentId, studentId))
       .orderBy(calendarEvents.startTime);
+  }
+
+  // Company operations
+  async getTutoringCompany(id: string): Promise<TutoringCompany | undefined> {
+    const [company] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, id));
+    return company;
+  }
+
+  async createTutoringCompany(companyData: InsertTutoringCompany): Promise<TutoringCompany> {
+    const [company] = await db.insert(tutoringCompanies).values(companyData).returning();
+    return company;
+  }
+
+  async getAllTutoringCompanies(): Promise<TutoringCompany[]> {
+    return await db.select().from(tutoringCompanies)
+      .where(eq(tutoringCompanies.isActive, true))
+      .orderBy(tutoringCompanies.name);
+  }
+
+  async updateTutoringCompany(id: string, updates: Partial<InsertTutoringCompany>): Promise<TutoringCompany> {
+    const [company] = await db.update(tutoringCompanies)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(tutoringCompanies.id, id))
+      .returning();
+    return company;
+  }
+
+  // Company Admin operations
+  async getCompanyAdmin(id: string): Promise<CompanyAdmin | undefined> {
+    const [admin] = await db.select().from(companyAdmins).where(eq(companyAdmins.id, id));
+    return admin;
+  }
+
+  async getCompanyAdminByUserId(userId: string): Promise<CompanyAdmin | undefined> {
+    const [admin] = await db.select().from(companyAdmins).where(eq(companyAdmins.userId, userId));
+    return admin;
+  }
+
+  async createCompanyAdmin(adminData: InsertCompanyAdmin): Promise<CompanyAdmin> {
+    const [admin] = await db.insert(companyAdmins).values(adminData).returning();
+    return admin;
+  }
+
+  async getTutorsByCompany(companyId: string): Promise<Tutor[]> {
+    return await db.select().from(tutors).where(eq(tutors.companyId, companyId));
   }
 
   // Admin user management methods

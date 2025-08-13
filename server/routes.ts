@@ -315,6 +315,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Company management routes
+  app.get('/api/companies', isAuthenticated, async (req: any, res) => {
+    try {
+      const companies = await storage.getAllTutoringCompanies();
+      res.json(companies);
+    } catch (error) {
+      console.error("Error fetching companies:", error);
+      res.status(500).json({ message: "Failed to fetch companies" });
+    }
+  });
+
+  app.post('/api/companies', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const companyData = {
+        name: req.body.name,
+        description: req.body.description,
+        contactEmail: req.body.contactEmail,
+        contactPhone: req.body.contactPhone,
+        address: req.body.address,
+      };
+
+      const newCompany = await storage.createTutoringCompany(companyData);
+      res.json(newCompany);
+    } catch (error) {
+      console.error("Error creating company:", error);
+      res.status(500).json({ message: "Failed to create company", error: (error as Error).message });
+    }
+  });
+
+  app.get('/api/companies/:id/tutors', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const companyId = req.params.id;
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      // Check if user is company admin for this company or system admin
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const tutors = await storage.getTutorsByCompany(companyId);
+      res.json(tutors);
+    } catch (error) {
+      console.error("Error fetching company tutors:", error);
+      res.status(500).json({ message: "Failed to fetch tutors" });
+    }
+  });
+
+  // Company admin specific route
+  app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: any, res) => {
+    try {
+      const requestingUserId = req.user.claims.sub;
+      const targetUserId = req.params.userId;
+      
+      // Only allow users to fetch their own company admin data or system admins
+      if (requestingUserId !== targetUserId) {
+        const requestingUser = await storage.getUser(requestingUserId);
+        if (!requestingUser || requestingUser.role !== 'admin') {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const companyAdmin = await storage.getCompanyAdminByUserId(targetUserId);
+      if (!companyAdmin) {
+        return res.status(404).json({ message: "Company admin profile not found" });
+      }
+
+      res.json(companyAdmin);
+    } catch (error) {
+      console.error("Error fetching company admin:", error);
+      res.status(500).json({ message: "Failed to fetch company admin data" });
+    }
+  });
+
   // Admin routes for user management
   app.get('/api/admin/users', isAuthenticated, async (req: any, res) => {
     try {
@@ -413,9 +503,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log("Creating tutor profile");
         await storage.createTutor({
           userId: newUser.id,
+          companyId: req.body.companyId || null,
           specialization: req.body.specialization || null,
           qualifications: req.body.qualifications || null,
           isVerified: false,
+        });
+      } else if (req.body.role === 'company_admin') {
+        console.log("Creating company admin profile");
+        await storage.createCompanyAdmin({
+          userId: newUser.id,
+          companyId: req.body.companyId,
+          permissions: req.body.permissions || ['manage_tutors', 'view_reports'],
         });
       }
 
