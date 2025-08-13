@@ -1042,6 +1042,311 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // Academic Management Routes
+  
+  // Get academic years for a company
+  app.get('/api/companies/:companyId/academic-years', isAuthenticated, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      let academicYears = await storage.getAcademicYearsByCompany(companyId);
+      
+      // Create sample data if none exists
+      if (academicYears.length === 0) {
+        const sampleYears = [
+          { companyId, year: 1, name: "Year 1", description: "Foundation Year", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') },
+          { companyId, year: 2, name: "Year 2", description: "Building Skills", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') },
+          { companyId, year: 3, name: "Year 3", description: "Advanced Learning", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') }
+        ];
+        
+        for (const yearData of sampleYears) {
+          await storage.createAcademicYear(yearData);
+        }
+        
+        academicYears = await storage.getAcademicYearsByCompany(companyId);
+      }
+      
+      res.json(academicYears);
+    } catch (error) {
+      console.error("Error fetching academic years:", error);
+      res.status(500).json({ message: "Failed to fetch academic years" });
+    }
+  });
+
+  // Create academic year
+  app.post('/api/companies/:companyId/academic-years', isAuthenticated, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const academicYearData = {
+        ...req.body,
+        companyId
+      };
+
+      const academicYear = await storage.createAcademicYear(academicYearData);
+      res.json(academicYear);
+    } catch (error) {
+      console.error("Error creating academic year:", error);
+      res.status(500).json({ message: "Failed to create academic year" });
+    }
+  });
+
+  // Get academic terms
+  app.get('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const { yearId } = req.query;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      let academicTerms = yearId 
+        ? await storage.getAcademicTermsByYear(yearId as string)
+        : await storage.getAcademicTermsByCompany(companyId);
+        
+      // Create sample data if none exists
+      if (academicTerms.length === 0 && !yearId) {
+        const academicYears = await storage.getAcademicYearsByCompany(companyId);
+        if (academicYears.length > 0) {
+          const sampleTerms = [
+            { companyId, academicYearId: academicYears[0].id, name: "Autumn Term", startDate: new Date('2024-09-01'), endDate: new Date('2024-12-20') },
+            { companyId, academicYearId: academicYears[0].id, name: "Spring Term", startDate: new Date('2025-01-07'), endDate: new Date('2025-04-04') },
+            { companyId, academicYearId: academicYears[0].id, name: "Summer Term", startDate: new Date('2025-04-21'), endDate: new Date('2025-06-30') }
+          ];
+          
+          for (const termData of sampleTerms) {
+            await storage.createAcademicTerm(termData);
+          }
+          
+          academicTerms = await storage.getAcademicTermsByCompany(companyId);
+        }
+      }
+      
+      res.json(academicTerms);
+    } catch (error) {
+      console.error("Error fetching academic terms:", error);
+      res.status(500).json({ message: "Failed to fetch academic terms" });
+    }
+  });
+
+  // Create academic term
+  app.post('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const academicTermData = {
+        ...req.body,
+        companyId
+      };
+
+      const academicTerm = await storage.createAcademicTerm(academicTermData);
+      res.json(academicTerm);
+    } catch (error) {
+      console.error("Error creating academic term:", error);
+      res.status(500).json({ message: "Failed to create academic term" });
+    }
+  });
+
+  // Get classes
+  app.get('/api/companies/:companyId/classes', isAuthenticated, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const { termId } = req.query;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      let classes = termId 
+        ? await storage.getClassesByTerm(termId as string)
+        : await storage.getClassesByCompany(companyId);
+        
+      // Create sample data if none exists
+      if (classes.length === 0 && !termId) {
+        const academicTerms = await storage.getAcademicTermsByCompany(companyId);
+        if (academicTerms.length > 0) {
+          const sampleClasses = [
+            { 
+              companyId, 
+              academicTermId: academicTerms[0].id, 
+              name: "Mathematics 101", 
+              subject: "Mathematics",
+              description: "Basic mathematics for beginners",
+              capacity: 15,
+              startTime: "09:00",
+              endTime: "10:00",
+              daysOfWeek: ["Monday", "Wednesday", "Friday"]
+            },
+            { 
+              companyId, 
+              academicTermId: academicTerms[0].id, 
+              name: "English Literature", 
+              subject: "English",
+              description: "Introduction to classic literature",
+              capacity: 12,
+              startTime: "10:30",
+              endTime: "11:30",
+              daysOfWeek: ["Tuesday", "Thursday"]
+            },
+            { 
+              companyId, 
+              academicTermId: academicTerms[0].id, 
+              name: "Science Lab", 
+              subject: "Science",
+              description: "Hands-on science experiments",
+              capacity: 10,
+              startTime: "14:00",
+              endTime: "15:30",
+              daysOfWeek: ["Wednesday"]
+            }
+          ];
+          
+          for (const classData of sampleClasses) {
+            await storage.createClass(classData);
+          }
+          
+          classes = await storage.getClassesByCompany(companyId);
+        }
+      }
+      
+      res.json(classes);
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+      res.status(500).json({ message: "Failed to fetch classes" });
+    }
+  });
+
+  // Create class
+  app.post('/api/companies/:companyId/classes', isAuthenticated, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const classData = {
+        ...req.body,
+        companyId
+      };
+
+      const newClass = await storage.createClass(classData);
+      res.json(newClass);
+    } catch (error) {
+      console.error("Error creating class:", error);
+      res.status(500).json({ message: "Failed to create class" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging
