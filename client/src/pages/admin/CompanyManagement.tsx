@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin } from "lucide-react";
+import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin, Trash2 } from "lucide-react";
 import { Link } from "wouter";
 
 interface TutoringCompany {
@@ -82,6 +82,11 @@ export default function CompanyManagement() {
   const { data: unassignedTutors } = useQuery<CompanyTutor[]>({
     queryKey: ["/api/admin/unassigned-tutors"],
     enabled: !!companyId,
+  });
+
+  // Get current user to check if master admin
+  const { data: currentUser } = useQuery<{ id: string; role: string }>({
+    queryKey: ["/api/auth/user"],
   });
 
   // Toggle company status
@@ -163,6 +168,35 @@ export default function CompanyManagement() {
       });
     },
   });
+
+  // Delete user mutation (Master Admin only)
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest(`/api/admin/users/${userId}`, "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "tutors"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteUser = (userId: string, userName: string) => {
+    if (window.confirm(`Are you sure you want to permanently delete user "${userName}"? This action cannot be undone.`)) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,15 +429,28 @@ export default function CompanyManagement() {
                           <Card key={user.id} className="border">
                             <CardContent className="p-4">
                               <div className="flex justify-between items-start mb-2">
-                                <div>
+                                <div className="flex-1">
                                   <h4 className="font-semibold">
                                     {user.firstName} {user.lastName}
                                   </h4>
                                   <p className="text-sm text-gray-600">{user.email}</p>
                                 </div>
-                                <Badge variant={user.isActive ? "default" : "secondary"}>
-                                  {user.isActive ? "Active" : "Inactive"}
-                                </Badge>
+                                <div className="flex items-center space-x-2">
+                                  <Badge variant={user.isActive ? "default" : "secondary"}>
+                                    {user.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                  {currentUser?.role === 'admin' && (
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleDeleteUser(user.id, `${user.firstName} ${user.lastName}`)}
+                                      disabled={deleteUserMutation.isPending}
+                                      title="Delete User (Master Admin Only)"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </Button>
+                                  )}
+                                </div>
                               </div>
                             </CardContent>
                           </Card>

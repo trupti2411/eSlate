@@ -845,6 +845,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete user (Master Admin only)
+  app.delete('/api/admin/users/:id', isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      const targetUserId = req.params.id;
+      
+      // Only allow master admins (system admins) to delete users
+      if (!user || user.role !== 'admin') {
+        return res.status(403).json({ message: "Master admin access required to delete users" });
+      }
+
+      // Prevent self-deletion
+      if (userId === targetUserId) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      const targetUser = await storage.getUser(targetUserId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Delete user and all related records
+      await storage.deleteUser(targetUserId);
+      
+      res.json({ success: true, message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   // Development-only endpoint to grant admin access
   if (process.env.NODE_ENV === 'development') {
     app.post('/api/dev/make-admin', isAuthenticated, async (req: any, res) => {

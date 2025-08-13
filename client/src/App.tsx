@@ -10,6 +10,7 @@ import ParentDashboard from "@/pages/parent/Dashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
+import Users from "@/pages/admin/Users";
 import TestUserCreation from "@/pages/admin/TestUserCreation";
 import Companies from "@/pages/admin/Companies";
 import CompanyManagement from "@/pages/admin/CompanyManagement";
@@ -47,7 +48,7 @@ function Router() {
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
           <Route path="/admin" component={AdminDashboard} />
-          <Route path="/admin/users" component={UserManagement} />
+          <Route path="/admin/users" component={Users} />
           <Route path="/admin/companies" component={Companies} />
           <Route path="/admin/companies/:id" component={CompanyManagement} />
           <Route path="/admin/test" component={TestUserCreation} />
