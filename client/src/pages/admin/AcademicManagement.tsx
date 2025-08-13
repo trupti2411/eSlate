@@ -220,7 +220,9 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                     <div className="space-y-2">
                       <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                         <Calendar className="w-4 h-4 mr-2" />
-                        {format(new Date(year.startDate), 'MMM dd, yyyy')} - {format(new Date(year.endDate), 'MMM dd, yyyy')}
+                        {year.startDate && year.endDate ? (
+                          `${format(new Date(year.startDate), 'MMM dd, yyyy')} - ${format(new Date(year.endDate), 'MMM dd, yyyy')}`
+                        ) : 'Dates not set'}
                       </div>
                       <Badge variant={year.isActive ? "default" : "secondary"}>
                         {year.isActive ? "Active" : "Inactive"}
@@ -286,7 +288,9 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                     <div className="space-y-2">
                       <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
                         <Calendar className="w-4 h-4 mr-2" />
-                        {format(new Date(term.startDate), 'MMM dd')} - {format(new Date(term.endDate), 'MMM dd, yyyy')}
+                        {term.startDate && term.endDate ? (
+                          `${format(new Date(term.startDate), 'MMM dd')} - ${format(new Date(term.endDate), 'MMM dd, yyyy')}`
+                        ) : 'Dates not set'}
                       </div>
                       <Badge variant={term.isActive ? "default" : "secondary"}>
                         {term.isActive ? "Active" : "Inactive"}

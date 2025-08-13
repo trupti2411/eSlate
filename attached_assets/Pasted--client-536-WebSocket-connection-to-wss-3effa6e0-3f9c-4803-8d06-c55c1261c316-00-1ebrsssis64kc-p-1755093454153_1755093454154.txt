@@ -1,0 +1,74 @@
+
+﻿
+client:536 WebSocket connection to 'wss://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/?token=COdvyGUih6qR' failed: 
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=COdvyGUih6qR' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)
+
+chunk-RPCDYKBN.js?v=d569c1d3:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: 
+{id: 'e2127a4d-816f-425a-b070-bfacbc47287c', email: 'nish1882@outlook.com', firstName: 'Nirav', lastName: 'Shah', profileImageUrl: null, …}
+CompanyAcademicManagement.tsx:34 Company admin query state: 
+{companyAdmin: undefined, companyAdminLoading: true, companyAdminError: null}
+CompanyAcademicManagement.tsx:42 Company query state: 
+{company: undefined, companyLoading: false, companyError: null}
+CompanyAcademicManagement.tsx:55 Loading state triggered: 
+{companyAdmin: undefined, companyAdminLoading: true, companyLoading: false}
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: 
+{id: 'e2127a4d-816f-425a-b070-bfacbc47287c', email: 'nish1882@outlook.com', firstName: 'Nirav', lastName: 'Shah', profileImageUrl: null, …}
+CompanyAcademicManagement.tsx:34 Company admin query state: 
+{companyAdmin: {…}, companyAdminLoading: false, companyAdminError: null}
+CompanyAcademicManagement.tsx:42 Company query state: 
+{company: undefined, companyLoading: true, companyError: null}
+CompanyAcademicManagement.tsx:55 Loading state triggered: 
+{companyAdmin: {…}, companyAdminLoading: false, companyLoading: true}
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: 
+{id: 'e2127a4d-816f-425a-b070-bfacbc47287c', email: 'nish1882@outlook.com', firstName: 'Nirav', lastName: 'Shah', profileImageUrl: null, …}
+CompanyAcademicManagement.tsx:34 Company admin query state: 
+{companyAdmin: {…}, companyAdminLoading: false, companyAdminError: null}
+CompanyAcademicManagement.tsx:42 Company query state: 
+{company: {…}, companyLoading: false, companyError: null}
+CompanyAcademicManagement.tsx:84 Rendering AcademicManagement with: 
+{companyId: 'fe80a24c-ad97-445f-8241-5ead71bccfd2', companyName: 'Homework and Study Academy '}
+AcademicManagement.tsx:79 AcademicManagement component loaded with: 
+{companyId: 'fe80a24c-ad97-445f-8241-5ead71bccfd2', companyName: 'Homework and Study Academy '}
+AcademicManagement.tsx:79 AcademicManagement component loaded with: 
+{companyId: 'fe80a24c-ad97-445f-8241-5ead71bccfd2', companyName: 'Homework and Study Academy '}
+AcademicManagement.tsx:79 AcademicManagement component loaded with: 
+{companyId: 'fe80a24c-ad97-445f-8241-5ead71bccfd2', companyName: 'Homework and Study Academy '}
+date-fns.js?v=d569c1d3:2295 Uncaught RangeError: Invalid time value
+    at AcademicManagement.tsx:223:26
+    at Array.map (<anonymous>)
+    at AcademicManagement (AcademicManagement.tsx:188:50)
+AcademicManagement.tsx:79 AcademicManagement component loaded with: 
+{companyId: 'fe80a24c-ad97-445f-8241-5ead71bccfd2', companyName: 'Homework and Study Academy '}
+AcademicManagement.tsx:79 AcademicManagement component loaded with: 
+{companyId: 'fe80a24c-ad97-445f-8241-5ead71bccfd2', companyName: 'Homework and Study Academy '}
+date-fns.js?v=d569c1d3:2295 Uncaught RangeError: Invalid time value
+    at AcademicManagement.tsx:223:26
+    at Array.map (<anonymous>)
+    at AcademicManagement (AcademicManagement.tsx:188:50)
+chunk-RPCDYKBN.js?v=d569c1d3:14032 The above error occurred in the <AcademicManagement> component:
+
+    at AcademicManagement (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/src/pages/admin/AcademicManagement.tsx:41:46)
+    at div
+    at main
+    at div
+    at div
+    at Layout (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/src/components/Layout.tsx:22:34)
+    at CompanyAcademicManagement (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/src/pages/admin/CompanyAcademicManagement.tsx:24:20)
+    at Route (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=d569c1d3:323:16)
+    at Switch (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…/home/runner/workspace/node_modules/.vite/deps/wouter.js?v=d569c1d3:379:17)
+    at Router (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/src/App.tsx?v=sbL5e3zY_OiSZ00xrH1qY:39:48)
+    at Provider (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…unner/workspace/node_modules/.vite/deps/chunk-S34NKWM7.js?v=d569c1d3:48:15)
+    at TooltipProvider (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…rkspace/node_modules/.vite/deps/@radix-ui_react-tooltip.js?v=d569c1d3:60:5)
+    at QueryClientProvider (https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit…rkspace/node_modules/.vite/deps/@tanstack_react-query.js?v=d569c1d3:2805:3)
+    at App
+
+Consider adding an error boundary to your tree to customize error handling behavior.
+Visit https://reactjs.org/link/error-boundaries to learn more about error boundaries.
+chunk-RPCDYKBN.js?v=d569c1d3:9129 Uncaught RangeError: Invalid time value
+    at AcademicManagement.tsx:223:26
+    at Array.map (<anonymous>)
+    at AcademicManagement (AcademicManagement.tsx:188:50)
