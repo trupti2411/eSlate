@@ -1347,6 +1347,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get hierarchical academic structure: Years -> Terms -> Classes
+  app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: any, res) => {
+    try {
+      const { companyId } = req.params;
+      const requestingReplitId = req.user.claims.sub;
+      const requestingEmail = req.user.claims.email;
+      
+      let user = await storage.getUser(requestingReplitId);
+      if (!user && requestingEmail) {
+        user = await storage.getUserByEmail(requestingEmail);
+      }
+      
+      if (!user) {
+        return res.status(401).json({ message: "Unauthorized" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get all academic years for the company
+      const academicYears = await storage.getAcademicYearsByCompany(companyId);
+      
+      // Build hierarchical structure
+      const hierarchy = await Promise.all(
+        academicYears.map(async (year) => {
+          const terms = await storage.getAcademicTermsByYear(year.id);
+          const termsWithClasses = await Promise.all(
+            terms.map(async (term) => {
+              const classes = await storage.getClassesByTerm(term.id);
+              return {
+                ...term,
+                classes
+              };
+            })
+          );
+          return {
+            ...year,
+            terms: termsWithClasses
+          };
+        })
+      );
+      
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("Error fetching academic hierarchy:", error);
+      res.status(500).json({ message: "Failed to fetch academic hierarchy" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   // WebSocket server for real-time messaging

@@ -466,13 +466,10 @@ export const studentClassAssignmentsRelations = relations(studentClassAssignment
   }),
 }));
 
-// Type exports
+// Type exports for academic entities
 export type AcademicYear = typeof academicYears.$inferSelect;
-export type InsertAcademicYear = typeof academicYears.$inferInsert;
 export type AcademicTerm = typeof academicTerms.$inferSelect;
-export type InsertAcademicTerm = typeof academicTerms.$inferInsert;
 export type Class = typeof classes.$inferSelect;
-export type InsertClass = typeof classes.$inferInsert;
 export type StudentClassAssignment = typeof studentClassAssignments.$inferSelect;
 export type InsertStudentClassAssignment = typeof studentClassAssignments.$inferInsert;
 

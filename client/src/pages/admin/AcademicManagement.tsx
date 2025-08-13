@@ -22,31 +22,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-interface AcademicYear {
-  id: string;
-  companyId: string;
-  yearNumber: number;
-  name: string;
-  startDate: string;
-  endDate: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface AcademicTerm {
-  id: string;
-  academicYearId: string;
-  companyId: string;
-  name: string;
-  termNumber: number;
-  startDate: string;
-  endDate: string;
-  isActive: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 interface Class {
   id: string;
   companyId: string;
@@ -65,13 +40,40 @@ interface Class {
   updatedAt: string;
 }
 
+interface AcademicTerm {
+  id: string;
+  academicYearId: string;
+  companyId: string;
+  name: string;
+  termNumber: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  classes: Class[];
+}
+
+interface AcademicYear {
+  id: string;
+  companyId: string;
+  yearNumber: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  terms: AcademicTerm[];
+}
+
 interface AcademicManagementProps {
   companyId: string;
   companyName: string;
 }
 
 export default function AcademicManagement({ companyId, companyName }: AcademicManagementProps) {
-  const [activeTab, setActiveTab] = useState<'years' | 'terms' | 'classes'>('years');
+  const [activeTab, setActiveTab] = useState<'overview' | 'years' | 'terms' | 'classes'>('overview');
   const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
 
@@ -94,6 +96,12 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const { data: classes = [], isLoading: classesLoading } = useQuery({
     queryKey: [`/api/companies/${companyId}/classes`],
     enabled: !!companyId && activeTab === 'classes',
+  });
+
+  // Fetch hierarchical structure for overview
+  const { data: academicHierarchy = [], isLoading: hierarchyLoading } = useQuery<AcademicYear[]>({
+    queryKey: [`/api/companies/${companyId}/academic-hierarchy`],
+    enabled: !!companyId && activeTab === 'overview',
   });
 
   const getDayName = (dayNumber: number) => {
@@ -128,6 +136,17 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       {/* Navigation Tabs */}
       <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
         <button
+          onClick={() => setActiveTab('overview')}
+          className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'overview'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4 mr-2" />
+          Overview
+        </button>
+        <button
           onClick={() => setActiveTab('years')}
           className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
             activeTab === 'years'
@@ -161,6 +180,129 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           Classes
         </button>
       </div>
+
+      {/* Overview Tab - Hierarchical Structure */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Academic Structure Overview</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Hierarchical view: Years → Terms → Classes
+            </p>
+          </div>
+
+          {hierarchyLoading ? (
+            <div className="flex justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {academicHierarchy.length === 0 ? (
+                <Card className="p-8 text-center">
+                  <div className="text-gray-500 dark:text-gray-400">
+                    <GraduationCap className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-lg font-medium mb-2">No Academic Structure Found</h3>
+                    <p className="text-sm">Create academic years, terms, and classes using the individual tabs above.</p>
+                  </div>
+                </Card>
+              ) : (
+                academicHierarchy.map((year) => (
+                  <Card key={year.id} className="border-2 border-blue-100 dark:border-blue-900">
+                    <CardHeader className="bg-blue-50 dark:bg-blue-950">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-xl text-blue-900 dark:text-blue-100 flex items-center">
+                            <Calendar className="w-5 h-5 mr-2" />
+                            {year.name}
+                          </CardTitle>
+                          <CardDescription className="text-blue-700 dark:text-blue-200">
+                            Year {year.yearNumber} • {year.terms?.length || 0} Terms
+                          </CardDescription>
+                        </div>
+                        <Badge variant={year.isActive ? "default" : "secondary"}>
+                          {year.isActive ? "Active" : "Inactive"}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      {year.terms && year.terms.length > 0 ? (
+                        <div className="space-y-4">
+                          {year.terms.map((term) => (
+                            <Card key={term.id} className="border border-gray-200 dark:border-gray-700">
+                              <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <CardTitle className="text-lg text-gray-900 dark:text-white flex items-center">
+                                      <Clock className="w-4 h-4 mr-2" />
+                                      {term.name}
+                                    </CardTitle>
+                                    <CardDescription>
+                                      {term.startDate && term.endDate ? (
+                                        `${format(new Date(term.startDate), 'MMM dd, yyyy')} - ${format(new Date(term.endDate), 'MMM dd, yyyy')}`
+                                      ) : 'Dates not set'} • {term.classes?.length || 0} Classes
+                                    </CardDescription>
+                                  </div>
+                                  <Badge variant={term.isActive ? "default" : "secondary"}>
+                                    {term.isActive ? "Active" : "Inactive"}
+                                  </Badge>
+                                </div>
+                              </CardHeader>
+                              {term.classes && term.classes.length > 0 && (
+                                <CardContent className="pt-0">
+                                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                                    {term.classes.map((cls) => (
+                                      <Card key={cls.id} className="border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
+                                        <CardContent className="p-4">
+                                          <div className="flex items-start justify-between">
+                                            <div className="min-w-0 flex-1">
+                                              <h4 className="font-medium text-gray-900 dark:text-white text-sm flex items-center">
+                                                <BookOpen className="w-3 h-3 mr-1 flex-shrink-0" />
+                                                {cls.name}
+                                              </h4>
+                                              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
+                                                {cls.subject}
+                                              </p>
+                                              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-2">
+                                                <Clock className="w-3 h-3 mr-1" />
+                                                {formatTime(cls.startTime)} - {formatTime(cls.endTime)}
+                                              </div>
+                                              {cls.daysOfWeek && cls.daysOfWeek.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mt-2">
+                                                  {cls.daysOfWeek.map((day) => (
+                                                    <Badge key={day} variant="outline" className="text-xs px-1 py-0">
+                                                      {day.slice(0, 3)}
+                                                    </Badge>
+                                                  ))}
+                                                </div>
+                                              )}
+                                            </div>
+                                            <Badge variant={cls.isActive ? "default" : "secondary"} className="text-xs">
+                                              {cls.isActive ? "Active" : "Inactive"}
+                                            </Badge>
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                    ))}
+                                  </div>
+                                </CardContent>
+                              )}
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                          <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p className="text-sm">No terms found for this academic year</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Academic Years Tab */}
       {activeTab === 'years' && (
