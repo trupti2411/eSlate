@@ -692,8 +692,13 @@ export default function CompanyManagement() {
                 <p>Error: {(tutorsError as Error).message}</p>
               </div>
             ) : tutors && tutors.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tutors.map((tutor) => (
+              <div className="space-y-4">
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                  <p className="text-sm text-green-600">Debug: Found {tutors.length} tutors</p>
+                  <p className="text-xs text-gray-500">Tutors data: {JSON.stringify(tutors, null, 2)}</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {tutors.map((tutor) => (
                   <Card key={tutor.id} className="border">
                     <CardContent className="p-4">
                       <div className="flex justify-between items-start mb-3">
@@ -722,8 +727,11 @@ export default function CompanyManagement() {
                         </p>
                       )}
                       
-                      {!tutor.isVerified && (
-                        <div className="mt-3 pt-3 border-t">
+                      <div className="mt-3 pt-3 border-t">
+                        <p className="text-xs text-gray-500 mb-2">
+                          Debug: isVerified = {String(tutor.isVerified)}
+                        </p>
+                        {!tutor.isVerified && (
                           <Button
                             size="sm"
                             onClick={() => verifyTutorMutation.mutate(tutor.id)}
@@ -732,11 +740,17 @@ export default function CompanyManagement() {
                           >
                             {verifyTutorMutation.isPending ? 'Verifying...' : 'Verify Tutor'}
                           </Button>
-                        </div>
-                      )}
+                        )}
+                        {tutor.isVerified && (
+                          <Badge variant="default" className="bg-green-100 text-green-800">
+                            ✓ Verified
+                          </Badge>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
-                ))}
+                  ))}
+                </div>
               </div>
             ) : (
               <div className="text-center py-8">
