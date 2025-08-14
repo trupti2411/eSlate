@@ -209,17 +209,21 @@ export default function AssignmentDetailDialog({
             <div>
               <h3 className="font-semibold mb-2">Assignment Files</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {assignment.attachmentUrls.map((url, index) => (
-                  <Button
-                    key={index}
-                    variant="outline"
-                    className="justify-start"
-                    onClick={() => window.open(url, '_blank')}
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download File {index + 1}
-                  </Button>
-                ))}
+                {assignment.attachmentUrls.map((url, index) => {
+                  const fileName = url.split('/').pop() || `file-${index + 1}`;
+                  const downloadUrl = `/api/assignments/${assignment.id}/attachments/${fileName}`;
+                  return (
+                    <Button
+                      key={index}
+                      variant="outline"
+                      className="justify-start"
+                      onClick={() => window.open(downloadUrl, '_blank')}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download File {index + 1}
+                    </Button>
+                  );
+                })}
               </div>
             </div>
           )}

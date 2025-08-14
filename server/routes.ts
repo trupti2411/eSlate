@@ -139,6 +139,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Serve assignment attachment files through our server (for authenticated access)
+  app.get('/api/assignments/:assignmentId/attachments/:fileName', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assignmentId, fileName } = req.params;
+      
+      // Verify user has access to this assignment
+      const user = req.user!;
+      const assignment = await storage.getAssignment(assignmentId);
+      
+      if (!assignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+
+      // Check if user has access to this assignment
+      let hasAccess = false;
+      
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (student && assignment.studentIds?.includes(student.id)) {
+          hasAccess = true;
+        }
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (tutor && assignment.tutorId === tutor.id) {
+          hasAccess = true;
+        }
+      } else if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (companyAdmin) {
+          // Company admin can access assignments from their company
+          hasAccess = true;
+        }
+      }
+
+      if (!hasAccess) {
+        return res.status(403).json({ message: "Access denied to this assignment" });
+      }
+
+      // Find the attachment URL that matches the fileName
+      const attachmentUrl = assignment.attachmentUrls?.find(url => url.includes(fileName));
+      
+      if (!attachmentUrl) {
+        return res.status(404).json({ message: "Attachment not found" });
+      }
+
+      // Redirect to the actual file URL or proxy the download
+      // For now, we'll redirect - but this should be improved for security
+      res.redirect(attachmentUrl);
+      
+    } catch (error) {
+      console.error("Error serving assignment attachment:", error);
+      res.status(500).json({ message: "Failed to serve attachment" });
+    }
+  });
+
   app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;

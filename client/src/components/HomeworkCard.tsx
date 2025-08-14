@@ -89,18 +89,22 @@ export default function HomeworkCard({ assignment }: HomeworkCardProps) {
           <div className="mb-3 p-2 bg-gray-50 rounded">
             <div className="text-xs text-gray-600 mb-1">Assignment Files:</div>
             <div className="flex flex-wrap gap-1">
-              {assignment.attachmentUrls.map((url, index) => (
-                <Button
-                  key={index}
-                  size="sm"
-                  variant="outline"
-                  className="text-xs"
-                  onClick={() => window.open(url, '_blank')}
-                >
-                  <Download className="h-3 w-3 mr-1" />
-                  File {index + 1}
-                </Button>
-              ))}
+              {assignment.attachmentUrls.map((url, index) => {
+                const fileName = url.split('/').pop() || `file-${index + 1}`;
+                const downloadUrl = `/api/assignments/${assignment.id}/attachments/${fileName}`;
+                return (
+                  <Button
+                    key={index}
+                    size="sm"
+                    variant="outline"
+                    className="text-xs"
+                    onClick={() => window.open(downloadUrl, '_blank')}
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    File {index + 1}
+                  </Button>
+                );
+              })}
             </div>
           </div>
         )}
