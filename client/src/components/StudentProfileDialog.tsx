@@ -142,6 +142,10 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   }, [student]);
 
   const handleSave = () => {
+    if (updateStudentMutation.isPending) {
+      console.log("Save already in progress, ignoring duplicate request");
+      return;
+    }
     console.log("Saving student profile with data:", formData);
     updateStudentMutation.mutate(formData);
   };
