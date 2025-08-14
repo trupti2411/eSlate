@@ -46,7 +46,7 @@ interface AcademicYear {
 interface AcademicTerm {
   id: string;
   name: string;
-  yearId: string;
+  academicYearId: string;
   startDate: string;
   endDate: string;
 }
@@ -144,7 +144,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   const selectedClass = allClasses.find(cls => cls.id === formData.classId);
   // Filter terms based on selected year ID
   const filteredTerms = formData.yearId 
-    ? allAcademicTerms.filter(term => term.yearId === formData.yearId)
+    ? allAcademicTerms.filter(term => term.academicYearId === formData.yearId)
     : [];
   
   // Filter classes based on selected term ID
