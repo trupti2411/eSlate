@@ -67,8 +67,8 @@ export default function CompanyManagement() {
   });
 
   // Fetch company tutors
-  const { data: tutors, isLoading: tutorsLoading } = useQuery<CompanyTutor[]>({
-    queryKey: ["/api/companies", companyId, "tutors"],
+  const { data: tutors, isLoading: tutorsLoading, error: tutorsError } = useQuery<CompanyTutor[]>({
+    queryKey: [`/api/companies/${companyId}/tutors`],
     enabled: !!companyId,
   });
 
@@ -120,8 +120,8 @@ export default function CompanyManagement() {
         title: "Success",
         description: "Tutor assigned successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "tutors"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "users"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/unassigned-tutors"] });
     },
     onError: (error: Error) => {
@@ -146,8 +146,8 @@ export default function CompanyManagement() {
         title: "Success",
         description: "User created successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "tutors"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "users"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
       setIsCreateUserDialogOpen(false);
       setNewUserData({ email: "", firstName: "", lastName: "", role: "" });
     },
@@ -179,8 +179,8 @@ export default function CompanyManagement() {
         title: "Success",
         description: "User deleted successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "tutors"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
     },
     onError: (error: Error) => {
@@ -470,6 +470,11 @@ export default function CompanyManagement() {
           <TabsContent value="tutors" className="space-y-6">
             {tutorsLoading ? (
               <p>Loading tutors...</p>
+            ) : tutorsError ? (
+              <div className="text-center text-red-500 py-8">
+                <p>Error loading tutors: {(tutorsError as Error).message}</p>
+                <p className="text-sm mt-2">Check console for details</p>
+              </div>
             ) : tutors && tutors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tutors.map((tutor) => (

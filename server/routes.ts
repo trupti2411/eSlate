@@ -1535,5 +1535,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   });
 
+  // Logout route for custom auth
+  app.get('/api/logout', (req, res) => {
+    req.logout((err) => {
+      if (err) {
+        console.error('Logout error:', err);
+        return res.status(500).json({ message: 'Logout failed' });
+      }
+      // Clear session and redirect to login
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Session destruction error:', err);
+        }
+        res.clearCookie('connect.sid');
+        res.redirect('/');
+      });
+    });
+  });
+
   return httpServer;
 }
