@@ -841,7 +841,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create new user within a company context
   app.post('/api/admin/create-user', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {

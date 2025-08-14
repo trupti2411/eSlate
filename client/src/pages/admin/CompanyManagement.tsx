@@ -469,11 +469,17 @@ export default function CompanyManagement() {
           {/* Current Tutors Tab */}
           <TabsContent value="tutors" className="space-y-6">
             {tutorsLoading ? (
-              <p>Loading tutors...</p>
+              <div className="text-center py-8">
+                <p>Loading tutors...</p>
+              </div>
             ) : tutorsError ? (
               <div className="text-center text-red-500 py-8">
-                <p>Error loading tutors: {(tutorsError as Error).message}</p>
-                <p className="text-sm mt-2">Check console for details</p>
+                <h3 className="text-lg font-semibold mb-2">Error Loading Tutors</h3>
+                <p>Error: {(tutorsError as Error).message}</p>
+                <p className="text-sm mt-2">API Status: {tutorsError instanceof Error ? 'Network Error' : 'Unknown Error'}</p>
+                <pre className="mt-4 text-xs bg-gray-100 p-2 rounded">
+                  {JSON.stringify(tutorsError, null, 2)}
+                </pre>
               </div>
             ) : tutors && tutors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -510,7 +516,14 @@ export default function CompanyManagement() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-gray-500 py-8">No tutors assigned to this company yet.</p>
+              <div className="text-center py-8">
+                <h3 className="text-lg font-semibold text-gray-700 mb-2">No Tutors Found</h3>
+                <p className="text-gray-500 mb-4">This company currently has no tutors assigned.</p>
+                <p className="text-sm text-gray-400">
+                  API Response: {JSON.stringify(tutors)} | 
+                  Status: {tutors === null ? 'null' : Array.isArray(tutors) ? `Array[${tutors.length}]` : typeof tutors}
+                </p>
+              </div>
             )}
           </TabsContent>
 
