@@ -860,8 +860,10 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           const assignedStudents = (activeStudents || []).filter((student: any) => student.classId === classItem.id);
                           console.log('Debug - Class ID:', classItem.id);
                           console.log('Debug - All students:', activeStudents);
+                          console.log('Debug - Student data structure sample:', activeStudents?.[0]);
+                          console.log('Debug - Student names:', activeStudents?.map(s => `${s.user?.firstName} ${s.user?.lastName} (classId: ${s.classId})`));
+                          console.log('Debug - Class IDs in students:', activeStudents?.map(s => s.classId));
                           console.log('Debug - Assigned students for this class:', assignedStudents);
-                          console.log('Debug - Student data structure:', activeStudents?.[0]);
                           return (
                             <>
                               <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
@@ -881,7 +883,9 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                 )}
                                 {assignedStudents.length === 0 && (
                                   <div className="text-xs text-gray-400 dark:text-gray-500">
-                                    No students assigned (Debug: Total students: {(activeStudents || []).length})
+                                    No students assigned (Debug: Total students: {(activeStudents || []).length}, Class ID: {classItem.id})
+                                    <br />
+                                    <span>All students: {(activeStudents || []).map(s => `${s.user?.firstName || 'N/A'} ${s.user?.lastName || 'N/A'} (${s.classId || 'no class'})`).join(', ')}</span>
                                   </div>
                                 )}
                               </div>
