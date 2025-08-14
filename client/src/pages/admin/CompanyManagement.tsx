@@ -727,26 +727,18 @@ export default function CompanyManagement() {
                         </p>
                       )}
                       
-                      <div className="mt-3 pt-3 border-t">
-                        <p className="text-xs text-gray-500 mb-2">
-                          Debug: isVerified = {String(tutor.isVerified)}
-                        </p>
-                        {!tutor.isVerified && (
+                      {!tutor.isVerified && (
+                        <div className="mt-3 pt-3 border-t">
                           <Button
                             size="sm"
                             onClick={() => verifyTutorMutation.mutate(tutor.id)}
                             disabled={verifyTutorMutation.isPending}
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-green-600 hover:bg-green-700 text-white"
                           >
                             {verifyTutorMutation.isPending ? 'Verifying...' : 'Verify Tutor'}
                           </Button>
-                        )}
-                        {tutor.isVerified && (
-                          <Badge variant="default" className="bg-green-100 text-green-800">
-                            ✓ Verified
-                          </Badge>
-                        )}
-                      </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                   ))}
