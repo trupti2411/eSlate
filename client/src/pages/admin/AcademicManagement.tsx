@@ -121,6 +121,8 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [isAddYearOpen, setIsAddYearOpen] = useState(false);
   const [isAddTermOpen, setIsAddTermOpen] = useState(false);
   const [isAddClassOpen, setIsAddClassOpen] = useState(false);
+  const [isAddStudentToClassOpen, setIsAddStudentToClassOpen] = useState(false);
+  const [selectedClassForStudents, setSelectedClassForStudents] = useState<string | null>(null);
 
   // Form instances
   const yearForm = useForm<AcademicYearFormData>({
@@ -247,6 +249,32 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     },
   });
 
+  // Assign student to class mutation
+  const assignStudentToClassMutation = useMutation({
+    mutationFn: async ({ studentId, classId }: { studentId: string; classId: string }) => {
+      return await apiRequest(`/api/students/${studentId}`, 'PATCH', {
+        classId,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Student assigned to class successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      setIsAddStudentToClassOpen(false);
+      setSelectedClassForStudents(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to assign student to class",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Debug log
   console.log('AcademicManagement component loaded with:', { companyId, companyName });
 
@@ -284,6 +312,12 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const { data: academicHierarchy = [], isLoading: hierarchyLoading } = useQuery<AcademicYear[]>({
     queryKey: [`/api/companies/${companyId}/academic-hierarchy`],
     enabled: !!companyId && activeTab === 'overview',
+  });
+
+  // Fetch active students for the company
+  const { data: activeStudents = [] } = useQuery({
+    queryKey: [`/api/companies/${companyId}/students`],
+    enabled: !!companyId && isAddStudentToClassOpen,
   });
 
   const getDayName = (dayNumber: number) => {
@@ -716,9 +750,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setSelectedClassForStudents(classItem.id);
+                              setIsAddStudentToClassOpen(true);
+                            }}
+                          >
                             <Users className="w-4 h-4 mr-2" />
-                            Manage Students
+                            Add Student
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-red-600">
                             <Trash2 className="w-4 h-4 mr-2" />
@@ -1099,6 +1138,72 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               </div>
             </form>
           </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Student to Class Dialog */}
+      <Dialog open={isAddStudentToClassOpen} onOpenChange={setIsAddStudentToClassOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Student to Class</DialogTitle>
+            <DialogDescription>
+              Select a student to add to this class.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {activeStudents.length === 0 ? (
+              <p className="text-gray-500 text-center py-4">No active students available</p>
+            ) : (
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {activeStudents.map((student: any) => (
+                  <div 
+                    key={student.id} 
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {student.user?.firstName} {student.user?.lastName}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {student.user?.email}
+                      </div>
+                      {student.schoolName && (
+                        <div className="text-xs text-gray-400 dark:text-gray-500">
+                          {student.schoolName}
+                        </div>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (selectedClassForStudents) {
+                          assignStudentToClassMutation.mutate({
+                            studentId: student.id,
+                            classId: selectedClassForStudents,
+                          });
+                        }
+                      }}
+                      disabled={assignStudentToClassMutation.isPending}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      {assignStudentToClassMutation.isPending ? 'Adding...' : 'Add to Class'}
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAddStudentToClassOpen(false);
+                  setSelectedClassForStudents(null);
+                }}
+              >
+                Cancel
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

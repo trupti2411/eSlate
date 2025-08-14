@@ -70,7 +70,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
     schoolName: "",
-    classId: "",
   });
 
   // Fetch student data
@@ -132,7 +131,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
     if (student) {
       setFormData({
         schoolName: student.schoolName || "",
-        classId: student.classId || "",
       });
     }
   }, [student]);
@@ -146,7 +144,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
     updateStudentMutation.mutate(formData);
   };
 
-  const selectedClass = allClasses.find(cls => cls.id === formData.classId);
+  const selectedClass = allClasses.find(cls => cls.id === student?.classId);
 
   if (studentLoading) {
     return (
@@ -199,7 +197,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                       setEditMode(false);
                       setFormData({
                         schoolName: student.schoolName || "",
-                        classId: student.classId || "",
                       });
                     }}
                   >
@@ -280,7 +277,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
             </CardContent>
           </Card>
 
-          {/* Class Assignment */}
+          {/* Class Assignment (Read-Only) */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -291,38 +288,22 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
             <CardContent className="space-y-4">
               <div>
                 <Label>Assigned Class</Label>
-                {editMode ? (
-                  <Select 
-                    value={formData.classId || "none"} 
-                    onValueChange={(value) => setFormData({...formData, classId: value === "none" ? "" : value})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a class" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No class assigned</SelectItem>
-                      {allClasses.map((cls) => (
-                        <SelectItem key={cls.id} value={cls.id}>
-                          {cls.name} - {cls.subject} (Tutor: {cls.tutor?.user?.firstName} {cls.tutor?.user?.lastName})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input 
-                    value={selectedClass ? `${selectedClass.name} - ${selectedClass.subject} (Tutor: ${selectedClass.tutor?.user?.firstName} ${selectedClass.tutor?.user?.lastName})` : "No class assigned"} 
-                    disabled 
-                  />
+                <Input 
+                  value={selectedClass ? `${selectedClass.name} - ${selectedClass.subject}` : "No class assigned"} 
+                  disabled 
+                />
+                {!selectedClass && (
+                  <p className="text-sm text-gray-500 mt-1">
+                    Classes are assigned through Academic Management → Classes section
+                  </p>
                 )}
               </div>
               
               {selectedClass && (
-                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                  <h4 className="font-medium text-sm text-gray-700 mb-2">Class Details</h4>
-                  <div className="space-y-1 text-sm text-gray-600">
+                <div className="mt-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                  <h4 className="font-medium text-sm text-gray-700 dark:text-gray-300 mb-2">Class Details</h4>
+                  <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
                     <div><strong>Subject:</strong> {selectedClass.subject}</div>
-                    <div><strong>Description:</strong> {selectedClass.description || "No description"}</div>
-                    <div><strong>Schedule:</strong> {selectedClass.schedule || "Not specified"}</div>
                     <div><strong>Tutor:</strong> {selectedClass.tutor?.user?.firstName} {selectedClass.tutor?.user?.lastName}</div>
                   </div>
                 </div>
