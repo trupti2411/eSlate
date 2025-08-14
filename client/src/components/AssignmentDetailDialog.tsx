@@ -53,39 +53,32 @@ export default function AssignmentDetailDialog({
     enabled: isOpen,
   });
 
-  // Upload file mutation
+  // Upload file mutation - using direct upload approach
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
       try {
-        console.log("Starting file upload for:", file.name);
+        console.log("Starting direct file upload for:", file.name);
         
-        // Get upload URL
-        const uploadResponse = await apiRequest("POST", "/api/homework/upload");
-        const uploadData = await uploadResponse.json();
+        // Create FormData for multipart upload
+        const formData = new FormData();
+        formData.append('file', file);
         
-        if (!uploadData.uploadURL) {
-          throw new Error('No upload URL received from server');
-        }
-        
-        console.log("Got upload URL:", uploadData.uploadURL);
-        
-        // Upload file to signed URL
-        const response = await fetch(uploadData.uploadURL, {
-          method: 'PUT',
-          body: file,
-          headers: {
-            'Content-Type': file.type,
-          },
+        // Upload directly to our server
+        const response = await fetch('/api/homework/upload-direct', {
+          method: 'POST',
+          body: formData,
+          credentials: 'include', // Include session cookies for authentication
         });
         
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error("Upload failed:", response.status, errorText);
-          throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+          const errorData = await response.json();
+          console.error("Direct upload failed:", response.status, errorData);
+          throw new Error(`Failed to upload file: ${errorData.error || response.statusText}`);
         }
         
-        console.log("File uploaded successfully");
-        return uploadData.uploadURL.split('?')[0]; // Return URL without query params
+        const result = await response.json();
+        console.log("File uploaded successfully:", result);
+        return result.fileUrl;
       } catch (error) {
         console.error("Upload error:", error);
         throw error;

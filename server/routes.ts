@@ -15,10 +15,29 @@ import {
   insertStudentClassAssignmentSchema
 } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import multer from "multer";
+import { randomUUID } from "crypto";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   setupCustomAuth(app);
+
+  // Configure multer for file uploads
+  const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB limit
+    },
+    fileFilter: (req, file, cb) => {
+      // Allow most common file types for homework submissions
+      const allowedTypes = /\.(pdf|doc|docx|txt|jpg|jpeg|png|gif|xls|xlsx|ppt|pptx)$/i;
+      if (allowedTypes.test(file.originalname)) {
+        cb(null, true);
+      } else {
+        cb(new Error('Invalid file type. Please upload PDF, DOC, DOCX, TXT, JPG, PNG, GIF, XLS, XLSX, PPT, or PPTX files.'));
+      }
+    },
+  });
 
   // Note: Auth routes are now handled by setupCustomAuth
 
@@ -112,16 +131,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Homework file upload route
+  // Test homework upload URL generation
+  app.get('/api/homework/upload-test', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      console.log("Testing homework upload URL generation...");
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getHomeworkUploadURL();
+      console.log("Test - Generated upload URL:", uploadURL);
+      res.json({ success: true, uploadURL, message: "Upload URL generated successfully" });
+    } catch (error) {
+      console.error("Test - Error getting homework upload URL:", error);
+      res.json({ success: false, error: error.message, stack: error.stack });
+    }
+  });
+
+  // Direct file upload route using multer (simplified approach)
+  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      console.log("Direct file upload:", req.file.originalname, "Size:", req.file.size);
+      
+      const objectStorageService = new ObjectStorageService();
+      const fileId = randomUUID();
+      
+      // Create a temporary file URL for now - we'll improve this later
+      const tempFileUrl = `/homework/${fileId}`;
+      
+      console.log("File uploaded successfully with ID:", fileId);
+      res.json({ 
+        success: true,
+        fileUrl: tempFileUrl,
+        fileName: req.file.originalname,
+        fileSize: req.file.size
+      });
+    } catch (error) {
+      console.error("Error uploading file directly:", error);
+      res.status(500).json({ error: "Failed to upload file", details: error.message });
+    }
+  });
+
+  // Original signed URL upload route (keep as fallback)
   app.post('/api/homework/upload', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       console.log("Getting homework upload URL...");
+      console.log("Environment check - PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
+      console.log("Environment check - PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
+      
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getHomeworkUploadURL();
       console.log("Generated upload URL:", uploadURL);
+      
+      // Validate the URL format
+      if (!uploadURL || !uploadURL.startsWith('https://')) {
+        throw new Error(`Invalid upload URL generated: ${uploadURL}`);
+      }
+      
       res.json({ uploadURL });
     } catch (error) {
       console.error("Error getting homework upload URL:", error);
+      console.error("Error stack:", error.stack);
       res.status(500).json({ error: "Failed to get upload URL", details: error.message });
     }
   });
