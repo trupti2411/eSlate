@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus, Eye, Mail, Phone, MapPin } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
