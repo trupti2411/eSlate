@@ -551,6 +551,136 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update tutor profile
+  app.put('/api/companies/:companyId/tutors/:tutorId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, tutorId } = req.params;
+      const user = req.user!;
+
+      // Check permissions
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Update tutor profile
+      const tutorData = {
+        specialization: req.body.specialization,
+        qualifications: req.body.qualifications,
+        isVerified: req.body.isVerified,
+      };
+
+      const updatedTutor = await storage.updateTutor(tutorId, tutorData);
+
+      // Update user information if provided
+      if (req.body.firstName || req.body.lastName || req.body.email) {
+        const tutor = await storage.getTutor(tutorId);
+        if (tutor) {
+          const userData = {
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            email: req.body.email,
+          };
+          await storage.updateUser(tutor.userId, userData);
+        }
+      }
+
+      res.json(updatedTutor);
+    } catch (error) {
+      console.error("Error updating tutor:", error);
+      res.status(500).json({ message: "Failed to update tutor" });
+    }
+  });
+
+  // Update student profile
+  app.put('/api/companies/:companyId/students/:studentId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, studentId } = req.params;
+      const user = req.user!;
+
+      // Check permissions
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Update student profile
+      const studentData = {
+        gradeLevel: req.body.gradeLevel,
+        schoolName: req.body.schoolName,
+        parentId: req.body.parentId,
+        tutorId: req.body.tutorId,
+      };
+
+      const updatedStudent = await storage.updateStudent(studentId, studentData);
+
+      // Update user information if provided
+      if (req.body.firstName || req.body.lastName || req.body.email) {
+        const student = await storage.getStudent(studentId);
+        if (student) {
+          const userData = {
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            email: req.body.email,
+          };
+          await storage.updateUser(student.userId, userData);
+        }
+      }
+
+      res.json(updatedStudent);
+    } catch (error) {
+      console.error("Error updating student:", error);
+      res.status(500).json({ message: "Failed to update student" });
+    }
+  });
+
+  // Update company admin profile
+  app.put('/api/admin/company-admin/:adminId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { adminId } = req.params;
+      const user = req.user!;
+
+      // Only system admins can update company admin profiles
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "System admin access required" });
+      }
+
+      // Update company admin profile
+      const adminData = {
+        permissions: req.body.permissions,
+        companyId: req.body.companyId,
+      };
+
+      const updatedAdmin = await storage.updateCompanyAdmin(adminId, adminData);
+
+      // Update user information if provided
+      if (req.body.firstName || req.body.lastName || req.body.email) {
+        const companyAdmin = await storage.getCompanyAdmin(adminId);
+        if (companyAdmin) {
+          const userData = {
+            firstName: req.body.firstName,
+            lastName: req.body.lastName,
+            email: req.body.email,
+          };
+          await storage.updateUser(companyAdmin.userId, userData);
+        }
+      }
+
+      res.json(updatedAdmin);
+    } catch (error) {
+      console.error("Error updating company admin:", error);
+      res.status(500).json({ message: "Failed to update company admin" });
+    }
+  });
+
   // Get company students 
   app.get('/api/companies/:id/students', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {

@@ -63,6 +63,7 @@ export interface IStorage {
   getStudent(id: string): Promise<Student | undefined>;
   getStudentByUserId(userId: string): Promise<Student | undefined>;
   createStudent(student: InsertStudent): Promise<Student>;
+  updateStudent(id: string, updates: Partial<InsertStudent>): Promise<Student>;
   getStudentsByTutor(tutorId: string): Promise<Student[]>;
   getStudentsByParent(parentId: string): Promise<Student[]>;
   
@@ -75,6 +76,7 @@ export interface IStorage {
   getTutor(id: string): Promise<Tutor | undefined>;
   getTutorByUserId(userId: string): Promise<Tutor | undefined>;
   createTutor(tutor: InsertTutor): Promise<Tutor>;
+  updateTutor(id: string, updates: Partial<InsertTutor>): Promise<Tutor>;
   
   // Assignment operations
   getAssignment(id: string): Promise<Assignment | undefined>;
@@ -119,6 +121,7 @@ export interface IStorage {
   getCompanyAdmin(id: string): Promise<CompanyAdmin | undefined>;
   getCompanyAdminByUserId(userId: string): Promise<CompanyAdmin | undefined>;
   createCompanyAdmin(admin: InsertCompanyAdmin): Promise<CompanyAdmin>;
+  updateCompanyAdmin(id: string, updates: Partial<InsertCompanyAdmin>): Promise<CompanyAdmin>;
   getTutorsByCompany(companyId: string): Promise<Tutor[]>;
 
   // Admin user management methods
@@ -276,6 +279,15 @@ export class DatabaseStorage implements IStorage {
     return student;
   }
 
+  async updateStudent(id: string, updates: Partial<InsertStudent>): Promise<Student> {
+    const [updatedStudent] = await db
+      .update(students)
+      .set(updates)
+      .where(eq(students.id, id))
+      .returning();
+    return updatedStudent;
+  }
+
   async getStudentsByTutor(tutorId: string): Promise<Student[]> {
     return await db.select().from(students).where(eq(students.tutorId, tutorId));
   }
@@ -314,6 +326,15 @@ export class DatabaseStorage implements IStorage {
   async createTutor(tutorData: InsertTutor): Promise<Tutor> {
     const [tutor] = await db.insert(tutors).values(tutorData).returning();
     return tutor;
+  }
+
+  async updateTutor(id: string, updates: Partial<InsertTutor>): Promise<Tutor> {
+    const [updatedTutor] = await db
+      .update(tutors)
+      .set(updates)
+      .where(eq(tutors.id, id))
+      .returning();
+    return updatedTutor;
   }
 
   // Assignment operations
@@ -602,6 +623,15 @@ export class DatabaseStorage implements IStorage {
   async createCompanyAdmin(adminData: InsertCompanyAdmin): Promise<CompanyAdmin> {
     const [admin] = await db.insert(companyAdmins).values(adminData).returning();
     return admin;
+  }
+
+  async updateCompanyAdmin(id: string, updates: Partial<InsertCompanyAdmin>): Promise<CompanyAdmin> {
+    const [updatedAdmin] = await db
+      .update(companyAdmins)
+      .set(updates)
+      .where(eq(companyAdmins.id, id))
+      .returning();
+    return updatedAdmin;
   }
 
   async getTutorsByCompany(companyId: string): Promise<Tutor[]> {

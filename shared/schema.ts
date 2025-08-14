@@ -59,6 +59,7 @@ export const students = pgTable("students", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   gradeLevel: varchar("grade_level"),
+  schoolName: varchar("school_name"),
   parentId: varchar("parent_id").references(() => parents.id),
   tutorId: varchar("tutor_id").references(() => tutors.id),
   createdAt: timestamp("created_at").defaultNow(),
