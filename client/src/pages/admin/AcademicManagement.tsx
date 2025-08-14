@@ -125,6 +125,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [selectedClassForStudents, setSelectedClassForStudents] = useState<string | null>(null);
   const [isEditClassOpen, setIsEditClassOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
+  const [assigningStudentId, setAssigningStudentId] = useState<string | null>(null);
 
   // Form instances
   const yearForm = useForm<AcademicYearFormData>({
@@ -254,17 +255,21 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   // Assign student to class mutation
   const assignStudentToClassMutation = useMutation({
     mutationFn: async ({ studentId, classId }: { studentId: string; classId: string }) => {
+      setAssigningStudentId(studentId);
       return await apiRequest(`/api/students/${studentId}`, 'PATCH', {
         classId,
       });
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       toast({
         title: "Success",
         description: "Student assigned to class successfully",
       });
+      // Force refetch of students data to show updated assignments
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.refetchQueries({ queryKey: [`/api/companies/${companyId}/students`] });
+      setAssigningStudentId(null);
       setIsAddStudentToClassOpen(false);
       setSelectedClassForStudents(null);
     },
@@ -274,6 +279,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
         description: error.message || "Failed to assign student to class",
         variant: "destructive",
       });
+      setAssigningStudentId(null);
     },
   });
 
@@ -849,9 +855,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       {/* Show assigned students */}
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         {(() => {
-                          const assignedStudents = activeStudents.filter((student: any) => student.classId === classItem.id);
-                          console.log(`Class ${classItem.id} assigned students:`, assignedStudents);
-                          console.log('All students:', activeStudents);
+                          const assignedStudents = (activeStudents || []).filter((student: any) => student.classId === classItem.id);
                           return (
                             <>
                               <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
@@ -1263,10 +1267,10 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           });
                         }
                       }}
-                      disabled={assignStudentToClassMutation.isPending}
+                      disabled={assigningStudentId === student.id}
                       className="bg-blue-600 hover:bg-blue-700"
                     >
-                      {assignStudentToClassMutation.isPending ? 'Adding...' : 'Add to Class'}
+                      {assigningStudentId === student.id ? 'Adding...' : 'Add to Class'}
                     </Button>
                   </div>
                 ))}
