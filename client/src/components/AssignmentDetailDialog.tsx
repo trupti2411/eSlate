@@ -126,10 +126,13 @@ export default function AssignmentDetailDialog({
       } else {
         // Create new submission
         console.log("Creating new submission");
-        return await apiRequest("POST", "/api/submissions", submissionData);
+        const response = await apiRequest("POST", "/api/submissions", submissionData);
+        console.log("API request completed, response status:", response.status);
+        return response;
       }
     },
-    onSuccess: () => {
+    onSuccess: (response) => {
+      console.log("Assignment submitted successfully:", response);
       toast({
         title: "Assignment submitted successfully!",
         description: "Your submission has been sent for review.",
@@ -139,8 +142,12 @@ export default function AssignmentDetailDialog({
       onClose();
     },
     onError: (error: Error) => {
+      console.error("Submission error details:", error);
+      console.error("Error name:", error.name);
+      console.error("Error message:", error.message);
+      console.error("Error stack:", error.stack);
       toast({
-        title: "Submission failed",
+        title: "Submission failed", 
         description: error.message,
         variant: "destructive",
       });
