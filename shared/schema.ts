@@ -62,6 +62,7 @@ export const students = pgTable("students", {
   schoolName: varchar("school_name"),
   parentId: varchar("parent_id").references(() => parents.id),
   tutorId: varchar("tutor_id").references(() => tutors.id),
+  companyId: varchar("company_id").references(() => tutoringCompanies.id), // Direct company assignment
   createdAt: timestamp("created_at").defaultNow(),
 });
 

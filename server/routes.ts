@@ -265,7 +265,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company management routes
-  app.get('/api/companies', isAuthenticated, async (req: any, res) => {
+  // Get all companies - accessible for registration
+  app.get('/api/companies', async (req: any, res) => {
     try {
       const companies = await storage.getAllTutoringCompanies();
       res.json(companies);
@@ -805,6 +806,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gradeLevel: req.body.gradeLevel || null,
           parentId: req.body.parentId || null,
           tutorId: req.body.tutorId || null,
+          companyId: req.body.companyId || null, // Add company assignment
         };
         await storage.createStudent(studentData);
       } else if (req.body.role === 'parent') {

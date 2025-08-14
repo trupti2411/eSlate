@@ -15,6 +15,13 @@ interface RegistrationFormData {
   firstName: string;
   lastName: string;
   role: string;
+  companyId?: string;
+}
+
+interface Company {
+  id: string;
+  name: string;
+  isActive: boolean;
 }
 
 export default function SimpleRegistration() {
@@ -23,12 +30,19 @@ export default function SimpleRegistration() {
     password: "",
     firstName: "",
     lastName: "",
-    role: "student"
+    role: "student",
+    companyId: ""
   });
   const [errors, setErrors] = useState<Partial<RegistrationFormData>>({});
   const [successMessage, setSuccessMessage] = useState("");
   const { toast } = useToast();
   const { user, isAuthenticated } = useAuth();
+
+  // Fetch available companies for selection
+  const { data: companies } = useQuery<Company[]>({
+    queryKey: ['/api/companies'],
+    enabled: true, // Always fetch companies for registration
+  });
 
   const validateForm = (): boolean => {
     const newErrors: Partial<RegistrationFormData> = {};
@@ -73,7 +87,8 @@ export default function SimpleRegistration() {
         password: "",
         firstName: "",
         lastName: "",
-        role: "student"
+        role: "student",
+        companyId: ""
       });
       toast({
         title: "Success!",
@@ -266,6 +281,34 @@ export default function SimpleRegistration() {
                     )}
                   </div>
                 </div>
+
+                {/* Company Selection - Only show for students */}
+                {formData.role === 'student' && (
+                  <div>
+                    <label htmlFor="companyId" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Select Tutoring Company
+                    </label>
+                    <div className="mt-1">
+                      <select
+                        id="companyId"
+                        value={formData.companyId}
+                        onChange={(e) => handleInputChange('companyId', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                        disabled={registerMutation.isPending}
+                      >
+                        <option value="">Select a company (optional)</option>
+                        {companies?.filter((c: Company) => c.isActive).map((company: Company) => (
+                          <option key={company.id} value={company.id}>
+                            {company.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-500">
+                        Choose the tutoring company you want to register with
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Submit Button */}
                 <Button
