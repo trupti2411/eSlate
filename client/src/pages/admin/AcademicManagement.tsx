@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import { 
   Calendar, 
   Plus, 
@@ -72,10 +83,77 @@ interface AcademicManagementProps {
   companyName: string;
 }
 
+// Form schemas
+const academicYearSchema = z.object({
+  yearNumber: z.number().min(1).max(12),
+  name: z.string().min(1, "Name is required"),
+  description: z.string().optional(),
+});
+
+const academicTermSchema = z.object({
+  academicYearId: z.string().min(1, "Academic year is required"),
+  name: z.string().min(1, "Name is required"),
+  startDate: z.string().min(1, "Start date is required"),
+  endDate: z.string().min(1, "End date is required"),
+});
+
+const classSchema = z.object({
+  termId: z.string().min(1, "Term is required"),
+  name: z.string().min(1, "Name is required"),
+  subject: z.string().min(1, "Subject is required"),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().min(1, "End time is required"),
+  daysOfWeek: z.array(z.string()).min(1, "At least one day is required"),
+  maxStudents: z.number().min(1).optional(),
+});
+
+type AcademicYearFormData = z.infer<typeof academicYearSchema>;
+type AcademicTermFormData = z.infer<typeof academicTermSchema>;
+type ClassFormData = z.infer<typeof classSchema>;
+
 export default function AcademicManagement({ companyId, companyName }: AcademicManagementProps) {
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'overview' | 'years' | 'terms' | 'classes'>('overview');
   const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
+  
+  // Dialog states
+  const [isAddYearOpen, setIsAddYearOpen] = useState(false);
+  const [isAddTermOpen, setIsAddTermOpen] = useState(false);
+  const [isAddClassOpen, setIsAddClassOpen] = useState(false);
+
+  // Form instances
+  const yearForm = useForm<AcademicYearFormData>({
+    resolver: zodResolver(academicYearSchema),
+    defaultValues: {
+      yearNumber: 1,
+      name: '',
+      description: '',
+    },
+  });
+
+  const termForm = useForm<AcademicTermFormData>({
+    resolver: zodResolver(academicTermSchema),
+    defaultValues: {
+      academicYearId: '',
+      name: '',
+      startDate: '',
+      endDate: '',
+    },
+  });
+
+  const classForm = useForm<ClassFormData>({
+    resolver: zodResolver(classSchema),
+    defaultValues: {
+      termId: '',
+      name: '',
+      subject: '',
+      startTime: '',
+      endTime: '',
+      daysOfWeek: [],
+      maxStudents: 20,
+    },
+  });
 
   // Function to handle year selection - switches to terms tab and filters by year
   const handleYearClick = (yearId: string, yearName: string) => {
@@ -89,6 +167,85 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     setSelectedTermId(termId);
     setActiveTab('classes');
   };
+
+  // Create mutations
+  const createYearMutation = useMutation({
+    mutationFn: async (data: AcademicYearFormData) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-years`, 'POST', {
+        ...data,
+        companyId,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Academic year created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-years`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setIsAddYearOpen(false);
+      yearForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create academic year",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createTermMutation = useMutation({
+    mutationFn: async (data: AcademicTermFormData) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-terms`, 'POST', {
+        ...data,
+        companyId,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Academic term created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setIsAddTermOpen(false);
+      termForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create academic term",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const createClassMutation = useMutation({
+    mutationFn: async (data: ClassFormData) => {
+      return await apiRequest(`/api/companies/${companyId}/classes`, 'POST', {
+        ...data,
+        companyId,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Class created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setIsAddClassOpen(false);
+      classForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create class",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Debug log
   console.log('AcademicManagement component loaded with:', { companyId, companyName });
@@ -338,10 +495,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Academic Years</h2>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Academic Year
-            </Button>
+            <Dialog open={isAddYearOpen} onOpenChange={setIsAddYearOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Academic Year
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </div>
 
           {yearsLoading ? (
@@ -428,10 +589,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 </p>
               )}
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Term
-            </Button>
+            <Dialog open={isAddTermOpen} onOpenChange={setIsAddTermOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Term
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </div>
 
           {termsLoading ? (
@@ -512,10 +677,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 </p>
               )}
             </div>
-            <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Class
-            </Button>
+            <Dialog open={isAddClassOpen} onOpenChange={setIsAddClassOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Class
+                </Button>
+              </DialogTrigger>
+            </Dialog>
           </div>
 
           {classesLoading ? (
@@ -597,6 +766,341 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           )}
         </div>
       )}
+
+      {/* Add Academic Year Dialog */}
+      <Dialog open={isAddYearOpen} onOpenChange={setIsAddYearOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Academic Year</DialogTitle>
+            <DialogDescription>
+              Create a new academic year for {companyName}.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...yearForm}>
+            <form onSubmit={yearForm.handleSubmit((data) => createYearMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={yearForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Year Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Year 1, Grade 10" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={yearForm.control}
+                name="yearNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Year Number</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        max="12" 
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={yearForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Brief description of this academic year" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddYearOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createYearMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {createYearMutation.isPending ? 'Creating...' : 'Create Year'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Academic Term Dialog */}
+      <Dialog open={isAddTermOpen} onOpenChange={setIsAddTermOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Add Academic Term</DialogTitle>
+            <DialogDescription>
+              Create a new academic term for {companyName}.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...termForm}>
+            <form onSubmit={termForm.handleSubmit((data) => createTermMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={termForm.control}
+                name="academicYearId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Academic Year</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an academic year" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(academicYears as AcademicYear[]).map((year) => (
+                          <SelectItem key={year.id} value={year.id}>
+                            {year.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={termForm.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Term Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Term 1, Fall Semester" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={termForm.control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={termForm.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddTermOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createTermMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {createTermMutation.isPending ? 'Creating...' : 'Create Term'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Class Dialog */}
+      <Dialog open={isAddClassOpen} onOpenChange={setIsAddClassOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Add Class</DialogTitle>
+            <DialogDescription>
+              Create a new class for {companyName}.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...classForm}>
+            <form onSubmit={classForm.handleSubmit((data) => createClassMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={classForm.control}
+                name="termId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Academic Term</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an academic term" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(academicTerms as AcademicTerm[]).map((term) => (
+                          <SelectItem key={term.id} value={term.id}>
+                            {term.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={classForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Class Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Mathematics 101" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={classForm.control}
+                  name="subject"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subject</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Mathematics" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={classForm.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={classForm.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={classForm.control}
+                name="daysOfWeek"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Days of Week</FormLabel>
+                    <div className="grid grid-cols-4 gap-2">
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                        <label key={day} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={field.value?.includes(day) || false}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              if (e.target.checked) {
+                                field.onChange([...current, day]);
+                              } else {
+                                field.onChange(current.filter((d) => d !== day));
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm">{day.slice(0, 3)}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={classForm.control}
+                name="maxStudents"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Maximum Students</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        placeholder="20"
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 20)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddClassOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={createClassMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {createClassMutation.isPending ? 'Creating...' : 'Create Class'}
+                </Button>
+              </div>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
