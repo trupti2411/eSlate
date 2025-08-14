@@ -70,8 +70,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
     schoolName: "",
-    yearId: "",
-    termId: "",
     classId: "",
   });
 
@@ -134,8 +132,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
     if (student) {
       setFormData({
         schoolName: student.schoolName || "",
-        yearId: student.yearId || "",
-        termId: student.termId || "",
         classId: student.classId || "",
       });
     }
@@ -150,18 +146,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
     updateStudentMutation.mutate(formData);
   };
 
-  const selectedYear = academicYears.find(year => year.id === formData.yearId);
-  const selectedTerm = allAcademicTerms.find(term => term.id === formData.termId);
   const selectedClass = allClasses.find(cls => cls.id === formData.classId);
-  // Filter terms based on selected year ID
-  const filteredTerms = formData.yearId 
-    ? allAcademicTerms.filter(term => term.academicYearId === formData.yearId)
-    : [];
-  
-  // Filter classes based on selected term ID
-  const filteredClasses = formData.termId 
-    ? allClasses.filter(cls => cls.termId === formData.termId)
-    : [];
 
   if (studentLoading) {
     return (
@@ -214,8 +199,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                       setEditMode(false);
                       setFormData({
                         schoolName: student.schoolName || "",
-                        yearId: student.yearId || "",
-                        termId: student.termId || "",
                         classId: student.classId || "",
                       });
                     }}
@@ -297,109 +280,53 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
             </CardContent>
           </Card>
 
-          {/* Academic Assignment */}
+          {/* Class Assignment */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <GraduationCap className="w-4 h-4" />
-                <span>Academic Assignment</span>
+                <BookOpen className="w-4 h-4" />
+                <span>Class Assignment</span>
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Academic Year</Label>
+                <Label>Assigned Class</Label>
                 {editMode ? (
                   <Select 
-                    value={formData.yearId || "none"} 
-                    onValueChange={(value) => setFormData({...formData, yearId: value === "none" ? "" : value, termId: "", classId: ""})}
+                    value={formData.classId || "none"} 
+                    onValueChange={(value) => setFormData({...formData, classId: value === "none" ? "" : value})}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select academic year" />
+                      <SelectValue placeholder="Select a class" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {academicYears.map((year) => (
-                        <SelectItem key={year.id} value={year.id}>
-                          {year.name} ({year.startDate ? new Date(year.startDate).getFullYear() : "?"}-{year.endDate ? new Date(year.endDate).getFullYear() : "?"})
+                      <SelectItem value="none">No class assigned</SelectItem>
+                      {allClasses.map((cls) => (
+                        <SelectItem key={cls.id} value={cls.id}>
+                          {cls.name} - {cls.subject} (Tutor: {cls.tutor?.user?.firstName} {cls.tutor?.user?.lastName})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : (
                   <Input 
-                    value={selectedYear ? `${selectedYear.name} (${selectedYear.startDate ? new Date(selectedYear.startDate).getFullYear() : "?"}-${selectedYear.endDate ? new Date(selectedYear.endDate).getFullYear() : "?"})` : "Not assigned"} 
+                    value={selectedClass ? `${selectedClass.name} - ${selectedClass.subject} (Tutor: ${selectedClass.tutor?.user?.firstName} ${selectedClass.tutor?.user?.lastName})` : "No class assigned"} 
                     disabled 
                   />
                 )}
               </div>
-
-              <div>
-                <Label>Academic Term</Label>
-                {editMode ? (
-                  <Select 
-                    value={formData.termId || "none"} 
-                    onValueChange={(value) => setFormData({...formData, termId: value === "none" ? "" : value, classId: ""})}
-                    disabled={!formData.yearId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={!formData.yearId ? "Select academic year first" : `Select academic term (${filteredTerms.length} available)`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {filteredTerms.length === 0 && formData.yearId ? (
-                        <SelectItem value="no-terms" disabled>
-                          No terms found for selected year
-                        </SelectItem>
-                      ) : (
-                        filteredTerms.map((term) => (
-                          <SelectItem key={term.id} value={term.id}>
-                            {term.name} ({new Date(term.startDate).toLocaleDateString()} - {new Date(term.endDate).toLocaleDateString()})
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input 
-                    value={selectedTerm ? `${selectedTerm.name} (${new Date(selectedTerm.startDate).toLocaleDateString()} - ${new Date(selectedTerm.endDate).toLocaleDateString()})` : "Not assigned"} 
-                    disabled 
-                  />
-                )}
-              </div>
-
-              <div>
-                <Label>Class</Label>
-                {editMode ? (
-                  <Select 
-                    value={formData.classId || "none"} 
-                    onValueChange={(value) => setFormData({...formData, classId: value === "none" ? "" : value})}
-                    disabled={!formData.termId}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={!formData.termId ? "Select academic term first" : `Select class (${filteredClasses.length} available)`} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None</SelectItem>
-                      {filteredClasses.length === 0 && formData.termId ? (
-                        <SelectItem value="no-classes" disabled>
-                          No classes found for selected term
-                        </SelectItem>
-                      ) : (
-                        filteredClasses.map((cls) => (
-                          <SelectItem key={cls.id} value={cls.id}>
-                            {cls.name} - {cls.subject} (Tutor: {cls.tutor?.user?.firstName} {cls.tutor?.user?.lastName})
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input 
-                    value={selectedClass ? `${selectedClass.name} - ${selectedClass.subject} (Tutor: ${selectedClass.tutor?.user?.firstName} ${selectedClass.tutor?.user?.lastName})` : "Not assigned"} 
-                    disabled 
-                  />
-                )}
-              </div>
+              
+              {selectedClass && (
+                <div className="mt-4 p-3 bg-gray-50 rounded-lg">
+                  <h4 className="font-medium text-sm text-gray-700 mb-2">Class Details</h4>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div><strong>Subject:</strong> {selectedClass.subject}</div>
+                    <div><strong>Description:</strong> {selectedClass.description || "No description"}</div>
+                    <div><strong>Schedule:</strong> {selectedClass.schedule || "Not specified"}</div>
+                    <div><strong>Tutor:</strong> {selectedClass.tutor?.user?.firstName} {selectedClass.tutor?.user?.lastName}</div>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

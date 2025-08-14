@@ -322,8 +322,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Clean the request body to only include allowed fields
-      const allowedFields = ['schoolName', 'yearId', 'termId', 'classId'];
+      // Clean the request body to only include allowed fields (simplified - direct class assignment)
+      const allowedFields = ['schoolName', 'classId'];
       const updateData: any = {};
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
