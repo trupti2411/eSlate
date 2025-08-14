@@ -39,6 +39,7 @@ export default function AuthPage() {
       lastName: "",
       role: "student",
     },
+    mode: "onChange", // Enable real-time validation
   });
 
   // Login mutation
@@ -328,6 +329,7 @@ export default function AuthPage() {
                                 type="email"
                                 placeholder="Enter your email"
                                 className="pl-10"
+                                disabled={registerMutation.isPending}
                                 {...field}
                               />
                               <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
