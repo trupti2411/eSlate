@@ -228,20 +228,42 @@ export default function UsersManagement() {
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="role">Role</Label>
-                    <Select value={newUserData.role} onValueChange={(value) => setNewUserData(prev => ({ ...prev, role: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">System Admin</SelectItem>
-                        <SelectItem value="company_admin">Company Admin</SelectItem>
-                        <SelectItem value="tutor">Tutor</SelectItem>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="parent">Parent</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label>User Roles</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { value: 'student', label: 'Student' },
+                        { value: 'parent', label: 'Parent' },
+                        { value: 'tutor', label: 'Tutor' },
+                        { value: 'company_admin', label: 'Business Admin' },
+                        { value: 'admin', label: 'System Admin' }
+                      ].map((role) => (
+                        <div key={role.value} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`users-role-${role.value}`}
+                            checked={newUserData.role === role.value}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewUserData(prev => ({ ...prev, role: role.value }));
+                              } else {
+                                setNewUserData(prev => ({ ...prev, role: '' }));
+                              }
+                            }}
+                            className="rounded border-gray-300 h-4 w-4"
+                          />
+                          <label
+                            htmlFor={`users-role-${role.value}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {role.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Select the primary role for this user. Only one role can be selected at a time.
+                    </p>
                   </div>
 
                   <div className="flex justify-end space-x-2">

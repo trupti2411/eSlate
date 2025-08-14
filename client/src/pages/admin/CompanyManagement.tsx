@@ -374,45 +374,44 @@ export default function CompanyManagement() {
                     />
                   </div>
 
-                  <div>
-                    <Label htmlFor="role">Primary Role</Label>
-                    <Select value={newUserData.role} onValueChange={(value) => setNewUserData(prev => ({ ...prev, role: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select primary role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tutor">Tutor</SelectItem>
-                        <SelectItem value="student">Student</SelectItem>
-                        <SelectItem value="parent">Parent</SelectItem>
-                        <SelectItem value="company_admin">Business Admin</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="space-y-3">
+                    <Label>User Roles</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { value: 'student', label: 'Student' },
+                        { value: 'parent', label: 'Parent' },
+                        { value: 'tutor', label: 'Tutor' },
+                        { value: 'company_admin', label: 'Business Admin' }
+                      ].map((role) => (
+                        <div key={role.value} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`create-role-${role.value}`}
+                            checked={newUserData.role === role.value}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setNewUserData(prev => ({ ...prev, role: role.value }));
+                              } else {
+                                setNewUserData(prev => ({ ...prev, role: '' }));
+                              }
+                            }}
+                            className="rounded border-gray-300 h-4 w-4"
+                          />
+                          <label
+                            htmlFor={`create-role-${role.value}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {role.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Select the primary role for this user. Only one role can be selected at a time.
+                    </p>
                   </div>
 
-                  {(newUserData.role === 'tutor' || newUserData.role === 'company_admin') && (
-                    <div>
-                      <Label>Additional Roles (Optional)</Label>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {['tutor', 'company_admin'].filter(role => role !== newUserData.role).map((role) => (
-                          <label key={role} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={newUserData.roles.includes(role)}
-                              onChange={(e) => {
-                                setNewUserData(prev => ({
-                                  ...prev,
-                                  roles: e.target.checked 
-                                    ? [...prev.roles, role]
-                                    : prev.roles.filter(r => r !== role)
-                                }));
-                              }}
-                            />
-                            <span className="text-sm">{role === 'company_admin' ? 'Business Admin' : role.charAt(0).toUpperCase() + role.slice(1)}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+
 
                   <div className="flex justify-end space-x-2">
                     <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
@@ -465,20 +464,46 @@ export default function CompanyManagement() {
                       />
                     </div>
 
-                    <div>
-                      <Label htmlFor="editRole">Role</Label>
-                      <Select name="editRole" defaultValue={editingUser.role}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="tutor">Tutor</SelectItem>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="company_admin">Business Admin</SelectItem>
-                          {currentUser?.role === 'admin' && <SelectItem value="admin">System Admin</SelectItem>}
-                        </SelectContent>
-                      </Select>
+                    <div className="space-y-3">
+                      <Label>User Roles</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        {[
+                          { value: 'student', label: 'Student' },
+                          { value: 'parent', label: 'Parent' },
+                          { value: 'tutor', label: 'Tutor' },
+                          { value: 'company_admin', label: 'Business Admin' },
+                          ...(currentUser?.role === 'admin' ? [{ value: 'admin', label: 'System Admin' }] : [])
+                        ].map((roleOption) => (
+                          <div key={roleOption.value} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={`edit-role-${roleOption.value}`}
+                              name="editRole"
+                              value={roleOption.value}
+                              defaultChecked={editingUser.role === roleOption.value}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  // Uncheck other role checkboxes
+                                  const roleCheckboxes = document.querySelectorAll('input[name="editRole"]') as NodeListOf<HTMLInputElement>;
+                                  roleCheckboxes.forEach(checkbox => {
+                                    if (checkbox !== e.target) checkbox.checked = false;
+                                  });
+                                }
+                              }}
+                              className="rounded border-gray-300 h-4 w-4"
+                            />
+                            <label
+                              htmlFor={`edit-role-${roleOption.value}`}
+                              className="text-sm font-medium leading-none cursor-pointer"
+                            >
+                              {roleOption.label}
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        Select the primary role for this user. Only one role can be selected at a time.
+                      </p>
                     </div>
 
                     <div className="flex items-center space-x-2">
