@@ -840,6 +840,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get student info for editing (including company assignment)
+  app.get('/api/admin/users/:userId/student-info', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      const { userId } = req.params;
+      
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      res.json({
+        companyId: student.companyId,
+        tutorId: student.tutorId,
+        gradeLevel: student.gradeLevel,
+        parentId: student.parentId
+      });
+    } catch (error) {
+      console.error("Error fetching student info:", error);
+      res.status(500).json({ message: "Failed to fetch student info" });
+    }
+  });
+
   // Create new user within a company context
   app.post('/api/admin/create-user', isAuthenticated, async (req: any, res) => {
     try {
@@ -925,7 +952,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const updatedUser = await storage.updateUser(req.params.id, req.body);
+      const { companyId, ...updateData } = req.body;
+      
+      // Update basic user data
+      const updatedUser = await storage.updateUser(req.params.id, updateData);
+      
+      // If user is a student and companyId is provided, update student record
+      if (updatedUser.role === 'student' && companyId !== undefined) {
+        const student = await storage.getStudentByUserId(req.params.id);
+        if (student) {
+          await storage.updateStudent(student.id, {
+            companyId: companyId || null
+          });
+        }
+      }
+      
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating user:", error);

@@ -8,13 +8,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
-**August 14, 2025 - Student-Company Assignment System Implemented**
+**August 14, 2025 - Admin-Controlled Student-Company Assignment System**
 - ✅ Added direct `companyId` field to students table for flexible company assignment
-- ✅ Enhanced registration form with company selection dropdown for student registrations
 - ✅ Updated database schema with `drizzle-kit push` - changes applied successfully
-- ✅ Modified `/api/companies` endpoint to be accessible without authentication for registration
-- ✅ Updated backend to handle company assignment during student creation
-- ✅ Students can now be directly assigned to companies during registration process
+- ✅ Implemented company assignment in admin user edit dialog
+- ✅ Added company selection dropdown that appears only when editing students
+- ✅ Created `/api/admin/users/:userId/student-info` endpoint to fetch current assignments
+- ✅ Updated user PATCH endpoint to handle student company assignment updates
+- ✅ System admin can now assign students to companies through the user management interface
 
 **August 14, 2025 - Registration Form Issues Resolved**
 - ✅ Created completely new SimpleRegistration component to bypass form library conflicts

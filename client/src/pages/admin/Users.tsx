@@ -44,6 +44,7 @@ export default function UsersManagement() {
     lastName: "",
     roles: [] as string[],
     isActive: true,
+    companyId: "",
   });
 
   // Get current user to check if master admin
@@ -59,6 +60,11 @@ export default function UsersManagement() {
   // Fetch deleted users
   const { data: deletedUsers = [], isLoading: deletedUsersLoading } = useQuery<User[]>({
     queryKey: ["/api/admin/deleted-users"],
+  });
+
+  // Fetch companies for assignment
+  const { data: companies = [] } = useQuery<{id: string; name: string; isActive: boolean}[]>({
+    queryKey: ["/api/companies"],
   });
 
   // Filter users by role
@@ -172,16 +178,30 @@ export default function UsersManagement() {
     },
   });
 
-  const handleEditUser = (user: User) => {
+  const handleEditUser = async (user: User) => {
     setSelectedUser(user);
     // Convert single role to array for multiple role support
     const userRoles = user.role ? [user.role] : [];
+    
+    // Fetch student's current company assignment if user is a student
+    let currentCompanyId = "";
+    if (user.role === 'student') {
+      try {
+        const response = await apiRequest(`/api/admin/users/${user.id}/student-info`, 'GET');
+        const studentInfo = await response.json();
+        currentCompanyId = studentInfo.companyId || "";
+      } catch (error) {
+        console.log("Could not fetch student company info:", error);
+      }
+    }
+    
     setEditUserData({
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
       roles: userRoles,
       isActive: user.isActive,
+      companyId: currentCompanyId,
     });
     setIsEditUserDialogOpen(true);
   };
@@ -424,6 +444,32 @@ export default function UsersManagement() {
                       Select one or more roles for this user. Business Admins can also be Tutors.
                     </p>
                   </div>
+
+                  {/* Company Assignment - Only show for students */}
+                  {editUserData.roles.includes('student') && (
+                    <div>
+                      <Label htmlFor="editCompanyId">Assign to Tutoring Company</Label>
+                      <Select 
+                        value={editUserData.companyId} 
+                        onValueChange={(value) => setEditUserData(prev => ({ ...prev, companyId: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a company (optional)" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">No company assigned</SelectItem>
+                          {companies.filter(c => c.isActive).map((company) => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Assign this student to a tutoring company for management purposes.
+                      </p>
+                    </div>
+                  )}
 
                   <div className="space-y-3">
                     <Label>User Status</Label>
