@@ -171,9 +171,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           tutorId = req.body.tutorId;
         } else {
-          // For now, require tutorId to be specified for company admin assignments
-          // This ensures data integrity since tutorId is required in the schema
-          return res.status(400).json({ message: "Please specify a tutor for this assignment" });
+          // Company admin can create assignments without specifying a tutor
+          tutorId = null;
         }
       }
 

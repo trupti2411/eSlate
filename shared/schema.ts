@@ -118,7 +118,7 @@ export const assignments = pgTable("assignments", {
   description: text("description"),
   instructions: text("instructions"),
   dueDate: timestamp("due_date"),
-  tutorId: varchar("tutor_id").notNull().references(() => tutors.id),
+  tutorId: varchar("tutor_id").references(() => tutors.id), // Optional - company admins can create assignments without specifying tutors
   studentIds: text("student_ids").array(), // Support multiple students per assignment
   classId: varchar("class_id").references(() => classes.id), // Assign to entire class
   status: assignmentStatusEnum("status").notNull().default('assigned'),
