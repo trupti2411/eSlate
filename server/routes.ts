@@ -930,20 +930,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Academic Management Routes
   
   // Get academic years for a company
-  app.get('/api/companies/:companyId/academic-years', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:companyId/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
-      
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const user = req.user!;
 
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
@@ -979,20 +969,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create academic year
-  app.post('/api/companies/:companyId/academic-years', isAuthenticated, async (req: any, res) => {
+  app.post('/api/companies/:companyId/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
-      
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const user = req.user!;
 
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
@@ -1017,21 +997,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get academic terms
-  app.get('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
       const { yearId } = req.query;
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
-      
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const user = req.user!;
 
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
@@ -1072,20 +1042,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create academic term
-  app.post('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res) => {
+  app.post('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
-      
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const user = req.user!;
 
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
@@ -1110,21 +1070,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get classes
-  app.get('/api/companies/:companyId/classes', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:companyId/classes', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
       const { termId } = req.query;
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
-      
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const user = req.user!;
 
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
@@ -1195,20 +1145,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create class
-  app.post('/api/companies/:companyId/classes', isAuthenticated, async (req: any, res) => {
+  app.post('/api/companies/:companyId/classes', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
-      
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const user = req.user!;
 
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
@@ -1233,20 +1173,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get hierarchical academic structure: Years -> Terms -> Classes
-  app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { companyId } = req.params;
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
-      
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
+      const user = req.user!;
 
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
