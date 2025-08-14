@@ -1178,6 +1178,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Update academic year
+  app.put('/api/companies/:companyId/academic-years/:yearId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, yearId } = req.params;
+      const user = req.user!;
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const academicYearData = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+
+      const updatedYear = await storage.updateAcademicYear(yearId, academicYearData);
+      res.json(updatedYear);
+    } catch (error) {
+      console.error("Error updating academic year:", error);
+      res.status(500).json({ message: "Failed to update academic year" });
+    }
+  });
+
+  // Update academic term
+  app.put('/api/companies/:companyId/academic-terms/:termId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, termId } = req.params;
+      const user = req.user!;
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const academicTermData = {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      };
+
+      const updatedTerm = await storage.updateAcademicTerm(termId, academicTermData);
+      res.json(updatedTerm);
+    } catch (error) {
+      console.error("Error updating academic term:", error);
+      res.status(500).json({ message: "Failed to update academic term" });
+    }
+  });
+
+  // Update class
+  app.put('/api/companies/:companyId/classes/:classId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, classId } = req.params;
+      const user = req.user!;
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const classData = {
+        ...req.body,
+        daysOfWeek: Array.isArray(req.body.daysOfWeek) ? req.body.daysOfWeek : [req.body.daysOfWeek].filter(Boolean),
+      };
+
+      const updatedClass = await storage.updateClass(classId, classData);
+      res.json(updatedClass);
+    } catch (error) {
+      console.error("Error updating class:", error);
+      res.status(500).json({ message: "Failed to update class" });
+    }
+  });
+
+  // Delete academic year
+  app.delete('/api/companies/:companyId/academic-years/:yearId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, yearId } = req.params;
+      const user = req.user!;
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.deleteAcademicYear(yearId);
+      res.json({ message: "Academic year deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting academic year:", error);
+      res.status(500).json({ message: "Failed to delete academic year" });
+    }
+  });
+
+  // Delete academic term
+  app.delete('/api/companies/:companyId/academic-terms/:termId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, termId } = req.params;
+      const user = req.user!;
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.deleteAcademicTerm(termId);
+      res.json({ message: "Academic term deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting academic term:", error);
+      res.status(500).json({ message: "Failed to delete academic term" });
+    }
+  });
+
+  // Delete class
+  app.delete('/api/companies/:companyId/classes/:classId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, classId } = req.params;
+      const user = req.user!;
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.deleteClass(classId);
+      res.json({ message: "Class deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      res.status(500).json({ message: "Failed to delete class" });
+    }
+  });
+
   // Get hierarchical academic structure: Years -> Terms -> Classes
   app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
