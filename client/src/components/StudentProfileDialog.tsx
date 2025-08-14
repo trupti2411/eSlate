@@ -179,7 +179,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
           <DialogTitle className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <User className="w-5 h-5" />
-              <span>{student.user.firstName} {student.user.lastName} - Profile</span>
+              <span>{student.user?.firstName || 'Unknown'} {student.user?.lastName || 'User'} - Profile</span>
             </div>
             <div className="flex space-x-2">
               {editMode ? (
@@ -236,17 +236,17 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>First Name</Label>
-                  <Input value={student.user.firstName || ""} disabled />
+                  <Input value={student.user?.firstName || ""} disabled />
                 </div>
                 <div>
                   <Label>Last Name</Label>
-                  <Input value={student.user.lastName || ""} disabled />
+                  <Input value={student.user?.lastName || ""} disabled />
                 </div>
               </div>
               
               <div>
                 <Label>Email</Label>
-                <Input value={student.user.email || ""} disabled />
+                <Input value={student.user?.email || ""} disabled />
               </div>
               
               <div className="grid grid-cols-2 gap-4">
@@ -298,15 +298,15 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                 <div>
                   <Label>Status</Label>
                   <div className="mt-1">
-                    <Badge variant={student.user.isActive ? "default" : "destructive"}>
-                      {student.user.isActive ? "Active" : "Inactive"}
+                    <Badge variant={student.user?.isActive ? "default" : "destructive"}>
+                      {student.user?.isActive ? "Active" : "Inactive"}
                     </Badge>
                   </div>
                 </div>
                 <div>
                   <Label>Joined Date</Label>
                   <div className="mt-1 text-sm text-gray-600">
-                    {new Date(student.user.createdAt).toLocaleDateString()}
+                    {student.user?.createdAt ? new Date(student.user.createdAt).toLocaleDateString() : "Unknown"}
                   </div>
                 </div>
               </div>

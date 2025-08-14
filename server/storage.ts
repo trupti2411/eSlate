@@ -253,9 +253,35 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Student operations
-  async getStudent(id: string): Promise<Student | undefined> {
-    const [student] = await db.select().from(students).where(eq(students.id, id));
-    return student;
+  async getStudent(id: string): Promise<any> {
+    const result = await db
+      .select({
+        id: students.id,
+        userId: students.userId,
+        gradeLevel: students.gradeLevel,
+        schoolName: students.schoolName,
+        parentId: students.parentId,
+        tutorId: students.tutorId,
+        companyId: students.companyId,
+        yearId: students.yearId,
+        termId: students.termId,
+        classId: students.classId,
+        createdAt: students.createdAt,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          isActive: users.isActive,
+          createdAt: users.createdAt,
+        }
+      })
+      .from(students)
+      .leftJoin(users, eq(students.userId, users.id))
+      .where(eq(students.id, id))
+      .limit(1);
+    
+    return result[0] || undefined;
   }
 
   async getStudentByUserId(userId: string): Promise<Student | undefined> {
@@ -287,7 +313,11 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     // Return the updated student with user details
-    return this.getStudent(id)!;
+    const updatedStudentWithUser = await this.getStudent(id);
+    if (!updatedStudentWithUser) {
+      throw new Error("Failed to retrieve updated student");
+    }
+    return updatedStudentWithUser;
   }
 
   async getStudentsByTutor(tutorId: string): Promise<Student[]> {
