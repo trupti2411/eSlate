@@ -269,12 +269,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateStudent(id: string, updates: Partial<InsertStudent>): Promise<Student> {
+    // Get the current student for validation
+    const currentStudent = await this.getStudent(id);
+    if (!currentStudent) {
+      throw new Error("Student not found");
+    }
+
     const [updatedStudent] = await db
       .update(students)
-      .set(updates)
+      .set({
+        ...updates,
+        // Don't allow updating these fields
+        id: undefined,
+        userId: undefined,
+      })
       .where(eq(students.id, id))
       .returning();
-    return updatedStudent;
+    
+    // Return the updated student with user details
+    return this.getStudent(id)!;
   }
 
   async getStudentsByTutor(tutorId: string): Promise<Student[]> {

@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar } from "lucide-react";
+import { StudentProfileDialog } from "@/components/StudentProfileDialog";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
@@ -67,6 +68,8 @@ export default function CompanyDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [isCreateTutorOpen, setIsCreateTutorOpen] = useState(false);
   const [isAssignTutorOpen, setIsAssignTutorOpen] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
 
   const [tutorFormData, setTutorFormData] = useState({
@@ -602,20 +605,19 @@ export default function CompanyDashboard() {
                           </div>
                         </td>
                         <td className="border border-gray-300 px-4 py-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              // TODO: Implement student profile view
-                              toast({
-                                title: "Student Profile",
-                                description: `Viewing profile for ${student.user.firstName} ${student.user.lastName}`,
-                              });
-                            }}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            View Profile
-                          </Button>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setSelectedStudentId(student.id);
+                                setIsStudentProfileOpen(true);
+                              }}
+                            >
+                              <Edit className="w-4 h-4 mr-1" />
+                              Edit Profile
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -631,6 +633,19 @@ export default function CompanyDashboard() {
             )}
           </CardContent>
         </Card>
+
+        {/* Student Profile Dialog */}
+        {selectedStudentId && companyAdmin && (
+          <StudentProfileDialog
+            studentId={selectedStudentId}
+            companyId={companyAdmin.companyId}
+            isOpen={isStudentProfileOpen}
+            onClose={() => {
+              setIsStudentProfileOpen(false);
+              setSelectedStudentId(null);
+            }}
+          />
+        )}
       </div>
     </Layout>
   );

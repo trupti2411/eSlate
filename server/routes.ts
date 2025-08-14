@@ -261,6 +261,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Student profile routes
+  app.get("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    const { studentId } = req.params;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+
+    try {
+      const student = await storage.getStudent(studentId);
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      
+      // Check permissions - only allow company admins, tutors from same company, or the student themselves
+      if (user.role === 'student' && student.userId !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      } else if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || student.companyId !== companyAdmin.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor || student.companyId !== tutor.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      res.json(student);
+    } catch (error) {
+      console.error("Error fetching student:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Update student profile
+  app.patch("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    const { studentId } = req.params;
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+
+    try {
+      const student = await storage.getStudent(studentId);
+      if (!student) return res.status(404).json({ message: "Student not found" });
+      
+      // Check permissions - only allow company admins, tutors from same company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || student.companyId !== companyAdmin.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor || student.companyId !== tutor.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const updatedStudent = await storage.updateStudent(studentId, req.body);
+      res.json(updatedStudent);
+    } catch (error) {
+      console.error("Error updating student:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Progress routes
   app.get('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
