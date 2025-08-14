@@ -103,6 +103,13 @@ export default function AssignmentDetailDialog({
   // Submit assignment mutation
   const submitMutation = useMutation({
     mutationFn: async () => {
+      console.log("Submitting assignment with data:", {
+        assignmentId: assignment.id,
+        content: submissionText,
+        fileUrls: uploadedFiles,
+        status: 'submitted'
+      });
+
       const submissionData = {
         assignmentId: assignment.id,
         content: submissionText,
@@ -114,9 +121,11 @@ export default function AssignmentDetailDialog({
 
       if (existingSubmission?.id) {
         // Update existing submission
+        console.log("Updating existing submission:", existingSubmission.id);
         return await apiRequest("PATCH", `/api/submissions/${existingSubmission.id}`, submissionData);
       } else {
         // Create new submission
+        console.log("Creating new submission");
         return await apiRequest("POST", "/api/submissions", submissionData);
       }
     },

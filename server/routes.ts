@@ -340,6 +340,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
+      console.log("Creating submission for user:", user.id, "role:", user.role);
+      console.log("Submission data received:", req.body);
       
       if (user.role !== 'student') {
         return res.status(403).json({ message: "Only students can create submissions" });
@@ -347,19 +349,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const student = await storage.getStudentByUserId(user.id);
       if (!student) {
+        console.log("Student profile not found for user:", user.id);
         return res.status(404).json({ message: "Student profile not found" });
       }
 
-      const validatedData = insertSubmissionSchema.parse({
+      console.log("Found student:", student.id);
+
+      const submissionData = {
         ...req.body,
         studentId: student.id,
-      });
+        submittedAt: req.body.submittedAt ? new Date(req.body.submittedAt) : new Date(),
+      };
+
+      console.log("Prepared submission data:", submissionData);
+
+      const validatedData = insertSubmissionSchema.parse(submissionData);
+      console.log("Validated submission data:", validatedData);
 
       const submission = await storage.createSubmission(validatedData);
+      console.log("Created submission:", submission);
       res.json(submission);
     } catch (error) {
       console.error("Error creating submission:", error);
-      res.status(500).json({ message: "Failed to create submission" });
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ message: "Failed to create submission", details: error.message });
     }
   });
 
