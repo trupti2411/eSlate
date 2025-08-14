@@ -954,6 +954,13 @@ export class DatabaseStorage implements IStorage {
     return tutorData;
   }
 
+  async verifyTutor(tutorId: string): Promise<void> {
+    await db
+      .update(tutors)
+      .set({ isVerified: true })
+      .where(eq(tutors.id, tutorId));
+  }
+
   // Academic management methods implementation
 
   // Academic Years
