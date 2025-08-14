@@ -20,32 +20,19 @@ interface ObjectUploaderProps {
   ) => void;
   buttonClassName?: string;
   children: ReactNode;
-  allowedFileTypes?: string[];
 }
 
 /**
  * A file upload component that renders as a button and provides a modal interface for
  * file management.
- * 
- * Features:
- * - Renders as a customizable button that opens a file upload modal
- * - Provides a modal interface for:
- *   - File selection
- *   - File preview
- *   - Upload progress tracking
- *   - Upload status display
- * 
- * The component uses Uppy under the hood to handle all file upload functionality.
- * All file management features are automatically handled by the Uppy dashboard modal.
  */
 export function ObjectUploader({
-  maxNumberOfFiles = 5,
+  maxNumberOfFiles = 1,
   maxFileSize = 10485760, // 10MB default
   onGetUploadParameters,
   onComplete,
   buttonClassName,
   children,
-  allowedFileTypes = ['pdf', 'doc', 'docx', 'txt', 'jpg', 'png', 'mp4', 'mp3'],
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
   const [uppy] = useState(() =>
@@ -53,7 +40,6 @@ export function ObjectUploader({
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
-        allowedFileTypes: allowedFileTypes.length > 0 ? allowedFileTypes.map(ext => `.${ext}`) : undefined,
       },
       autoProceed: false,
     })
@@ -63,7 +49,6 @@ export function ObjectUploader({
       })
       .on("complete", (result) => {
         onComplete?.(result);
-        setShowModal(false);
       })
   );
 

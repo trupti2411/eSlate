@@ -10,6 +10,10 @@ import {
   messages,
   progress,
   calendarEvents,
+  academicYears,
+  academicTerms,
+  classes,
+  studentClassAssignments,
   type User,
   type Student,
   type InsertStudent,
@@ -360,6 +364,42 @@ export class DatabaseStorage implements IStorage {
       .where(eq(assignments.id, id))
       .returning();
     return assignment;
+  }
+
+  async getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .leftJoin(tutors, eq(assignments.tutorId, tutors.id))
+      .where(eq(tutors.companyId, companyId))
+      .orderBy(desc(assignments.createdAt));
+  }
+
+  async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
+    return await db.select({
+      id: students.id,
+      userId: students.userId,
+      user: {
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      }
+    }).from(students)
+      .leftJoin(users, eq(students.userId, users.id))
+      .where(eq(students.companyId, companyId));
+  }
+
+  async gradeSubmission(submissionId: string, score: number, feedback: string, graderId: string): Promise<Submission | null> {
+    const [submission] = await db.update(submissions)
+      .set({ 
+        score, 
+        feedback, 
+        gradedBy: graderId,
+        gradedAt: new Date(),
+        status: 'graded',
+        updatedAt: new Date()
+      })
+      .where(eq(submissions.id, submissionId))
+      .returning();
+    return submission || null;
   }
 
   // Submission operations

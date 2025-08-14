@@ -238,6 +238,20 @@ export default function CompanyDashboard() {
           <div>
             <h1 className="page-title">{company.name} - Admin Dashboard</h1>
             <p className="text-gray-600">Manage your tutoring company's staff and operations</p>
+            <div className="flex space-x-4 mt-4">
+              <Link href="/company/homework">
+                <Button variant="outline" className="flex items-center space-x-2">
+                  <BookOpen className="w-4 h-4" />
+                  <span>Homework Management</span>
+                </Button>
+              </Link>
+              <Link href="/company/academic">
+                <Button variant="outline" className="flex items-center space-x-2">
+                  <Calendar className="w-4 h-4" />
+                  <span>Academic Management</span>
+                </Button>
+              </Link>
+            </div>
           </div>
           
           <div className="flex space-x-2">
