@@ -35,6 +35,9 @@ function Router() {
 
   return (
     <Switch>
+      {/* Always available auth route for registration */}
+      <Route path="/auth" component={AuthPage} />
+      
       {!isAuthenticated ? (
         <Route path="/" component={AuthPage} />
       ) : (

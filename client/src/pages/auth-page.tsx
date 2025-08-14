@@ -8,10 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Mail, Lock, User, UserPlus, LogIn, AlertCircle, CheckCircle, GraduationCap } from "lucide-react";
+import { Mail, Lock, User, UserPlus, LogIn, AlertCircle, CheckCircle, GraduationCap, ArrowLeft } from "lucide-react";
 import { registerSchema, loginSchema, type RegisterData, type LoginData } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { Link } from "wouter";
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -19,6 +21,7 @@ export default function AuthPage() {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const { toast } = useToast();
+  const { user, isAuthenticated } = useAuth();
 
   // Login form
   const loginForm = useForm<LoginData>({
@@ -148,6 +151,15 @@ export default function AuthPage() {
       {/* Left side - Form */}
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-6">
+          {/* Back button for authenticated users */}
+          {isAuthenticated && (
+            <Link href="/">
+              <Button variant="outline" className="mb-4">
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            </Link>
+          )}
           {/* Logo/Header */}
           <div className="text-center">
             <div className="flex items-center justify-center mb-4">
