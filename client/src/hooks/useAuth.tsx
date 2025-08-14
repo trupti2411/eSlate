@@ -78,15 +78,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await apiRequest("/api/auth/logout", "POST");
     },
     onSuccess: () => {
+      // Clear localStorage token
       localStorage.removeItem('authToken');
+      // Clear query cache
       queryClient.setQueryData(["/api/auth/user"], null);
-      queryClient.clear(); // Clear all cached data
+      // Clear all cached data
+      queryClient.clear();
       toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
+        title: "Goodbye!",
+        description: "You have been logged out successfully.",
       });
     },
     onError: (error: Error) => {
+      // Even if logout fails, clear local data
+      localStorage.removeItem('authToken');
+      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.clear();
       toast({
         title: "Logout failed",
         description: error.message,

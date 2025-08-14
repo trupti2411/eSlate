@@ -14,20 +14,20 @@ export default function Layout({ children }: LayoutProps) {
 
   const handleLogout = async () => {
     try {
+      // Clear localStorage first
+      localStorage.removeItem('authToken');
+      
       const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });
       
-      if (response.ok) {
-        // Force a full page reload to clear all state
-        window.location.href = '/';
-      } else {
-        console.error('Logout failed');
-      }
+      // Force a full page reload to clear all state regardless of response
+      window.location.href = '/';
     } catch (error) {
       console.error('Logout error:', error);
-      // Fallback: still redirect even if logout request fails
+      // Clear localStorage and redirect even if logout request fails
+      localStorage.removeItem('authToken');
       window.location.href = '/';
     }
   };

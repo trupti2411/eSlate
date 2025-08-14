@@ -121,7 +121,7 @@ export interface AuthenticatedRequest extends Request {
 
 export async function isAuthenticated(req: AuthenticatedRequest, res: Response, next: NextFunction) {
   try {
-    // Check session-based authentication
+    // Check session-based authentication first
     if ((req as any).session?.userId) {
       const user = await storage.getUser((req as any).session.userId);
       if (user && user.isActive && !user.isDeleted) {
@@ -142,9 +142,17 @@ export async function isAuthenticated(req: AuthenticatedRequest, res: Response, 
           return next();
         }
       } catch (jwtError) {
-        // Invalid JWT, continue to unauthorized
+        console.error('JWT verification error:', jwtError);
       }
     }
+
+    // Debug logging for authentication failures
+    console.error('Authentication failed:', {
+      hasSession: !!(req as any).session?.userId,
+      hasAuthHeader: !!authHeader,
+      userAgent: req.headers['user-agent'],
+      path: req.path
+    });
 
     return res.status(401).json({ message: 'Authentication required' });
   } catch (error) {
