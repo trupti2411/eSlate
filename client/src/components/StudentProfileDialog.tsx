@@ -22,7 +22,6 @@ interface StudentProfileDialogProps {
 interface Student {
   id: string;
   userId: string;
-  gradeLevel: string;
   schoolName: string;
   yearId: string;
   termId: string;
@@ -70,7 +69,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   const { toast } = useToast();
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
-    gradeLevel: "",
     schoolName: "",
     yearId: "",
     termId: "",
@@ -129,7 +127,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   useEffect(() => {
     if (student) {
       setFormData({
-        gradeLevel: student.gradeLevel || "",
         schoolName: student.schoolName || "",
         yearId: student.yearId || "",
         termId: student.termId || "",
@@ -198,7 +195,6 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                     onClick={() => {
                       setEditMode(false);
                       setFormData({
-                        gradeLevel: student.gradeLevel || "",
                         schoolName: student.schoolName || "",
                         yearId: student.yearId || "",
                         termId: student.termId || "",
@@ -249,37 +245,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                 <Input value={student.user?.email || ""} disabled />
               </div>
               
-              <div>
-                <Label>Grade Level (Alternative to Academic Year)</Label>
-                {editMode ? (
-                  <Select 
-                    value={formData.gradeLevel || "none"} 
-                    onValueChange={(value) => setFormData({...formData, gradeLevel: value === "none" ? "" : value, yearId: "", termId: "", classId: ""})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select grade level (or use Academic Year below)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">None - Use Academic Year Instead</SelectItem>
-                      <SelectItem value="K">Kindergarten</SelectItem>
-                      <SelectItem value="1">Grade 1</SelectItem>
-                      <SelectItem value="2">Grade 2</SelectItem>
-                      <SelectItem value="3">Grade 3</SelectItem>
-                      <SelectItem value="4">Grade 4</SelectItem>
-                      <SelectItem value="5">Grade 5</SelectItem>
-                      <SelectItem value="6">Grade 6</SelectItem>
-                      <SelectItem value="7">Grade 7</SelectItem>
-                      <SelectItem value="8">Grade 8</SelectItem>
-                      <SelectItem value="9">Grade 9</SelectItem>
-                      <SelectItem value="10">Grade 10</SelectItem>
-                      <SelectItem value="11">Grade 11</SelectItem>
-                      <SelectItem value="12">Grade 12</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input value={student.gradeLevel || "Not set"} disabled />
-                )}
-              </div>
+
 
               <div>
                 <Label>School Name</Label>
@@ -323,28 +289,27 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Academic Year (Alternative to Grade Level)</Label>
+                <Label>Academic Year</Label>
                 {editMode ? (
                   <Select 
                     value={formData.yearId || "none"} 
-                    onValueChange={(value) => setFormData({...formData, yearId: value === "none" ? "" : value, termId: "", classId: "", gradeLevel: ""})}
-                    disabled={!!formData.gradeLevel}
+                    onValueChange={(value) => setFormData({...formData, yearId: value === "none" ? "" : value, termId: "", classId: ""})}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={formData.gradeLevel ? "Clear Grade Level to use Academic Year" : "Select academic year"} />
+                      <SelectValue placeholder="Select academic year" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {academicYears.map((year) => (
                         <SelectItem key={year.id} value={year.id}>
-                          {year.name} ({new Date(year.startDate).getFullYear()}-{new Date(year.endDate).getFullYear()})
+                          {year.name} ({year.startDate ? new Date(year.startDate).getFullYear() : "?"}-{year.endDate ? new Date(year.endDate).getFullYear() : "?"})
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 ) : (
                   <Input 
-                    value={selectedYear ? `${selectedYear.name} (${new Date(selectedYear.startDate).getFullYear()}-${new Date(selectedYear.endDate).getFullYear()})` : "Not assigned"} 
+                    value={selectedYear ? `${selectedYear.name} (${selectedYear.startDate ? new Date(selectedYear.startDate).getFullYear() : "?"}-${selectedYear.endDate ? new Date(selectedYear.endDate).getFullYear() : "?"})` : "Not assigned"} 
                     disabled 
                   />
                 )}
