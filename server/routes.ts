@@ -73,18 +73,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Submission routes
-  app.get('/api/submissions', isAuthenticated, async (req: any, res) => {
+  app.get('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      const user = req.user!;
 
       let submissions: any[] = [];
       if (user.role === 'student') {
-        const student = await storage.getStudentByUserId(userId);
+        const student = await storage.getStudentByUserId(user.id);
         if (student) {
           submissions = await storage.getSubmissionsByStudent(student.id);
         }
@@ -97,16 +92,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/submissions', isAuthenticated, async (req: any, res) => {
+  app.post('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       
-      if (!user || user.role !== 'student') {
+      if (user.role !== 'student') {
         return res.status(403).json({ message: "Only students can create submissions" });
       }
 
-      const student = await storage.getStudentByUserId(userId);
+      const student = await storage.getStudentByUserId(user.id);
       if (!student) {
         return res.status(404).json({ message: "Student profile not found" });
       }
@@ -124,13 +118,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/submissions/:id/verify', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/submissions/:id/verify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       const submissionId = req.params.id;
       
-      if (!user || user.role !== 'parent') {
+      if (user.role !== 'parent') {
         return res.status(403).json({ message: "Only parents can verify submissions" });
       }
 
@@ -143,9 +136,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Message routes
-  app.get('/api/messages/:receiverId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/messages/:receiverId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const senderId = req.user.claims.sub;
+      const user = req.user!;
+      const senderId = user.id;
       const receiverId = req.params.receiverId;
       
       const messages = await storage.getMessagesBetweenUsers(senderId, receiverId);
@@ -156,9 +150,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/messages', isAuthenticated, async (req: any, res) => {
+  app.post('/api/messages', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const senderId = req.user.claims.sub;
+      const user = req.user!;
+      const senderId = user.id;
       
       const validatedData = insertMessageSchema.parse({
         ...req.body,
@@ -174,18 +169,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Progress routes
-  app.get('/api/progress', isAuthenticated, async (req: any, res) => {
+  app.get('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      const user = req.user!;
 
       let progress: any[] = [];
       if (user.role === 'student') {
-        const student = await storage.getStudentByUserId(userId);
+        const student = await storage.getStudentByUserId(user.id);
         if (student) {
           progress = await storage.getProgressByStudent(student.id);
         }
@@ -199,23 +189,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar routes
-  app.get('/api/calendar', isAuthenticated, async (req: any, res) => {
+  app.get('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      const user = req.user!;
 
       let events: any[] = [];
       if (user.role === 'tutor') {
-        const tutor = await storage.getTutorByUserId(userId);
+        const tutor = await storage.getTutorByUserId(user.id);
         if (tutor) {
           events = await storage.getCalendarEventsByTutor(tutor.id);
         }
       } else if (user.role === 'student') {
-        const student = await storage.getStudentByUserId(userId);
+        const student = await storage.getStudentByUserId(user.id);
         if (student) {
           events = await storage.getCalendarEventsByStudent(student.id);
         }
@@ -228,16 +213,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/calendar', isAuthenticated, async (req: any, res) => {
+  app.post('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       
-      if (!user || user.role !== 'tutor') {
+      if (user.role !== 'tutor') {
         return res.status(403).json({ message: "Only tutors can create calendar events" });
       }
 
-      const tutor = await storage.getTutorByUserId(userId);
+      const tutor = await storage.getTutorByUserId(user.id);
       if (!tutor) {
         return res.status(404).json({ message: "Tutor profile not found" });
       }
@@ -256,23 +240,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Students route for tutors and parents
-  app.get('/api/students', isAuthenticated, async (req: any, res) => {
+  app.get('/api/students', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
+      const user = req.user!;
 
       let students: any[] = [];
       if (user.role === 'tutor') {
-        const tutor = await storage.getTutorByUserId(userId);
+        const tutor = await storage.getTutorByUserId(user.id);
         if (tutor) {
           students = await storage.getStudentsByTutor(tutor.id);
         }
       } else if (user.role === 'parent') {
-        const parent = await storage.getParentByUserId(userId);
+        const parent = await storage.getParentByUserId(user.id);
         if (parent) {
           students = await storage.getStudentsByParent(parent.id);
         }
@@ -297,17 +276,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get individual company details
-  app.get('/api/companies/:id', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:id', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
+      const user = req.user!;
       const companyId = req.params.id;
-      
-      // Get requesting user (try by Replit ID first, then by email)
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
       
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
@@ -334,19 +306,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all users within a company
-  app.get('/api/companies/:id/users', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:id/users', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       const companyId = req.params.id;
       
-      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
       // Check if user is company admin for this company
       if (user.role === 'company_admin') {
-        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (!companyAdmin || companyAdmin.companyId !== companyId) {
           return res.status(403).json({ message: "Access denied to this company" });
         }
@@ -360,12 +331,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies', isAuthenticated, async (req: any, res) => {
+  app.post('/api/companies', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       
-      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -385,21 +355,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/companies/:id/tutors', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:id/tutors', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
+      const user = req.user!;
       const companyId = req.params.id;
-      
-      // Get requesting user (try by Replit ID first, then by email)
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
 
       // Check if user is company admin for this company or system admin
       if (user.role === 'company_admin') {
@@ -553,18 +512,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get unassigned tutors (for assignment)
-  app.get('/api/admin/unassigned-tutors', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/unassigned-tutors', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
+      const user = req.user!;
       
-      // Get requesting user (try by Replit ID first, then by email)
-      let user = await storage.getUser(requestingReplitId);
-      if (!user && requestingEmail) {
-        user = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -577,21 +529,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company admin specific route
-  app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
+      const requestingUser = req.user!;
       const targetUserId = req.params.userId;
-      
-      // Get requesting user (try by Replit ID first, then by email)
-      let requestingUser = await storage.getUser(requestingReplitId);
-      if (!requestingUser && requestingEmail) {
-        requestingUser = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!requestingUser) {
-        return res.status(401).json({ message: "User not found" });
-      }
       
       // Allow users to fetch their own company admin data or system admins
       if (requestingUser.id !== targetUserId && requestingUser.role !== 'admin') {
@@ -611,21 +552,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get company students 
-  app.get('/api/companies/:id/students', isAuthenticated, async (req: any, res) => {
+  app.get('/api/companies/:id/students', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const requestingReplitId = req.user.claims.sub;
-      const requestingEmail = req.user.claims.email;
+      const requestingUser = req.user!;
       const companyId = req.params.id;
-      
-      // Get requesting user
-      let requestingUser = await storage.getUser(requestingReplitId);
-      if (!requestingUser && requestingEmail) {
-        requestingUser = await storage.getUserByEmail(requestingEmail);
-      }
-      
-      if (!requestingUser) {
-        return res.status(401).json({ message: "User not found" });
-      }
       
       // Check if user has access to this company
       if (requestingUser.role === 'company_admin') {
@@ -647,12 +577,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Admin routes for user management
   // Get deleted users
-  app.get('/api/admin/deleted-users', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/deleted-users', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       
-      if (!user || user.role !== 'admin') {
+      if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -664,12 +593,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/users', isAuthenticated, async (req: any, res) => {
+  app.get('/api/admin/users', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       
-      if (!user || user.role !== 'admin') {
+      if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
