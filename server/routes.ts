@@ -1512,17 +1512,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // TODO: Re-enable WebSocket when proper authentication and URL handling is implemented
   // const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
-  // Logout route for custom auth
-  app.get('/api/logout', (req, res) => {
-    // Clear session and redirect to login
-    req.session.destroy((err) => {
-      if (err) {
-        console.error('Session destruction error:', err);
-      }
-      res.clearCookie('connect.sid');
-      res.redirect('/');
-    });
-  });
+  // Logout route for custom auth (already handled by setupCustomAuth)
+  // This is redundant - setupCustomAuth already creates a logout route
 
   return httpServer;
 }

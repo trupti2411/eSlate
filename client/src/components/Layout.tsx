@@ -12,8 +12,24 @@ export default function Layout({ children }: LayoutProps) {
   const { user } = useAuth();
   const [location] = useLocation();
 
-  const handleLogout = () => {
-    window.location.href = '/api/logout';
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'POST',
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        // Force a full page reload to clear all state
+        window.location.href = '/';
+      } else {
+        console.error('Logout failed');
+      }
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Fallback: still redirect even if logout request fails
+      window.location.href = '/';
+    }
   };
 
   const getNavigationItems = () => {
