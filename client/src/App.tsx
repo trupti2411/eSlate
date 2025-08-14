@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth, AuthProvider } from "@/hooks/useAuth.tsx";
 import AuthPage from "@/pages/auth-page";
+import SimpleRegistration from "@/pages/simple-registration";
 import StudentDashboard from "@/pages/student/Dashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
@@ -37,6 +38,7 @@ function Router() {
     <Switch>
       {/* Always available auth route for registration */}
       <Route path="/auth" component={AuthPage} />
+      <Route path="/register" component={SimpleRegistration} />
       
       {!isAuthenticated ? (
         <Route path="/" component={AuthPage} />
