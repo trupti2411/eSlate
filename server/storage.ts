@@ -33,7 +33,7 @@ import {
   type CalendarEvent,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull, sql } from "drizzle-orm";
+import { eq, and, or, desc, isNull, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (supports both Replit Auth and Custom Auth)
@@ -410,9 +410,38 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]> {
-    return await db.select().from(assignments)
+    return await db.select({
+      id: assignments.id,
+      title: assignments.title,
+      description: assignments.description,
+      instructions: assignments.instructions,
+      dueDate: assignments.dueDate,
+      tutorId: assignments.tutorId,
+      studentIds: assignments.studentIds,
+      classId: assignments.classId,
+      status: assignments.status,
+      maxPoints: assignments.maxPoints,
+      attachmentUrls: assignments.attachmentUrls,
+      allowedFileTypes: assignments.allowedFileTypes,
+      isRecurring: assignments.isRecurring,
+      recurringPattern: assignments.recurringPattern,
+      visibleFrom: assignments.visibleFrom,
+      autoGrade: assignments.autoGrade,
+      createdAt: assignments.createdAt,
+      updatedAt: assignments.updatedAt,
+    }).from(assignments)
       .leftJoin(tutors, eq(assignments.tutorId, tutors.id))
-      .where(eq(tutors.companyId, companyId))
+      .where(or(
+        eq(tutors.companyId, companyId), // Assignments created by company tutors
+        and(
+          isNull(assignments.tutorId), // Assignments created by company admin without tutor
+          sql`EXISTS (
+            SELECT 1 FROM ${students} s 
+            WHERE s.company_id = ${companyId} 
+            AND s.id = ANY(${assignments.studentIds})
+          )`
+        )
+      ))
       .orderBy(desc(assignments.createdAt));
   }
 
