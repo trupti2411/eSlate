@@ -379,14 +379,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Deactivate/activate company
-  app.patch('/api/companies/:id/status', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/companies/:id/status', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       const companyId = req.params.id;
       const { isActive } = req.body;
       
-      if (!user || user.role !== 'admin') {
+      if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -399,20 +398,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Deactivate/activate user
-  app.patch('/api/admin/users/:id/status', isAuthenticated, async (req: any, res) => {
+  app.patch('/api/admin/users/:id/status', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       const targetUserId = req.params.id;
       const { isActive } = req.body;
       
-      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
 
       // Company admins can only deactivate tutors in their company
       if (user.role === 'company_admin') {
-        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         const targetUser = await storage.getUser(targetUserId);
         
         if (!companyAdmin || !targetUser || targetUser.role !== 'tutor') {

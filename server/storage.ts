@@ -634,8 +634,35 @@ export class DatabaseStorage implements IStorage {
     return updatedAdmin;
   }
 
-  async getTutorsByCompany(companyId: string): Promise<Tutor[]> {
-    return await db.select().from(tutors).where(eq(tutors.companyId, companyId));
+  async getTutorsByCompany(companyId: string): Promise<any[]> {
+    try {
+      // Get all tutors in this company with their user information
+      const companyTutors = await db.select({
+        id: tutors.id,
+        userId: tutors.userId,
+        specialization: tutors.specialization,
+        qualifications: tutors.qualifications,
+        isVerified: tutors.isVerified,
+        companyId: tutors.companyId,
+        user: {
+          id: users.id,
+          email: users.email,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          isActive: users.isActive,
+          createdAt: users.createdAt
+        }
+      })
+      .from(tutors)
+      .innerJoin(users, eq(tutors.userId, users.id))
+      .where(and(eq(tutors.companyId, companyId), eq(users.isDeleted, false)))
+      .orderBy(users.firstName, users.lastName);
+
+      return companyTutors;
+    } catch (error) {
+      console.error("Error fetching company tutors:", error);
+      return [];
+    }
   }
 
   // Admin user management methods
