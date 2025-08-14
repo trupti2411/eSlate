@@ -352,9 +352,11 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   });
 
   // Fetch active students for the company
-  const { data: activeStudents = [] } = useQuery({
+  const { data: activeStudents = [], isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
     queryKey: [`/api/companies/${companyId}/students`],
     enabled: !!companyId && activeTab === 'classes',
+    staleTime: 0, // Always refetch fresh data
+    cacheTime: 0, // Don't cache
   });
 
   const getDayName = (dayNumber: number) => {
@@ -856,6 +858,10 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         {(() => {
                           const assignedStudents = (activeStudents || []).filter((student: any) => student.classId === classItem.id);
+                          console.log('Debug - Class ID:', classItem.id);
+                          console.log('Debug - All students:', activeStudents);
+                          console.log('Debug - Assigned students for this class:', assignedStudents);
+                          console.log('Debug - Student data structure:', activeStudents?.[0]);
                           return (
                             <>
                               <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
@@ -865,7 +871,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                               <div className="space-y-1">
                                 {assignedStudents.slice(0, 3).map((student: any) => (
                                   <div key={student.id} className="text-xs text-gray-500 dark:text-gray-400">
-                                    • {student.user?.firstName} {student.user?.lastName}
+                                    • {student.user?.firstName} {student.user?.lastName} (ID: {student.classId})
                                   </div>
                                 ))}
                                 {assignedStudents.length > 3 && (
@@ -874,7 +880,9 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                   </div>
                                 )}
                                 {assignedStudents.length === 0 && (
-                                  <div className="text-xs text-gray-400 dark:text-gray-500">No students assigned</div>
+                                  <div className="text-xs text-gray-400 dark:text-gray-500">
+                                    No students assigned (Debug: Total students: {(activeStudents || []).length})
+                                  </div>
                                 )}
                               </div>
                             </>
