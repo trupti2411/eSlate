@@ -653,7 +653,12 @@ export default function UserManagement() {
                           checked={editForm.watch('role') === roleOption.value}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              editForm.setValue('role', roleOption.value);
+                              editForm.setValue('role', roleOption.value as 'admin' | 'company_admin' | 'tutor' | 'student' | 'parent');
+                              // Uncheck other role checkboxes
+                              const roleCheckboxes = document.querySelectorAll('input[id^="edit-role-"]') as NodeListOf<HTMLInputElement>;
+                              roleCheckboxes.forEach(checkbox => {
+                                if (checkbox !== e.target) checkbox.checked = false;
+                              });
                             }
                           }}
                           className="rounded border-gray-300 h-4 w-4"
