@@ -848,25 +848,34 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       
                       {/* Show assigned students */}
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
-                          <Users className="w-4 h-4 mr-2" />
-                          <span>Assigned Students ({(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length})</span>
-                        </div>
-                        <div className="space-y-1">
-                          {(activeStudents.filter((student: any) => student.classId === classItem.id) || []).slice(0, 3).map((student: any) => (
-                            <div key={student.id} className="text-xs text-gray-500 dark:text-gray-400">
-                              • {student.user?.firstName} {student.user?.lastName}
-                            </div>
-                          ))}
-                          {(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length > 3 && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">
-                              +{(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length - 3} more
-                            </div>
-                          )}
-                          {(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length === 0 && (
-                            <div className="text-xs text-gray-400 dark:text-gray-500">No students assigned</div>
-                          )}
-                        </div>
+                        {(() => {
+                          const assignedStudents = activeStudents.filter((student: any) => student.classId === classItem.id);
+                          console.log(`Class ${classItem.id} assigned students:`, assignedStudents);
+                          console.log('All students:', activeStudents);
+                          return (
+                            <>
+                              <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
+                                <Users className="w-4 h-4 mr-2" />
+                                <span>Assigned Students ({assignedStudents.length})</span>
+                              </div>
+                              <div className="space-y-1">
+                                {assignedStudents.slice(0, 3).map((student: any) => (
+                                  <div key={student.id} className="text-xs text-gray-500 dark:text-gray-400">
+                                    • {student.user?.firstName} {student.user?.lastName}
+                                  </div>
+                                ))}
+                                {assignedStudents.length > 3 && (
+                                  <div className="text-xs text-gray-400 dark:text-gray-500">
+                                    +{assignedStudents.length - 3} more
+                                  </div>
+                                )}
+                                {assignedStudents.length === 0 && (
+                                  <div className="text-xs text-gray-400 dark:text-gray-500">No students assigned</div>
+                                )}
+                              </div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </CardContent>
