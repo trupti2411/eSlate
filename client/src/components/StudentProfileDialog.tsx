@@ -90,15 +90,15 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   });
 
   // Fetch academic terms for selected year
-  const { data: academicTerms = [] } = useQuery<AcademicTerm[]>({
+  const { data: allAcademicTerms = [] } = useQuery<AcademicTerm[]>({
     queryKey: ["/api/companies", companyId, "academic-terms"],
-    enabled: isOpen && !!companyId && !!formData.yearId,
+    enabled: isOpen && !!companyId,
   });
 
   // Fetch classes for selected term
-  const { data: classes = [] } = useQuery<Class[]>({
+  const { data: allClasses = [] } = useQuery<Class[]>({
     queryKey: ["/api/companies", companyId, "classes"],
-    enabled: isOpen && !!companyId && !!formData.termId,
+    enabled: isOpen && !!companyId,
   });
 
   // Update student mutation
@@ -143,10 +143,10 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   };
 
   const selectedYear = academicYears.find(year => year.id === formData.yearId);
-  const selectedTerm = academicTerms.find(term => term.id === formData.termId);
-  const selectedClass = classes.find(cls => cls.id === formData.classId);
-  const filteredTerms = academicTerms.filter(term => term.yearId === formData.yearId);
-  const filteredClasses = classes.filter(cls => cls.termId === formData.termId);
+  const selectedTerm = allAcademicTerms.find(term => term.id === formData.termId);
+  const selectedClass = allClasses.find(cls => cls.id === formData.classId);
+  const filteredTerms = allAcademicTerms.filter(term => term.yearId === formData.yearId);
+  const filteredClasses = allClasses.filter(cls => cls.termId === formData.termId);
 
   if (studentLoading) {
     return (
@@ -249,49 +249,49 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                 <Input value={student.user?.email || ""} disabled />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Grade Level</Label>
-                  {editMode ? (
-                    <Select 
-                      value={formData.gradeLevel} 
-                      onValueChange={(value) => setFormData({...formData, gradeLevel: value})}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select grade level" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="K">Kindergarten</SelectItem>
-                        <SelectItem value="1">Grade 1</SelectItem>
-                        <SelectItem value="2">Grade 2</SelectItem>
-                        <SelectItem value="3">Grade 3</SelectItem>
-                        <SelectItem value="4">Grade 4</SelectItem>
-                        <SelectItem value="5">Grade 5</SelectItem>
-                        <SelectItem value="6">Grade 6</SelectItem>
-                        <SelectItem value="7">Grade 7</SelectItem>
-                        <SelectItem value="8">Grade 8</SelectItem>
-                        <SelectItem value="9">Grade 9</SelectItem>
-                        <SelectItem value="10">Grade 10</SelectItem>
-                        <SelectItem value="11">Grade 11</SelectItem>
-                        <SelectItem value="12">Grade 12</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input value={student.gradeLevel || "Not set"} disabled />
-                  )}
-                </div>
-                <div>
-                  <Label>School Name</Label>
-                  {editMode ? (
-                    <Input 
-                      value={formData.schoolName} 
-                      onChange={(e) => setFormData({...formData, schoolName: e.target.value})}
-                      placeholder="Enter school name"
-                    />
-                  ) : (
-                    <Input value={student.schoolName || "Not set"} disabled />
-                  )}
-                </div>
+              <div>
+                <Label>Grade Level (Alternative to Academic Year)</Label>
+                {editMode ? (
+                  <Select 
+                    value={formData.gradeLevel} 
+                    onValueChange={(value) => setFormData({...formData, gradeLevel: value, yearId: "", termId: "", classId: ""})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select grade level (or use Academic Year below)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="">None - Use Academic Year Instead</SelectItem>
+                      <SelectItem value="K">Kindergarten</SelectItem>
+                      <SelectItem value="1">Grade 1</SelectItem>
+                      <SelectItem value="2">Grade 2</SelectItem>
+                      <SelectItem value="3">Grade 3</SelectItem>
+                      <SelectItem value="4">Grade 4</SelectItem>
+                      <SelectItem value="5">Grade 5</SelectItem>
+                      <SelectItem value="6">Grade 6</SelectItem>
+                      <SelectItem value="7">Grade 7</SelectItem>
+                      <SelectItem value="8">Grade 8</SelectItem>
+                      <SelectItem value="9">Grade 9</SelectItem>
+                      <SelectItem value="10">Grade 10</SelectItem>
+                      <SelectItem value="11">Grade 11</SelectItem>
+                      <SelectItem value="12">Grade 12</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input value={student.gradeLevel || "Not set"} disabled />
+                )}
+              </div>
+
+              <div>
+                <Label>School Name</Label>
+                {editMode ? (
+                  <Input 
+                    value={formData.schoolName} 
+                    onChange={(e) => setFormData({...formData, schoolName: e.target.value})}
+                    placeholder="Enter school name"
+                  />
+                ) : (
+                  <Input value={student.schoolName || "Not set"} disabled />
+                )}
               </div>
 
               <div className="flex items-center space-x-4">
@@ -323,16 +323,18 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label>Academic Year</Label>
+                <Label>Academic Year (Alternative to Grade Level)</Label>
                 {editMode ? (
                   <Select 
                     value={formData.yearId} 
-                    onValueChange={(value) => setFormData({...formData, yearId: value, termId: "", classId: ""})}
+                    onValueChange={(value) => setFormData({...formData, yearId: value, termId: "", classId: "", gradeLevel: ""})}
+                    disabled={!!formData.gradeLevel}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select academic year" />
+                      <SelectValue placeholder={formData.gradeLevel ? "Clear Grade Level to use Academic Year" : "Select academic year"} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="">None</SelectItem>
                       {academicYears.map((year) => (
                         <SelectItem key={year.id} value={year.id}>
                           {year.name} ({new Date(year.startDate).getFullYear()}-{new Date(year.endDate).getFullYear()})
