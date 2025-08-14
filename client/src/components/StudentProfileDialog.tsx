@@ -142,8 +142,15 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   const selectedYear = academicYears.find(year => year.id === formData.yearId);
   const selectedTerm = allAcademicTerms.find(term => term.id === formData.termId);
   const selectedClass = allClasses.find(cls => cls.id === formData.classId);
-  const filteredTerms = allAcademicTerms.filter(term => term.yearId === formData.yearId);
-  const filteredClasses = allClasses.filter(cls => cls.termId === formData.termId);
+  // Filter terms based on selected year ID
+  const filteredTerms = formData.yearId 
+    ? allAcademicTerms.filter(term => term.yearId === formData.yearId)
+    : [];
+  
+  // Filter classes based on selected term ID
+  const filteredClasses = formData.termId 
+    ? allClasses.filter(cls => cls.termId === formData.termId)
+    : [];
 
   if (studentLoading) {
     return (
@@ -324,15 +331,21 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                     disabled={!formData.yearId}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select academic term" />
+                      <SelectValue placeholder={!formData.yearId ? "Select academic year first" : `Select academic term (${filteredTerms.length} available)`} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {filteredTerms.map((term) => (
-                        <SelectItem key={term.id} value={term.id}>
-                          {term.name} ({new Date(term.startDate).toLocaleDateString()} - {new Date(term.endDate).toLocaleDateString()})
+                      {filteredTerms.length === 0 && formData.yearId ? (
+                        <SelectItem value="no-terms" disabled>
+                          No terms found for selected year
                         </SelectItem>
-                      ))}
+                      ) : (
+                        filteredTerms.map((term) => (
+                          <SelectItem key={term.id} value={term.id}>
+                            {term.name} ({new Date(term.startDate).toLocaleDateString()} - {new Date(term.endDate).toLocaleDateString()})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 ) : (
@@ -352,15 +365,21 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                     disabled={!formData.termId}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select class" />
+                      <SelectValue placeholder={!formData.termId ? "Select academic term first" : `Select class (${filteredClasses.length} available)`} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
-                      {filteredClasses.map((cls) => (
-                        <SelectItem key={cls.id} value={cls.id}>
-                          {cls.name} - {cls.subject} (Tutor: {cls.tutor?.user?.firstName} {cls.tutor?.user?.lastName})
+                      {filteredClasses.length === 0 && formData.termId ? (
+                        <SelectItem value="no-classes" disabled>
+                          No classes found for selected term
                         </SelectItem>
-                      ))}
+                      ) : (
+                        filteredClasses.map((cls) => (
+                          <SelectItem key={cls.id} value={cls.id}>
+                            {cls.name} - {cls.subject} (Tutor: {cls.tutor?.user?.firstName} {cls.tutor?.user?.lastName})
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                 ) : (
