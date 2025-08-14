@@ -302,6 +302,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) return res.status(401).json({ message: "Authentication required" });
 
     try {
+      console.log("Student update request:", { studentId, body: req.body, userRole: user.role });
+      
       const student = await storage.getStudent(studentId);
       if (!student) return res.status(404).json({ message: "Student not found" });
       
@@ -320,11 +322,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const updatedStudent = await storage.updateStudent(studentId, req.body);
+      // Clean the request body to only include allowed fields
+      const allowedFields = ['schoolName', 'yearId', 'termId', 'classId'];
+      const updateData: any = {};
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          updateData[field] = req.body[field] === "" ? null : req.body[field];
+        }
+      }
+      
+      console.log("Cleaned update data:", updateData);
+      const updatedStudent = await storage.updateStudent(studentId, updateData);
+      console.log("Student updated successfully:", updatedStudent.id);
       res.json(updatedStudent);
     } catch (error) {
       console.error("Error updating student:", error);
-      res.status(500).json({ message: "Internal server error" });
+      res.status(500).json({ message: "Internal server error", error: error.message });
     }
   });
 
