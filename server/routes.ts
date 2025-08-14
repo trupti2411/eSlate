@@ -434,7 +434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Assign existing tutor to company
   app.patch('/api/companies/:companyId/assign-tutor/:tutorId', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       const { companyId, tutorId } = req.params;
       
@@ -473,7 +473,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Unassign tutor from company
   app.patch('/api/companies/:companyId/unassign-tutor/:tutorId', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       const { companyId, tutorId } = req.params;
       
@@ -739,7 +739,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/parents', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (!user || user.role !== 'admin') {
@@ -756,7 +756,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/tutors', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
       if (!user || user.role !== 'admin') {
@@ -773,7 +773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/admin/users', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       console.log("Creating user, admin ID:", userId);
       console.log("Request body:", req.body);
       
@@ -916,10 +916,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/admin/users/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== 'admin') {
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -933,10 +933,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch('/api/admin/users/:id/status', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== 'admin') {
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
@@ -963,7 +963,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete user (Master Admin only)
   app.delete('/api/admin/users/:id', isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
       const targetUserId = req.params.id;
       
@@ -1001,7 +1001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   if (process.env.NODE_ENV === 'development') {
     app.post('/api/dev/make-admin', isAuthenticated, async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const user = await storage.getUser(userId);
         
         if (!user) {
@@ -1019,7 +1019,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     // Test endpoint to create a user directly
     app.post('/api/dev/test-create-user', isAuthenticated, async (req: any, res) => {
       try {
-        const userId = req.user.claims.sub;
+        const userId = req.user.id;
         const user = await storage.getUser(userId);
         
         if (!user || user.role !== 'admin') {
