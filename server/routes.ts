@@ -726,7 +726,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verify tutor
-  app.patch('/api/tutors/:tutorId/verify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/tutors/:tutorId/verify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
       const { tutorId } = req.params;
