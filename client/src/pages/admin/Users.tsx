@@ -29,12 +29,21 @@ interface User {
 export default function UsersManagement() {
   const { toast } = useToast();
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("all");
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
     lastName: "",
     role: "",
+  });
+  const [editUserData, setEditUserData] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    role: "",
+    isActive: true,
   });
 
   // Get current user to check if master admin
@@ -139,6 +148,58 @@ export default function UsersManagement() {
       });
     },
   });
+
+  // Edit user mutation
+  const editUserMutation = useMutation({
+    mutationFn: async (userData: typeof editUserData & { id: string }) => {
+      return await apiRequest(`/api/admin/users/${userData.id}`, "PATCH", userData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      setIsEditUserDialogOpen(false);
+      setSelectedUser(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditUser = (user: User) => {
+    setSelectedUser(user);
+    setEditUserData({
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      isActive: user.isActive,
+    });
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedUser || !editUserData.email || !editUserData.firstName || !editUserData.role) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    editUserMutation.mutate({
+      ...editUserData,
+      id: selectedUser.id,
+    });
+  };
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,6 +338,116 @@ export default function UsersManagement() {
                 </form>
               </DialogContent>
             </Dialog>
+
+            {/* Edit User Dialog */}
+            <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleEditSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="editFirstName">First Name</Label>
+                      <Input
+                        id="editFirstName"
+                        value={editUserData.firstName}
+                        onChange={(e) => setEditUserData(prev => ({ ...prev, firstName: e.target.value }))}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="editLastName">Last Name</Label>
+                      <Input
+                        id="editLastName"
+                        value={editUserData.lastName}
+                        onChange={(e) => setEditUserData(prev => ({ ...prev, lastName: e.target.value }))}
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="editEmail">Email</Label>
+                    <Input
+                      id="editEmail"
+                      type="email"
+                      value={editUserData.email}
+                      onChange={(e) => setEditUserData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>User Roles</Label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { value: 'student', label: 'Student' },
+                        { value: 'parent', label: 'Parent' },
+                        { value: 'tutor', label: 'Tutor' },
+                        { value: 'company_admin', label: 'Business Admin' },
+                        { value: 'admin', label: 'System Admin' }
+                      ].map((role) => (
+                        <div key={role.value} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={`edit-role-${role.value}`}
+                            checked={editUserData.role === role.value}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setEditUserData(prev => ({ ...prev, role: role.value }));
+                              } else {
+                                setEditUserData(prev => ({ ...prev, role: '' }));
+                              }
+                            }}
+                            className="rounded border-gray-300 h-4 w-4"
+                          />
+                          <label
+                            htmlFor={`edit-role-${role.value}`}
+                            className="text-sm font-medium leading-none cursor-pointer"
+                          >
+                            {role.label}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Select the primary role for this user. Only one role can be selected at a time.
+                    </p>
+                  </div>
+
+                  <div className="space-y-3">
+                    <Label>User Status</Label>
+                    <div className="flex items-center space-x-2">
+                      <input
+                        type="checkbox"
+                        id="edit-isActive"
+                        checked={editUserData.isActive}
+                        onChange={(e) => setEditUserData(prev => ({ ...prev, isActive: e.target.checked }))}
+                        className="rounded border-gray-300 h-4 w-4"
+                      />
+                      <label
+                        htmlFor="edit-isActive"
+                        className="text-sm font-medium leading-none cursor-pointer"
+                      >
+                        Active User
+                      </label>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      Inactive users cannot log in to the system.
+                    </p>
+                  </div>
+
+                  <div className="flex justify-end space-x-2">
+                    <Button type="button" variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={editUserMutation.isPending}>
+                      {editUserMutation.isPending ? "Updating..." : "Update User"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -331,41 +502,51 @@ export default function UsersManagement() {
                           </Badge>
                         </div>
                         
-                        <div className="flex justify-end items-center pt-2 border-t space-x-2">
-                          {/* Only show activate/deactivate for non-master admins */}
-                          {user.role !== 'admin' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => toggleUserStatus.mutate({ userId: user.id, isActive: !user.isActive })}
-                              disabled={toggleUserStatus.isPending}
-                            >
-                              {user.isActive ? (
-                                <>
-                                  <PowerOff className="w-3 h-3 mr-1" />
-                                  Deactivate
-                                </>
-                              ) : (
-                                <>
-                                  <Power className="w-3 h-3 mr-1" />
-                                  Activate
-                                </>
-                              )}
-                            </Button>
-                          )}
-                          
-                          {/* Only show delete for non-master admins and non-self */}
-                          {currentUser?.role === 'admin' && user.role !== 'admin' && user.id !== currentUser?.id && (
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDeleteUser(user.id, `${user.firstName} ${user.lastName}`)}
-                              disabled={deleteUserMutation.isPending}
-                              title="Delete User (Master Admin Only)"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          )}
+                        <div className="flex justify-between items-center pt-2 border-t">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleEditUser(user)}
+                            className="text-xs"
+                          >
+                            Edit
+                          </Button>
+                          <div className="flex space-x-2">
+                            {/* Only show activate/deactivate for non-master admins */}
+                            {user.role !== 'admin' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => toggleUserStatus.mutate({ userId: user.id, isActive: !user.isActive })}
+                                disabled={toggleUserStatus.isPending}
+                              >
+                                {user.isActive ? (
+                                  <>
+                                    <PowerOff className="w-3 h-3 mr-1" />
+                                    Deactivate
+                                  </>
+                                ) : (
+                                  <>
+                                    <Power className="w-3 h-3 mr-1" />
+                                    Activate
+                                  </>
+                                )}
+                              </Button>
+                            )}
+                            
+                            {/* Only show delete for non-master admins and non-self */}
+                            {currentUser?.role === 'admin' && user.role !== 'admin' && user.id !== currentUser?.id && (
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => handleDeleteUser(user.id, `${user.firstName} ${user.lastName}`)}
+                                disabled={deleteUserMutation.isPending}
+                                title="Delete User (Master Admin Only)"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </CardContent>
