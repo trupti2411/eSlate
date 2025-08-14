@@ -354,14 +354,15 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                 <Label>Academic Term</Label>
                 {editMode ? (
                   <Select 
-                    value={formData.termId} 
-                    onValueChange={(value) => setFormData({...formData, termId: value, classId: ""})}
+                    value={formData.termId || "none"} 
+                    onValueChange={(value) => setFormData({...formData, termId: value === "none" ? "" : value, classId: ""})}
                     disabled={!formData.yearId}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select academic term" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
                       {filteredTerms.map((term) => (
                         <SelectItem key={term.id} value={term.id}>
                           {term.name} ({new Date(term.startDate).toLocaleDateString()} - {new Date(term.endDate).toLocaleDateString()})
@@ -381,14 +382,15 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                 <Label>Class</Label>
                 {editMode ? (
                   <Select 
-                    value={formData.classId} 
-                    onValueChange={(value) => setFormData({...formData, classId: value})}
+                    value={formData.classId || "none"} 
+                    onValueChange={(value) => setFormData({...formData, classId: value === "none" ? "" : value})}
                     disabled={!formData.termId}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select class" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">None</SelectItem>
                       {filteredClasses.map((cls) => (
                         <SelectItem key={cls.id} value={cls.id}>
                           {cls.name} - {cls.subject} (Tutor: {cls.tutor?.user?.firstName} {cls.tutor?.user?.lastName})
