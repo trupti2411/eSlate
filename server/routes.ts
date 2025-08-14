@@ -985,7 +985,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const academicYearData = {
         ...req.body,
-        companyId
+        companyId,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
 
       const academicYear = await storage.createAcademicYear(academicYearData);
@@ -1058,7 +1060,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const academicTermData = {
         ...req.body,
-        companyId
+        companyId,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
       };
 
       const academicTerm = await storage.createAcademicTerm(academicTermData);
@@ -1161,7 +1165,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const classData = {
         ...req.body,
-        companyId
+        companyId,
+        // Ensure arrays are properly handled
+        daysOfWeek: Array.isArray(req.body.daysOfWeek) ? req.body.daysOfWeek : [req.body.daysOfWeek].filter(Boolean),
       };
 
       const newClass = await storage.createClass(classData);
