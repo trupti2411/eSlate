@@ -143,18 +143,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       
-      if (user.role !== 'tutor') {
-        return res.status(403).json({ message: "Only tutors can create assignments" });
+      if (user.role !== 'tutor' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Only tutors and company admins can create assignments" });
       }
 
-      const tutor = await storage.getTutorByUserId(user.id);
-      if (!tutor) {
-        return res.status(404).json({ message: "Tutor profile not found" });
+      let tutorId = null;
+
+      if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor) {
+          return res.status(404).json({ message: "Tutor profile not found" });
+        }
+        tutorId = tutor.id;
+      } else if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin) {
+          return res.status(404).json({ message: "Company admin profile not found" });
+        }
+        
+        // For company admin assignments, we need to specify a tutor if provided in the request
+        // or use a default/system tutor for the company
+        if (req.body.tutorId) {
+          // Verify the tutor belongs to the same company
+          const tutor = await storage.getTutor(req.body.tutorId);
+          if (!tutor || tutor.companyId !== companyAdmin.companyId) {
+            return res.status(400).json({ message: "Invalid tutor selection" });
+          }
+          tutorId = req.body.tutorId;
+        } else {
+          // For now, require tutorId to be specified for company admin assignments
+          // This ensures data integrity since tutorId is required in the schema
+          return res.status(400).json({ message: "Please specify a tutor for this assignment" });
+        }
       }
 
       const validatedData = insertAssignmentSchema.parse({
         ...req.body,
-        tutorId: tutor.id,
+        tutorId,
       });
 
       const assignment = await storage.createAssignment(validatedData);
