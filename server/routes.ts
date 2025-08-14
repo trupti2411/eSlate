@@ -176,10 +176,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const validatedData = insertAssignmentSchema.parse({
+      // Parse the date string to Date object if provided
+      const assignmentData = {
         ...req.body,
         tutorId,
-      });
+        dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+      };
+
+      const validatedData = insertAssignmentSchema.parse(assignmentData);
 
       const assignment = await storage.createAssignment(validatedData);
       res.json(assignment);
