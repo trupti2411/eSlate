@@ -188,10 +188,13 @@ export default function UsersManagement() {
     if (user.role === 'student') {
       try {
         const response = await apiRequest(`/api/admin/users/${user.id}/student-info`, 'GET');
-        const studentInfo = await response.json();
-        currentCompanyId = studentInfo.companyId || "";
+        if (response.ok) {
+          const studentInfo = await response.json();
+          currentCompanyId = studentInfo.companyId || "";
+        }
       } catch (error) {
-        console.log("Could not fetch student company info:", error);
+        // Student record may not exist yet, which is fine
+        console.log("Student info not found (this is normal for new students):", error);
       }
     }
     
@@ -201,7 +204,7 @@ export default function UsersManagement() {
       lastName: user.lastName,
       roles: userRoles,
       isActive: user.isActive,
-      companyId: currentCompanyId,
+      companyId: currentCompanyId || "",
     });
     setIsEditUserDialogOpen(true);
   };
@@ -450,14 +453,14 @@ export default function UsersManagement() {
                     <div>
                       <Label htmlFor="editCompanyId">Assign to Tutoring Company</Label>
                       <Select 
-                        value={editUserData.companyId} 
-                        onValueChange={(value) => setEditUserData(prev => ({ ...prev, companyId: value }))}
+                        value={editUserData.companyId || "none"} 
+                        onValueChange={(value) => setEditUserData(prev => ({ ...prev, companyId: value === "none" ? "" : value }))}
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select a company (optional)" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">No company assigned</SelectItem>
+                          <SelectItem value="none">No company assigned</SelectItem>
                           {companies.filter(c => c.isActive).map((company) => (
                             <SelectItem key={company.id} value={company.id}>
                               {company.name}
