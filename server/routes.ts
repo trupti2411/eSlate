@@ -725,39 +725,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Verify tutor
-  app.post('/api/tutors/:tutorId/verify', isAuthenticated, async (req: any, res) => {
-    try {
-      const user = req.user!;
-      const { tutorId } = req.params;
-      
-      console.log('Verify tutor request:', { tutorId, userRole: user?.role, userId: user?.id });
-      
-      if (user.role !== 'admin' && user.role !== 'company_admin') {
-        return res.status(403).json({ message: "Admin access required" });
-      }
 
-      // If company admin, verify they can manage this tutor
-      if (user.role === 'company_admin') {
-        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
-        if (!companyAdmin) {
-          return res.status(403).json({ message: "Company admin profile not found" });
-        }
-        
-        const tutor = await storage.getTutor(tutorId);
-        if (!tutor || tutor.companyId !== companyAdmin.companyId) {
-          return res.status(403).json({ message: "Can only verify tutors in your company" });
-        }
-      }
-
-      await storage.verifyTutor(tutorId);
-      console.log('Tutor verified successfully:', tutorId);
-      res.json({ success: true, message: "Tutor verified successfully" });
-    } catch (error) {
-      console.error("Error verifying tutor:", error);
-      res.status(500).json({ message: "Failed to verify tutor" });
-    }
-  });
 
   // Company admin specific route
   app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: AuthenticatedRequest, res) => {

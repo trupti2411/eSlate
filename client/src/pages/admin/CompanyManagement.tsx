@@ -197,27 +197,7 @@ export default function CompanyManagement() {
     },
   });
 
-  // Verify tutor mutation
-  const verifyTutorMutation = useMutation({
-    mutationFn: async (tutorId: string) => {
-      const response = await apiRequest("POST", `/api/tutors/${tutorId}/verify`);
-      return response.json();
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Tutor verified successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to verify tutor",
-        variant: "destructive",
-      });
-    },
-  });
+
 
   // Update user mutation  
   const updateUserMutation = useMutation({
@@ -728,18 +708,7 @@ export default function CompanyManagement() {
                         </p>
                       )}
                       
-                      {!tutor.isVerified && (
-                        <div className="mt-3 pt-3 border-t">
-                          <Button
-                            size="sm"
-                            onClick={() => verifyTutorMutation.mutate(tutor.id)}
-                            disabled={verifyTutorMutation.isPending}
-                            className="bg-green-600 hover:bg-green-700 text-white"
-                          >
-                            {verifyTutorMutation.isPending ? 'Verifying...' : 'Verify Tutor'}
-                          </Button>
-                        </div>
-                      )}
+
                     </CardContent>
                   </Card>
                   ))}
