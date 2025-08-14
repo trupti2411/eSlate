@@ -1508,48 +1508,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   const httpServer = createServer(app);
 
-  // WebSocket server for real-time messaging
-  const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
-
-  wss.on('connection', (ws) => {
-    console.log('New WebSocket connection established');
-
-    ws.on('message', async (data) => {
-      try {
-        const message = JSON.parse(data.toString());
-        
-        // Broadcast message to all connected clients
-        // In a production app, you'd want to filter by user/room
-        wss.clients.forEach((client) => {
-          if (client !== ws && client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify(message));
-          }
-        });
-      } catch (error) {
-        console.error('Error handling WebSocket message:', error);
-      }
-    });
-
-    ws.on('close', () => {
-      console.log('WebSocket connection closed');
-    });
-  });
+  // WebSocket server for real-time messaging - disabled to prevent connection errors
+  // TODO: Re-enable WebSocket when proper authentication and URL handling is implemented
+  // const wss = new WebSocketServer({ server: httpServer, path: '/ws' });
 
   // Logout route for custom auth
   app.get('/api/logout', (req, res) => {
-    req.logout((err) => {
+    // Clear session and redirect to login
+    req.session.destroy((err) => {
       if (err) {
-        console.error('Logout error:', err);
-        return res.status(500).json({ message: 'Logout failed' });
+        console.error('Session destruction error:', err);
       }
-      // Clear session and redirect to login
-      req.session.destroy((err) => {
-        if (err) {
-          console.error('Session destruction error:', err);
-        }
-        res.clearCookie('connect.sid');
-        res.redirect('/');
-      });
+      res.clearCookie('connect.sid');
+      res.redirect('/');
     });
   });
 

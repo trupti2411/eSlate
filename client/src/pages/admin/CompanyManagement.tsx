@@ -62,7 +62,7 @@ export default function CompanyManagement() {
 
   // Fetch company details
   const { data: company, isLoading: companyLoading } = useQuery<TutoringCompany>({
-    queryKey: ["/api/companies", companyId],
+    queryKey: [`/api/companies/${companyId}`],
     enabled: !!companyId,
   });
 
@@ -74,7 +74,7 @@ export default function CompanyManagement() {
 
   // Fetch all users within company
   const { data: companyUsers, isLoading: usersLoading } = useQuery<User[]>({
-    queryKey: ["/api/companies", companyId, "users"],
+    queryKey: [`/api/companies/${companyId}/users`],
     enabled: !!companyId,
   });
 
@@ -99,7 +99,7 @@ export default function CompanyManagement() {
         title: "Success",
         description: "Company status updated successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}`] });
     },
     onError: (error: Error) => {
       toast({
