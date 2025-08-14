@@ -122,13 +122,18 @@ export default function AssignmentDetailDialog({
       if (existingSubmission?.id) {
         // Update existing submission
         console.log("Updating existing submission:", existingSubmission.id);
-        return await apiRequest("PATCH", `/api/submissions/${existingSubmission.id}`, submissionData);
+        const response = await apiRequest(`/api/submissions/${existingSubmission.id}`, "PATCH", submissionData);
+        const result = await response.json();
+        return result;
       } else {
         // Create new submission
         console.log("Creating new submission");
-        const response = await apiRequest("POST", "/api/submissions", submissionData);
+        console.log("Making POST request to /api/submissions with data:", submissionData);
+        const response = await apiRequest("/api/submissions", "POST", submissionData);
         console.log("API request completed, response status:", response.status);
-        return response;
+        const result = await response.json();
+        console.log("Response data:", result);
+        return result;
       }
     },
     onSuccess: (response) => {
