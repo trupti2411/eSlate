@@ -144,10 +144,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { assignmentId, fileName } = req.params;
       
-      // For now, let's try to serve files through the public objects route
       const objectStorageService = new ObjectStorageService();
       
-      // Try different possible paths for the file
+      // Assignment attachments are stored in the homework directory under private storage
+      // Try to get the file using the homework file method
+      try {
+        console.log(`Looking for homework file: /homework/${fileName}`);
+        const file = await objectStorageService.getHomeworkFile(`/homework/${fileName}`);
+        console.log(`Found homework file: ${fileName}`);
+        return objectStorageService.downloadObject(file, res);
+      } catch (homeworkError) {
+        console.log(`File not found in homework directory: ${homeworkError.message}`);
+      }
+      
+      // Fallback: Try public object paths
       const possiblePaths = [
         fileName,
         `attachments/${fileName}`,
@@ -161,17 +171,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           const file = await objectStorageService.searchPublicObject(filePath);
           if (file) {
-            console.log(`Found file at path: ${filePath}`);
+            console.log(`Found file in public storage at path: ${filePath}`);
             return objectStorageService.downloadObject(file, res);
           }
         } catch (e) {
           // Continue to next path
-          console.log(`File not found at path: ${filePath}`);
+          console.log(`File not found at public path: ${filePath}`);
         }
       }
       
-      // If we can't find the file, return 404
-      console.error(`File ${fileName} not found in any path`);
+      // If we can't find the file anywhere, return 404
+      console.error(`File ${fileName} not found in any location (private homework or public paths)`);
       res.status(404).json({ message: "File not found" });
       
     } catch (error) {
