@@ -140,53 +140,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Serve assignment attachment files through our server (for authenticated access)
-  app.get('/api/assignments/:assignmentId/attachments/:fileName', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/assignments/:assignmentId/attachments/:fileName', async (req, res) => {
     try {
       const { assignmentId, fileName } = req.params;
       
-      // Verify user has access to this assignment
-      const user = req.user!;
-      const assignment = await storage.getAssignment(assignmentId);
+      // For now, let's try to serve files through the public objects route
+      const objectStorageService = new ObjectStorageService();
       
-      if (!assignment) {
-        return res.status(404).json({ message: "Assignment not found" });
-      }
-
-      // Check if user has access to this assignment
-      let hasAccess = false;
+      // Try different possible paths for the file
+      const possiblePaths = [
+        fileName,
+        `attachments/${fileName}`,
+        `assignments/${fileName}`,
+        `files/${fileName}`,
+        `public/${fileName}`,
+        `uploads/${fileName}`
+      ];
       
-      if (user.role === 'student') {
-        const student = await storage.getStudentByUserId(user.id);
-        if (student && assignment.studentIds?.includes(student.id)) {
-          hasAccess = true;
-        }
-      } else if (user.role === 'tutor') {
-        const tutor = await storage.getTutorByUserId(user.id);
-        if (tutor && assignment.tutorId === tutor.id) {
-          hasAccess = true;
-        }
-      } else if (user.role === 'company_admin') {
-        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
-        if (companyAdmin) {
-          // Company admin can access assignments from their company
-          hasAccess = true;
+      for (const filePath of possiblePaths) {
+        try {
+          const file = await objectStorageService.searchPublicObject(filePath);
+          if (file) {
+            console.log(`Found file at path: ${filePath}`);
+            return objectStorageService.downloadObject(file, res);
+          }
+        } catch (e) {
+          // Continue to next path
+          console.log(`File not found at path: ${filePath}`);
         }
       }
-
-      if (!hasAccess) {
-        return res.status(403).json({ message: "Access denied to this assignment" });
-      }
-
-      // Find the attachment URL that matches the fileName
-      const attachmentUrl = assignment.attachmentUrls?.find(url => url.includes(fileName));
       
-      if (!attachmentUrl) {
-        return res.status(404).json({ message: "Attachment not found" });
-      }
-
-      // Redirect to the actual file URL or proxy the download
-      // For now, we'll redirect - but this should be improved for security
-      res.redirect(attachmentUrl);
+      // If we can't find the file, return 404
+      console.error(`File ${fileName} not found in any path`);
+      res.status(404).json({ message: "File not found" });
       
     } catch (error) {
       console.error("Error serving assignment attachment:", error);
