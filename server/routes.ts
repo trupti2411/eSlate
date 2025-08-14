@@ -115,12 +115,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Homework file upload route
   app.post('/api/homework/upload', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
+      console.log("Getting homework upload URL...");
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getHomeworkUploadURL();
+      console.log("Generated upload URL:", uploadURL);
       res.json({ uploadURL });
     } catch (error) {
       console.error("Error getting homework upload URL:", error);
-      res.status(500).json({ error: "Failed to get upload URL" });
+      res.status(500).json({ error: "Failed to get upload URL", details: error.message });
     }
   });
 

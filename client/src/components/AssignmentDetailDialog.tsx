@@ -56,24 +56,40 @@ export default function AssignmentDetailDialog({
   // Upload file mutation
   const uploadMutation = useMutation({
     mutationFn: async (file: File) => {
-      // Get upload URL
-      const uploadResponse = await apiRequest("POST", "/api/homework/upload");
-      const { uploadURL } = await uploadResponse.json();
-      
-      // Upload file to signed URL
-      const response = await fetch(uploadURL, {
-        method: 'PUT',
-        body: file,
-        headers: {
-          'Content-Type': file.type,
-        },
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to upload file');
+      try {
+        console.log("Starting file upload for:", file.name);
+        
+        // Get upload URL
+        const uploadResponse = await apiRequest("POST", "/api/homework/upload");
+        const uploadData = await uploadResponse.json();
+        
+        if (!uploadData.uploadURL) {
+          throw new Error('No upload URL received from server');
+        }
+        
+        console.log("Got upload URL:", uploadData.uploadURL);
+        
+        // Upload file to signed URL
+        const response = await fetch(uploadData.uploadURL, {
+          method: 'PUT',
+          body: file,
+          headers: {
+            'Content-Type': file.type,
+          },
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error("Upload failed:", response.status, errorText);
+          throw new Error(`Failed to upload file: ${response.status} ${response.statusText}`);
+        }
+        
+        console.log("File uploaded successfully");
+        return uploadData.uploadURL.split('?')[0]; // Return URL without query params
+      } catch (error) {
+        console.error("Upload error:", error);
+        throw error;
       }
-      
-      return uploadURL.split('?')[0]; // Return URL without query params
     },
     onSuccess: (fileUrl) => {
       setUploadedFiles(prev => [...prev, fileUrl]);
