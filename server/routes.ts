@@ -957,10 +957,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update basic user data
       const updatedUser = await storage.updateUser(req.params.id, updateData);
       
-      // If user is a student and companyId is provided, update student record
+      // If user is a student and companyId is provided, create/update student record
       if (updatedUser.role === 'student' && companyId !== undefined) {
-        const student = await storage.getStudentByUserId(req.params.id);
-        if (student) {
+        let student = await storage.getStudentByUserId(req.params.id);
+        if (!student) {
+          // Create student record if it doesn't exist
+          student = await storage.createStudent({
+            userId: req.params.id,
+            companyId: companyId || null,
+            tutorId: null,
+            gradeLevel: null,
+            parentId: null,
+          });
+        } else {
+          // Update existing student record
           await storage.updateStudent(student.id, {
             companyId: companyId || null
           });

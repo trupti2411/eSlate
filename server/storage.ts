@@ -561,13 +561,14 @@ export class DatabaseStorage implements IStorage {
 
   async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
     try {
-      // Get all students assigned to tutors in this company
+      // Get students with direct company assignment OR assigned to tutors in this company
       const companyStudents = await db.select({
         id: students.id,
         userId: students.userId,
         gradeLevel: students.gradeLevel,
         parentId: students.parentId,
         tutorId: students.tutorId,
+        companyId: students.companyId,
         user: {
           id: users.id,
           email: users.email,
@@ -579,8 +580,16 @@ export class DatabaseStorage implements IStorage {
       })
       .from(students)
       .innerJoin(users, eq(students.userId, users.id))
-      .innerJoin(tutors, eq(students.tutorId, tutors.id))
-      .where(and(eq(tutors.companyId, companyId), eq(users.isDeleted, false)))
+      .leftJoin(tutors, eq(students.tutorId, tutors.id))
+      .where(
+        and(
+          // Either direct company assignment OR tutor's company matches
+          and(
+            eq(students.companyId, companyId)
+          ),
+          eq(users.isDeleted, false)
+        )
+      )
       .orderBy(users.firstName, users.lastName);
 
       return companyStudents;
