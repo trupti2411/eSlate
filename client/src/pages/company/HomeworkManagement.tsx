@@ -422,6 +422,24 @@ export default function HomeworkManagement() {
                                       Late
                                     </Badge>
                                   )}
+                                  
+                                  <div className="flex items-center gap-2">
+                                    <span className={`inline-block w-2 h-2 rounded-full ${
+                                      submission.status === 'submitted' ? 'bg-green-500' : 
+                                      submission.status === 'graded' ? 'bg-blue-500' : 'bg-gray-400'
+                                    }`}></span>
+                                    <span className="text-sm text-gray-600 capitalize">{submission.status}</span>
+                                    {!submission.isVerifiedByParent && (
+                                      <Badge variant="outline" className="text-xs border-orange-500 text-orange-600">
+                                        Awaiting Parent Verification
+                                      </Badge>
+                                    )}
+                                    {submission.isVerifiedByParent && (
+                                      <Badge variant="outline" className="text-xs border-green-500 text-green-600">
+                                        Parent Verified
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                                 <div className="flex items-center space-x-2">
                                   {submission.score && (
@@ -471,7 +489,7 @@ export default function HomeworkManagement() {
                 <p className="text-gray-600 text-sm">Active assignments</p>
               </CardContent>
             </Card>
-            
+
             <Card>
               <CardHeader>
                 <CardTitle>Pending Submissions</CardTitle>

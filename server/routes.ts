@@ -45,7 +45,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       let assignments: any[] = [];
       if (user.role === 'student') {
         const student = await storage.getStudentByUserId(user.id);
@@ -153,13 +153,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log("Direct file upload:", req.file.originalname, "Size:", req.file.size);
-      
+
       const objectStorageService = new ObjectStorageService();
       const fileId = randomUUID();
-      
+
       // Create a temporary file URL for now - we'll improve this later
       const tempFileUrl = `/homework/${fileId}`;
-      
+
       console.log("File uploaded successfully with ID:", fileId);
       res.json({ 
         success: true,
@@ -179,16 +179,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Getting homework upload URL...");
       console.log("Environment check - PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
       console.log("Environment check - PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
-      
+
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getHomeworkUploadURL();
       console.log("Generated upload URL:", uploadURL);
-      
+
       // Validate the URL format
       if (!uploadURL || !uploadURL.startsWith('https://')) {
         throw new Error(`Invalid upload URL generated: ${uploadURL}`);
       }
-      
+
       res.json({ uploadURL });
     } catch (error) {
       console.error("Error getting homework upload URL:", error);
@@ -216,9 +216,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/assignments/:assignmentId/attachments/:fileName', async (req, res) => {
     try {
       const { assignmentId, fileName } = req.params;
-      
+
       const objectStorageService = new ObjectStorageService();
-      
+
       // Assignment attachments are stored in the homework directory under private storage
       // Try to get the file using the homework file method
       try {
@@ -229,7 +229,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (homeworkError) {
         console.log(`File not found in homework directory: ${homeworkError.message}`);
       }
-      
+
       // Fallback: Try public object paths
       const possiblePaths = [
         fileName,
@@ -239,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         `public/${fileName}`,
         `uploads/${fileName}`
       ];
-      
+
       for (const filePath of possiblePaths) {
         try {
           const file = await objectStorageService.searchPublicObject(filePath);
@@ -252,11 +252,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`File not found at public path: ${filePath}`);
         }
       }
-      
+
       // If we can't find the file anywhere, return 404
       console.error(`File ${fileName} not found in any location (private homework or public paths)`);
       res.status(404).json({ message: "File not found" });
-      
+
     } catch (error) {
       console.error("Error serving assignment attachment:", error);
       res.status(500).json({ message: "Failed to serve attachment" });
@@ -266,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'tutor' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Only tutors and company admins can create assignments" });
       }
@@ -284,7 +284,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!companyAdmin) {
           return res.status(404).json({ message: "Company admin profile not found" });
         }
-        
+
         // For company admin assignments, we need to specify a tutor if provided in the request
         // or use a default/system tutor for the company
         if (req.body.tutorId) {
@@ -342,7 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       console.log("Creating submission for user:", user.id, "role:", user.role);
       console.log("Submission data received:", req.body);
-      
+
       if (user.role !== 'student') {
         return res.status(403).json({ message: "Only students can create submissions" });
       }
@@ -380,7 +380,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const submissionId = req.params.id;
-      
+
       if (user.role !== 'parent') {
         return res.status(403).json({ message: "Only parents can verify submissions" });
       }
@@ -399,7 +399,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       const senderId = user.id;
       const receiverId = req.params.receiverId;
-      
+
       const messages = await storage.getMessagesBetweenUsers(senderId, receiverId);
       res.json(messages);
     } catch (error) {
@@ -412,7 +412,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const senderId = user.id;
-      
+
       const validatedData = insertMessageSchema.parse({
         ...req.body,
         senderId,
@@ -435,7 +435,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const student = await storage.getStudent(studentId);
       if (!student) return res.status(404).json({ message: "Student not found" });
-      
+
       // Check permissions - only allow company admins, tutors from same company, or the student themselves
       if (user.role === 'student' && student.userId !== user.id) {
         return res.status(403).json({ message: "Access denied" });
@@ -468,10 +468,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       console.log("Student update request:", { studentId, body: req.body, userRole: user.role });
-      
+
       const student = await storage.getStudent(studentId);
       if (!student) return res.status(404).json({ message: "Student not found" });
-      
+
       // Check permissions - only allow company admins, tutors from same company
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
@@ -495,7 +495,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           updateData[field] = req.body[field] === "" ? null : req.body[field];
         }
       }
-      
+
       console.log("Cleaned update data:", updateData);
       const updatedStudent = await storage.updateStudent(studentId, updateData);
       console.log("Student updated successfully:", updatedStudent.id);
@@ -554,7 +554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'tutor') {
         return res.status(403).json({ message: "Only tutors can create calendar events" });
       }
@@ -619,7 +619,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const companyId = req.params.id;
-      
+
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -636,7 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!company) {
         return res.status(404).json({ message: "Company not found" });
       }
-      
+
       res.json(company);
     } catch (error) {
       console.error("Error fetching company:", error);
@@ -649,7 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const companyId = req.params.id;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -673,7 +673,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/companies', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -723,7 +723,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       const companyId = req.params.id;
       const { isActive } = req.body;
-      
+
       if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -742,7 +742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const user = req.user!;
       const targetUserId = req.params.id;
       const { isActive } = req.body;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -751,7 +751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         const targetUser = await storage.getUser(targetUserId);
-        
+
         if (!companyAdmin || !targetUser || targetUser.role !== 'tutor') {
           return res.status(403).json({ message: "Can only manage tutors in your company" });
         }
@@ -776,7 +776,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
       const { companyId, tutorId } = req.params;
-      
+
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -801,7 +801,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Assign tutor to company
       await storage.assignTutorToCompany(tutorId, companyId);
-      
+
       res.json({ success: true, message: "Tutor assigned to company successfully" });
     } catch (error) {
       console.error("Error assigning tutor to company:", error);
@@ -815,7 +815,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
       const { companyId, tutorId } = req.params;
-      
+
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -840,7 +840,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Unassign tutor from company
       await storage.unassignTutorFromCompany(tutorId);
-      
+
       res.json({ success: true, message: "Tutor removed from company successfully" });
     } catch (error) {
       console.error("Error unassigning tutor from company:", error);
@@ -852,7 +852,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/unassigned-tutors', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -872,7 +872,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const requestingUser = req.user!;
       const targetUserId = req.params.userId;
-      
+
       // Allow users to fetch their own company admin data or system admins
       if (requestingUser.id !== targetUserId && requestingUser.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
@@ -1025,7 +1025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const requestingUser = req.user!;
       const companyId = req.params.id;
-      
+
       // Check if user has access to this company
       if (requestingUser.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(requestingUser.id);
@@ -1049,7 +1049,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/deleted-users', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1065,7 +1065,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/users', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1082,7 +1082,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      
+
       if (!user || user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1099,7 +1099,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      
+
       if (!user || user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1117,9 +1117,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       console.log("Creating user, admin ID:", userId);
       console.log("Request body:", req.body);
-      
+
       const user = await storage.getUser(userId);
-      
+
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         console.log("Access denied - user:", user);
         return res.status(403).json({ message: "Admin access required" });
@@ -1185,7 +1185,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const { userId } = req.params;
-      
+
       if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1212,13 +1212,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      
+
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
       const { role, email, firstName, lastName, companyId } = req.body;
-      
+
       if (!role || !email) {
         return res.status(400).json({ message: "Role and email are required" });
       }
@@ -1246,7 +1246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
 
       const newUser = await storage.createUserWithRole(userData);
-      
+
       // Create role-specific records
       if (role === 'student') {
         await storage.createStudent({
@@ -1275,7 +1275,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           permissions: ['manage_tutors', 'view_reports'],
         });
       }
-      
+
       res.json(newUser);
     } catch (error) {
       console.error("Error creating user:", error);
@@ -1287,16 +1287,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      
+
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
 
       const { companyId, ...updateData } = req.body;
-      
+
       // Update basic user data
       const updatedUser = await storage.updateUser(req.params.id, updateData);
-      
+
       // If user is a student and companyId is provided, create/update student record
       if (updatedUser.role === 'student' && companyId !== undefined) {
         let student = await storage.getStudentByUserId(req.params.id);
@@ -1316,7 +1316,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
-      
+
       res.json(updatedUser);
     } catch (error) {
       console.error("Error updating user:", error);
@@ -1328,7 +1328,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
-      
+
       if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -1359,7 +1359,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.id;
       const user = await storage.getUser(userId);
       const targetUserId = req.params.id;
-      
+
       // Only allow master admins (system admins) to delete users
       if (!user || user.role !== 'admin') {
         return res.status(403).json({ message: "Master admin access required to delete users" });
@@ -1382,7 +1382,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Delete user and all related records
       await storage.deleteUser(targetUserId, userId);
-      
+
       res.json({ success: true, message: "User deleted successfully" });
     } catch (error) {
       console.error("Error deleting user:", error);
@@ -1396,7 +1396,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const userId = req.user.id;
         const user = await storage.getUser(userId);
-        
+
         if (!user) {
           return res.status(404).json({ message: "User not found" });
         }
@@ -1414,7 +1414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const userId = req.user.id;
         const user = await storage.getUser(userId);
-        
+
         if (!user || user.role !== 'admin') {
           return res.status(403).json({ message: "Admin access required" });
         }
@@ -1429,7 +1429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
 
         const newUser = await storage.createUserWithRole(testUserData);
-        
+
         // Create student profile
         const studentData = {
           userId: newUser.id,
@@ -1437,7 +1437,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           parentId: null,
           tutorId: null,
         };
-        
+
         const studentProfile = await storage.createStudent(studentData);
 
         res.json({ user: newUser, studentProfile });
@@ -1449,7 +1449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }
 
   // Academic Management Routes
-  
+
   // Get academic years for a company
   app.get('/api/companies/:companyId/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
@@ -1466,7 +1466,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       let academicYears = await storage.getAcademicYearsByCompany(companyId);
-      
+
       // Create sample data if none exists
       if (academicYears.length === 0) {
         const sampleYears = [
@@ -1474,14 +1474,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           { companyId, yearNumber: 2, name: "Year 2", description: "Building Skills", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') },
           { companyId, yearNumber: 3, name: "Year 3", description: "Advanced Learning", startDate: new Date('2024-09-01'), endDate: new Date('2025-06-30') }
         ];
-        
+
         for (const yearData of sampleYears) {
           await storage.createAcademicYear(yearData);
         }
-        
+
         academicYears = await storage.getAcademicYearsByCompany(companyId);
       }
-      
+
       res.json(academicYears);
     } catch (error) {
       console.error("Error fetching academic years:", error);
@@ -1538,7 +1538,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let academicTerms = yearId 
         ? await storage.getAcademicTermsByYear(yearId as string)
         : await storage.getAcademicTermsByCompany(companyId);
-        
+
       // Create sample data if none exists
       if (academicTerms.length === 0 && !yearId) {
         const academicYears = await storage.getAcademicYearsByCompany(companyId);
@@ -1548,15 +1548,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             { companyId, academicYearId: academicYears[0].id, name: "Spring Term", startDate: new Date('2025-01-07'), endDate: new Date('2025-04-04') },
             { companyId, academicYearId: academicYears[0].id, name: "Summer Term", startDate: new Date('2025-04-21'), endDate: new Date('2025-06-30') }
           ];
-          
+
           for (const termData of sampleTerms) {
             await storage.createAcademicTerm(termData);
           }
-          
+
           academicTerms = await storage.getAcademicTermsByCompany(companyId);
         }
       }
-      
+
       res.json(academicTerms);
     } catch (error) {
       console.error("Error fetching academic terms:", error);
@@ -1613,7 +1613,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let classes = termId 
         ? await storage.getClassesByTerm(termId as string)
         : await storage.getClassesByCompany(companyId);
-        
+
       // Create sample data if none exists
       if (classes.length === 0 && !termId) {
         const academicTerms = await storage.getAcademicTermsByCompany(companyId);
@@ -1653,15 +1653,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
               daysOfWeek: ["Wednesday"]
             }
           ];
-          
+
           for (const classData of sampleClasses) {
             await storage.createClass(classData);
           }
-          
+
           classes = await storage.getClassesByCompany(companyId);
         }
       }
-      
+
       res.json(classes);
     } catch (error) {
       console.error("Error fetching classes:", error);
@@ -1871,7 +1871,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Get all academic years for the company
       const academicYears = await storage.getAcademicYearsByCompany(companyId);
-      
+
       // Build hierarchical structure
       const hierarchy = await Promise.all(
         academicYears.map(async (year) => {
@@ -1891,7 +1891,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
         })
       );
-      
+
       res.json(hierarchy);
     } catch (error) {
       console.error("Error fetching academic hierarchy:", error);
