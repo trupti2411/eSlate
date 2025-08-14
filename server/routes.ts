@@ -779,7 +779,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const user = await storage.getUser(userId);
       
-      if (!user || user.role !== 'admin') {
+      if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
         console.log("Access denied - user:", user);
         return res.status(403).json({ message: "Admin access required" });
       }

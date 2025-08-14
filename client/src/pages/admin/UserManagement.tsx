@@ -636,30 +636,41 @@ export default function UserManagement() {
                   )}
                 />
 
-                <FormField
-                  control={editForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="tutor">Tutor</SelectItem>
-                          <SelectItem value="company_admin">Business Admin</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-3">
+                  <FormLabel>User Roles</FormLabel>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { value: 'student', label: 'Student' },
+                      { value: 'parent', label: 'Parent' },
+                      { value: 'tutor', label: 'Tutor' },
+                      { value: 'company_admin', label: 'Business Admin' },
+                      { value: 'admin', label: 'System Admin' },
+                    ].map((roleOption) => (
+                      <div key={roleOption.value} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`edit-role-${roleOption.value}`}
+                          checked={editForm.watch('role') === roleOption.value}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              editForm.setValue('role', roleOption.value);
+                            }
+                          }}
+                          className="rounded border-gray-300 h-4 w-4"
+                        />
+                        <label
+                          htmlFor={`edit-role-${roleOption.value}`}
+                          className="text-sm font-medium leading-none cursor-pointer"
+                        >
+                          {roleOption.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Select the primary role for this user. Only one role can be selected at a time.
+                  </p>
+                </div>
 
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button
