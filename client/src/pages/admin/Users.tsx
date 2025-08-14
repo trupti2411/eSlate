@@ -36,13 +36,13 @@ export default function UsersManagement() {
     email: "",
     firstName: "",
     lastName: "",
-    role: "",
+    roles: [] as string[],
   });
   const [editUserData, setEditUserData] = useState({
     email: "",
     firstName: "",
     lastName: "",
-    role: "",
+    roles: [] as string[],
     isActive: true,
   });
 
@@ -87,7 +87,7 @@ export default function UsersManagement() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
       setIsCreateUserDialogOpen(false);
-      setNewUserData({ email: "", firstName: "", lastName: "", role: "" });
+      setNewUserData({ email: "", firstName: "", lastName: "", roles: [] });
     },
     onError: (error: Error) => {
       let errorMessage = "Failed to create user";
@@ -174,11 +174,13 @@ export default function UsersManagement() {
 
   const handleEditUser = (user: User) => {
     setSelectedUser(user);
+    // Convert single role to array for multiple role support
+    const userRoles = user.role ? [user.role] : [];
     setEditUserData({
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
-      role: user.role,
+      roles: userRoles,
       isActive: user.isActive,
     });
     setIsEditUserDialogOpen(true);
@@ -186,27 +188,31 @@ export default function UsersManagement() {
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedUser || !editUserData.email || !editUserData.firstName || !editUserData.role) {
+    if (!selectedUser || !editUserData.email || !editUserData.firstName || editUserData.roles.length === 0) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields and select at least one role",
         variant: "destructive",
       });
       return;
     }
 
+    // Convert roles array to primary role for backend compatibility
+    const primaryRole = editUserData.roles[0];
+    const { roles, ...editDataWithRole } = editUserData;
     editUserMutation.mutate({
-      ...editUserData,
+      ...editDataWithRole,
+      role: primaryRole,
       id: selectedUser.id,
     });
   };
 
   const handleCreateUser = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newUserData.email || !newUserData.firstName || !newUserData.role) {
+    if (!newUserData.email || !newUserData.firstName || newUserData.roles.length === 0) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields (Email, First Name, and Role are required)",
+        description: "Please fill in all required fields (Email, First Name, and at least one Role are required)",
         variant: "destructive",
       });
       return;
@@ -223,7 +229,13 @@ export default function UsersManagement() {
       return;
     }
 
-    createUserMutation.mutate(newUserData);
+    // Convert roles array to primary role for backend compatibility
+    const primaryRole = newUserData.roles[0];
+    const { roles, ...newDataWithRole } = newUserData;
+    createUserMutation.mutate({
+      ...newDataWithRole,
+      role: primaryRole
+    });
   };
 
   const handleDeleteUser = (userId: string, userName: string) => {
@@ -296,19 +308,18 @@ export default function UsersManagement() {
                         { value: 'student', label: 'Student' },
                         { value: 'parent', label: 'Parent' },
                         { value: 'tutor', label: 'Tutor' },
-                        { value: 'company_admin', label: 'Business Admin' },
-                        { value: 'admin', label: 'System Admin' }
+                        { value: 'company_admin', label: 'Business Admin' }
                       ].map((role) => (
                         <div key={role.value} className="flex items-center space-x-2">
                           <input
                             type="checkbox"
                             id={`users-role-${role.value}`}
-                            checked={newUserData.role === role.value}
+                            checked={newUserData.roles.includes(role.value)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setNewUserData(prev => ({ ...prev, role: role.value }));
+                                setNewUserData(prev => ({ ...prev, roles: [...prev.roles, role.value] }));
                               } else {
-                                setNewUserData(prev => ({ ...prev, role: '' }));
+                                setNewUserData(prev => ({ ...prev, roles: prev.roles.filter(r => r !== role.value) }));
                               }
                             }}
                             className="rounded border-gray-300 h-4 w-4"
@@ -323,7 +334,7 @@ export default function UsersManagement() {
                       ))}
                     </div>
                     <p className="text-xs text-gray-500">
-                      Select the primary role for this user. Only one role can be selected at a time.
+                      Select one or more roles for this user. Business Admins can also be Tutors.
                     </p>
                   </div>
 
@@ -384,19 +395,18 @@ export default function UsersManagement() {
                         { value: 'student', label: 'Student' },
                         { value: 'parent', label: 'Parent' },
                         { value: 'tutor', label: 'Tutor' },
-                        { value: 'company_admin', label: 'Business Admin' },
-                        { value: 'admin', label: 'System Admin' }
+                        { value: 'company_admin', label: 'Business Admin' }
                       ].map((role) => (
                         <div key={role.value} className="flex items-center space-x-2">
                           <input
                             type="checkbox"
                             id={`edit-role-${role.value}`}
-                            checked={editUserData.role === role.value}
+                            checked={editUserData.roles.includes(role.value)}
                             onChange={(e) => {
                               if (e.target.checked) {
-                                setEditUserData(prev => ({ ...prev, role: role.value }));
+                                setEditUserData(prev => ({ ...prev, roles: [...prev.roles, role.value] }));
                               } else {
-                                setEditUserData(prev => ({ ...prev, role: '' }));
+                                setEditUserData(prev => ({ ...prev, roles: prev.roles.filter(r => r !== role.value) }));
                               }
                             }}
                             className="rounded border-gray-300 h-4 w-4"
@@ -411,7 +421,7 @@ export default function UsersManagement() {
                       ))}
                     </div>
                     <p className="text-xs text-gray-500">
-                      Select the primary role for this user. Only one role can be selected at a time.
+                      Select one or more roles for this user. Business Admins can also be Tutors.
                     </p>
                   </div>
 
