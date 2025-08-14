@@ -200,7 +200,8 @@ export default function CompanyManagement() {
   // Verify tutor mutation
   const verifyTutorMutation = useMutation({
     mutationFn: async (tutorId: string) => {
-      return await apiRequest(`/api/tutors/${tutorId}/verify`, "PATCH");
+      const response = await apiRequest("POST", `/api/tutors/${tutorId}/verify`);
+      return response.json();
     },
     onSuccess: () => {
       toast({
