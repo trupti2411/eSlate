@@ -726,10 +726,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verify tutor
-  app.post('/api/tutors/:tutorId/verify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/tutors/:tutorId/verify', isAuthenticated, async (req: any, res) => {
     try {
       const user = req.user!;
       const { tutorId } = req.params;
+      
+      console.log('Verify tutor request:', { tutorId, userRole: user?.role, userId: user?.id });
       
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin access required" });
@@ -749,6 +751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.verifyTutor(tutorId);
+      console.log('Tutor verified successfully:', tutorId);
       res.json({ success: true, message: "Tutor verified successfully" });
     } catch (error) {
       console.error("Error verifying tutor:", error);
