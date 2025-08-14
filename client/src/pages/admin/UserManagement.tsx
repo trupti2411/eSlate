@@ -269,30 +269,46 @@ export default function UserManagement() {
                   )}
                 />
 
-                <FormField
-                  control={createForm.control}
-                  name="role"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Role</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a role" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="student">Student</SelectItem>
-                          <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="tutor">Tutor</SelectItem>
-                          <SelectItem value="company_admin">Business Admin</SelectItem>
-                          <SelectItem value="admin">Admin</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="space-y-3">
+                  <FormLabel>User Roles</FormLabel>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { value: 'student', label: 'Student' },
+                      { value: 'parent', label: 'Parent' },
+                      { value: 'tutor', label: 'Tutor' },
+                      { value: 'company_admin', label: 'Business Admin' },
+                      { value: 'admin', label: 'System Admin' }
+                    ].map((roleOption) => (
+                      <div key={roleOption.value} className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          id={`create-role-${roleOption.value}`}
+                          checked={createForm.watch('role') === roleOption.value}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              createForm.setValue('role', roleOption.value as 'student' | 'parent' | 'tutor' | 'company_admin' | 'admin');
+                              // Uncheck other role checkboxes
+                              const roleCheckboxes = document.querySelectorAll('input[id^="create-role-"]') as NodeListOf<HTMLInputElement>;
+                              roleCheckboxes.forEach(checkbox => {
+                                if (checkbox !== e.target) checkbox.checked = false;
+                              });
+                            }
+                          }}
+                          className="rounded border-gray-300 h-4 w-4"
+                        />
+                        <label
+                          htmlFor={`create-role-${roleOption.value}`}
+                          className="text-sm font-medium leading-none cursor-pointer"
+                        >
+                          {roleOption.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    Select the primary role for this user. Only one role can be selected at a time.
+                  </p>
+                </div>
 
                 {/* Multiple Roles Support */}
                 {(watchedRole === "tutor" || watchedRole === "company_admin") && (
@@ -500,83 +516,63 @@ export default function UserManagement() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user) => (
-                  <TableRow key={user.id}>
-                    <TableCell>
-                      <div className="font-medium">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {users.map((user) => (
+              <Card key={user.id} className="border">
+                <CardContent className="p-4">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex-1">
+                      <h4 className="font-semibold">
                         {user.firstName} {user.lastName}
-                      </div>
-                    </TableCell>
-                    <TableCell>{user.email}</TableCell>
-                    <TableCell>
-                      <Badge className={getRoleBadgeColor(user.role)}>
-                        {user.role === 'company_admin' ? 'Business Admin' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={user.isActive ? "default" : "destructive"}>
+                      </h4>
+                      <p className="text-sm text-gray-600">{user.email}</p>
+                      <p className="text-xs text-gray-500 capitalize">
+                        {user.role === 'company_admin' ? 'Business Admin' : user.role.replace('_', ' ')}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant={user.isActive ? "default" : "secondary"}>
                         {user.isActive ? "Active" : "Inactive"}
                       </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "N/A"}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditUser(user)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => toggleUserStatus.mutate({
-                            id: user.id,
-                            isActive: !user.isActive
-                          })}
-                          disabled={toggleUserStatus.isPending}
-                        >
-                          {user.isActive ? (
-                            <PowerOff className="h-4 w-4 text-red-600" />
-                          ) : (
-                            <Power className="h-4 w-4 text-green-600" />
-                          )}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant={user.isActive ? "destructive" : "default"}
-                          onClick={() =>
-                            toggleUserStatus.mutate({
-                              id: user.id,
-                              isActive: !user.isActive,
-                            })
-                          }
-                          disabled={toggleUserStatus.isPending}
-                        >
-                          {user.isActive ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleEditUser(user)}
+                      className="text-xs"
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={user.isActive ? "destructive" : "default"}
+                      onClick={() =>
+                        toggleUserStatus.mutate({
+                          id: user.id,
+                          isActive: !user.isActive,
+                        })
+                      }
+                      disabled={toggleUserStatus.isPending}
+                      className="text-xs"
+                    >
+                      {user.isActive ? (
+                        <>
+                          <UserX className="h-3 w-3 mr-1" />
+                          Deactivate
+                        </>
+                      ) : (
+                        <>
+                          <UserCheck className="h-3 w-3 mr-1" />
+                          Activate
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
           </div>
         </CardContent>
       </Card>
