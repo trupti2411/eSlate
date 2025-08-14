@@ -123,6 +123,8 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [isAddClassOpen, setIsAddClassOpen] = useState(false);
   const [isAddStudentToClassOpen, setIsAddStudentToClassOpen] = useState(false);
   const [selectedClassForStudents, setSelectedClassForStudents] = useState<string | null>(null);
+  const [isEditClassOpen, setIsEditClassOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<Class | null>(null);
 
   // Form instances
   const yearForm = useForm<AcademicYearFormData>({
@@ -275,6 +277,35 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     },
   });
 
+  // Update class mutation
+  const updateClassMutation = useMutation({
+    mutationFn: async (data: ClassFormData) => {
+      if (!editingClass) throw new Error("No class selected for editing");
+      return await apiRequest(`/api/companies/${companyId}/classes/${editingClass.id}`, 'PUT', {
+        ...data,
+        companyId,
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Class updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setIsEditClassOpen(false);
+      setEditingClass(null);
+      classForm.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update class",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Debug log
   console.log('AcademicManagement component loaded with:', { companyId, companyName });
 
@@ -317,7 +348,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   // Fetch active students for the company
   const { data: activeStudents = [] } = useQuery({
     queryKey: [`/api/companies/${companyId}/students`],
-    enabled: !!companyId && isAddStudentToClassOpen,
+    enabled: !!companyId && activeTab === 'classes',
   });
 
   const getDayName = (dayNumber: number) => {
@@ -746,7 +777,24 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setEditingClass(classItem);
+                              setIsEditClassOpen(true);
+                              // Pre-populate the edit form
+                              classForm.reset({
+                                termId: classItem.termId,
+                                name: classItem.name,
+                                subject: classItem.subject,
+                                startTime: classItem.startTime,
+                                endTime: classItem.endTime,
+                                daysOfWeek: classItem.daysOfWeek || [],
+                                maxStudents: classItem.maxStudents,
+                                location: classItem.location || '',
+                                description: classItem.description || '',
+                              });
+                            }}
+                          >
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
@@ -797,6 +845,29 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       <Badge variant={classItem.isActive ? "default" : "secondary"}>
                         {classItem.isActive ? "Active" : "Inactive"}
                       </Badge>
+                      
+                      {/* Show assigned students */}
+                      <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
+                          <Users className="w-4 h-4 mr-2" />
+                          <span>Assigned Students ({(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length})</span>
+                        </div>
+                        <div className="space-y-1">
+                          {(activeStudents.filter((student: any) => student.classId === classItem.id) || []).slice(0, 3).map((student: any) => (
+                            <div key={student.id} className="text-xs text-gray-500 dark:text-gray-400">
+                              • {student.user?.firstName} {student.user?.lastName}
+                            </div>
+                          ))}
+                          {(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length > 3 && (
+                            <div className="text-xs text-gray-400 dark:text-gray-500">
+                              +{(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length - 3} more
+                            </div>
+                          )}
+                          {(activeStudents.filter((student: any) => student.classId === classItem.id) || []).length === 0 && (
+                            <div className="text-xs text-gray-400 dark:text-gray-500">No students assigned</div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1204,6 +1275,171 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Class Dialog */}
+      <Dialog open={isEditClassOpen} onOpenChange={setIsEditClassOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Class</DialogTitle>
+            <DialogDescription>
+              Update the class information for {companyName}.
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...classForm}>
+            <form onSubmit={classForm.handleSubmit((data) => updateClassMutation.mutate(data))} className="space-y-4">
+              <FormField
+                control={classForm.control}
+                name="termId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Academic Term</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select an academic term" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {(academicTerms as AcademicTerm[]).map((term) => (
+                          <SelectItem key={term.id} value={term.id}>
+                            {term.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={classForm.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Class Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Mathematics 101" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={classForm.control}
+                  name="subject"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Subject</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., Mathematics" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={classForm.control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={classForm.control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <FormField
+                control={classForm.control}
+                name="daysOfWeek"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Days of Week</FormLabel>
+                    <div className="grid grid-cols-4 gap-2">
+                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                        <label key={day} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={field.value?.includes(day) || false}
+                            onChange={(e) => {
+                              const current = field.value || [];
+                              if (e.target.checked) {
+                                field.onChange([...current, day]);
+                              } else {
+                                field.onChange(current.filter((d) => d !== day));
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          <span className="text-sm">{day.slice(0, 3)}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={classForm.control}
+                name="maxStudents"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Maximum Students</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="number" 
+                        min="1" 
+                        placeholder="20"
+                        {...field} 
+                        onChange={(e) => field.onChange(parseInt(e.target.value) || 20)}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="flex justify-end space-x-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsEditClassOpen(false);
+                    setEditingClass(null);
+                    classForm.reset();
+                  }}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={updateClassMutation.isPending}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {updateClassMutation.isPending ? 'Updating...' : 'Update Class'}
+                </Button>
+              </div>
+            </form>
+          </Form>
         </DialogContent>
       </Dialog>
     </div>
