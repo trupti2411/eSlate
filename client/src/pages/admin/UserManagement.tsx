@@ -283,6 +283,7 @@ export default function UserManagement() {
                           <SelectItem value="student">Student</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
                           <SelectItem value="tutor">Tutor</SelectItem>
+                          <SelectItem value="company_admin">Business Admin</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>
@@ -290,6 +291,23 @@ export default function UserManagement() {
                     </FormItem>
                   )}
                 />
+
+                {/* Multiple Roles Support */}
+                {(watchedRole === "tutor" || watchedRole === "company_admin") && (
+                  <div>
+                    <FormLabel>Additional Roles (Optional)</FormLabel>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {['tutor', 'company_admin'].filter(role => role !== watchedRole).map((role) => (
+                        <label key={role} className="flex items-center space-x-2">
+                          <input type="checkbox" />
+                          <span className="text-sm">
+                            {role === 'company_admin' ? 'Business Admin' : role.charAt(0).toUpperCase() + role.slice(1)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Conditional fields based on role */}
                 {watchedRole === "student" && (
@@ -503,7 +521,7 @@ export default function UserManagement() {
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
                       <Badge className={getRoleBadgeColor(user.role)}>
-                        {user.role}
+                        {user.role === 'company_admin' ? 'Business Admin' : user.role.charAt(0).toUpperCase() + user.role.slice(1)}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -632,6 +650,7 @@ export default function UserManagement() {
                           <SelectItem value="student">Student</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
                           <SelectItem value="tutor">Tutor</SelectItem>
+                          <SelectItem value="company_admin">Business Admin</SelectItem>
                           <SelectItem value="admin">Admin</SelectItem>
                         </SelectContent>
                       </Select>

@@ -364,9 +364,12 @@ export default function CompanyManagement() {
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
                       value={newUserData.email}
                       onChange={(e) => setNewUserData(prev => ({ ...prev, email: e.target.value }))}
+                      placeholder="user@example.com"
+                      autoComplete="email"
                       required
                     />
                   </div>
@@ -641,12 +644,8 @@ export default function CompanyManagement() {
               <div className="text-center text-red-500 py-8">
                 <h3 className="text-lg font-semibold mb-2">Error Loading Tutors</h3>
                 <p>Error: {(tutorsError as Error).message}</p>
-                <p className="text-sm mt-2">API Status: {tutorsError instanceof Error ? 'Network Error' : 'Unknown Error'}</p>
-                <pre className="mt-4 text-xs bg-gray-100 p-2 rounded">
-                  {JSON.stringify(tutorsError, null, 2)}
-                </pre>
               </div>
-            ) : tutors && tutors.length > 0 ? (
+            ) : Array.isArray(tutors) && tutors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tutors.map((tutor) => (
                   <Card key={tutor.id} className="border">
