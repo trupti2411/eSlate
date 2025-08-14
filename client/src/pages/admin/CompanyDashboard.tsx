@@ -202,6 +202,28 @@ export default function CompanyDashboard() {
     },
   });
 
+  // Verify tutor mutation
+  const verifyTutorMutation = useMutation({
+    mutationFn: async (tutorId: string) => {
+      const response = await apiRequest("POST", `/api/tutors/${tutorId}/verify`);
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({ 
+        title: "Tutor verified successfully!",
+        description: "This tutor can now create assignments.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/companies", companyAdmin?.companyId, "tutors"] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to verify tutor",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleInputChange = (field: string, value: string) => {
     setTutorFormData(prev => ({ ...prev, [field]: value }));
   };
@@ -527,9 +549,22 @@ export default function CompanyDashboard() {
                       )}
                       
                       {tutor.qualifications && (
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm text-gray-600 mb-3">
                           <strong>Qualifications:</strong> {tutor.qualifications}
                         </p>
+                      )}
+                      
+                      {!tutor.isVerified && (
+                        <div className="mt-3 pt-3 border-t">
+                          <Button
+                            size="sm"
+                            onClick={() => verifyTutorMutation.mutate(tutor.id)}
+                            disabled={verifyTutorMutation.isPending}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                          >
+                            {verifyTutorMutation.isPending ? 'Verifying...' : 'Verify Tutor'}
+                          </Button>
+                        </div>
                       )}
                     </CardContent>
                   </Card>
