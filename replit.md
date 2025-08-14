@@ -8,6 +8,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**August 14, 2025 - All 4 Critical Issues Resolved**
+- Fixed 404 error on /company/tutors route by adding proper routing in App.tsx
+- Fixed email input functionality in CompanyManagement with proper form attributes (name, placeholder, autoComplete)
+- Fixed user role editing globally by resolving server authentication issues (req.user.claims.sub → req.user.id)
+- Added multiple role support with checkbox selections for tutors and business admins
+- Updated all "Company Admin" terminology to "Business Admin" throughout the system
+- Server authentication compatibility fixed for custom auth system
+- All API endpoints now returning HTTP 200 responses with proper data
+
 **August 13, 2025 - Academic Management System Fixed**
 - Fixed critical API endpoint issue: Frontend was calling incorrect `/api/company-admin/` instead of `/api/admin/company-admin/`
 - Resolved date formatting crashes in Academic Management interface by adding proper null checks

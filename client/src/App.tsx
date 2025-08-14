@@ -55,6 +55,7 @@ function Router() {
           <Route path="/admin/companies/:id" component={CompanyManagement} />
           <Route path="/admin/test" component={TestUserCreation} />
           <Route path="/company" component={CompanyDashboard} />
+          <Route path="/company/tutors" component={CompanyDashboard} />
           <Route path="/company/students" component={CompanyStudents} />
           <Route path="/company/academic" component={CompanyAcademicManagement} />
         </>

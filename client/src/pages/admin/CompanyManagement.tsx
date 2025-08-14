@@ -645,7 +645,7 @@ export default function CompanyManagement() {
                 <h3 className="text-lg font-semibold mb-2">Error Loading Tutors</h3>
                 <p>Error: {(tutorsError as Error).message}</p>
               </div>
-            ) : Array.isArray(tutors) && tutors.length > 0 ? (
+            ) : tutors && tutors.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {tutors.map((tutor) => (
                   <Card key={tutor.id} className="border">
