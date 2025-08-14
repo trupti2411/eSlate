@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupCustomAuth, isAuthenticated, type AuthenticatedRequest } from "./customAuth";
 import { 
   insertAssignmentSchema,
   insertSubmissionSchema,
@@ -17,65 +17,23 @@ import {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
-  await setupAuth(app);
+  setupCustomAuth(app);
 
-  // Auth routes
-  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
-    try {
-      const replitUserId = req.user.claims.sub;
-      const userEmail = req.user.claims.email;
-      
-      // First try to get user by Replit ID
-      let user = await storage.getUser(replitUserId);
-      
-      // If not found by Replit ID, try by email (for existing users created manually)
-      if (!user && userEmail) {
-        user = await storage.getUserByEmail(userEmail);
-      }
-      
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-      
-      // Get role-specific data using the actual user ID (not Replit ID)
-      let roleData = null;
-      switch (user.role) {
-        case 'student':
-          roleData = await storage.getStudentByUserId(user.id);
-          break;
-        case 'parent':
-          roleData = await storage.getParentByUserId(user.id);
-          break;
-        case 'tutor':
-          roleData = await storage.getTutorByUserId(user.id);
-          break;
-      }
-
-      res.json({ ...user, roleData });
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
+  // Note: Auth routes are now handled by setupCustomAuth
 
   // Assignment routes
-  app.get('/api/assignments', isAuthenticated, async (req: any, res) => {
+  app.get('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
       let assignments: any[] = [];
       if (user.role === 'student') {
-        const student = await storage.getStudentByUserId(userId);
+        const student = await storage.getStudentByUserId(user.id);
         if (student) {
           assignments = await storage.getAssignmentsByStudent(student.id);
         }
       } else if (user.role === 'tutor') {
-        const tutor = await storage.getTutorByUserId(userId);
+        const tutor = await storage.getTutorByUserId(user.id);
         if (tutor) {
           assignments = await storage.getAssignmentsByTutor(tutor.id);
         }
@@ -88,16 +46,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/assignments', isAuthenticated, async (req: any, res) => {
+  app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
+      const user = req.user!;
       
-      if (!user || user.role !== 'tutor') {
+      if (user.role !== 'tutor') {
         return res.status(403).json({ message: "Only tutors can create assignments" });
       }
 
-      const tutor = await storage.getTutorByUserId(userId);
+      const tutor = await storage.getTutorByUserId(user.id);
       if (!tutor) {
         return res.status(404).json({ message: "Tutor profile not found" });
       }

@@ -49,10 +49,15 @@ import { db } from "./db";
 import { eq, and, desc, isNull } from "drizzle-orm";
 
 export interface IStorage {
-  // User operations (required for Replit Auth)
+  // User operations (supports both Replit Auth and Custom Auth)
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  createUserWithAuth(user: Partial<User>): Promise<string>;
+  updateUserLastLogin(id: string): Promise<void>;
+  verifyEmailToken(token: string): Promise<boolean>;
+  setPasswordResetToken(userId: string, token: string, expires: Date): Promise<void>;
+  resetPassword(token: string, hashedPassword: string): Promise<boolean>;
   
   // Student operations
   getStudent(id: string): Promise<Student | undefined>;
@@ -181,6 +186,78 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return user;
+  }
+
+  async createUserWithAuth(userData: Partial<User>): Promise<string> {
+    const [user] = await db
+      .insert(users)
+      .values(userData as any)
+      .returning();
+    return user.id;
+  }
+
+  async updateUserLastLogin(id: string): Promise<void> {
+    await db
+      .update(users)
+      .set({ lastLogin: new Date(), updatedAt: new Date() })
+      .where(eq(users.id, id));
+  }
+
+  async verifyEmailToken(token: string): Promise<boolean> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.emailVerificationToken, token));
+    
+    if (!user) return false;
+
+    await db
+      .update(users)
+      .set({ 
+        isEmailVerified: true, 
+        emailVerificationToken: null,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, user.id));
+    
+    return true;
+  }
+
+  async setPasswordResetToken(userId: string, token: string, expires: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        passwordResetToken: token,
+        passwordResetExpires: expires,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async resetPassword(token: string, hashedPassword: string): Promise<boolean> {
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(and(
+        eq(users.passwordResetToken, token),
+        isNull(users.passwordResetExpires) ? eq(users.passwordResetExpires, null) : 
+        // Check if token hasn't expired
+        new Date() < users.passwordResetExpires as any
+      ));
+    
+    if (!user) return false;
+
+    await db
+      .update(users)
+      .set({ 
+        password: hashedPassword,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        updatedAt: new Date()
+      })
+      .where(eq(users.id, user.id));
+    
+    return true;
   }
 
   // Student operations

@@ -30,15 +30,23 @@ export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', '
 export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
 
-// User storage table (required for Replit Auth)
+// User storage table with custom authentication
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique(),
+  email: varchar("email").unique().notNull(),
+  password: varchar("password"), // For email/password auth
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
   role: userRoleEnum("role").notNull().default('student'),
   isActive: boolean("is_active").notNull().default(true),
+  isEmailVerified: boolean("is_email_verified").notNull().default(false),
+  emailVerificationToken: varchar("email_verification_token"),
+  passwordResetToken: varchar("password_reset_token"),
+  passwordResetExpires: timestamp("password_reset_expires"),
+  lastLogin: timestamp("last_login"),
+  authProvider: varchar("auth_provider").default('email'), // 'email' or 'replit'
+  replitId: varchar("replit_id"), // Keep for existing users
   isDeleted: boolean("is_deleted").notNull().default(false),
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by").references(() => users.id),
@@ -524,3 +532,31 @@ export type InsertTutoringCompany = z.infer<typeof insertTutoringCompanySchema>;
 export type TutoringCompany = typeof tutoringCompanies.$inferSelect;
 export type InsertCompanyAdmin = z.infer<typeof insertCompanyAdminSchema>;
 export type CompanyAdmin = typeof companyAdmins.$inferSelect;
+
+// Authentication schemas
+export const registerSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  role: z.enum(['student', 'parent', 'tutor']).default('student'),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  password: z.string().min(1, "Password is required"),
+});
+
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string(),
+  password: z.string().min(8, "Password must be at least 8 characters"),
+});
+
+export type RegisterData = z.infer<typeof registerSchema>;
+export type LoginData = z.infer<typeof loginSchema>;
+export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
