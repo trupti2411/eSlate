@@ -1,0 +1,127 @@
+1. Sign Up and Set Up Your Project
+Go to Bubble.io and create a free account.
+
+Click “New app”, give your project a name (e.g., “MyLMS”), and select a blank or base template.
+
+2. Design the Database (Data Types)
+In the Data tab, create the following data types (tables):
+
+User: fields—email, role (student, teacher, admin), enrolled_courses (list), etc.
+
+Course: fields—title, description, teacher (User), students (list of Users), lessons (list), assignments (list), etc.
+
+Lesson: fields—title, content (text, video, PDF), course (Course), order (number).
+
+Assignment: fields—title, instructions, due_date, course (Course), submissions (list).
+
+Submission: fields—student (User), assignment (Assignment), file, grade, feedback.
+
+3. Configure User Roles and Authentication
+Enable Bubble’s built-in user authentication (Sign up/log in workflows).
+
+Add a “role” field to distinguish Students, Teachers, and Admins.
+
+Set workflows to show/hide elements based on the Current User’s role.
+
+4. Create Core Pages
+Home/Landing Page: Overview and sign-in options.
+
+Dashboard(s): Different dashboards for each user role (conditional logic to show right view).
+
+Course Catalog: List available courses; allow enrollment or course creation.
+
+Course Detail: List lessons, assignments, participants.
+
+Lesson Viewer: Show lesson content (embed videos, display PDFs/text).
+
+Assignment Submission: Form for students to upload work.
+
+Grading & Feedback: Interface for teachers to review and grade.
+
+5. Build Workflows (Logic)
+Enrollment: When a Student clicks “enroll,” add Course to their enrolled_courses field and User to Course’s students list.
+
+Course creation: When a Teacher/Admin creates a course, set them as the course’s Teacher.
+
+Submission: When a Student submits, create a Submission and link it to both Assignment and User.
+
+Grading: Teachers can enter a grade and feedback on Submissions.
+
+6. Design the UI
+Use Bubble’s drag-and-drop editor to layout the above pages.
+
+Add dynamic groups/lists—repeating groups to show courses, lessons, assignments.
+
+Use conditionals to display/hide UI based on user roles and data.
+
+7. Add Messaging and Notifications (Optional)
+Create a Message data type; let users send messages to each other.
+
+Use workflows to send email notifications for new assignments, submitted work, or grades (Bubble supports this natively).
+
+8. Test Your Application
+Use Bubble’s “Preview” mode to test flows for each user type.
+
+Double-check permissions (privacy settings) in the Data tab so learners see only their info.
+
+9. Optimize & Launch
+Polish the design for clarity and accessibility.
+
+Invite test users for feedback.
+
+Launch and continue iterating—Bubble lets you deploy live with one click.
+
+Tips:
+
+Bubble’s template marketplace has LMS and course management templates for faster setup.
+
+Bubble’s documentation, forums, and video tutorials are great for learning about advanced features.
+
+Use Bubble’s “Privacy” tab to set who can read/write which data—crucial for user data security.
+
+Would you like more detail or a template example for a specific feature?
+
+now - We need to develop below funcationality on the company page which is 
+Homework Submission and Management: This will Allows students to submit homework and lets tutors manage and evaluate assignments. Parents can verify submissions.
+Can you give me more specific features for this?
+
+now - We need to develop below funcationality on the company page which is Homework Submission and Management: This will Allows students to submit homework and lets tutors manage and evaluate assignments. Parents can verify submissions. Can you give me more specific features for this?
+Sure! For the Homework Submission and Management functionality on the company (LMS) page, here are specific features you should implement to cover the complete workflow for students, tutors, and parents:
+
+Homework Submission and Management: Key Features
+1. Assignment Creation & Scheduling
+Tutors can create homework: Add instructions, attach files, set deadlines, and assign to specific students or groups.
+
+Visibility scheduling: Control when assignments become visible to students.
+
+Recurring assignments: Optionally set repeat schedules (daily, weekly, etc.).
+
+2. Student Submission Portal
+Upload interface: Students can upload files, write text answers, or submit links.
+
+Multiple file types accepted: Support for documents, images, audio, and video as needed.
+
+Draft and Final Submission: Allow students to save drafts before final submission.
+
+Due date reminders: Automatic alerts (email/push notifications) before deadlines.
+
+3. Tutor Management & Evaluation
+Submission dashboard: Tutors view all submissions per assignment, filter by status (submitted, pending, late).
+
+Review tools: Preview submissions, leave comments, assign scores or grades.
+
+Bulk feedback: Provide feedback to multiple students at once.
+
+Late submission marking: Indicate late submissions and optionally auto-apply penalties.
+
+4. Parent Verification & Involvement
+Submission notification: Parents receive alerts when their child submits homework.
+
+Verification interface: Parents can review submitted work and confirm authenticity, leave optional comments.
+
+View feedback and grades: Parents can see tutors’ evaluation and feedback.
+
+5. Progress Tracking & History
+Submission history: Students, tutors, and parents can view past assignments, submissions, and grades.
+
+Status indicators: Show current status (e.g., pending verification, graded, needs revision).

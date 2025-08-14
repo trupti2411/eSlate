@@ -14,6 +14,7 @@ import {
   insertClassSchema,
   insertStudentClassAssignmentSchema
 } from "@shared/schema";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
@@ -37,12 +38,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (tutor) {
           assignments = await storage.getAssignmentsByTutor(tutor.id);
         }
+      } else if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (companyAdmin) {
+          assignments = await storage.getAssignmentsByCompanyId(companyAdmin.companyId);
+        }
       }
 
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching assignments:", error);
       res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Company assignments route
+  app.get('/api/company/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      let assignments: any[] = [];
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (companyAdmin) {
+          assignments = await storage.getAssignmentsByCompanyId(companyAdmin.companyId);
+        }
+      }
+
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching company assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Company students route
+  app.get('/api/company/students', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      let students: any[] = [];
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (companyAdmin) {
+          students = await storage.getCompanyStudentsByCompanyId(companyAdmin.companyId);
+        }
+      }
+
+      res.json(students);
+    } catch (error) {
+      console.error("Error fetching company students:", error);
+      res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  // Student assignments route  
+  app.get('/api/student/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+      let assignments: any[] = [];
+
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (student) {
+          assignments = await storage.getAssignmentsByStudent(student.id);
+        }
+      }
+
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching student assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Homework file upload route
+  app.post('/api/homework/upload', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const uploadURL = await objectStorageService.getHomeworkUploadURL();
+      res.json({ uploadURL });
+    } catch (error) {
+      console.error("Error getting homework upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+
+  // Serve homework files
+  app.get('/homework/:filePath(*)', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const objectStorageService = new ObjectStorageService();
+      const file = await objectStorageService.getHomeworkFile(`/homework/${req.params.filePath}`);
+      objectStorageService.downloadObject(file, res);
+    } catch (error) {
+      console.error("Error downloading homework file:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
     }
   });
 

@@ -27,7 +27,8 @@ export const sessions = pgTable(
 
 // Enums for user roles and status
 export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', 'admin', 'company_admin']);
-export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed']);
+export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed', 'late', 'needs_revision']);
+export const submissionStatusEnum = pgEnum('submission_status', ['draft', 'submitted', 'late', 'graded', 'parent_verified', 'needs_revision']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
 
 // User storage table with custom authentication
@@ -115,9 +116,16 @@ export const assignments = pgTable("assignments", {
   instructions: text("instructions"),
   dueDate: timestamp("due_date"),
   tutorId: varchar("tutor_id").notNull().references(() => tutors.id),
-  studentId: varchar("student_id").notNull().references(() => students.id),
+  studentIds: text("student_ids").array(), // Support multiple students per assignment
+  classId: varchar("class_id").references(() => classes.id), // Assign to entire class
   status: assignmentStatusEnum("status").notNull().default('assigned'),
   maxPoints: integer("max_points").default(100),
+  attachmentUrls: text("attachment_urls").array(), // Tutor can attach files
+  allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'txt', 'jpg', 'png']),
+  isRecurring: boolean("is_recurring").default(false),
+  recurringPattern: varchar("recurring_pattern"), // 'daily', 'weekly', 'monthly'
+  visibleFrom: timestamp("visible_from"),
+  autoGrade: boolean("auto_grade").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -127,15 +135,27 @@ export const submissions = pgTable("submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   assignmentId: varchar("assignment_id").notNull().references(() => assignments.id),
   studentId: varchar("student_id").notNull().references(() => students.id),
-  content: text("content"),
-  filePath: varchar("file_path"),
-  submittedAt: timestamp("submitted_at").defaultNow(),
+  content: text("content"), // Text response
+  fileUrls: text("file_urls").array(), // Multiple uploaded files
+  status: submissionStatusEnum("status").notNull().default('draft'),
+  isDraft: boolean("is_draft").notNull().default(true),
+  submittedAt: timestamp("submitted_at"),
+  isLate: boolean("is_late").notNull().default(false),
+  // Parent verification
   isVerifiedByParent: boolean("is_verified_by_parent").notNull().default(false),
   parentVerifiedAt: timestamp("parent_verified_at"),
+  parentComments: text("parent_comments"),
+  // Grading
   score: integer("score"),
   feedback: text("feedback"),
   gradedAt: timestamp("graded_at"),
   gradedBy: varchar("graded_by").references(() => tutors.id),
+  // Revision workflow
+  needsRevision: boolean("needs_revision").notNull().default(false),
+  revisionFeedback: text("revision_feedback"),
+  revisionCount: integer("revision_count").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Messages table for real-time communication
@@ -202,7 +222,10 @@ export const studentsRelations = relations(students, ({ one, many }) => ({
     fields: [students.tutorId],
     references: [tutors.id],
   }),
-  assignments: many(assignments),
+  company: one(tutoringCompanies, {
+    fields: [students.companyId],
+    references: [tutoringCompanies.id],
+  }),
   submissions: many(submissions),
   progress: many(progress),
   calendarEvents: many(calendarEvents),
@@ -250,10 +273,6 @@ export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
   tutor: one(tutors, {
     fields: [assignments.tutorId],
     references: [tutors.id],
-  }),
-  student: one(students, {
-    fields: [assignments.studentId],
-    references: [students.id],
   }),
   submissions: many(submissions),
   progress: many(progress),
@@ -340,6 +359,8 @@ export const insertSubmissionSchema = createInsertSchema(submissions).omit({
   submittedAt: true,
   parentVerifiedAt: true,
   gradedAt: true,
+  createdAt: true,
+  updatedAt: true,
 });
 
 export const insertMessageSchema = createInsertSchema(messages).omit({
@@ -358,6 +379,26 @@ export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit
   createdAt: true,
 });
 
+// Types
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type Student = typeof students.$inferSelect;
+export type InsertStudent = z.infer<typeof insertStudentSchema>;
+export type Parent = typeof parents.$inferSelect;
+export type InsertParent = z.infer<typeof insertParentSchema>;
+export type Tutor = typeof tutors.$inferSelect;
+export type InsertTutor = z.infer<typeof insertTutorSchema>;
+export type TutoringCompany = typeof tutoringCompanies.$inferSelect;
+export type Assignment = typeof assignments.$inferSelect;
+export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
+export type Submission = typeof submissions.$inferSelect;
+export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
+export type Message = typeof messages.$inferSelect;
+export type InsertMessage = z.infer<typeof insertMessageSchema>;
+export type Progress = typeof progress.$inferSelect;
+export type InsertProgress = z.infer<typeof insertProgressSchema>;
+export type CalendarEvent = typeof calendarEvents.$inferSelect;
+
 // Academic management insert schemas will be added after table definitions
 
 export const insertTutoringCompanySchema = createInsertSchema(tutoringCompanies).omit({
@@ -371,9 +412,7 @@ export const insertCompanyAdminSchema = createInsertSchema(companyAdmins).omit({
   createdAt: true,
 });
 
-// Types
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
+
 
 // Academic Years table
 export const academicYears = pgTable("academic_years", {

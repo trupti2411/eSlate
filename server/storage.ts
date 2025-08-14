@@ -11,7 +11,6 @@ import {
   progress,
   calendarEvents,
   type User,
-  type UpsertUser,
   type Student,
   type InsertStudent,
   type Parent,
@@ -19,9 +18,6 @@ import {
   type Tutor,
   type InsertTutor,
   type TutoringCompany,
-  type InsertTutoringCompany,
-  type CompanyAdmin,
-  type InsertCompanyAdmin,
   type Assignment,
   type InsertAssignment,
   type Submission,
@@ -31,28 +27,15 @@ import {
   type Progress,
   type InsertProgress,
   type CalendarEvent,
-  type InsertCalendarEvent,
-  academicYears,
-  academicTerms,
-  classes,
-  studentClassAssignments,
-  type AcademicYear,
-  type InsertAcademicYear,
-  type AcademicTerm,
-  type InsertAcademicTerm,
-  type Class,
-  type InsertClass,
-  type StudentClassAssignment,
-  type InsertStudentClassAssignment,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, isNull } from "drizzle-orm";
+import { eq, and, desc, isNull, sql } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (supports both Replit Auth and Custom Auth)
   getUser(id: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
+  upsertUser(user: any): Promise<User>;
   createUserWithAuth(user: Partial<User>): Promise<string>;
   updateUserLastLogin(id: string): Promise<void>;
   verifyEmailToken(token: string): Promise<boolean>;
@@ -83,6 +66,7 @@ export interface IStorage {
   createAssignment(assignment: InsertAssignment): Promise<Assignment>;
   getAssignmentsByStudent(studentId: string): Promise<Assignment[]>;
   getAssignmentsByTutor(tutorId: string): Promise<Assignment[]>;
+  getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]>;
   updateAssignmentStatus(id: string, status: string): Promise<Assignment>;
   
   // Submission operations
@@ -91,6 +75,7 @@ export interface IStorage {
   getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
   getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
+  gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission | undefined>;
   verifySubmissionByParent(id: string): Promise<Submission>;
   
   // Message operations
@@ -349,9 +334,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssignmentsByStudent(studentId: string): Promise<Assignment[]> {
-    return await db.select().from(assignments)
-      .where(eq(assignments.studentId, studentId))
-      .orderBy(desc(assignments.dueDate));
+    try {
+      // Find assignments where this student is in the student_ids array
+      const studentAssignments = await db.select()
+        .from(assignments)
+        .where(sql`${studentId} = ANY(${assignments.studentIds})`)
+        .orderBy(desc(assignments.dueDate));
+
+      return studentAssignments;
+    } catch (error) {
+      console.error("Error fetching assignments for student:", error);
+      return [];
+    }
   }
 
   async getAssignmentsByTutor(tutorId: string): Promise<Assignment[]> {
@@ -380,9 +374,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getSubmissionsByStudent(studentId: string): Promise<Submission[]> {
-    return await db.select().from(submissions)
-      .where(eq(submissions.studentId, studentId))
-      .orderBy(desc(submissions.submittedAt));
+    try {
+      return await db.select().from(submissions)
+        .where(eq(submissions.studentId, studentId))
+        .orderBy(desc(submissions.submittedAt));
+    } catch (error) {
+      console.error("Error fetching submissions for student:", error);
+      return [];
+    }
   }
 
   async getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]> {
@@ -596,6 +595,45 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error fetching company students:", error);
       return [];
+    }
+  }
+
+  // Homework and Assignment operations
+  async getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]> {
+    try {
+      const companyAssignments = await db
+        .select()
+        .from(assignments)
+        .innerJoin(tutors, eq(assignments.tutorId, tutors.id))
+        .where(eq(tutors.companyId, companyId))
+        .orderBy(desc(assignments.createdAt));
+
+      return companyAssignments.map(item => item.assignments);
+    } catch (error) {
+      console.error("Error fetching company assignments:", error);
+      return [];
+    }
+  }
+
+  async gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission | undefined> {
+    try {
+      const [graded] = await db
+        .update(submissions)
+        .set({
+          score,
+          feedback,
+          gradedBy,
+          gradedAt: new Date(),
+          status: 'graded',
+          updatedAt: new Date(),
+        })
+        .where(eq(submissions.id, submissionId))
+        .returning();
+
+      return graded;
+    } catch (error) {
+      console.error("Error grading submission:", error);
+      return undefined;
     }
   }
 
