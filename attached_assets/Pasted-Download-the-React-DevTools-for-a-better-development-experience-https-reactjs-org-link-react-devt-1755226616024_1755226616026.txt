@@ -1,0 +1,73 @@
+Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+ObjectUploader.tsx:50 Getting upload parameters for file: Completed Homework.docx
+ObjectUploader.tsx:52 Upload parameters received: {url: undefined, fields: {…}}
+ObjectUploader.tsx:64 Error getting upload parameters: Error: Upload URL is undefined
+    at getUploadParameters (ObjectUploader.tsx:55:21)
+getUploadParameters @ ObjectUploader.tsx:64
+await in getUploadParameters
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1081
+call_fn @ @uppy_aws-s3.js?v=597491ab:1168
+run @ @uppy_aws-s3.js?v=597491ab:1053
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1077
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1076
+nonMultipartUpload_fn @ @uppy_aws-s3.js?v=597491ab:1832
+uploadFile @ @uppy_aws-s3.js?v=597491ab:1678
+createUpload_fn @ @uppy_aws-s3.js?v=597491ab:1553
+start @ @uppy_aws-s3.js?v=597491ab:1470
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:2337
+uploadLocalFile_fn @ @uppy_aws-s3.js?v=597491ab:2266
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1963
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1944
+runUpload_fn @ chunk-VPYNWGLN.js?v=597491ab:3285
+await in runUpload_fn
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:2797
+Promise.then
+upload @ chunk-VPYNWGLN.js?v=597491ab:2786
+(anonymous) @ @uppy_react.js?v=597491ab:2764
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:850Understand this error
+chunk-VPYNWGLN.js?v=597491ab:683 [Uppy] [12:56:34] Upload URL is undefined
+error @ chunk-VPYNWGLN.js?v=597491ab:683
+log @ chunk-VPYNWGLN.js?v=597491ab:2694
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:3075
+emitAll @ chunk-VPYNWGLN.js?v=597491ab:385
+emit @ chunk-VPYNWGLN.js?v=597491ab:330
+emit @ chunk-VPYNWGLN.js?v=597491ab:2075
+onError @ @uppy_aws-s3.js?v=597491ab:2277
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1423
+Promise.then
+createUpload_fn @ @uppy_aws-s3.js?v=597491ab:1553
+start @ @uppy_aws-s3.js?v=597491ab:1470
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:2337
+uploadLocalFile_fn @ @uppy_aws-s3.js?v=597491ab:2266
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1963
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1944
+runUpload_fn @ chunk-VPYNWGLN.js?v=597491ab:3285
+await in runUpload_fn
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:2797
+Promise.then
+upload @ chunk-VPYNWGLN.js?v=597491ab:2786
+(anonymous) @ @uppy_react.js?v=597491ab:2764
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:850Understand this error
+ObjectUploader.tsx:74 Upload error for file Completed Homework.docx : Error: Upload URL is undefined
+    at getUploadParameters (ObjectUploader.tsx:55:21)
+(anonymous) @ ObjectUploader.tsx:74
+emitAll @ chunk-VPYNWGLN.js?v=597491ab:385
+emit @ chunk-VPYNWGLN.js?v=597491ab:330
+emit @ chunk-VPYNWGLN.js?v=597491ab:2075
+onError @ @uppy_aws-s3.js?v=597491ab:2277
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1423
+Promise.then
+createUpload_fn @ @uppy_aws-s3.js?v=597491ab:1553
+start @ @uppy_aws-s3.js?v=597491ab:1470
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:2337
+uploadLocalFile_fn @ @uppy_aws-s3.js?v=597491ab:2266
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1963
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1944
+runUpload_fn @ chunk-VPYNWGLN.js?v=597491ab:3285
+await in runUpload_fn
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:2797
+Promise.then
+upload @ chunk-VPYNWGLN.js?v=597491ab:2786
+(anonymous) @ @uppy_react.js?v=597491ab:2764
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:850Understand this error
+ObjectUploader.tsx:70 Upload complete: {successful: Array(0), failed: Array(1), uploadID: 'UJb-LPc4xMhvARMtJCR6M'}
