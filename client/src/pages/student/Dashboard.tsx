@@ -2,14 +2,12 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import Layout from "@/components/Layout";
-import HomeworkCard from "@/components/HomeworkCard";
 import ProgressChart from "@/components/ProgressChart";
 import MessageCenter from "@/components/MessageCenter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Clock, CheckCircle, AlertCircle } from "lucide-react";
+import { BookOpen, Clock, CheckCircle, MessageSquare } from "lucide-react";
 
 export default function StudentDashboard() {
   const { toast } = useToast();
@@ -30,16 +28,6 @@ export default function StudentDashboard() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: assignments, isLoading: assignmentsLoading } = useQuery({
-    queryKey: ["/api/assignments"],
-    enabled: !!user,
-  });
-
-  const { data: submissions, isLoading: submissionsLoading } = useQuery({
-    queryKey: ["/api/submissions"],
-    enabled: !!user,
-  });
-
   const { data: progress, isLoading: progressLoading } = useQuery({
     queryKey: ["/api/progress"],
     enabled: !!user,
@@ -56,10 +44,6 @@ export default function StudentDashboard() {
     );
   }
 
-  const pendingAssignments = assignments?.filter(a => a.status === 'assigned') || [];
-  const completedAssignments = assignments?.filter(a => a.status === 'completed') || [];
-  const unverifiedSubmissions = submissions?.filter(s => !s.isVerifiedByParent) || [];
-
   return (
     <Layout>
       <div className="container py-8">
@@ -74,12 +58,12 @@ export default function StudentDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
                 <BookOpen className="h-5 w-5 mr-2" />
-                Assignments
+                Learning Progress
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{assignments?.length || 0}</div>
-              <p className="text-gray-600 text-sm">Total assignments</p>
+              <div className="text-2xl font-bold">{progress?.length || 0}</div>
+              <p className="text-sm text-gray-600">Study sessions</p>
             </CardContent>
           </Card>
 
@@ -87,12 +71,14 @@ export default function StudentDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
                 <Clock className="h-5 w-5 mr-2" />
-                Pending
+                Study Time
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{pendingAssignments.length}</div>
-              <p className="text-gray-600 text-sm">Need to complete</p>
+              <div className="text-2xl font-bold">
+                {progress?.reduce((total, p) => total + (p.timeSpent || 0), 0) || 0}
+              </div>
+              <p className="text-sm text-gray-600">Minutes studied</p>
             </CardContent>
           </Card>
 
@@ -100,81 +86,92 @@ export default function StudentDashboard() {
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
                 <CheckCircle className="h-5 w-5 mr-2" />
-                Completed
+                Completed Activities
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">
-                {assignments?.filter(a => a.status === 'completed').length || 0}
+              <div className="text-2xl font-bold">
+                {progress?.filter(p => p.completionPercentage === 100).length || 0}
               </div>
-              <p className="text-gray-600 text-sm">Assignments done</p>
+              <p className="text-sm text-gray-600">Activities completed</p>
             </CardContent>
           </Card>
 
           <Card className="eink-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                Submissions
+                <MessageSquare className="h-5 w-5 mr-2" />
+                Messages
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{submissions?.length || 0}</div>
-              <p className="text-gray-600 text-sm">Total submitted</p>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-sm text-gray-600">Unread messages</p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Recent Assignments */}
-          <div>
-            <h2 className="section-title">Recent Assignments</h2>
-            {assignmentsLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="eink-card p-4 animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                  </div>
-                ))}
-              </div>
-            ) : assignments && assignments.length > 0 ? (
-              <div className="space-y-4">
-                {assignments.slice(0, 5).map((assignment) => (
-                  <HomeworkCard key={assignment.id} assignment={assignment} />
-                ))}
-              </div>
-            ) : (
-              <Card className="eink-card">
-                <CardContent className="p-8 text-center">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-semibold text-black mb-2">No Assignments Yet</h3>
-                  <p className="text-gray-600">Your tutor hasn't assigned any work yet.</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Progress Overview */}
-          <div>
-            <h2 className="section-title">Progress Overview</h2>
-            {progressLoading ? (
-              <div className="eink-card p-6">
-                <div className="animate-pulse">
-                  <div className="h-4 bg-gray-200 rounded mb-4"></div>
-                  <div className="h-32 bg-gray-200 rounded"></div>
+          <Card className="eink-card">
+            <CardHeader>
+              <CardTitle>Learning Progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {progressLoading ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
                 </div>
-              </div>
-            ) : (
-              <ProgressChart data={progress || []} />
-            )}
-          </div>
+              ) : (
+                <>
+                  {progress && progress.length > 0 ? (
+                    <ProgressChart data={progress} />
+                  ) : (
+                    <div className="text-center py-8">
+                      <BookOpen className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                      <p className="text-gray-600">No progress data available</p>
+                      <p className="text-sm text-gray-500">Start studying to track your progress!</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Message Center */}
+          <Card className="eink-card">
+            <CardHeader>
+              <CardTitle>Messages</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <MessageCenter />
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Message Center */}
+        {/* Study Resources */}
         <div className="mt-8">
-          <h2 className="section-title">Messages</h2>
-          <MessageCenter />
+          <Card className="eink-card">
+            <CardHeader>
+              <CardTitle>Study Resources</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <BookOpen className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Ready to Learn</h3>
+                <p className="text-gray-600 mb-4">
+                  Welcome to eSlate! Your tutors will provide study materials and guidance.
+                </p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Badge variant="outline">Mathematics</Badge>
+                  <Badge variant="outline">Science</Badge>
+                  <Badge variant="outline">English</Badge>
+                  <Badge variant="outline">History</Badge>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </Layout>

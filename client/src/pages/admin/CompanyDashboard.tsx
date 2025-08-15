@@ -80,80 +80,65 @@ export default function CompanyDashboard() {
     qualifications: "",
   });
 
-  // Redirect if not authenticated or not company admin
+  const [tutorAssignmentData, setTutorAssignmentData] = useState({
+    tutorId: "",
+  });
+
+  // Redirect if not authenticated
   useEffect(() => {
-    if (!isLoading && (!isAuthenticated || (user && user.role !== 'company_admin'))) {
+    if (!isLoading && !isAuthenticated) {
       toast({
-        title: "Access Denied",
-        description: "Company admin access required",
+        title: "Unauthorized",
+        description: "You are logged out. Logging in again...",
         variant: "destructive",
       });
       setTimeout(() => {
-        window.location.href = "/";
-      }, 1000);
+        window.location.href = "/api/login";
+      }, 500);
       return;
     }
-  }, [isAuthenticated, isLoading, user, toast]);
+  }, [isAuthenticated, isLoading, toast]);
 
-  // Fetch company admin details
+  // Fetch company admin data
+  const { data: companyAdminData } = useQuery({
+    queryKey: [`/api/admin/company-admin/${user?.id}`],
+    enabled: !!user && user.role === 'company_admin',
+  });
+
   useEffect(() => {
-    const fetchCompanyAdmin = async () => {
-      if (user && user.role === 'company_admin') {
-        try {
-          const response = await fetch(`/api/admin/company-admin/${user.id}`, {
-            credentials: 'include',
-          });
-          if (response.ok) {
-            const adminData = await response.json();
-            setCompanyAdmin(adminData);
-          }
-        } catch (error) {
-          console.error("Failed to fetch company admin data:", error);
-        }
-      }
-    };
+    if (companyAdminData) {
+      setCompanyAdmin(companyAdminData);
+    }
+  }, [companyAdminData]);
 
-    fetchCompanyAdmin();
-  }, [user]);
+  // Fetch company data
+  const { data: companies } = useQuery({
+    queryKey: ["/api/companies"],
+    enabled: !!companyAdmin,
+  });
 
-  // Fetch company details
-  const { data: company } = useQuery<TutoringCompany>({
-    queryKey: ["/api/companies", companyAdmin?.companyId],
+  const company = companies?.[0];
+
+  // Fetch tutors
+  const { data: tutors } = useQuery({
+    queryKey: [`/api/companies/${companyAdmin?.companyId}/tutors`],
     enabled: !!companyAdmin?.companyId,
   });
 
-  // Fetch company tutors
-  const { data: tutors, isLoading: loadingTutors } = useQuery<CompanyTutor[]>({
-    queryKey: ["/api/companies", companyAdmin?.companyId, "tutors"],
-    enabled: !!companyAdmin?.companyId,
-  });
-
-  // Fetch unassigned tutors for assignment
-  const { data: unassignedTutors } = useQuery<CompanyTutor[]>({
-    queryKey: ["/api/admin/unassigned-tutors"],
-    enabled: !!companyAdmin?.companyId,
-  });
-
-  // Fetch company students
-  const { data: companyStudents = [], isLoading: studentsLoading } = useQuery<CompanyStudent[]>({
-    queryKey: ["/api/companies", companyAdmin?.companyId, "students"],
+  // Fetch students
+  const { data: students } = useQuery({
+    queryKey: [`/api/companies/${companyAdmin?.companyId}/students`],
     enabled: !!companyAdmin?.companyId,
   });
 
   // Create tutor mutation
   const createTutorMutation = useMutation({
-    mutationFn: async (tutorData: typeof tutorFormData) => {
-      return await apiRequest("/api/admin/users", "POST", {
-        ...tutorData,
-        role: "tutor",
-        companyId: companyAdmin?.companyId,
-      });
+    mutationFn: async (tutorData: any) => {
+      const response = await apiRequest("/api/admin/create-tutor", "POST", tutorData);
+      return response;
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Tutor created successfully",
-      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/tutors`] });
       setIsCreateTutorOpen(false);
       setTutorFormData({
         email: "",
@@ -162,11 +147,12 @@ export default function CompanyDashboard() {
         specialization: "",
         qualifications: "",
       });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/companies", companyAdmin?.companyId, "tutors"] 
+      toast({
+        title: "Success",
+        description: "Tutor created successfully",
       });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Failed to create tutor",
@@ -175,25 +161,23 @@ export default function CompanyDashboard() {
     },
   });
 
-  // Assign existing tutor mutation
+  // Assign tutor mutation
   const assignTutorMutation = useMutation({
-    mutationFn: async (tutorId: string) => {
-      return await apiRequest(`/api/companies/${companyAdmin?.companyId}/assign-tutor/${tutorId}`, "PATCH");
+    mutationFn: async ({ studentId, tutorId }: { studentId: string; tutorId: string }) => {
+      const response = await apiRequest(`/api/students/${studentId}`, "PATCH", { tutorId });
+      return response;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/students`] });
+      setIsAssignTutorOpen(false);
+      setSelectedStudentId(null);
+      setTutorAssignmentData({ tutorId: "" });
       toast({
         title: "Success",
         description: "Tutor assigned successfully",
       });
-      setIsAssignTutorOpen(false);
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/companies", companyAdmin?.companyId, "tutors"] 
-      });
-      queryClient.invalidateQueries({ 
-        queryKey: ["/api/admin/unassigned-tutors"] 
-      });
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
       toast({
         title: "Error",
         description: error.message || "Failed to assign tutor",
@@ -202,15 +186,32 @@ export default function CompanyDashboard() {
     },
   });
 
-
-
-  const handleInputChange = (field: string, value: string) => {
-    setTutorFormData(prev => ({ ...prev, [field]: value }));
+  const handleCreateTutor = (e: React.FormEvent) => {
+    e.preventDefault();
+    createTutorMutation.mutate({
+      ...tutorFormData,
+      companyId: companyAdmin?.companyId,
+    });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleAssignTutor = (e: React.FormEvent) => {
     e.preventDefault();
-    createTutorMutation.mutate(tutorFormData);
+    if (selectedStudentId && tutorAssignmentData.tutorId) {
+      assignTutorMutation.mutate({
+        studentId: selectedStudentId,
+        tutorId: tutorAssignmentData.tutorId,
+      });
+    }
+  };
+
+  const openTutorAssignmentDialog = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setIsAssignTutorOpen(true);
+  };
+
+  const openStudentProfile = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    setIsStudentProfileOpen(true);
   };
 
   if (isLoading) {
@@ -224,13 +225,13 @@ export default function CompanyDashboard() {
     );
   }
 
-  if (!company) {
+  if (!companyAdmin) {
     return (
       <Layout>
         <div className="container py-8">
           <div className="text-center">
-            <Building2 className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h2 className="text-xl font-semibold text-gray-600 mb-2">Loading Company Data...</h2>
+            <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+            <p className="text-gray-600">You don't have permission to access this dashboard.</p>
           </div>
         </div>
       </Layout>
@@ -240,409 +241,300 @@ export default function CompanyDashboard() {
   return (
     <Layout>
       <div className="container py-8">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="page-title">{company.name} - Admin Dashboard</h1>
-            <p className="text-gray-600">Manage your tutoring company's staff and operations</p>
-            <div className="flex space-x-4 mt-4">
-              <Link href="/company/homework">
-                <Button variant="outline" className="flex items-center space-x-2">
-                  <BookOpen className="w-4 h-4" />
-                  <span>Homework Management</span>
-                </Button>
-              </Link>
-              <Link href="/company/academic">
-                <Button variant="outline" className="flex items-center space-x-2">
-                  <Calendar className="w-4 h-4" />
-                  <span>Academic Management</span>
-                </Button>
-              </Link>
-            </div>
-          </div>
-          
-          <div className="flex space-x-2">
-            <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
-              <DialogTrigger asChild>
-                <Button className="eink-button">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Tutor
-                </Button>
-              </DialogTrigger>
-            </Dialog>
-            
-            <Dialog open={isAssignTutorOpen} onOpenChange={setIsAssignTutorOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="eink-button">
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Assign Existing Tutor
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Assign Existing Tutor to {company?.name}</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {unassignedTutors && unassignedTutors.length > 0 ? (
-                    <div className="space-y-2">
-                      <p className="text-sm text-gray-600">
-                        Select a tutor to assign to your company:
-                      </p>
-                      {unassignedTutors.map((tutor) => (
-                        <Card key={tutor.id} className="border p-4">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="font-medium">
-                                {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : `Tutor #${tutor.id.slice(-6)}`}
-                              </h4>
-                              <p className="text-sm text-gray-600">{tutor.user?.email}</p>
-                              {tutor.specialization && (
-                                <p className="text-sm text-gray-500">
-                                  Specialization: {tutor.specialization}
-                                </p>
-                              )}
-                            </div>
-                            <Button
-                              onClick={() => assignTutorMutation.mutate(tutor.id)}
-                              disabled={assignTutorMutation.isPending}
-                            >
-                              Assign
-                            </Button>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-center text-gray-500 py-4">
-                      No unassigned tutors available
-                    </p>
-                  )}
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-          
-          <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add New Tutor to {company.name}</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input
-                      id="firstName"
-                      value={tutorFormData.firstName}
-                      onChange={(e) => handleInputChange("firstName", e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input
-                      id="lastName"
-                      value={tutorFormData.lastName}
-                      onChange={(e) => handleInputChange("lastName", e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={tutorFormData.email}
-                    onChange={(e) => handleInputChange("email", e.target.value)}
-                    required
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="specialization">Specialization</Label>
-                  <Input
-                    id="specialization"
-                    value={tutorFormData.specialization}
-                    onChange={(e) => handleInputChange("specialization", e.target.value)}
-                    placeholder="e.g., Mathematics, Science, Language Arts"
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="qualifications">Qualifications</Label>
-                  <Input
-                    id="qualifications"
-                    value={tutorFormData.qualifications}
-                    onChange={(e) => handleInputChange("qualifications", e.target.value)}
-                    placeholder="e.g., B.S. Mathematics, Teaching Certificate"
-                  />
-                </div>
-
-                <div className="flex justify-end space-x-2">
-                  <Button type="button" variant="outline" onClick={() => setIsCreateTutorOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={createTutorMutation.isPending}>
-                    {createTutorMutation.isPending ? "Creating..." : "Create Tutor"}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+        <div className="mb-8">
+          <h1 className="page-title">Business Admin Dashboard</h1>
+          {company && (
+            <p className="text-gray-600">{company.name} Management</p>
+          )}
         </div>
 
         {/* Company Overview */}
-        <Card className="eink-card mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Building2 className="w-5 h-5" />
-              <span>Company Details</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <div className="flex items-start space-x-2">
-                  <Building2 className="w-4 h-4 mt-1 text-gray-500" />
-                  <div>
-                    <p className="text-sm text-gray-600">Company Name</p>
-                    <p className="font-semibold">{company.name}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-2">
-                  <Mail className="w-4 h-4 mt-1 text-gray-500" />
-                  <div>
-                    <p className="text-sm text-gray-600">Contact Email</p>
-                    <p className="font-semibold">{company.contactEmail}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-2">
-                  <Phone className="w-4 h-4 mt-1 text-gray-500" />
-                  <div>
-                    <p className="text-sm text-gray-600">Contact Phone</p>
-                    <p className="font-semibold">{company.contactPhone || 'Not provided'}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                <div className="flex items-start space-x-2">
-                  <MapPin className="w-4 h-4 mt-1 text-gray-500" />
-                  <div>
-                    <p className="text-sm text-gray-600">Address</p>
-                    <p className="font-semibold">{company.address || 'Not provided'}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-2">
-                  <CheckCircle className="w-4 h-4 mt-1 text-gray-500" />
-                  <div>
-                    <p className="text-sm text-gray-600">Status</p>
-                    <Badge variant={company.isActive ? "default" : "destructive"}>
-                      {company.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {company.description && (
-              <div className="mt-4 pt-4 border-t">
-                <p className="text-sm text-gray-600">Description</p>
-                <p className="mt-1">{company.description}</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Tutors Section */}
-        <Card className="eink-card">
-          <CardHeader>
-            <CardTitle className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Users className="w-5 h-5" />
-                <span>{company?.name || 'Company'} Tutors ({tutors?.length || 0})</span>
-              </div>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setIsCreateTutorOpen(true)}
-                  className="text-sm"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create New
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => setIsAssignTutorOpen(true)}
-                  className="text-sm"
-                >
-                  <UserPlus className="w-4 h-4 mr-2" />
-                  Assign Existing
-                </Button>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loadingTutors ? (
-              <p>Loading tutors...</p>
-            ) : tutors && tutors.length > 0 ? (
+        {company && (
+          <Card className="eink-card mb-8">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Building2 className="h-5 w-5 mr-2" />
+                Company Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {tutors.map((tutor) => (
-                  <Card key={tutor.id} className="border">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex items-center space-x-2">
-                          <GraduationCap className="w-5 h-5 text-blue-600" />
-                          <h4 className="font-semibold">
-                            {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : `Tutor #${tutor.id.slice(-6)}`}
-                          </h4>
-                        </div>
-                        <Badge variant={tutor.isVerified ? "default" : "secondary"}>
-                          {tutor.isVerified ? (
-                            <>
-                              <CheckCircle className="w-3 h-3 mr-1" />
-                              Verified
-                            </>
-                          ) : (
-                            <>
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pending
-                            </>
-                          )}
-                        </Badge>
+                <div>
+                  <p className="text-sm text-gray-600">Company Name</p>
+                  <p className="font-semibold">{company.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Email</p>
+                  <p className="font-semibold flex items-center">
+                    <Mail className="h-4 w-4 mr-1" />
+                    {company.contactEmail}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600">Phone</p>
+                  <p className="font-semibold flex items-center">
+                    <Phone className="h-4 w-4 mr-1" />
+                    {company.contactPhone || 'Not provided'}
+                  </p>
+                </div>
+                <div className="md:col-span-2 lg:col-span-3">
+                  <p className="text-sm text-gray-600">Address</p>
+                  <p className="font-semibold flex items-center">
+                    <MapPin className="h-4 w-4 mr-1" />
+                    {company.address || 'Not provided'}
+                  </p>
+                </div>
+                <div className="md:col-span-2 lg:col-span-3">
+                  <p className="text-sm text-gray-600">Description</p>
+                  <p className="font-semibold">{company.description}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stats Overview */}
+        <div className="dashboard-grid mb-8">
+          <Card className="eink-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <Users className="h-5 w-5 mr-2" />
+                Total Tutors
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{tutors?.length || 0}</div>
+              <p className="text-sm text-gray-600">Active tutors</p>
+            </CardContent>
+          </Card>
+
+          <Card className="eink-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <GraduationCap className="h-5 w-5 mr-2" />
+                Total Students
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{students?.length || 0}</div>
+              <p className="text-sm text-gray-600">Enrolled students</p>
+            </CardContent>
+          </Card>
+
+          <Card className="eink-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Active Sessions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-sm text-gray-600">Current sessions</p>
+            </CardContent>
+          </Card>
+
+          <Card className="eink-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <BookOpen className="h-5 w-5 mr-2" />
+                Learning Progress
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">85%</div>
+              <p className="text-sm text-gray-600">Average progress</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+          <Card className="eink-card">
+            <CardHeader>
+              <CardTitle>Quick Actions</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
+                <DialogTrigger asChild>
+                  <Button className="w-full eink-button">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add New Tutor
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Tutor</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleCreateTutor} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="firstName">First Name</Label>
+                        <Input
+                          id="firstName"
+                          value={tutorFormData.firstName}
+                          onChange={(e) => setTutorFormData({ ...tutorFormData, firstName: e.target.value })}
+                          required
+                        />
                       </div>
-                      
-                      {tutor.user?.email && (
-                        <p className="text-sm text-gray-600 mb-2">
-                          <strong>Email:</strong> {tutor.user.email}
-                        </p>
-                      )}
-                      
-                      {tutor.specialization && (
-                        <p className="text-sm text-gray-600 mb-2">
-                          <strong>Specialization:</strong> {tutor.specialization}
-                        </p>
-                      )}
-                      
-                      {tutor.qualifications && (
-                        <p className="text-sm text-gray-600 mb-3">
-                          <strong>Qualifications:</strong> {tutor.qualifications}
-                        </p>
-                      )}
-                      
+                      <div>
+                        <Label htmlFor="lastName">Last Name</Label>
+                        <Input
+                          id="lastName"
+                          value={tutorFormData.lastName}
+                          onChange={(e) => setTutorFormData({ ...tutorFormData, lastName: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={tutorFormData.email}
+                        onChange={(e) => setTutorFormData({ ...tutorFormData, email: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="specialization">Specialization</Label>
+                      <Input
+                        id="specialization"
+                        value={tutorFormData.specialization}
+                        onChange={(e) => setTutorFormData({ ...tutorFormData, specialization: e.target.value })}
+                        placeholder="e.g., Mathematics, Science"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="qualifications">Qualifications</Label>
+                      <Input
+                        id="qualifications"
+                        value={tutorFormData.qualifications}
+                        onChange={(e) => setTutorFormData({ ...tutorFormData, qualifications: e.target.value })}
+                        placeholder="e.g., B.Sc. Mathematics, Teaching Certificate"
+                      />
+                    </div>
+                    <Button 
+                      type="submit" 
+                      className="w-full eink-button"
+                      disabled={createTutorMutation.isPending}
+                    >
+                      {createTutorMutation.isPending ? "Creating..." : "Create Tutor"}
+                    </Button>
+                  </form>
+                </DialogContent>
+              </Dialog>
 
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">No Tutors Yet</h3>
-                <p className="text-gray-500 mb-4">Add your first tutor to get started.</p>
-                <Button onClick={() => setIsCreateTutorOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add First Tutor
+              <Link href="/company/tutors">
+                <Button variant="outline" className="w-full">
+                  <Users className="h-4 w-4 mr-2" />
+                  Manage Tutors
                 </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </Link>
 
-        {/* Students Section */}
-        <Card className="eink-card mt-8">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <GraduationCap className="w-5 h-5" />
-              <span>{company?.name || 'Company'} Students ({companyStudents.length})</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {studentsLoading ? (
-              <p>Loading students...</p>
-            ) : companyStudents.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-gray-300">
-                  <thead>
-                    <tr className="bg-gray-50">
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Name</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Email</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Grade Level</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Status</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Joined</th>
-                      <th className="border border-gray-300 px-4 py-2 text-left font-semibold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {companyStudents.map((student) => (
-                      <tr key={student.id} className="hover:bg-gray-50">
-                        <td className="border border-gray-300 px-4 py-2">
-                          <div className="font-medium">
-                            {student.user.firstName} {student.user.lastName}
-                          </div>
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2">
-                          <div className="text-sm text-gray-600">
-                            {student.user.email}
-                          </div>
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2">
-                          <div className="text-sm">
-                            {student.gradeLevel || 'Not set'}
-                          </div>
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2">
-                          <Badge 
-                            variant={student.user.isActive ? "default" : "destructive"}
-                            className="text-xs"
-                          >
-                            {student.user.isActive ? "Active" : "Inactive"}
-                          </Badge>
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2">
-                          <div className="text-sm text-gray-600">
-                            {new Date(student.user.createdAt).toLocaleDateString()}
-                          </div>
-                        </td>
-                        <td className="border border-gray-300 px-4 py-2">
-                          <div className="flex space-x-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setSelectedStudentId(student.id);
-                                setIsStudentProfileOpen(true);
-                              }}
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit Profile
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
+              <Link href="/company/students">
+                <Button variant="outline" className="w-full">
+                  <GraduationCap className="h-4 w-4 mr-2" />
+                  Manage Students
+                </Button>
+              </Link>
+
+              <Link href="/company/academic">
+                <Button variant="outline" className="w-full">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Academic Management
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+
+          <Card className="eink-card">
+            <CardHeader>
+              <CardTitle>Recent Students</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {students && students.length > 0 ? (
+                <div className="space-y-2">
+                  {students.slice(0, 5).map((student) => (
+                    <div key={student.id} className="flex items-center justify-between p-2 border rounded">
+                      <div>
+                        <p className="font-medium">
+                          {student.user.firstName} {student.user.lastName}
+                        </p>
+                        <p className="text-sm text-gray-600">{student.user.email}</p>
+                      </div>
+                      <div className="flex space-x-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openStudentProfile(student.id)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openTutorAssignmentDialog(student.id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <GraduationCap className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+                  <p className="text-gray-600">No students enrolled yet</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tutor Assignment Dialog */}
+        <Dialog open={isAssignTutorOpen} onOpenChange={setIsAssignTutorOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Assign Tutor to Student</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleAssignTutor} className="space-y-4">
+              <div>
+                <Label htmlFor="tutorSelect">Select Tutor</Label>
+                <Select
+                  value={tutorAssignmentData.tutorId}
+                  onValueChange={(value) => setTutorAssignmentData({ tutorId: value })}
+                  required
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a tutor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {tutors?.map((tutor) => (
+                      <SelectItem key={tutor.id} value={tutor.id}>
+                        {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : 'Unknown Tutor'}
+                        {tutor.specialization && ` - ${tutor.specialization}`}
+                      </SelectItem>
                     ))}
-                  </tbody>
-                </table>
+                  </SelectContent>
+                </Select>
               </div>
-            ) : (
-              <div className="text-center py-8">
-                <GraduationCap className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-600 mb-2">No Students Yet</h3>
-                <p className="text-gray-500">Students will appear here once they are assigned to your company's tutors.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              <Button 
+                type="submit" 
+                className="w-full eink-button"
+                disabled={assignTutorMutation.isPending}
+              >
+                {assignTutorMutation.isPending ? "Assigning..." : "Assign Tutor"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Student Profile Dialog */}
-        {selectedStudentId && companyAdmin && (
+        {selectedStudentId && (
           <StudentProfileDialog
             studentId={selectedStudentId}
-            companyId={companyAdmin.companyId}
             isOpen={isStudentProfileOpen}
             onClose={() => {
               setIsStudentProfileOpen(false);
