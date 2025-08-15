@@ -1,0 +1,99 @@
+Server response: Response {type: 'basic', url: 'https://3effa6e0-3f9c-4803-8d06-c55c1261c316-00-1ebrsssis64kc.picard.replit.dev/api/homework/upload', redirected: false, status: 200, ok: true, …}
+TutorDashboard.tsx:195 Error getting upload parameters: Error: No uploadURL received from server
+    at handleGetUploadParameters (TutorDashboard.tsx:186:15)
+    at async getUploadParameters (ObjectUploader.tsx:53:28)
+handleGetUploadParameters @ TutorDashboard.tsx:195
+await in handleGetUploadParameters
+getUploadParameters @ ObjectUploader.tsx:53
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1081
+call_fn @ @uppy_aws-s3.js?v=597491ab:1168
+run @ @uppy_aws-s3.js?v=597491ab:1053
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1077
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1076
+nonMultipartUpload_fn @ @uppy_aws-s3.js?v=597491ab:1832
+uploadFile @ @uppy_aws-s3.js?v=597491ab:1678
+createUpload_fn @ @uppy_aws-s3.js?v=597491ab:1553
+start @ @uppy_aws-s3.js?v=597491ab:1470
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:2337
+uploadLocalFile_fn @ @uppy_aws-s3.js?v=597491ab:2266
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1963
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1944
+runUpload_fn @ chunk-VPYNWGLN.js?v=597491ab:3285
+await in runUpload_fn
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:2797
+Promise.then
+upload @ chunk-VPYNWGLN.js?v=597491ab:2786
+(anonymous) @ @uppy_react.js?v=597491ab:2764
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:850Understand this error
+ObjectUploader.tsx:68 Error getting upload parameters: Error: No uploadURL received from server
+    at handleGetUploadParameters (TutorDashboard.tsx:186:15)
+    at async getUploadParameters (ObjectUploader.tsx:53:28)
+getUploadParameters @ ObjectUploader.tsx:68
+await in getUploadParameters
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1081
+call_fn @ @uppy_aws-s3.js?v=597491ab:1168
+run @ @uppy_aws-s3.js?v=597491ab:1053
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1077
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1076
+nonMultipartUpload_fn @ @uppy_aws-s3.js?v=597491ab:1832
+uploadFile @ @uppy_aws-s3.js?v=597491ab:1678
+createUpload_fn @ @uppy_aws-s3.js?v=597491ab:1553
+start @ @uppy_aws-s3.js?v=597491ab:1470
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:2337
+uploadLocalFile_fn @ @uppy_aws-s3.js?v=597491ab:2266
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1963
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1944
+runUpload_fn @ chunk-VPYNWGLN.js?v=597491ab:3285
+await in runUpload_fn
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:2797
+Promise.then
+upload @ chunk-VPYNWGLN.js?v=597491ab:2786
+(anonymous) @ @uppy_react.js?v=597491ab:2764
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:850Understand this error
+chunk-VPYNWGLN.js?v=597491ab:683 [Uppy] [13:02:51] No uploadURL received from server
+error @ chunk-VPYNWGLN.js?v=597491ab:683
+log @ chunk-VPYNWGLN.js?v=597491ab:2694
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:3075
+emitAll @ chunk-VPYNWGLN.js?v=597491ab:385
+emit @ chunk-VPYNWGLN.js?v=597491ab:330
+emit @ chunk-VPYNWGLN.js?v=597491ab:2075
+onError @ @uppy_aws-s3.js?v=597491ab:2277
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1423
+Promise.then
+createUpload_fn @ @uppy_aws-s3.js?v=597491ab:1553
+start @ @uppy_aws-s3.js?v=597491ab:1470
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:2337
+uploadLocalFile_fn @ @uppy_aws-s3.js?v=597491ab:2266
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1963
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1944
+runUpload_fn @ chunk-VPYNWGLN.js?v=597491ab:3285
+await in runUpload_fn
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:2797
+Promise.then
+upload @ chunk-VPYNWGLN.js?v=597491ab:2786
+(anonymous) @ @uppy_react.js?v=597491ab:2764
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:850Understand this error
+ObjectUploader.tsx:78 Upload error for file 8 AUG 25.docx : Error: No uploadURL received from server
+    at handleGetUploadParameters (TutorDashboard.tsx:186:15)
+    at async getUploadParameters (ObjectUploader.tsx:53:28)
+(anonymous) @ ObjectUploader.tsx:78
+emitAll @ chunk-VPYNWGLN.js?v=597491ab:385
+emit @ chunk-VPYNWGLN.js?v=597491ab:330
+emit @ chunk-VPYNWGLN.js?v=597491ab:2075
+onError @ @uppy_aws-s3.js?v=597491ab:2277
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1423
+Promise.then
+createUpload_fn @ @uppy_aws-s3.js?v=597491ab:1553
+start @ @uppy_aws-s3.js?v=597491ab:1470
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:2337
+uploadLocalFile_fn @ @uppy_aws-s3.js?v=597491ab:2266
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1963
+(anonymous) @ @uppy_aws-s3.js?v=597491ab:1944
+runUpload_fn @ chunk-VPYNWGLN.js?v=597491ab:3285
+await in runUpload_fn
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:2797
+Promise.then
+upload @ chunk-VPYNWGLN.js?v=597491ab:2786
+(anonymous) @ @uppy_react.js?v=597491ab:2764
+(anonymous) @ chunk-VPYNWGLN.js?v=597491ab:850Understand this error
+ObjectUploader.tsx:74 Upload complete: {successful: Array(0), failed: Array(1), uploadID: 'woxQRZ0x-bRs_gdKvV2a7'}
