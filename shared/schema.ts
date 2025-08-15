@@ -118,7 +118,8 @@ export const assignments = pgTable("assignments", {
   description: text("description"),
   instructions: text("instructions"),
   dueDate: timestamp("due_date"),
-  tutorId: varchar("tutor_id").references(() => tutors.id), // Optional - company admins can create assignments without specifying tutors
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id), // Link to company instead of tutor
+  createdBy: varchar("created_by").notNull().references(() => users.id), // Track who created it
   studentIds: text("student_ids").array(), // Support multiple students per assignment
   classId: varchar("class_id").references(() => classes.id), // Assign to entire class
   status: assignmentStatusEnum("status").notNull().default('assigned'),
@@ -273,9 +274,13 @@ export const tutorsRelations = relations(tutors, ({ one, many }) => ({
 }));
 
 export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
-  tutor: one(tutors, {
-    fields: [assignments.tutorId],
-    references: [tutors.id],
+  company: one(tutoringCompanies, {
+    fields: [assignments.companyId],
+    references: [tutoringCompanies.id],
+  }),
+  creator: one(users, {
+    fields: [assignments.createdBy],
+    references: [users.id],
   }),
   submissions: many(submissions),
   progress: many(progress),

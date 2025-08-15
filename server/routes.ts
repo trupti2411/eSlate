@@ -54,13 +54,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       } else if (user.role === 'tutor') {
         const tutor = await storage.getTutorByUserId(user.id);
-        if (tutor) {
-          assignments = await storage.getAssignmentsByTutor(tutor.id);
+        if (tutor && tutor.companyId) {
+          assignments = await storage.getAssignmentsByCompany(tutor.companyId);
         }
       } else if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (companyAdmin) {
-          assignments = await storage.getAssignmentsByCompanyId(companyAdmin.companyId);
+          assignments = await storage.getAssignmentsByCompany(companyAdmin.companyId);
         }
       }
 
@@ -100,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Invalid user role" });
       }
 
-      const assignments = await storage.getAssignmentsByCompanyId(companyId);
+      const assignments = await storage.getAssignmentsByCompany(companyId);
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching company assignments:", error);
@@ -324,39 +324,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Only tutors and company admins can create assignments" });
       }
 
-      let tutorId = null;
+      let companyId: string;
 
       if (user.role === 'tutor') {
         const tutor = await storage.getTutorByUserId(user.id);
-        if (!tutor) {
-          return res.status(404).json({ message: "Tutor profile not found" });
+        if (!tutor || !tutor.companyId) {
+          return res.status(404).json({ message: "Tutor profile not found or not assigned to company" });
         }
-        tutorId = tutor.id;
+        companyId = tutor.companyId;
       } else if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (!companyAdmin) {
           return res.status(404).json({ message: "Company admin profile not found" });
         }
-
-        // For company admin assignments, we need to specify a tutor if provided in the request
-        // or use a default/system tutor for the company
-        if (req.body.tutorId) {
-          // Verify the tutor belongs to the same company
-          const tutor = await storage.getTutor(req.body.tutorId);
-          if (!tutor || tutor.companyId !== companyAdmin.companyId) {
-            return res.status(400).json({ message: "Invalid tutor selection" });
-          }
-          tutorId = req.body.tutorId;
-        } else {
-          // Company admin can create assignments without specifying a tutor
-          tutorId = null;
-        }
+        companyId = companyAdmin.companyId;
+      } else {
+        return res.status(403).json({ message: "Invalid user role" });
       }
 
       // Parse the date string to Date object if provided
       const assignmentData = {
         ...req.body,
-        tutorId,
+        companyId,
+        createdBy: user.id,
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       };
 
@@ -405,17 +395,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check permissions
       if (user.role === 'tutor') {
         const tutor = await storage.getTutorByUserId(user.id);
-        if (!tutor || assignment.tutorId !== tutor.id) {
+        if (!tutor || !tutor.companyId || assignment.companyId !== tutor.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
       } else if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
-        if (!companyAdmin) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-        // Verify assignment belongs to company
-        const tutor = assignment.tutorId ? await storage.getTutor(assignment.tutorId) : null;
-        if (tutor && tutor.companyId !== companyAdmin.companyId) {
+        if (!companyAdmin || assignment.companyId !== companyAdmin.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
       } else if (user.role !== 'admin') {
