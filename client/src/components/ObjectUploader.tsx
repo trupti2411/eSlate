@@ -52,12 +52,12 @@ export function ObjectUploader({
             console.log("Getting upload parameters for file:", file.name);
             const params = await onGetUploadParameters();
             console.log("Upload parameters received:", params);
-            
+
             if (!params || !params.url) {
               console.error("Invalid upload parameters:", params);
               throw new Error("Upload URL is undefined or missing");
             }
-            
+
             return {
               method: params.method || "PUT",
               url: params.url,

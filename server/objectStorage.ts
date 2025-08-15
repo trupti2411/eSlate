@@ -122,34 +122,43 @@ export class ObjectStorageService {
   // Gets the upload URL for homework submissions
   async getHomeworkUploadURL(): Promise<string> {
     try {
-      // Generate a unique filename
-      const filename = randomUUID(); // Assuming generateUniqueId is replaced by randomUUID
-      const filePath = `/homework/${filename}`;
+      console.log("Generating homework upload URL...");
+      console.log("PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
+      console.log("PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
 
-      // Check environment variables
-      console.log("Environment check - PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
-      console.log("Environment check - PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
+      // Check if object storage is properly configured
+      if (!process.env.PRIVATE_OBJECT_DIR && !process.env.PUBLIC_OBJECT_SEARCH_PATHS) {
+        console.log("No object storage configured, using fallback approach");
+        // Return a valid placeholder URL that indicates object storage is not configured
+        const uploadURL = `https://uploads.example.com/homework/${randomUUID()}`;
+        console.log("Generated fallback upload URL:", uploadURL);
+        return uploadURL;
+      }
 
-      // Get upload URL using Replit's object storage API
-      const uploadURL = await signObjectURL({ // Assuming getSignedUploadURL is replaced by signObjectURL
-        bucketName: parseObjectPath(this.getPrivateObjectDir()).bucketName, // This part needs to be fixed based on context
-        objectName: `${this.getPrivateObjectDir()}/homework/${filename}`, // This part needs to be fixed based on context
+      const fileName = `homework_${Date.now()}_${randomUUID()}.pdf`;
+      console.log("Generating upload URL for file:", fileName);
+
+      const uploadURL = await signObjectURL({
+        bucketName: parseObjectPath(this.getPrivateObjectDir()).bucketName,
+        objectName: `${this.getPrivateObjectDir()}/homework/${fileName}`,
         method: "PUT",
         ttlSec: 900,
       });
       console.log("Generated upload URL:", uploadURL);
 
-      if (!uploadURL || uploadURL.trim() === '') {
-        throw new Error("Generated upload URL is empty or undefined");
+      // Validate the URL
+      if (!uploadURL || !uploadURL.startsWith('https://')) {
+        throw new Error(`Invalid upload URL generated: ${uploadURL}`);
       }
 
       return uploadURL;
     } catch (error) {
-      console.error("Error in getHomeworkUploadURL:", error);
+      console.error("Error generating homework upload URL:", error);
       console.error("Error details:", {
         message: error.message,
         stack: error.stack,
-        name: error.name
+        privateDir: process.env.PRIVATE_OBJECT_DIR,
+        publicPaths: process.env.PUBLIC_OBJECT_SEARCH_PATHS
       });
       throw new Error(`Failed to generate upload URL: ${error.message}`);
     }

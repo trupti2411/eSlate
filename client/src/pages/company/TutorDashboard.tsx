@@ -179,21 +179,39 @@ export default function TutorDashboard() {
   // File upload handlers
   const handleGetUploadParameters = async () => {
     try {
-      console.log("Requesting upload URL from server...");
-      const response = await apiRequest("/api/homework/upload", "POST");
-      console.log("Raw server response:", response);
-      console.log("Response uploadURL:", response?.uploadURL);
-      
-      if (!response || !response.uploadURL) {
-        console.error("Invalid response structure:", response);
-        throw new Error(`No uploadURL received from server. Response: ${JSON.stringify(response)}`);
+      console.log("Getting upload parameters...");
+      const response = await fetch('/api/homework/upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      console.log("Server response status:", response.status);
+      console.log("Server response headers:", Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Server error response:", errorText);
+        throw new Error(`Server returned ${response.status}: ${errorText}`);
       }
-      
-      return {
-        method: "PUT",
-        url: response.uploadURL,
-        fields: {},
-      };
+
+      const data = await response.json();
+      console.log("Response data:", data);
+
+      if (!data.uploadURL) {
+        console.error("No uploadURL in response:", data);
+        throw new Error("No uploadURL received from server");
+      }
+
+      // Validate the URL format
+      if (!data.uploadURL.startsWith('https://')) {
+        console.error("Invalid uploadURL format:", data.uploadURL);
+        throw new Error(`Invalid upload URL format: ${data.uploadURL}`);
+      }
+
+      return data;
     } catch (error) {
       console.error("Error getting upload parameters:", error);
       throw error;

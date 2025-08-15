@@ -194,6 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/homework/upload', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       console.log("Getting homework upload URL...");
+      console.log("User:", req.user?.id);
       console.log("Environment check - PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
       console.log("Environment check - PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
 
@@ -202,15 +203,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Generated upload URL:", uploadURL);
 
       // Validate the URL format
-      if (!uploadURL || !uploadURL.startsWith('https://')) {
-        throw new Error(`Invalid upload URL generated: ${uploadURL}`);
+      if (!uploadURL) {
+        throw new Error("No upload URL generated");
+      }
+      
+      if (!uploadURL.startsWith('https://')) {
+        console.warn("Upload URL does not start with https://", uploadURL);
+        // For development/testing, allow non-https URLs
+        if (process.env.NODE_ENV !== 'production' && uploadURL.startsWith('http://')) {
+          console.log("Allowing http URL in development mode");
+        } else {
+          throw new Error(`Invalid upload URL format: ${uploadURL}`);
+        }
       }
 
-      res.json({ uploadURL });
+      // Generate a unique upload ID for tracking
+      const uploadID = randomUUID();
+      
+      res.json({ 
+        uploadURL, 
+        uploadID,
+        success: true 
+      });
     } catch (error) {
       console.error("Error getting homework upload URL:", error);
       console.error("Error stack:", error.stack);
-      res.status(500).json({ error: "Failed to get upload URL", details: error.message });
+      console.error("Environment variables:", {
+        NODE_ENV: process.env.NODE_ENV,
+        PRIVATE_OBJECT_DIR: process.env.PRIVATE_OBJECT_DIR ? "SET" : "NOT SET",
+        PUBLIC_OBJECT_SEARCH_PATHS: process.env.PUBLIC_OBJECT_SEARCH_PATHS ? "SET" : "NOT SET"
+      });
+      
+      res.status(500).json({ 
+        error: "Failed to get upload URL", 
+        details: error.message,
+        success: false
+      });
     }
   });
 
@@ -319,8 +347,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
+      console.log("Creating assignment - User:", user.id, "Role:", user.role);
+      console.log("Request body:", JSON.stringify(req.body, null, 2));
 
       if (user.role !== 'tutor' && user.role !== 'company_admin') {
+        console.log("Access denied - invalid role:", user.role);
         return res.status(403).json({ message: "Only tutors and company admins can create assignments" });
       }
 
@@ -328,34 +359,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (user.role === 'tutor') {
         const tutor = await storage.getTutorByUserId(user.id);
+        console.log("Found tutor:", tutor);
         if (!tutor || !tutor.companyId) {
+          console.log("Tutor profile not found or not assigned to company");
           return res.status(404).json({ message: "Tutor profile not found or not assigned to company" });
         }
         companyId = tutor.companyId;
       } else if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        console.log("Found company admin:", companyAdmin);
         if (!companyAdmin) {
+          console.log("Company admin profile not found");
           return res.status(404).json({ message: "Company admin profile not found" });
         }
         companyId = companyAdmin.companyId;
       } else {
+        console.log("Invalid user role:", user.role);
         return res.status(403).json({ message: "Invalid user role" });
       }
 
-      // Parse the date string to Date object if provided
+      console.log("Using company ID:", companyId);
+
+      // Parse the date string to Date object if provided and add createdBy
       const assignmentData = {
         ...req.body,
         companyId,
+        createdBy: user.id, // Add the missing createdBy field
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
+        visibleFrom: req.body.visibleFrom ? new Date(req.body.visibleFrom) : null,
       };
 
+      console.log("Assignment data before validation:", JSON.stringify(assignmentData, null, 2));
+
       const validatedData = insertAssignmentSchema.parse(assignmentData);
+      console.log("Validated assignment data:", JSON.stringify(validatedData, null, 2));
 
       const assignment = await storage.createAssignment(validatedData);
+      console.log("Created assignment:", assignment.id);
       res.json(assignment);
     } catch (error) {
       console.error("Error creating assignment:", error);
-      res.status(500).json({ message: "Failed to create assignment" });
+      console.error("Error stack:", error.stack);
+      res.status(500).json({ message: "Failed to create assignment", details: error.message });
     }
   });
 
