@@ -45,10 +45,33 @@ export function ObjectUploader({
     })
       .use(AwsS3, {
         shouldUseMultipart: false,
-        getUploadParameters: onGetUploadParameters,
+        getUploadParameters: async (file) => {
+          try {
+            console.log("Getting upload parameters for file:", file.name);
+            const params = await onGetUploadParameters();
+            console.log("Upload parameters received:", params);
+            
+            if (!params.url) {
+              throw new Error("Upload URL is undefined");
+            }
+            
+            return {
+              method: params.method || "PUT",
+              url: params.url,
+              fields: params.fields || {},
+            };
+          } catch (error) {
+            console.error("Error getting upload parameters:", error);
+            throw error;
+          }
+        },
       })
       .on("complete", (result) => {
+        console.log("Upload complete:", result);
         onComplete?.(result);
+      })
+      .on("upload-error", (file, error) => {
+        console.error("Upload error for file", file?.name, ":", error);
       })
   );
 
