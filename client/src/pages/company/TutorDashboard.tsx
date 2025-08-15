@@ -179,11 +179,14 @@ export default function TutorDashboard() {
   // File upload handlers
   const handleGetUploadParameters = async () => {
     try {
+      console.log("Requesting upload URL from server...");
       const response = await apiRequest("/api/homework/upload", "POST");
-      console.log("Server response:", response);
+      console.log("Raw server response:", response);
+      console.log("Response uploadURL:", response?.uploadURL);
       
-      if (!response.uploadURL) {
-        throw new Error("No uploadURL received from server");
+      if (!response || !response.uploadURL) {
+        console.error("Invalid response structure:", response);
+        throw new Error(`No uploadURL received from server. Response: ${JSON.stringify(response)}`);
       }
       
       return {

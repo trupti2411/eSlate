@@ -7,32 +7,36 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-export async function apiRequest(
-  url: string,
-  method: string,
-  data?: unknown | undefined,
-): Promise<Response> {
-  const headers: Record<string, string> = {};
-  
-  if (data) {
-    headers["Content-Type"] = "application/json";
-  }
-  
-  // Add JWT token if available
-  const token = localStorage.getItem('authToken');
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const res = await fetch(url, {
+export async function apiRequest(endpoint: string, method: string = "GET", data?: any) {
+  const config: RequestInit = {
     method,
-    headers,
-    body: data ? JSON.stringify(data) : undefined,
+    headers: {
+      "Content-Type": "application/json",
+    },
     credentials: "include",
-  });
+  };
 
-  await throwIfResNotOk(res);
-  return res;
+  if (data) {
+    config.body = JSON.stringify(data);
+  }
+
+  const response = await fetch(endpoint, config);
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      // Clear any cached auth state and redirect to login
+      window.location.href = "/auth";
+      return;
+    }
+
+    const errorData = await response.json().catch(() => null);
+    throw new Error(errorData?.message || `HTTP ${response.status}`);
+  }
+
+  // Always ensure we return parsed JSON
+  const jsonResponse = await response.json();
+  console.log(`API Response for ${endpoint}:`, jsonResponse);
+  return jsonResponse;
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
@@ -42,7 +46,7 @@ export const getQueryFn: <T>(options: {
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
     const headers: Record<string, string> = {};
-    
+
     // Add JWT token if available
     const token = localStorage.getItem('authToken');
     if (token) {
