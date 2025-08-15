@@ -156,58 +156,6 @@ export default function StudentDashboard() {
           </div>
         </div>
 
-        {/* Notifications */}
-        {unverifiedSubmissions.length > 0 && (
-          <div className="mt-8">
-            <Card className="eink-card border-orange-500">
-              <CardHeader>
-                <CardTitle className="flex items-center text-orange-600">
-                  <AlertCircle className="h-5 w-5 mr-2" />
-                  Parent Verification Needed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4">
-                  You have {unverifiedSubmissions.length} submission(s) waiting for parent verification.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {unverifiedSubmissions.slice(0, 3).map((submission) => (
-                    <Badge key={submission.id} variant="outline" className="border-orange-500 text-orange-600">
-                      Assignment #{submission.assignmentId.slice(-6)}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Notifications */}
-        {unverifiedSubmissions.length > 0 && (
-          <div className="mt-8">
-            <Card className="eink-card border-orange-500">
-              <CardHeader>
-                <CardTitle className="flex items-center text-orange-600">
-                  <AlertCircle className="h-5 w-5 mr-2" />
-                  Parent Verification Needed
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600 mb-4">
-                  You have {unverifiedSubmissions.length} submission(s) waiting for parent verification.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {unverifiedSubmissions.slice(0, 3).map((submission) => (
-                    <Badge key={submission.id} variant="outline" className="border-orange-500 text-orange-600">
-                      Assignment #{submission.assignmentId.slice(-6)}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
         {/* Message Center */}
         <div className="mt-8">
           <h2 className="section-title">Messages</h2>

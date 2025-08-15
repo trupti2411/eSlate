@@ -183,7 +183,7 @@ export default function TutorDashboard() {
             )}
           </div>
 
-          {/* Recent Assignments */}
+          {/* Recent Assignments & Submissions */}
           <div>
             <h2 className="section-title">Recent Assignments</h2>
             {assignmentsLoading ? (
@@ -200,7 +200,7 @@ export default function TutorDashboard() {
                 {assignments.slice(0, 5).map((assignment) => (
                   <Card key={assignment.id} className="eink-card">
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between mb-3">
                         <div>
                           <h4 className="font-semibold text-black">{assignment.title}</h4>
                           <p className="text-sm text-gray-600">
@@ -211,6 +211,34 @@ export default function TutorDashboard() {
                           {assignment.status}
                         </Badge>
                       </div>
+                      
+                      {/* Show recent submissions for this assignment */}
+                      {assignment.submissions && assignment.submissions.length > 0 && (
+                        <div className="border-t pt-3">
+                          <h5 className="text-sm font-medium text-gray-700 mb-2">Recent Submissions:</h5>
+                          <div className="space-y-2">
+                            {assignment.submissions.slice(0, 3).map((submission) => (
+                              <div key={submission.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
+                                <div className="flex items-center space-x-2">
+                                  <span className="font-medium">
+                                    {submission.student?.user?.firstName} {submission.student?.user?.lastName}
+                                  </span>
+                                  <Badge className={`text-xs ${
+                                    submission.status === 'submitted' ? 'bg-green-100 text-green-800' :
+                                    submission.status === 'graded' ? 'bg-blue-100 text-blue-800' :
+                                    'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {submission.status}
+                                  </Badge>
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  {new Date(submission.submittedAt || submission.createdAt).toLocaleDateString()}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

@@ -376,22 +376,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch('/api/submissions/:id/verify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
-    try {
-      const user = req.user!;
-      const submissionId = req.params.id;
-
-      if (user.role !== 'parent') {
-        return res.status(403).json({ message: "Only parents can verify submissions" });
-      }
-
-      const submission = await storage.verifySubmissionByParent(submissionId);
-      res.json(submission);
-    } catch (error) {
-      console.error("Error verifying submission:", error);
-      res.status(500).json({ message: "Failed to verify submission" });
-    }
-  });
+  
 
   // Message routes
   app.get('/api/messages/:receiverId', isAuthenticated, async (req: AuthenticatedRequest, res) => {

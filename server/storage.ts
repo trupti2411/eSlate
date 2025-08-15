@@ -31,9 +31,21 @@ import {
   type Progress,
   type InsertProgress,
   type CalendarEvent,
+  type InsertCalendarEvent,
+  type CompanyAdmin,
+  type InsertCompanyAdmin,
+  type AcademicYear,
+  type InsertAcademicYear,
+  type AcademicTerm,
+  type InsertAcademicTerm,
+  type Class,
+  type InsertClass,
+  type StudentClassAssignment,
+  type InsertStudentClassAssignment,
+  type UpsertUser,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, isNull, sql } from "drizzle-orm";
+import { eq, and, or, desc, isNull, sql, arrayContains } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (supports both Replit Auth and Custom Auth)
@@ -45,73 +57,74 @@ export interface IStorage {
   verifyEmailToken(token: string): Promise<boolean>;
   setPasswordResetToken(userId: string, token: string, expires: Date): Promise<void>;
   resetPassword(token: string, hashedPassword: string): Promise<boolean>;
-  
+
   // Student operations
   getStudent(id: string): Promise<Student | undefined>;
   getStudentByUserId(userId: string): Promise<Student | undefined>;
   createStudent(student: InsertStudent): Promise<Student>;
   updateStudent(id: string, updates: Partial<InsertStudent>): Promise<Student>;
   getStudentsByTutor(tutorId: string): Promise<Student[]>;
-  getStudentsByParent(parentId: string): Promise<Student[]>;
-  
+  getStudentsByParent(parentId: string): Promise<any[]>;
+
   // Parent operations
   getParent(id: string): Promise<Parent | undefined>;
   getParentByUserId(userId: string): Promise<Parent | undefined>;
-  createParent(parent: InsertParent): Promise<Parent>;
-  
+  createParent(parentData: InsertParent): Promise<Parent>;
+
   // Tutor operations
   getTutor(id: string): Promise<Tutor | undefined>;
   getTutorByUserId(userId: string): Promise<Tutor | undefined>;
-  createTutor(tutor: InsertTutor): Promise<Tutor>;
+  createTutor(tutorData: InsertTutor): Promise<Tutor>;
   updateTutor(id: string, updates: Partial<InsertTutor>): Promise<Tutor>;
-  
+
   // Assignment operations
   getAssignment(id: string): Promise<Assignment | undefined>;
-  createAssignment(assignment: InsertAssignment): Promise<Assignment>;
+  createAssignment(assignmentData: InsertAssignment): Promise<Assignment>;
   getAssignmentsByStudent(studentId: string): Promise<Assignment[]>;
   getAssignmentsByTutor(tutorId: string): Promise<Assignment[]>;
   getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]>;
   updateAssignmentStatus(id: string, status: string): Promise<Assignment>;
-  
+
   // Submission operations
   getSubmission(id: string): Promise<Submission | undefined>;
-  createSubmission(submission: InsertSubmission): Promise<Submission>;
+  createSubmission(submissionData: InsertSubmission): Promise<Submission>;
   getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
   getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
-  gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission | undefined>;
+  gradeSubmission(submissionId: string, score: number, feedback: string, graderId: string): Promise<Submission | undefined>;
   verifySubmissionByParent(id: string): Promise<Submission>;
-  
+
   // Message operations
   getMessage(id: string): Promise<Message | undefined>;
-  createMessage(message: InsertMessage): Promise<Message>;
+  createMessage(messageData: InsertMessage): Promise<Message>;
   getMessagesBetweenUsers(senderId: string, receiverId: string): Promise<Message[]>;
   markMessageAsRead(id: string): Promise<Message>;
-  
+
   // Progress operations
   getProgress(id: string): Promise<Progress | undefined>;
-  createProgress(progress: InsertProgress): Promise<Progress>;
+  createProgress(progressData: InsertProgress): Promise<Progress>;
   getProgressByStudent(studentId: string): Promise<Progress[]>;
   updateProgress(id: string, updates: Partial<InsertProgress>): Promise<Progress>;
-  
+
   // Calendar operations
   getCalendarEvent(id: string): Promise<CalendarEvent | undefined>;
-  createCalendarEvent(event: InsertCalendarEvent): Promise<CalendarEvent>;
+  createCalendarEvent(eventData: InsertCalendarEvent): Promise<CalendarEvent>;
   getCalendarEventsByTutor(tutorId: string): Promise<CalendarEvent[]>;
   getCalendarEventsByStudent(studentId: string): Promise<CalendarEvent[]>;
-  
+
   // Company operations
   getTutoringCompany(id: string): Promise<TutoringCompany | undefined>;
-  createTutoringCompany(company: InsertTutoringCompany): Promise<TutoringCompany>;
+  createTutoringCompany(companyData: InsertTutoringCompany): Promise<TutoringCompany>;
   getAllTutoringCompanies(): Promise<TutoringCompany[]>;
   updateTutoringCompany(id: string, updates: Partial<InsertTutoringCompany>): Promise<TutoringCompany>;
-  
+  getCompanyStudentsByCompanyId(companyId: string): Promise<any[]>;
+
   // Company Admin operations
   getCompanyAdmin(id: string): Promise<CompanyAdmin | undefined>;
   getCompanyAdminByUserId(userId: string): Promise<CompanyAdmin | undefined>;
-  createCompanyAdmin(admin: InsertCompanyAdmin): Promise<CompanyAdmin>;
+  createCompanyAdmin(adminData: InsertCompanyAdmin): Promise<CompanyAdmin>;
   updateCompanyAdmin(id: string, updates: Partial<InsertCompanyAdmin>): Promise<CompanyAdmin>;
-  getTutorsByCompany(companyId: string): Promise<Tutor[]>;
+  getTutorsByCompany(companyId: string): Promise<any[]>;
 
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
@@ -119,7 +132,7 @@ export interface IStorage {
   getUsersByRole(role: string): Promise<User[]>;
   createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User>;
   updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
-  deleteUser(id: string, deletedBy: string): Promise<void>;
+  deleteUser(userId: string, deletedBy: string): Promise<void>;
 
   // Academic management methods
   // Academic Years
@@ -200,25 +213,25 @@ export class DatabaseStorage implements IStorage {
       .select()
       .from(users)
       .where(eq(users.emailVerificationToken, token));
-    
+
     if (!user) return false;
 
     await db
       .update(users)
-      .set({ 
-        isEmailVerified: true, 
+      .set({
+        isEmailVerified: true,
         emailVerificationToken: null,
         updatedAt: new Date()
       })
       .where(eq(users.id, user.id));
-    
+
     return true;
   }
 
   async setPasswordResetToken(userId: string, token: string, expires: Date): Promise<void> {
     await db
       .update(users)
-      .set({ 
+      .set({
         passwordResetToken: token,
         passwordResetExpires: expires,
         updatedAt: new Date()
@@ -232,23 +245,23 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(and(
         eq(users.passwordResetToken, token),
-        isNull(users.passwordResetExpires) ? eq(users.passwordResetExpires, null) : 
+        isNull(users.passwordResetExpires) ? eq(users.passwordResetExpires, null) :
         // Check if token hasn't expired
         new Date() < users.passwordResetExpires as any
       ));
-    
+
     if (!user) return false;
 
     await db
       .update(users)
-      .set({ 
+      .set({
         password: hashedPassword,
         passwordResetToken: null,
         passwordResetExpires: null,
         updatedAt: new Date()
       })
       .where(eq(users.id, user.id));
-    
+
     return true;
   }
 
@@ -280,7 +293,7 @@ export class DatabaseStorage implements IStorage {
       .leftJoin(users, eq(students.userId, users.id))
       .where(eq(students.id, id))
       .limit(1);
-    
+
     return result[0] || undefined;
   }
 
@@ -311,7 +324,7 @@ export class DatabaseStorage implements IStorage {
       })
       .where(eq(students.id, id))
       .returning();
-    
+
     // Return the updated student with user details
     const updatedStudentWithUser = await this.getStudent(id);
     if (!updatedStudentWithUser) {
@@ -324,8 +337,60 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(students).where(eq(students.tutorId, tutorId));
   }
 
-  async getStudentsByParent(parentId: string): Promise<Student[]> {
-    return await db.select().from(students).where(eq(students.parentId, parentId));
+  async getStudentsByParent(parentId: string): Promise<any[]> {
+    const studentData = await db.select({
+      id: students.id,
+      userId: students.userId,
+      gradeLevel: students.gradeLevel,
+      schoolName: students.schoolName,
+      parentId: students.parentId,
+      tutorId: students.tutorId,
+      companyId: students.companyId,
+      user: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      }
+    })
+    .from(students)
+    .leftJoin(users, eq(students.userId, users.id))
+    .where(eq(students.parentId, parentId));
+
+    // Get assignments and submissions for each student
+    const studentsWithDetails = await Promise.all(
+      studentData.map(async (student) => {
+        // Get assignments
+        const assignmentData = await db.select()
+          .from(assignments)
+          .where(arrayContains(assignments.studentIds, [student.id]));
+
+        // Get submissions with all details including content and files
+        const submissionData = await db.select({
+          id: submissions.id,
+          assignmentId: submissions.assignmentId,
+          content: submissions.content,
+          fileUrls: submissions.fileUrls,
+          status: submissions.status,
+          submittedAt: submissions.submittedAt,
+          createdAt: submissions.createdAt,
+          score: submissions.score,
+          feedback: submissions.feedback,
+          isVerifiedByParent: submissions.isVerifiedByParent,
+        })
+          .from(submissions)
+          .where(eq(submissions.studentId, student.id))
+          .orderBy(desc(submissions.submittedAt));
+
+        return {
+          ...student,
+          assignments: assignmentData,
+          submissions: submissionData
+        };
+      })
+    );
+
+    return studentsWithDetails;
   }
 
   // Parent operations
@@ -449,21 +514,38 @@ export class DatabaseStorage implements IStorage {
     return await db.select({
       id: students.id,
       userId: students.userId,
+      gradeLevel: students.gradeLevel,
+      parentId: students.parentId,
+      tutorId: students.tutorId,
+      companyId: students.companyId,
       user: {
+        id: users.id,
+        email: users.email,
         firstName: users.firstName,
         lastName: users.lastName,
-        email: users.email,
+        isActive: users.isActive,
+        createdAt: users.createdAt
       }
     }).from(students)
-      .leftJoin(users, eq(students.userId, users.id))
-      .where(eq(students.companyId, companyId));
+      .innerJoin(users, eq(students.userId, users.id))
+      .leftJoin(tutors, eq(students.tutorId, tutors.id))
+      .where(
+        and(
+          // Either direct company assignment OR tutor's company matches
+          and(
+            eq(students.companyId, companyId)
+          ),
+          eq(users.isDeleted, false)
+        )
+      )
+      .orderBy(users.firstName, users.lastName);
   }
 
   async gradeSubmission(submissionId: string, score: number, feedback: string, graderId: string): Promise<Submission | null> {
     const [submission] = await db.update(submissions)
-      .set({ 
-        score, 
-        feedback, 
+      .set({
+        score,
+        feedback,
         gradedBy: graderId,
         gradedAt: new Date(),
         status: 'graded',
@@ -512,9 +594,9 @@ export class DatabaseStorage implements IStorage {
 
   async verifySubmissionByParent(id: string): Promise<Submission> {
     const [submission] = await db.update(submissions)
-      .set({ 
-        isVerifiedByParent: true, 
-        parentVerifiedAt: new Date() 
+      .set({
+        isVerifiedByParent: true,
+        parentVerifiedAt: new Date()
       })
       .where(eq(submissions.id, id))
       .returning();
@@ -931,7 +1013,7 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         })
         .where(eq(users.id, userId));
-      
+
     } catch (error) {
       console.error("Detailed error during user deletion:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

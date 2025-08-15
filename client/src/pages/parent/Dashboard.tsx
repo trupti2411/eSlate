@@ -115,16 +115,16 @@ export default function ParentDashboard() {
           <Card className="eink-card">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                Pending Verifications
+                <BookOpen className="h-5 w-5 mr-2" />
+                Total Submissions
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-black">
                 {students?.reduce((acc, student) => 
-                  acc + (student.submissions?.filter(s => !s.isVerifiedByParent)?.length || 0), 0) || 0}
+                  acc + (student.submissions?.length || 0), 0) || 0}
               </div>
-              <p className="text-gray-600 text-sm">Need your approval</p>
+              <p className="text-gray-600 text-sm">From all children</p>
             </CardContent>
           </Card>
         </div>
@@ -172,38 +172,58 @@ export default function ParentDashboard() {
                         <p className="text-sm text-gray-600">Completed</p>
                       </div>
 
-                      {/* Pending Verification */}
+                      {/* Recent Submissions */}
                       <div className="text-center p-4 border border-gray-200 rounded">
-                        <div className="text-2xl font-bold text-orange-600">
-                          {student.submissions?.filter(s => !s.isVerifiedByParent)?.length || 0}
+                        <div className="text-2xl font-bold text-blue-600">
+                          {student.submissions?.length || 0}
                         </div>
-                        <p className="text-sm text-gray-600">Need Verification</p>
+                        <p className="text-sm text-gray-600">Total Submissions</p>
                       </div>
                     </div>
 
-                    {/* Recent Submissions Needing Verification */}
-                    {student.submissions?.filter(s => !s.isVerifiedByParent).length > 0 && (
+                    {/* Recent Submissions */}
+                    {student.submissions && student.submissions.length > 0 && (
                       <div className="mt-6">
-                        <h4 className="font-semibold text-black mb-3">Submissions Awaiting Verification</h4>
+                        <h4 className="font-semibold text-black mb-3">Recent Submissions</h4>
                         <div className="space-y-3">
                           {student.submissions
-                            .filter(s => !s.isVerifiedByParent)
-                            .slice(0, 3)
+                            .slice(0, 5)
                             .map((submission) => (
                             <div key={submission.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                              <div>
+                              <div className="flex-1">
                                 <h5 className="font-medium text-black">Assignment #{submission.assignmentId.slice(-6)}</h5>
                                 <p className="text-sm text-gray-600">
                                   Submitted: {new Date(submission.submittedAt).toLocaleDateString()}
                                 </p>
+                                {submission.content && (
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Message: {submission.content.substring(0, 100)}...
+                                  </p>
+                                )}
                               </div>
-                              <Button
-                                onClick={() => verifySubmissionMutation.mutate(submission.id)}
-                                disabled={verifySubmissionMutation.isPending}
-                                className="eink-button-primary"
-                              >
-                                {verifySubmissionMutation.isPending ? "Verifying..." : "Verify"}
-                              </Button>
+                              <div className="flex flex-col gap-2">
+                                <Badge className={`status-badge ${
+                                  submission.status === 'submitted' ? 'status-submitted' : 
+                                  submission.status === 'graded' ? 'status-completed' : 'status-assigned'
+                                }`}>
+                                  {submission.status}
+                                </Badge>
+                                {submission.fileUrls && submission.fileUrls.length > 0 && (
+                                  <div className="flex flex-col gap-1">
+                                    {submission.fileUrls.map((fileUrl, index) => (
+                                      <a
+                                        key={index}
+                                        href={fileUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-600 hover:underline"
+                                      >
+                                        View File {index + 1}
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           ))}
                         </div>
