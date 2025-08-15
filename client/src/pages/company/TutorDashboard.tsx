@@ -180,7 +180,14 @@ export default function TutorDashboard() {
   const handleGetUploadParameters = async () => {
     try {
       const response = await apiRequest("/api/homework/upload", "POST");
+      console.log("Server response:", response);
+      
+      if (!response.uploadURL) {
+        throw new Error("No uploadURL received from server");
+      }
+      
       return {
+        method: "PUT",
         url: response.uploadURL,
         fields: {},
       };

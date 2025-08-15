@@ -11,9 +11,11 @@ import { Button } from "@/components/ui/button";
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;
+  allowedFileTypes?: string[];
   onGetUploadParameters: () => Promise<{
-    method: "PUT";
+    method?: string;
     url: string;
+    fields?: Record<string, any>;
   }>;
   onComplete?: (
     result: UploadResult<Record<string, unknown>, Record<string, unknown>>
@@ -51,14 +53,16 @@ export function ObjectUploader({
             const params = await onGetUploadParameters();
             console.log("Upload parameters received:", params);
             
-            if (!params.url) {
-              throw new Error("Upload URL is undefined");
+            if (!params || !params.url) {
+              console.error("Invalid upload parameters:", params);
+              throw new Error("Upload URL is undefined or missing");
             }
             
             return {
               method: params.method || "PUT",
               url: params.url,
               fields: params.fields || {},
+              headers: {},
             };
           } catch (error) {
             console.error("Error getting upload parameters:", error);

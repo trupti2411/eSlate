@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
 import { setupCustomAuth, isAuthenticated, type AuthenticatedRequest } from "./customAuth";
-import { 
+import {
   insertAssignmentSchema,
   insertSubmissionSchema,
   insertMessageSchema,
@@ -128,7 +128,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Student assignments route  
+  // Student assignments route
   app.get('/api/student/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
@@ -178,7 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const tempFileUrl = `/homework/${fileId}`;
 
       console.log("File uploaded successfully with ID:", fileId);
-      res.json({ 
+      res.json({
         success: true,
         fileUrl: tempFileUrl,
         fileName: req.file.originalname,
@@ -1130,7 +1130,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get company students 
+  // Get company students
   app.get('/api/companies/:id/students', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const requestingUser = req.user!;
@@ -1645,7 +1645,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      let academicTerms = yearId 
+      let academicTerms = yearId
         ? await storage.getAcademicTermsByYear(yearId as string)
         : await storage.getAcademicTermsByCompany(companyId);
 
@@ -1720,7 +1720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      let classes = termId 
+      let classes = termId
         ? await storage.getClassesByTerm(termId as string)
         : await storage.getClassesByCompany(companyId);
 
@@ -1729,10 +1729,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const academicTerms = await storage.getAcademicTermsByCompany(companyId);
         if (academicTerms.length > 0) {
           const sampleClasses = [
-            { 
-              companyId, 
-              termId: academicTerms[0].id, 
-              name: "Mathematics 101", 
+            {
+              companyId,
+              termId: academicTerms[0].id,
+              name: "Mathematics 101",
               subject: "Mathematics",
               description: "Basic mathematics for beginners",
               capacity: 15,
@@ -1740,10 +1740,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               endTime: "10:00",
               daysOfWeek: ["Monday", "Wednesday", "Friday"]
             },
-            { 
-              companyId, 
-              termId: academicTerms[0].id, 
-              name: "English Literature", 
+            {
+              companyId,
+              termId: academicTerms[0].id,
+              name: "English Literature",
               subject: "English",
               description: "Introduction to classic literature",
               capacity: 12,
@@ -1751,10 +1751,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
               endTime: "11:30",
               daysOfWeek: ["Tuesday", "Thursday"]
             },
-            { 
-              companyId, 
-              termId: academicTerms[0].id, 
-              name: "Science Lab", 
+            {
+              companyId,
+              termId: academicTerms[0].id,
+              name: "Science Lab",
               subject: "Science",
               description: "Hands-on science experiments",
               capacity: 10,

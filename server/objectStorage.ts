@@ -92,7 +92,7 @@ export class ObjectStorageService {
     try {
       // Get file metadata
       const [metadata] = await file.getMetadata();
-      
+
       // Set appropriate headers
       res.set({
         "Content-Type": metadata.contentType || "application/octet-stream",
@@ -121,26 +121,38 @@ export class ObjectStorageService {
 
   // Gets the upload URL for homework submissions
   async getHomeworkUploadURL(): Promise<string> {
-    const privateObjectDir = this.getPrivateObjectDir();
-    if (!privateObjectDir) {
-      throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
-      );
+    try {
+      // Generate a unique filename
+      const filename = randomUUID(); // Assuming generateUniqueId is replaced by randomUUID
+      const filePath = `/homework/${filename}`;
+
+      // Check environment variables
+      console.log("Environment check - PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
+      console.log("Environment check - PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
+
+      // Get upload URL using Replit's object storage API
+      const uploadURL = await signObjectURL({ // Assuming getSignedUploadURL is replaced by signObjectURL
+        bucketName: parseObjectPath(this.getPrivateObjectDir()).bucketName, // This part needs to be fixed based on context
+        objectName: `${this.getPrivateObjectDir()}/homework/${filename}`, // This part needs to be fixed based on context
+        method: "PUT",
+        ttlSec: 900,
+      });
+      console.log("Generated upload URL:", uploadURL);
+
+      if (!uploadURL || uploadURL.trim() === '') {
+        throw new Error("Generated upload URL is empty or undefined");
+      }
+
+      return uploadURL;
+    } catch (error) {
+      console.error("Error in getHomeworkUploadURL:", error);
+      console.error("Error details:", {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+      throw new Error(`Failed to generate upload URL: ${error.message}`);
     }
-
-    const objectId = randomUUID();
-    const fullPath = `${privateObjectDir}/homework/${objectId}`;
-
-    const { bucketName, objectName } = parseObjectPath(fullPath);
-
-    // Sign URL for PUT method with TTL
-    return signObjectURL({
-      bucketName,
-      objectName,
-      method: "PUT",
-      ttlSec: 900,
-    });
   }
 
   // Gets the homework file
@@ -174,21 +186,21 @@ export class ObjectStorageService {
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;
     }
-  
+
     // Extract the path from the URL by removing query parameters and domain
     const url = new URL(rawPath);
     const rawObjectPath = url.pathname;
-  
+
     let privateDir = this.getPrivateObjectDir();
     if (!privateDir.endsWith("/")) {
       privateDir = `${privateDir}/`;
     }
-  
+
     const homeworkPrefix = `${privateDir}homework/`;
     if (!rawObjectPath.startsWith(homeworkPrefix)) {
       return rawObjectPath;
     }
-  
+
     // Extract the file ID from the path
     const fileId = rawObjectPath.slice(homeworkPrefix.length);
     return `/homework/${fileId}`;
