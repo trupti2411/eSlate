@@ -71,19 +71,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Company assignments route
+  // Get assignments for company (Company admin and tutors)
   app.get('/api/company/assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      const user = req.user!;
-      let assignments: any[] = [];
+      const userId = req.user!.id;
+      const user = await storage.getUser(userId);
 
-      if (user.role === 'company_admin') {
-        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
-        if (companyAdmin) {
-          assignments = await storage.getAssignmentsByCompanyId(companyAdmin.companyId);
-        }
+      if (!user || (user.role !== 'company_admin' && user.role !== 'tutor')) {
+        return res.status(403).json({ message: "Company admin or tutor access required" });
       }
 
+      let companyId: string;
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(userId);
+        if (!companyAdmin) {
+          return res.status(404).json({ message: "Company admin profile not found" });
+        }
+        companyId = companyAdmin.companyId;
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(userId);
+        if (!tutor || !tutor.companyId) {
+          return res.status(404).json({ message: "Tutor profile not found or not assigned to company" });
+        }
+        companyId = tutor.companyId;
+      } else {
+        return res.status(403).json({ message: "Invalid user role" });
+      }
+
+      const assignments = await storage.getAssignmentsByCompanyId(companyId);
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching company assignments:", error);
@@ -202,9 +218,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const filePath = req.params.filePath;
       console.log("Serving homework file:", filePath);
-      
+
       const objectStorageService = new ObjectStorageService();
-      
+
       // Try multiple path variations to find the file
       const possiblePaths = [
         `/homework/${filePath}`,
@@ -237,7 +253,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Set proper headers for download
       res.setHeader('Content-Disposition', `attachment; filename="${filePath}"`);
       res.setHeader('Content-Type', 'application/octet-stream');
-      
+
       objectStorageService.downloadObject(file, res);
     } catch (error) {
       console.error("Error downloading homework file:", error);
@@ -476,7 +492,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  
+
 
   // Parent acknowledgment route (optional, submissions are immediately visible regardless)
   app.patch('/api/submissions/:submissionId/acknowledge', isAuthenticated, async (req: AuthenticatedRequest, res) => {
