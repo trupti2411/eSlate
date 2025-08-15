@@ -373,7 +373,7 @@ export class DatabaseStorage implements IStorage {
         })
           .from(assignments)
           .where(arrayContains(assignments.studentIds, [student.id]))
-          .orderBy(desc(assignments.createdAt));
+          .orderBy(desc(assignments.dueDate));
 
         // Get submissions with all details including content and files
         const submissionData = await db.select({
@@ -480,35 +480,22 @@ export class DatabaseStorage implements IStorage {
 
   async getAssignmentsByCompany(companyId: string): Promise<Assignment[]> {
     const assignmentData = await db.select({
-      id: assignments.id,
-      title: assignments.title,
-      description: assignments.description,
-      instructions: assignments.instructions,
-      dueDate: assignments.dueDate,
-      companyId: assignments.companyId,
-      createdBy: assignments.createdBy,
-      studentIds: assignments.studentIds,
-      classId: assignments.classId,
-      status: assignments.status,
-      maxPoints: assignments.maxPoints,
-      attachmentUrls: assignments.attachmentUrls,
-      allowedFileTypes: assignments.allowedFileTypes,
-      isRecurring: assignments.isRecurring,
-      recurringPattern: assignments.recurringPattern,
-      visibleFrom: assignments.visibleFrom,
-      autoGrade: assignments.autoGrade,
-      createdAt: assignments.createdAt,
-      updatedAt: assignments.updatedAt,
-      creator: {
-        id: users.id,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        email: users.email,
-      }
-    }).from(assignments)
-      .leftJoin(users, eq(assignments.createdBy, users.id))
-      .where(eq(assignments.companyId, companyId))
-      .orderBy(desc(assignments.createdAt));
+        id: assignments.id,
+        title: assignments.title,
+        description: assignments.description,
+        instructions: assignments.instructions,
+        dueDate: assignments.dueDate,
+        companyId: assignments.companyId,
+        studentIds: assignments.studentIds,
+        status: assignments.status,
+        maxPoints: assignments.maxPoints,
+        attachmentUrls: assignments.attachmentUrls,
+        allowedFileTypes: assignments.allowedFileTypes,
+        createdAt: assignments.createdAt,
+        updatedAt: assignments.updatedAt,
+      }).from(assignments)
+        .where(eq(assignments.companyId, companyId))
+        .orderBy(desc(assignments.createdAt));
 
     console.log(`Found ${assignmentData.length} assignments for company ${companyId}`);
 
@@ -516,7 +503,7 @@ export class DatabaseStorage implements IStorage {
     const assignmentsWithSubmissions = await Promise.all(
       assignmentData.map(async (assignment) => {
         console.log(`Getting submissions for assignment ${assignment.id}`);
-        
+
         const submissionData = await db.select({
           id: submissions.id,
           assignmentId: submissions.assignmentId,
@@ -577,7 +564,7 @@ export class DatabaseStorage implements IStorage {
     return assignment;
   }
 
-  
+
 
   async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
     return await db.select({

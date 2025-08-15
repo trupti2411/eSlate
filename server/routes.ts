@@ -346,7 +346,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignmentData = {
         ...req.body,
         companyId,
-        createdBy: user.id,
         dueDate: req.body.dueDate ? new Date(req.body.dueDate) : null,
       };
 

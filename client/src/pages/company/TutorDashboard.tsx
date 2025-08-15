@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import { 
   Users, 
   GraduationCap, 
@@ -26,7 +27,8 @@ import {
   FileText,
   Download,
   Edit,
-  Plus
+  Plus,
+  Upload
 } from "lucide-react";
 
 interface Assignment {
@@ -106,7 +108,23 @@ export default function TutorDashboard() {
     enabled: !!user,
   });
 
-  const companyId = user?.companyId;
+  let companyId: string | undefined;
+  if (user?.role === 'tutor') {
+    // For tutors, we need to get their company ID from their tutor profile
+    const { data: tutorProfile } = useQuery({
+      queryKey: [`/api/tutors/${user.id}`],
+      enabled: !!user && user.role === 'tutor',
+    });
+    companyId = tutorProfile?.companyId;
+  } else if (user?.role === 'company_admin') {
+    // For company admins, we need to get their company ID from their admin profile
+    const { data: adminProfile } = useQuery({
+      queryKey: [`/api/admin/company-admin/${user.id}`],
+      enabled: !!user && user.role === 'company_admin',
+    });
+    companyId = adminProfile?.companyId;
+  }
+
   const { data: tutors = [] } = useQuery<Tutor[]>({
     queryKey: [`/api/companies/${companyId}/tutors`],
     enabled: !!companyId,
@@ -132,6 +150,7 @@ export default function TutorDashboard() {
     attachmentUrls: [] as string[],
     allowedFileTypes: ['pdf', 'doc', 'docx', 'txt', 'jpg', 'png'],
   });
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
 
   // Mutation for updating tutors
   const updateTutorMutation = useMutation({
@@ -157,6 +176,35 @@ export default function TutorDashboard() {
     },
   });
 
+  // File upload handlers
+  const handleGetUploadParameters = async () => {
+    try {
+      const response = await apiRequest("/api/homework/upload", "POST");
+      return {
+        url: response.uploadURL,
+        fields: {},
+      };
+    } catch (error) {
+      console.error("Error getting upload parameters:", error);
+      throw error;
+    }
+  };
+
+  const handleUploadComplete = (result: any) => {
+    if (result.successful && result.successful.length > 0) {
+      const newFileUrls = result.successful.map((file: any) => file.response?.body?.url || `/homework/${file.name}`);
+      setUploadedFiles(prev => [...prev, ...newFileUrls]);
+      setNewAssignment(prev => ({
+        ...prev,
+        attachmentUrls: [...prev.attachmentUrls, ...newFileUrls]
+      }));
+      toast({
+        title: "Success",
+        description: `${result.successful.length} file(s) uploaded successfully`,
+      });
+    }
+  };
+
   // Create assignment mutation
   const createAssignmentMutation = useMutation({
     mutationFn: async (assignmentData: typeof newAssignment) => {
@@ -169,6 +217,7 @@ export default function TutorDashboard() {
       });
       queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
       setIsCreateAssignmentOpen(false);
+      setUploadedFiles([]);
       setNewAssignment({
         title: "",
         description: "",
@@ -419,48 +468,81 @@ export default function TutorDashboard() {
 
                         <div>
                           <Label>Select Students</Label>
-                          <Select onValueChange={(value) => {
-                            if (value === "all") {
-                              setNewAssignment(prev => ({ ...prev, studentIds: students.map(s => s.id) }));
-                            } else {
-                              const currentIds = newAssignment.studentIds;
-                              const newIds = currentIds.includes(value) 
-                                ? currentIds.filter(id => id !== value)
-                                : [...currentIds, value];
-                              setNewAssignment(prev => ({ ...prev, studentIds: newIds }));
-                            }
-                          }}>
-                            <SelectTrigger className="mt-2">
-                              <SelectValue placeholder={
-                                newAssignment.studentIds.length === 0 
-                                  ? "Select students" 
-                                  : `${newAssignment.studentIds.length} student(s) selected`
-                              } />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="all">
+                          <div className="mt-2 space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                id="select-all"
+                                checked={newAssignment.studentIds.length === students.length && students.length > 0}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setNewAssignment(prev => ({ ...prev, studentIds: students.map(s => s.id) }));
+                                  } else {
+                                    setNewAssignment(prev => ({ ...prev, studentIds: [] }));
+                                  }
+                                }}
+                              />
+                              <Label htmlFor="select-all" className="text-sm">
                                 All Students ({students.length})
-                              </SelectItem>
-                              {students.map((student) => (
-                                <SelectItem key={student.id} value={student.id}>
-                                  {student.user?.firstName} {student.user?.lastName}
-                                  {newAssignment.studentIds.includes(student.id) && " ✓"}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                              </Label>
+                            </div>
+                            <div className="max-h-32 overflow-y-auto border rounded p-2 space-y-1">
+                              {students.length === 0 ? (
+                                <p className="text-sm text-gray-500">No students available</p>
+                              ) : (
+                                students.map((student) => (
+                                  <div key={student.id} className="flex items-center space-x-2">
+                                    <input
+                                      type="checkbox"
+                                      id={`student-${student.id}`}
+                                      checked={newAssignment.studentIds.includes(student.id)}
+                                      onChange={(e) => {
+                                        const currentIds = newAssignment.studentIds;
+                                        const newIds = e.target.checked
+                                          ? [...currentIds, student.id]
+                                          : currentIds.filter(id => id !== student.id);
+                                        setNewAssignment(prev => ({ ...prev, studentIds: newIds }));
+                                      }}
+                                    />
+                                    <Label htmlFor={`student-${student.id}`} className="text-sm">
+                                      {student.user?.firstName} {student.user?.lastName}
+                                    </Label>
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
                           {newAssignment.studentIds.length > 0 && (
                             <div className="mt-2 p-2 bg-gray-50 rounded">
-                              <p className="text-sm text-gray-600 mb-1">Selected students:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {newAssignment.studentIds.map(studentId => {
-                                  const student = students.find(s => s.id === studentId);
-                                  return student ? (
-                                    <Badge key={studentId} variant="secondary" className="text-xs">
-                                      {student.user?.firstName} {student.user?.lastName}
-                                    </Badge>
-                                  ) : null;
-                                })}
+                              <p className="text-sm text-gray-600 mb-1">
+                                Selected: {newAssignment.studentIds.length} student(s)
+                              </p>
+                            </div>
+                          )}
+                        </div>
+
+                        <div>
+                          <Label>Assignment Files (Optional)</Label>
+                          <ObjectUploader
+                            maxNumberOfFiles={5}
+                            allowedFileTypes={['pdf', 'doc', 'docx', 'txt', 'jpg', 'png', 'ppt', 'pptx']}
+                            onGetUploadParameters={handleGetUploadParameters}
+                            onComplete={handleUploadComplete}
+                            buttonClassName="mt-2"
+                          >
+                            <Upload className="w-4 h-4 mr-2" />
+                            Upload Assignment Files
+                          </ObjectUploader>
+                          {uploadedFiles.length > 0 && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded">
+                              <p className="text-sm text-gray-600 mb-1">Uploaded files:</p>
+                              <div className="space-y-1">
+                                {uploadedFiles.map((fileUrl, index) => (
+                                  <div key={index} className="flex items-center text-sm">
+                                    <FileText className="w-3 h-3 mr-1" />
+                                    File {index + 1}
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           )}
