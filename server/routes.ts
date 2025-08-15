@@ -221,8 +221,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const uploadID = randomUUID();
       
       res.json({ 
-        uploadURL, 
+        url: uploadURL,  // Standard property name for Uppy
+        uploadURL,       // Keep for backward compatibility
         uploadID,
+        method: "PUT",
         success: true 
       });
     } catch (error) {

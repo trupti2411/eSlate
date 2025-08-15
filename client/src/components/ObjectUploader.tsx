@@ -53,14 +53,17 @@ export function ObjectUploader({
             const params = await onGetUploadParameters();
             console.log("Upload parameters received:", params);
 
-            if (!params || !params.url) {
+            // Handle both 'url' and 'uploadURL' property names
+            const uploadUrl = params.url || params.uploadURL;
+            
+            if (!params || !uploadUrl) {
               console.error("Invalid upload parameters:", params);
               throw new Error("Upload URL is undefined or missing");
             }
 
             return {
               method: params.method || "PUT",
-              url: params.url,
+              url: uploadUrl,
               fields: params.fields || {},
               headers: {},
             };

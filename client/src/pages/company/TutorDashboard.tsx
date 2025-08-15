@@ -219,8 +219,13 @@ export default function TutorDashboard() {
   };
 
   const handleUploadComplete = (result: any) => {
+    console.log("Upload complete result:", result);
     if (result.successful && result.successful.length > 0) {
-      const newFileUrls = result.successful.map((file: any) => file.response?.body?.url || `/homework/${file.name}`);
+      const newFileUrls = result.successful.map((file: any) => {
+        // Extract file name and create a proper URL
+        const fileName = file.name || file.id;
+        return `/homework/${fileName}`;
+      });
       setUploadedFiles(prev => [...prev, ...newFileUrls]);
       setNewAssignment(prev => ({
         ...prev,
@@ -229,6 +234,15 @@ export default function TutorDashboard() {
       toast({
         title: "Success",
         description: `${result.successful.length} file(s) uploaded successfully`,
+      });
+    }
+    
+    if (result.failed && result.failed.length > 0) {
+      console.error("Upload failures:", result.failed);
+      toast({
+        title: "Upload Error",
+        description: `${result.failed.length} file(s) failed to upload`,
+        variant: "destructive",
       });
     }
   };
