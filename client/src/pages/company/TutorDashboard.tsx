@@ -207,15 +207,19 @@ export default function TutorDashboard() {
 
   // Create assignment mutation
   const createAssignmentMutation = useMutation({
-    mutationFn: async (assignmentData: typeof newAssignment) => {
-      return await apiRequest("/api/assignments", "POST", assignmentData);
+    mutationFn: async (assignmentData: any) => {
+      // Add the createdBy field from the current user
+      const assignmentWithCreator = {
+        ...assignmentData,
+        createdBy: user?.id,
+      };
+      return await apiRequest("/api/assignments", "POST", assignmentWithCreator);
     },
     onSuccess: () => {
       toast({
         title: "Success",
         description: "Assignment created successfully",
       });
-      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
       setIsCreateAssignmentOpen(false);
       setUploadedFiles([]);
       setNewAssignment({
@@ -230,6 +234,7 @@ export default function TutorDashboard() {
       });
     },
     onError: (error: Error) => {
+      console.error("Assignment creation error:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create assignment",
