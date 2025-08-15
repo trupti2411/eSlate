@@ -360,10 +360,21 @@ export class DatabaseStorage implements IStorage {
     // Get assignments and submissions for each student
     const studentsWithDetails = await Promise.all(
       studentData.map(async (student) => {
-        // Get assignments
-        const assignmentData = await db.select()
+        // Get assignments with full details
+        const assignmentData = await db.select({
+          id: assignments.id,
+          title: assignments.title,
+          description: assignments.description,
+          instructions: assignments.instructions,
+          dueDate: assignments.dueDate,
+          status: assignments.status,
+          maxPoints: assignments.maxPoints,
+          attachmentUrls: assignments.attachmentUrls,
+          createdAt: assignments.createdAt,
+        })
           .from(assignments)
-          .where(arrayContains(assignments.studentIds, [student.id]));
+          .where(arrayContains(assignments.studentIds, [student.id]))
+          .orderBy(desc(assignments.createdAt));
 
         // Get submissions with all details including content and files
         const submissionData = await db.select({
@@ -372,11 +383,19 @@ export class DatabaseStorage implements IStorage {
           content: submissions.content,
           fileUrls: submissions.fileUrls,
           status: submissions.status,
+          isDraft: submissions.isDraft,
           submittedAt: submissions.submittedAt,
-          createdAt: submissions.createdAt,
+          isLate: submissions.isLate,
           score: submissions.score,
           feedback: submissions.feedback,
+          gradedAt: submissions.gradedAt,
           isVerifiedByParent: submissions.isVerifiedByParent,
+          parentVerifiedAt: submissions.parentVerifiedAt,
+          parentComments: submissions.parentComments,
+          needsRevision: submissions.needsRevision,
+          revisionFeedback: submissions.revisionFeedback,
+          createdAt: submissions.createdAt,
+          updatedAt: submissions.updatedAt,
         })
           .from(submissions)
           .where(eq(submissions.studentId, student.id))

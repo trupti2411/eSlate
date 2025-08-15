@@ -184,48 +184,107 @@ export default function ParentDashboard() {
                     {/* Recent Submissions */}
                     {student.submissions && student.submissions.length > 0 && (
                       <div className="mt-6">
-                        <h4 className="font-semibold text-black mb-3">Recent Submissions</h4>
+                        <h4 className="font-semibold text-black mb-3">Recent Submissions ({student.submissions.length})</h4>
                         <div className="space-y-3">
                           {student.submissions
-                            .slice(0, 5)
-                            .map((submission) => (
-                            <div key={submission.id} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                              <div className="flex-1">
-                                <h5 className="font-medium text-black">Assignment #{submission.assignmentId.slice(-6)}</h5>
-                                <p className="text-sm text-gray-600">
-                                  Submitted: {new Date(submission.submittedAt).toLocaleDateString()}
-                                </p>
-                                {submission.content && (
-                                  <p className="text-sm text-gray-500 mt-1">
-                                    Message: {submission.content.substring(0, 100)}...
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex flex-col gap-2">
-                                <Badge className={`status-badge ${
-                                  submission.status === 'submitted' ? 'status-submitted' : 
-                                  submission.status === 'graded' ? 'status-completed' : 'status-assigned'
-                                }`}>
-                                  {submission.status}
-                                </Badge>
-                                {submission.fileUrls && submission.fileUrls.length > 0 && (
-                                  <div className="flex flex-col gap-1">
-                                    {submission.fileUrls.map((fileUrl, index) => (
-                                      <a
-                                        key={index}
-                                        href={fileUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-blue-600 hover:underline"
-                                      >
-                                        View File {index + 1}
-                                      </a>
-                                    ))}
+                            .slice(0, 10)
+                            .map((submission) => {
+                              // Find the assignment this submission belongs to
+                              const assignment = student.assignments?.find(a => a.id === submission.assignmentId);
+                              return (
+                                <div key={submission.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
+                                  <div className="flex items-start justify-between mb-3">
+                                    <div className="flex-1">
+                                      <h5 className="font-medium text-black">
+                                        {assignment?.title || `Assignment #${submission.assignmentId.slice(-6)}`}
+                                      </h5>
+                                      <p className="text-sm text-gray-600">
+                                        Submitted: {submission.submittedAt ? new Date(submission.submittedAt).toLocaleDateString() : 'Draft'}
+                                      </p>
+                                      {assignment?.dueDate && (
+                                        <p className="text-xs text-gray-500">
+                                          Due: {new Date(assignment.dueDate).toLocaleDateString()}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-col gap-2 items-end">
+                                      <Badge className={`status-badge ${
+                                        submission.status === 'submitted' ? 'status-submitted' : 
+                                        submission.status === 'graded' ? 'status-completed' : 
+                                        submission.isDraft ? 'status-assigned' : 'status-assigned'
+                                      }`}>
+                                        {submission.isDraft ? 'draft' : submission.status}
+                                      </Badge>
+                                      {submission.score !== null && (
+                                        <Badge className="bg-blue-100 text-blue-800">
+                                          Score: {submission.score}/{assignment?.maxPoints || '?'}
+                                        </Badge>
+                                      )}
+                                      {submission.isLate && (
+                                        <Badge className="bg-red-100 text-red-800">
+                                          Late
+                                        </Badge>
+                                      )}
+                                    </div>
                                   </div>
-                                )}
-                              </div>
+
+                                  {/* Student's message/content */}
+                                  {submission.content && (
+                                    <div className="mb-3 p-3 bg-white rounded border">
+                                      <h6 className="text-sm font-medium text-gray-700 mb-1">Student Message:</h6>
+                                      <p className="text-sm text-gray-600">{submission.content}</p>
+                                    </div>
+                                  )}
+
+                                  {/* Downloadable files */}
+                                  {submission.fileUrls && submission.fileUrls.length > 0 && (
+                                    <div className="mb-3">
+                                      <h6 className="text-sm font-medium text-gray-700 mb-2">Attached Files:</h6>
+                                      <div className="flex flex-wrap gap-2">
+                                        {submission.fileUrls.map((fileUrl, index) => (
+                                          <a
+                                            key={index}
+                                            href={fileUrl}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
+                                            download
+                                          >
+                                            📄 File {index + 1}
+                                          </a>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Feedback from tutor */}
+                                  {submission.feedback && (
+                                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
+                                      <h6 className="text-sm font-medium text-blue-800 mb-1">Tutor Feedback:</h6>
+                                      <p className="text-sm text-blue-700">{submission.feedback}</p>
+                                      {submission.gradedAt && (
+                                        <p className="text-xs text-blue-600 mt-1">
+                                          Graded on: {new Date(submission.gradedAt).toLocaleDateString()}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {/* Revision needed */}
+                                  {submission.needsRevision && (
+                                    <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
+                                      <h6 className="text-sm font-medium text-yellow-800 mb-1">Revision Needed:</h6>
+                                      <p className="text-sm text-yellow-700">{submission.revisionFeedback}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          {student.submissions.length > 10 && (
+                            <div className="text-center text-sm text-gray-500">
+                              Showing 10 of {student.submissions.length} submissions
                             </div>
-                          ))}
+                          )}
                         </div>
                       </div>
                     )}

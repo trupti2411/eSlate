@@ -200,15 +200,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve homework files
   app.get('/homework/:filePath(*)', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
+      const filePath = req.params.filePath;
+      console.log("Serving homework file:", filePath);
+      
       const objectStorageService = new ObjectStorageService();
-      const file = await objectStorageService.getHomeworkFile(`/homework/${req.params.filePath}`);
+      
+      // Try multiple path variations to find the file
+      const possiblePaths = [
+        `/homework/${filePath}`,
+        filePath,
+        `homework/${filePath}`,
+        `uploads/${filePath}`,
+        `files/${filePath}`
+      ];
+
+      let file = null;
+      for (const path of possiblePaths) {
+        try {
+          console.log("Trying path:", path);
+          file = await objectStorageService.getHomeworkFile(path);
+          if (file) {
+            console.log("Found file at path:", path);
+            break;
+          }
+        } catch (e) {
+          console.log("Path not found:", path);
+          continue;
+        }
+      }
+
+      if (!file) {
+        console.error("File not found at any path:", filePath);
+        return res.status(404).json({ message: "File not found" });
+      }
+
+      // Set proper headers for download
+      res.setHeader('Content-Disposition', `attachment; filename="${filePath}"`);
+      res.setHeader('Content-Type', 'application/octet-stream');
+      
       objectStorageService.downloadObject(file, res);
     } catch (error) {
       console.error("Error downloading homework file:", error);
       if (error instanceof ObjectNotFoundError) {
-        return res.sendStatus(404);
+        return res.status(404).json({ message: "File not found" });
       }
-      return res.sendStatus(500);
+      return res.status(500).json({ message: "Failed to serve file" });
     }
   });
 
@@ -442,26 +478,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   
 
-  // Parent verification route (view-only, no actual verification needed)
-  app.patch('/api/submissions/:submissionId/verify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  // Parent acknowledgment route (optional, submissions are immediately visible regardless)
+  app.patch('/api/submissions/:submissionId/acknowledge', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { submissionId } = req.params;
       const user = req.user!;
 
       if (user.role !== 'parent') {
-        return res.status(403).json({ message: "Only parents can verify submissions" });
+        return res.status(403).json({ message: "Only parents can acknowledge submissions" });
       }
 
-      // Just mark as viewed by parent, but don't require verification to proceed
+      // Optional acknowledgment - doesn't block anything
       const submission = await storage.updateSubmission(submissionId, {
         parentVerifiedAt: new Date(),
-        isVerifiedByParent: true
+        isVerifiedByParent: true,
+        parentComments: req.body.comments || null
       });
 
       res.json(submission);
     } catch (error) {
-      console.error("Error marking submission as viewed:", error);
-      res.status(500).json({ message: "Failed to mark submission as viewed" });
+      console.error("Error acknowledging submission:", error);
+      res.status(500).json({ message: "Failed to acknowledge submission" });
     }
   });
 

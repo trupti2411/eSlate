@@ -104,8 +104,10 @@ export default function StudentDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{completedAssignments.length}</div>
-              <p className="text-gray-600 text-sm">Finished assignments</p>
+              <div className="text-3xl font-bold text-black">
+                {assignments?.filter(a => a.status === 'completed').length || 0}
+              </div>
+              <p className="text-gray-600 text-sm">Assignments done</p>
             </CardContent>
           </Card>
         </div>

@@ -185,7 +185,7 @@ export default function TutorDashboard() {
 
           {/* Recent Assignments & Submissions */}
           <div>
-            <h2 className="section-title">Recent Assignments</h2>
+            <h2 className="section-title">Recent Assignments & Submissions</h2>
             {assignmentsLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map(i => (
@@ -196,8 +196,8 @@ export default function TutorDashboard() {
                 ))}
               </div>
             ) : assignments && assignments.length > 0 ? (
-              <div className="space-y-4">
-                {assignments.slice(0, 5).map((assignment) => (
+              <div className="space-y-6">
+                {assignments.slice(0, 8).map((assignment) => (
                   <Card key={assignment.id} className="eink-card">
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-3">
@@ -206,55 +206,114 @@ export default function TutorDashboard() {
                           <p className="text-sm text-gray-600">
                             Due: {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'}
                           </p>
+                          <p className="text-xs text-gray-500">
+                            Created: {new Date(assignment.createdAt).toLocaleDateString()}
+                          </p>
                         </div>
-                        <Badge className={`status-badge status-${assignment.status}`}>
-                          {assignment.status}
-                        </Badge>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge className={`status-badge status-${assignment.status}`}>
+                            {assignment.status}
+                          </Badge>
+                          {assignment.maxPoints && (
+                            <span className="text-xs text-gray-600">Max: {assignment.maxPoints} pts</span>
+                          )}
+                        </div>
                       </div>
                       
-                      {/* Show recent submissions for this assignment */}
-                      {assignment.submissions && assignment.submissions.length > 0 && (
-                        <div className="border-t pt-3">
-                          <h5 className="text-sm font-medium text-gray-700 mb-2">Recent Submissions ({assignment.submissions.length}):</h5>
-                          <div className="space-y-2">
-                            {assignment.submissions.slice(0, 3).map((submission) => (
-                              <div key={submission.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
-                                <div className="flex items-center space-x-2">
-                                  <span className="font-medium">
-                                    {submission.student?.user?.firstName} {submission.student?.user?.lastName}
-                                  </span>
-                                  <Badge className={`text-xs ${
-                                    submission.status === 'submitted' ? 'bg-green-100 text-green-800' :
-                                    submission.status === 'graded' ? 'bg-blue-100 text-blue-800' :
-                                    submission.isDraft ? 'bg-yellow-100 text-yellow-800' :
-                                    'bg-gray-100 text-gray-800'
-                                  }`}>
-                                    {submission.isDraft ? 'draft' : submission.status}
-                                  </Badge>
-                                  {submission.score !== null && (
-                                    <span className="text-xs text-blue-600">
-                                      Score: {submission.score}
+                      {/* Show all submissions for this assignment */}
+                      {assignment.submissions && assignment.submissions.length > 0 ? (
+                        <div className="border-t pt-4">
+                          <h5 className="text-sm font-medium text-gray-700 mb-3">
+                            Student Submissions ({assignment.submissions.length}):
+                          </h5>
+                          <div className="space-y-3">
+                            {assignment.submissions.map((submission) => (
+                              <div key={submission.id} className="p-3 bg-gray-50 rounded-lg border">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center space-x-3">
+                                    <span className="font-medium text-black">
+                                      {submission.student?.user?.firstName} {submission.student?.user?.lastName}
                                     </span>
-                                  )}
-                                </div>
-                                <div className="flex flex-col items-end">
-                                  <div className="text-xs text-gray-500">
-                                    {new Date(submission.submittedAt || submission.createdAt).toLocaleDateString()}
+                                    <Badge className={`text-xs ${
+                                      submission.status === 'submitted' ? 'bg-green-100 text-green-800' :
+                                      submission.status === 'graded' ? 'bg-blue-100 text-blue-800' :
+                                      submission.isDraft ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {submission.isDraft ? 'draft' : submission.status}
+                                    </Badge>
+                                    {submission.isLate && (
+                                      <Badge className="text-xs bg-red-100 text-red-800">
+                                        Late
+                                      </Badge>
+                                    )}
                                   </div>
-                                  {submission.fileUrls && submission.fileUrls.length > 0 && (
-                                    <div className="text-xs text-blue-600">
-                                      {submission.fileUrls.length} file(s)
-                                    </div>
-                                  )}
+                                  <div className="flex items-center gap-2">
+                                    {submission.score !== null && (
+                                      <span className="text-sm text-blue-600 font-medium">
+                                        {submission.score}/{assignment.maxPoints || '?'}
+                                      </span>
+                                    )}
+                                    <span className="text-xs text-gray-500">
+                                      {submission.submittedAt ? 
+                                        new Date(submission.submittedAt).toLocaleDateString() : 
+                                        new Date(submission.createdAt).toLocaleDateString()}
+                                    </span>
+                                  </div>
                                 </div>
+
+                                {/* Student message */}
+                                {submission.content && (
+                                  <div className="mb-2 p-2 bg-white rounded border">
+                                    <p className="text-sm text-gray-700">
+                                      <strong>Message:</strong> {submission.content}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Files */}
+                                {submission.fileUrls && submission.fileUrls.length > 0 && (
+                                  <div className="mb-2">
+                                    <p className="text-xs text-gray-600 mb-1">Files attached:</p>
+                                    <div className="flex gap-2">
+                                      {submission.fileUrls.map((fileUrl, fileIndex) => (
+                                        <a
+                                          key={fileIndex}
+                                          href={fileUrl}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                                          download
+                                        >
+                                          📄 File {fileIndex + 1}
+                                        </a>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {/* Feedback */}
+                                {submission.feedback && (
+                                  <div className="p-2 bg-blue-50 rounded border border-blue-200">
+                                    <p className="text-xs text-blue-700">
+                                      <strong>Your Feedback:</strong> {submission.feedback}
+                                    </p>
+                                  </div>
+                                )}
+
+                                {/* Action needed indicators */}
+                                {submission.status === 'submitted' && !submission.score && (
+                                  <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
+                                    <p className="text-xs text-yellow-700">⏳ Needs grading</p>
+                                  </div>
+                                )}
                               </div>
                             ))}
-                            {assignment.submissions.length > 3 && (
-                              <div className="text-xs text-gray-500 text-center">
-                                +{assignment.submissions.length - 3} more submissions
-                              </div>
-                            )}
                           </div>
+                        </div>
+                      ) : (
+                        <div className="border-t pt-3">
+                          <p className="text-sm text-gray-500 italic">No submissions yet</p>
                         </div>
                       )}
                     </CardContent>
