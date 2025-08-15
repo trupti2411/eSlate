@@ -1,12 +1,32 @@
-
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, Calendar, TrendingUp, Download } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
+import { 
+  Users, 
+  GraduationCap, 
+  BookOpen, 
+  Clock, 
+  Star,
+  TrendingUp,
+  Calendar,
+  MessageSquare,
+  CheckCircle,
+  AlertCircle,
+  FileText,
+  Download,
+  Edit,
+  Plus
+} from "lucide-react";
 
 interface Assignment {
   id: string;
@@ -41,8 +61,27 @@ interface Submission {
   };
 }
 
+interface Tutor {
+  id: string;
+  user: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
+interface Student {
+  id: string;
+  user: {
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+}
+
 export default function TutorDashboard() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading } = useAuth();
 
   // Redirect if not authenticated or not tutor/company_admin
@@ -60,10 +99,93 @@ export default function TutorDashboard() {
     }
   }, [isAuthenticated, isLoading, user, toast]);
 
-  // Fetch assignments based on user role
+  // Fetch assignments, tutors, and students
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<Assignment[]>({
     queryKey: ["/api/assignments"],
     enabled: !!user,
+  });
+
+  const companyId = user?.companyId;
+  const { data: tutors = [] } = useQuery<Tutor[]>({
+    queryKey: [`/api/companies/${companyId}/tutors`],
+    enabled: !!companyId,
+  });
+  const { data: students = [] } = useQuery<Student[]>({
+    queryKey: [`/api/companies/${companyId}/students`],
+    enabled: !!companyId,
+  });
+
+  // State and mutations for editing tutors
+  const [selectedTutor, setSelectedTutor] = useState<any>(null);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
+  // State and mutation for assignment creation
+  const [isCreateAssignmentOpen, setIsCreateAssignmentOpen] = useState(false);
+  const [newAssignment, setNewAssignment] = useState({
+    title: "",
+    description: "",
+    instructions: "",
+    dueDate: "",
+    maxPoints: 100,
+    studentIds: [] as string[],
+    attachmentUrls: [] as string[],
+    allowedFileTypes: ['pdf', 'doc', 'docx', 'txt', 'jpg', 'png'],
+  });
+
+  // Mutation for updating tutors
+  const updateTutorMutation = useMutation({
+    mutationFn: async (tutorData: any) => {
+      if (!companyId || !selectedTutor) return;
+      const response = await apiRequest(`/api/companies/${companyId}/tutors/${selectedTutor.id}`, "PUT", tutorData);
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Tutor updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
+      setIsEditDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update tutor",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Create assignment mutation
+  const createAssignmentMutation = useMutation({
+    mutationFn: async (assignmentData: typeof newAssignment) => {
+      return await apiRequest("/api/assignments", "POST", assignmentData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Assignment created successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/assignments"] });
+      setIsCreateAssignmentOpen(false);
+      setNewAssignment({
+        title: "",
+        description: "",
+        instructions: "",
+        dueDate: "",
+        maxPoints: 100,
+        studentIds: [],
+        attachmentUrls: [],
+        allowedFileTypes: ['pdf', 'doc', 'docx', 'txt', 'jpg', 'png'],
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create assignment",
+        variant: "destructive",
+      });
+    },
   });
 
   if (isLoading) {
@@ -156,9 +278,293 @@ export default function TutorDashboard() {
           </Card>
         </div>
 
+        {/* Main content grid */}
+        <div className="grid lg:grid-cols-3 gap-8">
+          {/* Left column - Company overview */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Company Stats */}
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <Card className="eink-card">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Users className="h-8 w-8 text-gray-600" />
+                    <div className="ml-4">
+                      <p className="text-2xl font-bold">{tutors.length}</p>
+                      <p className="text-gray-600 text-sm">Total Tutors</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="eink-card">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <GraduationCap className="h-8 w-8 text-gray-600" />
+                    <div className="ml-4">
+                      <p className="text-2xl font-bold">{students.length}</p>
+                      <p className="text-gray-600 text-sm">Students</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="eink-card">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <BookOpen className="h-8 w-8 text-gray-600" />
+                    <div className="ml-4">
+                      <p className="text-2xl font-bold">{assignments.length}</p>
+                      <p className="text-gray-600 text-sm">Assignments</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="eink-card">
+                <CardContent className="p-6">
+                  <div className="flex items-center">
+                    <Clock className="h-8 w-8 text-gray-600" />
+                    <div className="ml-4">
+                      <p className="text-2xl font-bold">
+                        {assignments.reduce((total, assignment) => 
+                          total + (assignment.submissions?.filter(sub => sub.status === 'submitted' && !sub.score).length || 0), 0
+                        )}
+                      </p>
+                      <p className="text-gray-600 text-sm">Pending Reviews</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Create Assignment Section */}
+            <Card className="eink-card">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center">
+                    <BookOpen className="h-5 w-5 mr-2" />
+                    Assignment Management
+                  </CardTitle>
+                  <Dialog open={isCreateAssignmentOpen} onOpenChange={setIsCreateAssignmentOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Assignment
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                      <DialogHeader>
+                        <DialogTitle>Create New Assignment</DialogTitle>
+                      </DialogHeader>
+                      <form onSubmit={(e) => {
+                        e.preventDefault();
+                        createAssignmentMutation.mutate(newAssignment);
+                      }} className="space-y-4">
+                        <div>
+                          <Label htmlFor="title">Assignment Title</Label>
+                          <Input
+                            id="title"
+                            value={newAssignment.title}
+                            onChange={(e) => setNewAssignment(prev => ({ ...prev, title: e.target.value }))}
+                            placeholder="Enter assignment title"
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="description">Description</Label>
+                          <Textarea
+                            id="description"
+                            value={newAssignment.description}
+                            onChange={(e) => setNewAssignment(prev => ({ ...prev, description: e.target.value }))}
+                            placeholder="Brief description of the assignment"
+                            rows={3}
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="instructions">Instructions</Label>
+                          <Textarea
+                            id="instructions"
+                            value={newAssignment.instructions}
+                            onChange={(e) => setNewAssignment(prev => ({ ...prev, instructions: e.target.value }))}
+                            placeholder="Detailed instructions for students"
+                            rows={4}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="dueDate">Due Date</Label>
+                            <Input
+                              id="dueDate"
+                              type="datetime-local"
+                              value={newAssignment.dueDate}
+                              onChange={(e) => setNewAssignment(prev => ({ ...prev, dueDate: e.target.value }))}
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="maxPoints">Max Points</Label>
+                            <Input
+                              id="maxPoints"
+                              type="number"
+                              value={newAssignment.maxPoints}
+                              onChange={(e) => setNewAssignment(prev => ({ ...prev, maxPoints: parseInt(e.target.value) || 100 }))}
+                              min="1"
+                              max="1000"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label>Select Students</Label>
+                          <div className="grid grid-cols-2 gap-2 mt-2 max-h-32 overflow-y-auto border rounded p-2">
+                            {students.map((student) => (
+                              <div key={student.id} className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  id={`student-${student.id}`}
+                                  checked={newAssignment.studentIds.includes(student.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setNewAssignment(prev => ({
+                                        ...prev,
+                                        studentIds: [...prev.studentIds, student.id]
+                                      }));
+                                    } else {
+                                      setNewAssignment(prev => ({
+                                        ...prev,
+                                        studentIds: prev.studentIds.filter(id => id !== student.id)
+                                      }));
+                                    }
+                                  }}
+                                  className="rounded"
+                                />
+                                <label htmlFor={`student-${student.id}`} className="text-sm">
+                                  {student.user?.firstName} {student.user?.lastName}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end space-x-2">
+                          <Button type="button" variant="outline" onClick={() => setIsCreateAssignmentOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={createAssignmentMutation.isPending}>
+                            {createAssignmentMutation.isPending ? "Creating..." : "Create Assignment"}
+                          </Button>
+                        </div>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+            </Card>
+          </div>
+
+          {/* Right column - Recent activity and quick actions */}
+          <div className="space-y-6">
+            {/* Recent Assignments & Submissions */}
+            <Card className="eink-card">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <BookOpen className="h-5 w-5 mr-2" />
+                  Recent Assignments & Submissions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {assignments.length === 0 ? (
+                  <p className="text-gray-500 text-sm">No assignments yet</p>
+                ) : (
+                  assignments.slice(0, 3).map((assignment) => (
+                    <div key={assignment.id} className="border rounded-lg p-3 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h4 className="font-medium text-sm">{assignment.title}</h4>
+                          <p className="text-xs text-gray-500">
+                            Due: {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'}
+                          </p>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {assignment.status}
+                        </Badge>
+                      </div>
+
+                      {assignment.submissions && assignment.submissions.length > 0 && (
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-gray-600">Submissions:</p>
+                          {assignment.submissions.slice(0, 2).map((submission: any) => (
+                            <div key={submission.id} className="flex items-center justify-between text-xs">
+                              <span className="flex items-center">
+                                <span className="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>
+                                {submission.student?.user?.firstName} {submission.student?.user?.lastName}
+                              </span>
+                              <div className="flex items-center space-x-1">
+                                <Badge 
+                                  variant="outline" 
+                                  className={`text-xs ${
+                                    submission.status === 'submitted' && !submission.score ? 'bg-orange-100 text-orange-800' :
+                                    submission.status === 'graded' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                                  }`}
+                                >
+                                  {submission.status === 'submitted' && !submission.score ? 'Needs Grading' : submission.status}
+                                </Badge>
+                                {submission.score && (
+                                  <span className="text-xs font-medium">{submission.score}/{assignment.maxPoints}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                          {assignment.submissions.length > 2 && (
+                            <p className="text-xs text-gray-500">+{assignment.submissions.length - 2} more</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Quick Actions */}
+            <Card className="eink-card">
+              <CardHeader>
+                <CardTitle className="flex items-center">
+                  <Clock className="h-5 w-5 mr-2" />
+                  Quick Actions
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button className="w-full justify-start" variant="outline">
+                  <Users className="h-4 w-4 mr-2" />
+                  Invite New Tutor
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <GraduationCap className="h-4 w-4 mr-2" />
+                  Add Student
+                </Button>
+                <Button 
+                  className="w-full justify-start" 
+                  variant="outline"
+                  onClick={() => setIsCreateAssignmentOpen(true)}
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Create Assignment
+                </Button>
+                <Button className="w-full justify-start" variant="outline">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  Send Message
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
         {/* Assignments & Submissions */}
         <div>
-          <h2 className="section-title">Assignments & Submissions</h2>
+          <h2 className="section-title">All Assignments & Submissions</h2>
           {assignmentsLoading ? (
             <div className="space-y-4">
               {[1, 2, 3].map(i => (
@@ -214,7 +620,7 @@ export default function TutorDashboard() {
                         </div>
                       </div>
                     )}
-                    
+
                     {/* Show all submissions for this assignment */}
                     {assignment.submissions && assignment.submissions.length > 0 ? (
                       <div className="border-t pt-4">
