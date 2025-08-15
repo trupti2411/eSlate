@@ -175,309 +175,120 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Direct file upload route using multer (simplified approach)
+  // Simple file upload route - stores files in memory
   app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
       }
 
-      console.log("Direct file upload:", req.file.originalname, "Size:", req.file.size);
+      console.log("Simple file upload:", req.file.originalname, "Size:", req.file.size);
 
-      const objectStorageService = new ObjectStorageService();
+      // Simple in-memory storage
+      const fileId = randomUUID();
+      const fileUrl = `/api/files/${fileId}`;
       
-      try {
-        // Try to upload to object storage
-        const fileUrl = await objectStorageService.uploadHomeworkFile(req.file);
-        console.log("File uploaded to object storage:", fileUrl);
-        
-        res.json({
-          success: true,
-          fileUrl: fileUrl,
-          fileName: req.file.originalname,
-          fileSize: req.file.size
-        });
-      } catch (storageError) {
-        console.error("Object storage upload failed, falling back to local storage:", storageError);
-        
-        // Fallback: create a temporary file reference
-        const fileId = randomUUID();
-        const tempFileUrl = `/homework/${req.file.originalname}`;
-        
-        // Store file metadata in memory for this session (temporary solution)
-        global.tempFiles = global.tempFiles || new Map();
-        global.tempFiles.set(req.file.originalname, {
-          buffer: req.file.buffer,
-          originalname: req.file.originalname,
-          mimetype: req.file.mimetype,
-          size: req.file.size
-        });
+      // Store file in memory with file ID
+      global.uploadedFiles = global.uploadedFiles || new Map();
+      global.uploadedFiles.set(fileId, {
+        buffer: req.file.buffer,
+        originalname: req.file.originalname,
+        mimetype: req.file.mimetype,
+        size: req.file.size,
+        uploadedAt: new Date()
+      });
 
-        console.log("File stored temporarily with name:", req.file.originalname);
-        res.json({
-          success: true,
-          fileUrl: tempFileUrl,
-          fileName: req.file.originalname,
-          fileSize: req.file.size
-        });
-      }
+      console.log("File stored with ID:", fileId);
+      res.json({
+        success: true,
+        fileUrl: fileUrl,
+        fileId: fileId,
+        fileName: req.file.originalname,
+        fileSize: req.file.size
+      });
     } catch (error) {
-      console.error("Error uploading file directly:", error);
+      console.error("Error uploading file:", error);
       res.status(500).json({ error: "Failed to upload file", details: error.message });
     }
   });
 
-  // Original signed URL upload route (keep as fallback)
-  app.post('/api/homework/upload', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+
+
+
+  // Simple file download route
+  app.get('/api/files/:fileId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
-      console.log("Getting homework upload URL...");
-      console.log("User:", req.user?.id);
-      console.log("Environment check - PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
-      console.log("Environment check - PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
+      const { fileId } = req.params;
+      console.log(`Looking for file with ID: ${fileId}`);
 
-      const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getHomeworkUploadURL();
-      console.log("Generated upload URL:", uploadURL);
-
-      // Validate the URL format
-      if (!uploadURL) {
-        throw new Error("No upload URL generated");
-      }
+      const uploadedFiles = global.uploadedFiles || new Map();
+      console.log("Available files:", Array.from(uploadedFiles.keys()));
       
-      if (!uploadURL.startsWith('https://')) {
-        console.warn("Upload URL does not start with https://", uploadURL);
-        // For development/testing, allow non-https URLs
-        if (process.env.NODE_ENV !== 'production' && uploadURL.startsWith('http://')) {
-          console.log("Allowing http URL in development mode");
-        } else {
-          throw new Error(`Invalid upload URL format: ${uploadURL}`);
-        }
-      }
-
-      // Generate a unique upload ID for tracking
-      const uploadID = randomUUID();
-      
-      res.json({ 
-        url: uploadURL,  // Standard property name for Uppy
-        uploadURL,       // Keep for backward compatibility
-        uploadID,
-        method: "PUT",
-        success: true 
-      });
-    } catch (error) {
-      console.error("Error getting homework upload URL:", error);
-      console.error("Error stack:", error.stack);
-      console.error("Environment variables:", {
-        NODE_ENV: process.env.NODE_ENV,
-        PRIVATE_OBJECT_DIR: process.env.PRIVATE_OBJECT_DIR ? "SET" : "NOT SET",
-        PUBLIC_OBJECT_SEARCH_PATHS: process.env.PUBLIC_OBJECT_SEARCH_PATHS ? "SET" : "NOT SET"
-      });
-      
-      res.status(500).json({ 
-        error: "Failed to get upload URL", 
-        details: error.message,
-        success: false
-      });
-    }
-  });
-
-  // Serve homework files
-  app.get('/homework/:filePath(*)', isAuthenticated, async (req: AuthenticatedRequest, res) => {
-    try {
-      const filePath = req.params.filePath;
-      console.log("Serving homework file:", filePath);
-
-      // First check temporary files (fallback storage)
-      const tempFiles = global.tempFiles || new Map();
-      
-      // Try exact match first
-      if (tempFiles.has(filePath)) {
-        console.log("Found file in temporary storage:", filePath);
-        const tempFile = tempFiles.get(filePath);
+      if (uploadedFiles.has(fileId)) {
+        const file = uploadedFiles.get(fileId);
+        console.log("Found file:", file.originalname);
         
         // Set proper headers for download
-        res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
-        res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
-        res.setHeader('Content-Length', tempFile.size);
+        res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
+        res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
+        res.setHeader('Content-Length', file.size);
         
         // Send the file buffer
-        return res.send(tempFile.buffer);
+        return res.send(file.buffer);
       }
 
-      // Try to find file by original name in temp storage
-      for (const [key, tempFile] of tempFiles.entries()) {
-        if (tempFile.originalname === filePath || key === tempFile.originalname) {
-          console.log("Found file in temporary storage by original name:", tempFile.originalname);
-          
-          // Set proper headers for download
-          res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
-          res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
-          res.setHeader('Content-Length', tempFile.size);
-          
-          // Send the file buffer
-          return res.send(tempFile.buffer);
-        }
-      }
-
-      // Try object storage if environment is configured
-      if (process.env.PRIVATE_OBJECT_DIR || process.env.PUBLIC_OBJECT_SEARCH_PATHS) {
-        try {
-          const objectStorageService = new ObjectStorageService();
-
-          // Try multiple path variations to find the file
-          const possiblePaths = [
-            `/homework/${filePath}`,
-            filePath,
-            `homework/${filePath}`,
-            `uploads/${filePath}`,
-            `files/${filePath}`,
-            // Also try without the leading slash
-            filePath.startsWith('/') ? filePath.substring(1) : `/${filePath}`
-          ];
-
-          let file = null;
-          let foundPath = null;
-          
-          for (const path of possiblePaths) {
-            try {
-              console.log("Trying object storage path:", path);
-              file = await objectStorageService.getHomeworkFile(path);
-              if (file) {
-                console.log("Found file at path:", path);
-                foundPath = path;
-                break;
-              }
-            } catch (e) {
-              console.log("Path not found:", path);
-              continue;
-            }
-          }
-
-          // If not found in homework directory, try public search
-          if (!file) {
-            console.log("File not found in homework directory, trying public search...");
-            try {
-              file = await objectStorageService.searchPublicObject(filePath);
-              if (file) {
-                console.log("Found file in public storage:", filePath);
-                foundPath = filePath;
-              }
-            } catch (e) {
-              console.log("File not found in public storage either:", e.message);
-            }
-          }
-
-          if (file) {
-            // Extract filename for proper download header
-            const fileName = filePath.split('/').pop() || filePath;
-            
-            // Set proper headers for download
-            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-            res.setHeader('Content-Type', 'application/octet-stream');
-
-            return objectStorageService.downloadObject(file, res);
-          }
-        } catch (storageError) {
-          console.log("Object storage error:", storageError.message);
-        }
-      }
-
-      console.error("File not found at any location:", filePath);
-      return res.status(404).json({ message: "File not found" });
+      console.error(`File ${fileId} not found`);
+      res.status(404).json({ message: "File not found" });
     } catch (error) {
-      console.error("Error downloading homework file:", error);
-      if (error instanceof ObjectNotFoundError) {
-        return res.status(404).json({ message: "File not found" });
-      }
-      return res.status(500).json({ message: "Failed to serve file" });
+      console.error("Error serving file:", error);
+      res.status(500).json({ message: "Failed to serve file" });
     }
   });
 
-  // Serve assignment attachment files through our server (for authenticated access)
+  // Assignment attachment download - maps to simple file system
   app.get('/api/assignments/:assignmentId/attachments/:fileName', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { assignmentId, fileName } = req.params;
       console.log(`Looking for assignment attachment: ${fileName} for assignment: ${assignmentId}`);
 
-      // First check temporary files (fallback storage)
-      const tempFiles = global.tempFiles || new Map();
-      console.log("Available temporary files:", Array.from(tempFiles.keys()));
-      
-      // Try exact match first
-      if (tempFiles.has(fileName)) {
-        console.log("Found attachment in temporary storage:", fileName);
-        const tempFile = tempFiles.get(fileName);
-        
-        // Set proper headers for download
-        res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
-        res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
-        res.setHeader('Content-Length', tempFile.size);
-        
-        // Send the file buffer
-        return res.send(tempFile.buffer);
+      // Get the assignment to check its attachment URLs
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment || !assignment.attachmentUrls) {
+        console.log("Assignment not found or no attachments");
+        return res.status(404).json({ message: "Assignment or attachments not found" });
       }
 
-      // Try to find file by original name in temp storage
-      for (const [key, tempFile] of tempFiles.entries()) {
-        console.log(`Checking temp file: key="${key}", originalname="${tempFile.originalname}"`);
-        if (tempFile.originalname === fileName || key === tempFile.originalname || key.includes(fileName) || fileName.includes(key)) {
-          console.log("Found attachment in temporary storage by original name:", tempFile.originalname);
-          
-          // Set proper headers for download
-          res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
-          res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
-          res.setHeader('Content-Length', tempFile.size);
-          
-          // Send the file buffer
-          return res.send(tempFile.buffer);
-        }
-      }
+      console.log("Assignment attachment URLs:", assignment.attachmentUrls);
 
-      // Try object storage if environment is configured
-      if (process.env.PRIVATE_OBJECT_DIR || process.env.PUBLIC_OBJECT_SEARCH_PATHS) {
-        try {
-          const objectStorageService = new ObjectStorageService();
-
-          // Assignment attachments are stored in the homework directory under private storage
-          // Try to get the file using the homework file method
-          try {
-            console.log(`Looking for homework file: /homework/${fileName}`);
-            const file = await objectStorageService.getHomeworkFile(`/homework/${fileName}`);
-            console.log(`Found homework file: ${fileName}`);
-            return objectStorageService.downloadObject(file, res);
-          } catch (homeworkError) {
-            console.log(`File not found in homework directory: ${homeworkError.message}`);
-          }
-
-          // Fallback: Try public object paths
-          const possiblePaths = [
-            fileName,
-            `attachments/${fileName}`,
-            `assignments/${fileName}`,
-            `files/${fileName}`,
-            `public/${fileName}`,
-            `uploads/${fileName}`
-          ];
-
-          for (const filePath of possiblePaths) {
-            try {
-              const file = await objectStorageService.searchPublicObject(filePath);
-              if (file) {
-                console.log(`Found file in public storage at path: ${filePath}`);
-                return objectStorageService.downloadObject(file, res);
-              }
-            } catch (e) {
-              // Continue to next path
-              console.log(`File not found at public path: ${filePath}`);
+      // Look for the file URL that contains this filename
+      for (const url of assignment.attachmentUrls) {
+        console.log("Checking attachment URL:", url);
+        
+        if (url.includes(fileName)) {
+          // Extract file ID from URL like /api/files/123abc
+          const match = url.match(/\/api\/files\/([^\/]+)/);
+          if (match) {
+            const fileId = match[1];
+            console.log("Found file ID:", fileId);
+            
+            const uploadedFiles = global.uploadedFiles || new Map();
+            if (uploadedFiles.has(fileId)) {
+              const file = uploadedFiles.get(fileId);
+              console.log("Found file:", file.originalname);
+              
+              // Set proper headers for download
+              res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
+              res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
+              res.setHeader('Content-Length', file.size);
+              
+              // Send the file buffer
+              return res.send(file.buffer);
             }
           }
-        } catch (storageError) {
-          console.log("Object storage error:", storageError.message);
         }
       }
 
-      // If we can't find the file anywhere, return 404
-      console.error(`File ${fileName} not found in any location (private homework or public paths)`);
+      console.error(`File ${fileName} not found in assignment attachments`);
       res.status(404).json({ message: "File not found" });
 
     } catch (error) {

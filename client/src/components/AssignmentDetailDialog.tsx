@@ -240,14 +240,14 @@ export default function AssignmentDetailDialog({
               <h3 className="font-semibold mb-2">Assignment Files</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {assignment.attachmentUrls.map((url, index) => {
-                  const fileName = url.split('/').pop() || `file-${index + 1}`;
-                  const downloadUrl = `/api/assignments/${assignment.id}/attachments/${fileName}`;
+                  // For simple file system, URL is like /api/files/abc123
+                  const fileName = `file-${index + 1}`;
                   return (
                     <Button
                       key={index}
                       variant="outline"
                       className="justify-start"
-                      onClick={() => window.open(downloadUrl, '_blank')}
+                      onClick={() => window.open(url, '_blank')}
                     >
                       <Download className="h-4 w-4 mr-2" />
                       Download File {index + 1}
