@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
@@ -122,16 +122,13 @@ export default function AssignmentDetailDialog({
       if (existingSubmission?.id) {
         // Update existing submission
         console.log("Updating existing submission:", existingSubmission.id);
-        const response = await apiRequest(`/api/submissions/${existingSubmission.id}`, "PATCH", submissionData);
-        const result = await response.json();
+        const result = await apiRequest(`/api/submissions/${existingSubmission.id}`, "PATCH", submissionData);
         return result;
       } else {
         // Create new submission
         console.log("Creating new submission");
         console.log("Making POST request to /api/submissions with data:", submissionData);
-        const response = await apiRequest("/api/submissions", "POST", submissionData);
-        console.log("API request completed, response status:", response.status);
-        const result = await response.json();
+        const result = await apiRequest("/api/submissions", "POST", submissionData);
         console.log("Response data:", result);
         return result;
       }
@@ -182,6 +179,9 @@ export default function AssignmentDetailDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">{assignment.title}</DialogTitle>
+          <DialogDescription>
+            Assignment details and submission form
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">

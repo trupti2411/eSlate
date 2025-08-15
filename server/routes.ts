@@ -258,16 +258,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filePath,
         `homework/${filePath}`,
         `uploads/${filePath}`,
-        `files/${filePath}`
+        `files/${filePath}`,
+        // Also try without the leading slash
+        filePath.startsWith('/') ? filePath.substring(1) : `/${filePath}`
       ];
 
       let file = null;
+      let foundPath = null;
+      
       for (const path of possiblePaths) {
         try {
           console.log("Trying path:", path);
           file = await objectStorageService.getHomeworkFile(path);
           if (file) {
             console.log("Found file at path:", path);
+            foundPath = path;
             break;
           }
         } catch (e) {
@@ -276,13 +281,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // If not found in homework directory, try public search
+      if (!file) {
+        console.log("File not found in homework directory, trying public search...");
+        try {
+          file = await objectStorageService.searchPublicObject(filePath);
+          if (file) {
+            console.log("Found file in public storage:", filePath);
+            foundPath = filePath;
+          }
+        } catch (e) {
+          console.log("File not found in public storage either:", e.message);
+        }
+      }
+
       if (!file) {
         console.error("File not found at any path:", filePath);
         return res.status(404).json({ message: "File not found" });
       }
 
+      // Extract filename for proper download header
+      const fileName = filePath.split('/').pop() || filePath;
+      
       // Set proper headers for download
-      res.setHeader('Content-Disposition', `attachment; filename="${filePath}"`);
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
       res.setHeader('Content-Type', 'application/octet-stream');
 
       objectStorageService.downloadObject(file, res);
@@ -449,6 +471,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!companyAdmin || assignment.companyId !== companyAdmin.companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
+      } else if (user.role === 'student') {
+        // Students can only access their own submissions for assignments they're assigned to
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) {
+          return res.status(403).json({ message: "Student profile not found" });
+        }
+        
+        // Check if this student is assigned to this assignment
+        const studentAssignments = await storage.getAssignmentsByStudent(student.id);
+        const hasAccess = studentAssignments.some(a => a.id === assignmentId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "Access denied to this assignment" });
+        }
+        
+        // Return only the student's own submission
+        const submissions = await storage.getSubmissionsByAssignment(assignmentId);
+        const studentSubmissions = submissions.filter(s => s.studentId === student.id);
+        return res.json(studentSubmissions);
       } else if (user.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
