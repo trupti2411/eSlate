@@ -18,6 +18,16 @@ import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import multer from "multer";
 import { randomUUID } from "crypto";
 
+// Global declaration for temporary file storage
+declare global {
+  var tempFiles: Map<string, {
+    buffer: Buffer;
+    originalname: string;
+    mimetype: string;
+    size: number;
+  }>;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   setupCustomAuth(app);
@@ -172,18 +182,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Direct file upload:", req.file.originalname, "Size:", req.file.size);
 
       const objectStorageService = new ObjectStorageService();
-      const fileId = randomUUID();
+      
+      try {
+        // Try to upload to object storage
+        const fileUrl = await objectStorageService.uploadHomeworkFile(req.file);
+        console.log("File uploaded to object storage:", fileUrl);
+        
+        res.json({
+          success: true,
+          fileUrl: fileUrl,
+          fileName: req.file.originalname,
+          fileSize: req.file.size
+        });
+      } catch (storageError) {
+        console.error("Object storage upload failed, falling back to local storage:", storageError);
+        
+        // Fallback: create a temporary file reference
+        const fileId = randomUUID();
+        const tempFileUrl = `/homework/${req.file.originalname}`;
+        
+        // Store file metadata in memory for this session (temporary solution)
+        global.tempFiles = global.tempFiles || new Map();
+        global.tempFiles.set(req.file.originalname, {
+          buffer: req.file.buffer,
+          originalname: req.file.originalname,
+          mimetype: req.file.mimetype,
+          size: req.file.size
+        });
 
-      // Create a temporary file URL for now - we'll improve this later
-      const tempFileUrl = `/homework/${fileId}`;
-
-      console.log("File uploaded successfully with ID:", fileId);
-      res.json({
-        success: true,
-        fileUrl: tempFileUrl,
-        fileName: req.file.originalname,
-        fileSize: req.file.size
-      });
+        console.log("File stored temporarily with name:", req.file.originalname);
+        res.json({
+          success: true,
+          fileUrl: tempFileUrl,
+          fileName: req.file.originalname,
+          fileSize: req.file.size
+        });
+      }
     } catch (error) {
       console.error("Error uploading file directly:", error);
       res.status(500).json({ error: "Failed to upload file", details: error.message });
@@ -250,6 +284,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const filePath = req.params.filePath;
       console.log("Serving homework file:", filePath);
 
+      // First check temporary files (fallback storage)
+      const tempFiles = global.tempFiles || new Map();
+      if (tempFiles.has(filePath)) {
+        console.log("Found file in temporary storage:", filePath);
+        const tempFile = tempFiles.get(filePath);
+        
+        // Set proper headers for download
+        res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
+        res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
+        res.setHeader('Content-Length', tempFile.size);
+        
+        // Send the file buffer
+        return res.send(tempFile.buffer);
+      }
+
+      // Try object storage
       const objectStorageService = new ObjectStorageService();
 
       // Try multiple path variations to find the file

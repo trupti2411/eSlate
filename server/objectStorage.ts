@@ -191,6 +191,37 @@ export class ObjectStorageService {
     return file;
   }
 
+  // Upload homework file directly to object storage
+  async uploadHomeworkFile(file: Express.Multer.File): Promise<string> {
+    try {
+      const fileName = `${Date.now()}_${file.originalname}`;
+      let privateDir = this.getPrivateObjectDir();
+      if (!privateDir.endsWith("/")) {
+        privateDir = `${privateDir}/`;
+      }
+      
+      const objectPath = `${privateDir}homework/${fileName}`;
+      const { bucketName, objectName } = parseObjectPath(objectPath);
+      
+      const bucket = objectStorageClient.bucket(bucketName);
+      const object = bucket.file(objectName);
+      
+      // Upload the file buffer
+      await object.save(file.buffer, {
+        metadata: {
+          contentType: file.mimetype,
+          cacheControl: 'private, max-age=3600',
+        },
+      });
+      
+      console.log(`File uploaded to object storage: ${objectPath}`);
+      return `/homework/${fileName}`;
+    } catch (error) {
+      console.error("Error uploading file to object storage:", error);
+      throw error;
+    }
+  }
+
   normalizeHomeworkPath(rawPath: string): string {
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;
@@ -214,6 +245,27 @@ export class ObjectStorageService {
     const fileId = rawObjectPath.slice(homeworkPrefix.length);
     return `/homework/${fileId}`;
   }
+}
+
+function parseObjectPath(path: string): {
+  bucketName: string;
+  objectName: string;
+} {
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+  const pathParts = path.split("/");
+  if (pathParts.length < 3) {
+    throw new Error("Invalid path: must contain at least a bucket name");
+  }
+
+  const bucketName = pathParts[1];
+  const objectName = pathParts.slice(2).join("/");
+
+  return {
+    bucketName,
+    objectName,
+  };
 }
 
 function parseObjectPath(path: string): {
