@@ -110,6 +110,19 @@ export default function StudentDashboard() {
               <p className="text-gray-600 text-sm">Assignments done</p>
             </CardContent>
           </Card>
+
+          <Card className="eink-card">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                Submissions
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-black">{submissions?.length || 0}</div>
+              <p className="text-gray-600 text-sm">Total submitted</p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="grid lg:grid-cols-2 gap-8">
