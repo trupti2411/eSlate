@@ -29,6 +29,9 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize global temporary file storage
+  global.tempFiles = global.tempFiles || new Map();
+
   // Auth middleware
   setupCustomAuth(app);
 
@@ -286,6 +289,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // First check temporary files (fallback storage)
       const tempFiles = global.tempFiles || new Map();
+      
+      // Try exact match first
       if (tempFiles.has(filePath)) {
         console.log("Found file in temporary storage:", filePath);
         const tempFile = tempFiles.get(filePath);
@@ -299,65 +304,86 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.send(tempFile.buffer);
       }
 
-      // Try object storage
-      const objectStorageService = new ObjectStorageService();
-
-      // Try multiple path variations to find the file
-      const possiblePaths = [
-        `/homework/${filePath}`,
-        filePath,
-        `homework/${filePath}`,
-        `uploads/${filePath}`,
-        `files/${filePath}`,
-        // Also try without the leading slash
-        filePath.startsWith('/') ? filePath.substring(1) : `/${filePath}`
-      ];
-
-      let file = null;
-      let foundPath = null;
-      
-      for (const path of possiblePaths) {
-        try {
-          console.log("Trying path:", path);
-          file = await objectStorageService.getHomeworkFile(path);
-          if (file) {
-            console.log("Found file at path:", path);
-            foundPath = path;
-            break;
-          }
-        } catch (e) {
-          console.log("Path not found:", path);
-          continue;
+      // Try to find file by original name in temp storage
+      for (const [key, tempFile] of tempFiles.entries()) {
+        if (tempFile.originalname === filePath || key === tempFile.originalname) {
+          console.log("Found file in temporary storage by original name:", tempFile.originalname);
+          
+          // Set proper headers for download
+          res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
+          res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
+          res.setHeader('Content-Length', tempFile.size);
+          
+          // Send the file buffer
+          return res.send(tempFile.buffer);
         }
       }
 
-      // If not found in homework directory, try public search
-      if (!file) {
-        console.log("File not found in homework directory, trying public search...");
+      // Try object storage if environment is configured
+      if (process.env.PRIVATE_OBJECT_DIR || process.env.PUBLIC_OBJECT_SEARCH_PATHS) {
         try {
-          file = await objectStorageService.searchPublicObject(filePath);
-          if (file) {
-            console.log("Found file in public storage:", filePath);
-            foundPath = filePath;
+          const objectStorageService = new ObjectStorageService();
+
+          // Try multiple path variations to find the file
+          const possiblePaths = [
+            `/homework/${filePath}`,
+            filePath,
+            `homework/${filePath}`,
+            `uploads/${filePath}`,
+            `files/${filePath}`,
+            // Also try without the leading slash
+            filePath.startsWith('/') ? filePath.substring(1) : `/${filePath}`
+          ];
+
+          let file = null;
+          let foundPath = null;
+          
+          for (const path of possiblePaths) {
+            try {
+              console.log("Trying object storage path:", path);
+              file = await objectStorageService.getHomeworkFile(path);
+              if (file) {
+                console.log("Found file at path:", path);
+                foundPath = path;
+                break;
+              }
+            } catch (e) {
+              console.log("Path not found:", path);
+              continue;
+            }
           }
-        } catch (e) {
-          console.log("File not found in public storage either:", e.message);
+
+          // If not found in homework directory, try public search
+          if (!file) {
+            console.log("File not found in homework directory, trying public search...");
+            try {
+              file = await objectStorageService.searchPublicObject(filePath);
+              if (file) {
+                console.log("Found file in public storage:", filePath);
+                foundPath = filePath;
+              }
+            } catch (e) {
+              console.log("File not found in public storage either:", e.message);
+            }
+          }
+
+          if (file) {
+            // Extract filename for proper download header
+            const fileName = filePath.split('/').pop() || filePath;
+            
+            // Set proper headers for download
+            res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+            res.setHeader('Content-Type', 'application/octet-stream');
+
+            return objectStorageService.downloadObject(file, res);
+          }
+        } catch (storageError) {
+          console.log("Object storage error:", storageError.message);
         }
       }
 
-      if (!file) {
-        console.error("File not found at any path:", filePath);
-        return res.status(404).json({ message: "File not found" });
-      }
-
-      // Extract filename for proper download header
-      const fileName = filePath.split('/').pop() || filePath;
-      
-      // Set proper headers for download
-      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
-      res.setHeader('Content-Type', 'application/octet-stream');
-
-      objectStorageService.downloadObject(file, res);
+      console.error("File not found at any location:", filePath);
+      return res.status(404).json({ message: "File not found" });
     } catch (error) {
       console.error("Error downloading homework file:", error);
       if (error instanceof ObjectNotFoundError) {
@@ -368,43 +394,83 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Serve assignment attachment files through our server (for authenticated access)
-  app.get('/api/assignments/:assignmentId/attachments/:fileName', async (req, res) => {
+  app.get('/api/assignments/:assignmentId/attachments/:fileName', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const { assignmentId, fileName } = req.params;
+      console.log(`Looking for assignment attachment: ${fileName} for assignment: ${assignmentId}`);
 
-      const objectStorageService = new ObjectStorageService();
-
-      // Assignment attachments are stored in the homework directory under private storage
-      // Try to get the file using the homework file method
-      try {
-        console.log(`Looking for homework file: /homework/${fileName}`);
-        const file = await objectStorageService.getHomeworkFile(`/homework/${fileName}`);
-        console.log(`Found homework file: ${fileName}`);
-        return objectStorageService.downloadObject(file, res);
-      } catch (homeworkError) {
-        console.log(`File not found in homework directory: ${homeworkError.message}`);
+      // First check temporary files (fallback storage)
+      const tempFiles = global.tempFiles || new Map();
+      
+      // Try exact match first
+      if (tempFiles.has(fileName)) {
+        console.log("Found attachment in temporary storage:", fileName);
+        const tempFile = tempFiles.get(fileName);
+        
+        // Set proper headers for download
+        res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
+        res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
+        res.setHeader('Content-Length', tempFile.size);
+        
+        // Send the file buffer
+        return res.send(tempFile.buffer);
       }
 
-      // Fallback: Try public object paths
-      const possiblePaths = [
-        fileName,
-        `attachments/${fileName}`,
-        `assignments/${fileName}`,
-        `files/${fileName}`,
-        `public/${fileName}`,
-        `uploads/${fileName}`
-      ];
+      // Try to find file by original name in temp storage
+      for (const [key, tempFile] of tempFiles.entries()) {
+        if (tempFile.originalname === fileName || key === tempFile.originalname) {
+          console.log("Found attachment in temporary storage by original name:", tempFile.originalname);
+          
+          // Set proper headers for download
+          res.setHeader('Content-Disposition', `attachment; filename="${tempFile.originalname}"`);
+          res.setHeader('Content-Type', tempFile.mimetype || 'application/octet-stream');
+          res.setHeader('Content-Length', tempFile.size);
+          
+          // Send the file buffer
+          return res.send(tempFile.buffer);
+        }
+      }
 
-      for (const filePath of possiblePaths) {
+      // Try object storage if environment is configured
+      if (process.env.PRIVATE_OBJECT_DIR || process.env.PUBLIC_OBJECT_SEARCH_PATHS) {
         try {
-          const file = await objectStorageService.searchPublicObject(filePath);
-          if (file) {
-            console.log(`Found file in public storage at path: ${filePath}`);
+          const objectStorageService = new ObjectStorageService();
+
+          // Assignment attachments are stored in the homework directory under private storage
+          // Try to get the file using the homework file method
+          try {
+            console.log(`Looking for homework file: /homework/${fileName}`);
+            const file = await objectStorageService.getHomeworkFile(`/homework/${fileName}`);
+            console.log(`Found homework file: ${fileName}`);
             return objectStorageService.downloadObject(file, res);
+          } catch (homeworkError) {
+            console.log(`File not found in homework directory: ${homeworkError.message}`);
           }
-        } catch (e) {
-          // Continue to next path
-          console.log(`File not found at public path: ${filePath}`);
+
+          // Fallback: Try public object paths
+          const possiblePaths = [
+            fileName,
+            `attachments/${fileName}`,
+            `assignments/${fileName}`,
+            `files/${fileName}`,
+            `public/${fileName}`,
+            `uploads/${fileName}`
+          ];
+
+          for (const filePath of possiblePaths) {
+            try {
+              const file = await objectStorageService.searchPublicObject(filePath);
+              if (file) {
+                console.log(`Found file in public storage at path: ${filePath}`);
+                return objectStorageService.downloadObject(file, res);
+              }
+            } catch (e) {
+              // Continue to next path
+              console.log(`File not found at public path: ${filePath}`);
+            }
+          }
+        } catch (storageError) {
+          console.log("Object storage error:", storageError.message);
         }
       }
 
@@ -1691,6 +1757,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } catch (error) {
         console.error("Error in test create user:", error);
         res.status(500).json({ message: "Test failed", error: (error as Error).message });
+      }
+    });
+
+    // Clear all assignments and submissions
+    app.post('/api/dev/clear-assignments', isAuthenticated, async (req: any, res) => {
+      try {
+        const userId = req.user.id;
+        const user = await storage.getUser(userId);
+
+        if (!user || (user.role !== 'admin' && user.role !== 'company_admin')) {
+          return res.status(403).json({ message: "Admin access required" });
+        }
+
+        console.log("Clearing all assignments and submissions...");
+
+        // Delete all submissions first (due to foreign key constraints)
+        await storage.clearAllSubmissions();
+        console.log("All submissions cleared");
+
+        // Delete all assignments
+        await storage.clearAllAssignments();
+        console.log("All assignments cleared");
+
+        // Clear temporary files
+        global.tempFiles = new Map();
+        console.log("Temporary files cleared");
+
+        res.json({ 
+          message: "All assignments and submissions cleared successfully",
+          clearedSubmissions: true,
+          clearedAssignments: true,
+          clearedTempFiles: true
+        });
+      } catch (error) {
+        console.error("Error clearing assignments:", error);
+        res.status(500).json({ message: "Failed to clear assignments", error: (error as Error).message });
+      }
+    });
+
+    // Debug route to list temporary files
+    app.get('/api/dev/temp-files', isAuthenticated, async (req: any, res) => {
+      try {
+        const tempFiles = global.tempFiles || new Map();
+        const fileList = Array.from(tempFiles.keys()).map(key => ({
+          key,
+          originalname: tempFiles.get(key)?.originalname,
+          size: tempFiles.get(key)?.size,
+          mimetype: tempFiles.get(key)?.mimetype
+        }));
+        
+        res.json({ 
+          count: tempFiles.size,
+          files: fileList
+        });
+      } catch (error) {
+        console.error("Error listing temp files:", error);
+        res.status(500).json({ message: "Failed to list temp files" });
       }
     });
   }

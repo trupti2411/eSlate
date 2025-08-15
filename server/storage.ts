@@ -61,7 +61,7 @@ export interface IStorage {
   // Student operations
   getStudent(id: string): Promise<Student | undefined>;
   getStudentByUserId(userId: string): Promise<Student | undefined>;
-  createStudent(student: InsertStudent): Promise<Student>;
+  createStudent(studentData: InsertStudent): Promise<Student>;
   updateStudent(id: string, updates: Partial<InsertStudent>): Promise<Student>;
   getStudentsByTutor(tutorId: string): Promise<Student[]>;
   getStudentsByParent(parentId: string): Promise<any[]>;
@@ -163,6 +163,10 @@ export interface IStorage {
   getStudentsByClass(classId: string): Promise<StudentClassAssignment[]>;
   getClassesByStudent(studentId: string): Promise<StudentClassAssignment[]>;
   removeStudentFromClass(studentId: string, classId: string): Promise<void>;
+
+  // Clear all assignment and submission data
+  clearAllAssignments(): Promise<void>;
+  clearAllSubmissions(): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -607,7 +611,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(users.firstName, users.lastName);
   }
 
-  
+
 
   // Submission operations
   async getSubmission(id: string): Promise<Submission | undefined> {
@@ -869,8 +873,8 @@ export class DatabaseStorage implements IStorage {
         .set({
           score,
           feedback,
-          gradedBy,
           gradedAt: new Date(),
+          gradedBy,
           status: 'graded',
           updatedAt: new Date(),
         })
@@ -1260,6 +1264,18 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
+  // Clear all assignment and submission data
+  async clearAllAssignments(): Promise<void> {
+    console.log("Deleting all assignments...");
+    await db.delete(assignments);
+    console.log("All assignments deleted");
+  }
+
+  async clearAllSubmissions(): Promise<void> {
+    console.log("Deleting all submissions...");
+    await db.delete(submissions);
+    console.log("All submissions deleted");
+  }
 }
 
 export const storage = new DatabaseStorage();
