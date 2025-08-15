@@ -464,29 +464,24 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssignmentsByStudent(studentId: string): Promise<Assignment[]> {
-    // This method appears to be using raw SQL and needs to be adapted to Drizzle ORM syntax.
-    // The original implementation used `this.db.execute`, which is not standard for Drizzle ORM with `db` instance.
-    // Assuming `db` is the Drizzle instance available in this scope.
-    const student = await this.getStudent(studentId);
-    if (!student) {
-      return [];
-    }
-    const companyId = student.companyId;
-
-    if (!companyId) {
-      console.warn(`Student ${studentId} is not associated with a company.`);
-      return [];
-    }
-
     try {
-      const assignments = await db.select()
+      const student = await this.getStudent(studentId);
+      if (!student) {
+        return [];
+      }
+      const companyId = student.companyId;
+
+      if (!companyId) {
+        console.warn(`Student ${studentId} is not associated with a company.`);
+        return [];
+      }
+
+      const assignmentList = await db.select()
         .from(assignments)
         .where(eq(assignments.companyId, companyId))
         .orderBy(desc(assignments.createdAt));
 
-      // Further filtering or joining for tutor details would be needed here if required by the original raw SQL.
-      // For now, returning assignments associated with the student's company.
-      return assignments;
+      return assignmentList;
     } catch (error) {
       console.error("Error fetching assignments for student:", error);
       return [];
@@ -612,20 +607,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(users.firstName, users.lastName);
   }
 
-  async gradeSubmission(submissionId: string, score: number, feedback: string, graderId: string): Promise<Submission | null> {
-    const [submission] = await db.update(submissions)
-      .set({
-        score,
-        feedback,
-        gradedBy: graderId,
-        gradedAt: new Date(),
-        status: 'graded',
-        updatedAt: new Date()
-      })
-      .where(eq(submissions.id, submissionId))
-      .returning();
-    return submission || null;
-  }
+  
 
   // Submission operations
   async getSubmission(id: string): Promise<Submission | undefined> {
