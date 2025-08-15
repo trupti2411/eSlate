@@ -419,34 +419,51 @@ export default function TutorDashboard() {
 
                         <div>
                           <Label>Select Students</Label>
-                          <div className="grid grid-cols-2 gap-2 mt-2 max-h-32 overflow-y-auto border rounded p-2">
-                            {students.map((student) => (
-                              <div key={student.id} className="flex items-center space-x-2">
-                                <input
-                                  type="checkbox"
-                                  id={`student-${student.id}`}
-                                  checked={newAssignment.studentIds.includes(student.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setNewAssignment(prev => ({
-                                        ...prev,
-                                        studentIds: [...prev.studentIds, student.id]
-                                      }));
-                                    } else {
-                                      setNewAssignment(prev => ({
-                                        ...prev,
-                                        studentIds: prev.studentIds.filter(id => id !== student.id)
-                                      }));
-                                    }
-                                  }}
-                                  className="rounded"
-                                />
-                                <label htmlFor={`student-${student.id}`} className="text-sm">
+                          <Select onValueChange={(value) => {
+                            if (value === "all") {
+                              setNewAssignment(prev => ({ ...prev, studentIds: students.map(s => s.id) }));
+                            } else {
+                              const currentIds = newAssignment.studentIds;
+                              const newIds = currentIds.includes(value) 
+                                ? currentIds.filter(id => id !== value)
+                                : [...currentIds, value];
+                              setNewAssignment(prev => ({ ...prev, studentIds: newIds }));
+                            }
+                          }}>
+                            <SelectTrigger className="mt-2">
+                              <SelectValue placeholder={
+                                newAssignment.studentIds.length === 0 
+                                  ? "Select students" 
+                                  : `${newAssignment.studentIds.length} student(s) selected`
+                              } />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="all">
+                                All Students ({students.length})
+                              </SelectItem>
+                              {students.map((student) => (
+                                <SelectItem key={student.id} value={student.id}>
                                   {student.user?.firstName} {student.user?.lastName}
-                                </label>
+                                  {newAssignment.studentIds.includes(student.id) && " ✓"}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {newAssignment.studentIds.length > 0 && (
+                            <div className="mt-2 p-2 bg-gray-50 rounded">
+                              <p className="text-sm text-gray-600 mb-1">Selected students:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {newAssignment.studentIds.map(studentId => {
+                                  const student = students.find(s => s.id === studentId);
+                                  return student ? (
+                                    <Badge key={studentId} variant="secondary" className="text-xs">
+                                      {student.user?.firstName} {student.user?.lastName}
+                                    </Badge>
+                                  ) : null;
+                                })}
                               </div>
-                            ))}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="flex justify-end space-x-2">
