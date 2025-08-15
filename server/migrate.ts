@@ -25,6 +25,17 @@ async function migrate() {
     } catch (error) {
       console.log('company_id column might already exist:', error.message);
     }
+
+    // Add created_by column if it doesn't exist
+    try {
+      await db.execute(sql`
+        ALTER TABLE assignments 
+        ADD COLUMN IF NOT EXISTS created_by varchar REFERENCES users(id)
+      `);
+      console.log('Added created_by column to assignments table');
+    } catch (error) {
+      console.log('created_by column might already exist:', error.message);
+    }
     
     // Update existing assignments to have a company_id if possible
     await db.execute(sql`
