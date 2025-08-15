@@ -401,6 +401,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // First check temporary files (fallback storage)
       const tempFiles = global.tempFiles || new Map();
+      console.log("Available temporary files:", Array.from(tempFiles.keys()));
       
       // Try exact match first
       if (tempFiles.has(fileName)) {
@@ -418,7 +419,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Try to find file by original name in temp storage
       for (const [key, tempFile] of tempFiles.entries()) {
-        if (tempFile.originalname === fileName || key === tempFile.originalname) {
+        console.log(`Checking temp file: key="${key}", originalname="${tempFile.originalname}"`);
+        if (tempFile.originalname === fileName || key === tempFile.originalname || key.includes(fileName) || fileName.includes(key)) {
           console.log("Found attachment in temporary storage by original name:", tempFile.originalname);
           
           // Set proper headers for download
