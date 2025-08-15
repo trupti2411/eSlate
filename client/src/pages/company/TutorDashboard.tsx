@@ -62,7 +62,7 @@ export default function TutorDashboard() {
 
   // Fetch assignments based on user role
   const { data: assignments = [], isLoading: assignmentsLoading } = useQuery<Assignment[]>({
-    queryKey: user?.role === 'company_admin' ? ["/api/company/assignments"] : ["/api/assignments"],
+    queryKey: ["/api/assignments"],
     enabled: !!user,
   });
 

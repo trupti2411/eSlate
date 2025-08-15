@@ -484,9 +484,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(assignments.tutorId, tutorId))
       .orderBy(desc(assignments.createdAt));
 
+    console.log(`Found ${assignmentData.length} assignments for tutor ${tutorId}`);
+
     // Get submissions for each assignment with student details
     const assignmentsWithSubmissions = await Promise.all(
       assignmentData.map(async (assignment) => {
+        console.log(`Getting submissions for assignment ${assignment.id}`);
+        
         const submissionData = await db.select({
           id: submissions.id,
           assignmentId: submissions.assignmentId,
@@ -526,6 +530,8 @@ export class DatabaseStorage implements IStorage {
           .leftJoin(users, eq(students.userId, users.id))
           .where(eq(submissions.assignmentId, assignment.id))
           .orderBy(desc(submissions.submittedAt));
+
+        console.log(`Found ${submissionData.length} submissions for assignment ${assignment.id}`);
 
         return {
           ...assignment,

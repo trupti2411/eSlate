@@ -64,6 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      console.log(`Fetched ${assignments.length} assignments for ${user.role}:`, user.id);
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching assignments:", error);
