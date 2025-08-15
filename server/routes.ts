@@ -337,6 +337,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get submissions for a specific assignment
+  app.get('/api/submissions/:assignmentId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assignmentId } = req.params;
+      const user = req.user!;
+
+      // Verify user has access to this assignment
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+
+      // Check permissions
+      if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor || assignment.tutorId !== tutor.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        // Verify assignment belongs to company
+        const tutor = assignment.tutorId ? await storage.getTutor(assignment.tutorId) : null;
+        if (tutor && tutor.companyId !== companyAdmin.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const submissions = await storage.getSubmissionsByAssignment(assignmentId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching assignment submissions:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
   app.post('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
@@ -376,7 +416,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Grade submission route
+  app.post('/api/submissions/:submissionId/grade', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { submissionId } = req.params;
+      const { score, feedback } = req.body;
+      const user = req.user!;
+
+      if (user.role !== 'tutor' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Only tutors and company admins can grade submissions" });
+      }
+
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) {
+        return res.status(404).json({ message: "Submission not found" });
+      }
+
+      const gradedSubmission = await storage.gradeSubmission(submissionId, score, feedback, user.id);
+      res.json(gradedSubmission);
+    } catch (error) {
+      console.error("Error grading submission:", error);
+      res.status(500).json({ message: "Failed to grade submission" });
+    }
+  });
+
   
+
+  // Parent verification route (view-only, no actual verification needed)
+  app.patch('/api/submissions/:submissionId/verify', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { submissionId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'parent') {
+        return res.status(403).json({ message: "Only parents can verify submissions" });
+      }
+
+      // Just mark as viewed by parent, but don't require verification to proceed
+      const submission = await storage.updateSubmission(submissionId, {
+        parentVerifiedAt: new Date(),
+        isVerifiedByParent: true
+      });
+
+      res.json(submission);
+    } catch (error) {
+      console.error("Error marking submission as viewed:", error);
+      res.status(500).json({ message: "Failed to mark submission as viewed" });
+    }
+  });
 
   // Message routes
   app.get('/api/messages/:receiverId', isAuthenticated, async (req: AuthenticatedRequest, res) => {

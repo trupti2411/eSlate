@@ -215,7 +215,7 @@ export default function TutorDashboard() {
                       {/* Show recent submissions for this assignment */}
                       {assignment.submissions && assignment.submissions.length > 0 && (
                         <div className="border-t pt-3">
-                          <h5 className="text-sm font-medium text-gray-700 mb-2">Recent Submissions:</h5>
+                          <h5 className="text-sm font-medium text-gray-700 mb-2">Recent Submissions ({assignment.submissions.length}):</h5>
                           <div className="space-y-2">
                             {assignment.submissions.slice(0, 3).map((submission) => (
                               <div key={submission.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
@@ -226,16 +226,34 @@ export default function TutorDashboard() {
                                   <Badge className={`text-xs ${
                                     submission.status === 'submitted' ? 'bg-green-100 text-green-800' :
                                     submission.status === 'graded' ? 'bg-blue-100 text-blue-800' :
+                                    submission.isDraft ? 'bg-yellow-100 text-yellow-800' :
                                     'bg-gray-100 text-gray-800'
                                   }`}>
-                                    {submission.status}
+                                    {submission.isDraft ? 'draft' : submission.status}
                                   </Badge>
+                                  {submission.score !== null && (
+                                    <span className="text-xs text-blue-600">
+                                      Score: {submission.score}
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  {new Date(submission.submittedAt || submission.createdAt).toLocaleDateString()}
+                                <div className="flex flex-col items-end">
+                                  <div className="text-xs text-gray-500">
+                                    {new Date(submission.submittedAt || submission.createdAt).toLocaleDateString()}
+                                  </div>
+                                  {submission.fileUrls && submission.fileUrls.length > 0 && (
+                                    <div className="text-xs text-blue-600">
+                                      {submission.fileUrls.length} file(s)
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             ))}
+                            {assignment.submissions.length > 3 && (
+                              <div className="text-xs text-gray-500 text-center">
+                                +{assignment.submissions.length - 3} more submissions
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}

@@ -461,9 +461,61 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssignmentsByTutor(tutorId: string): Promise<Assignment[]> {
-    return await db.select().from(assignments)
+    const assignmentData = await db.select().from(assignments)
       .where(eq(assignments.tutorId, tutorId))
       .orderBy(desc(assignments.createdAt));
+
+    // Get submissions for each assignment with student details
+    const assignmentsWithSubmissions = await Promise.all(
+      assignmentData.map(async (assignment) => {
+        const submissionData = await db.select({
+          id: submissions.id,
+          assignmentId: submissions.assignmentId,
+          studentId: submissions.studentId,
+          content: submissions.content,
+          fileUrls: submissions.fileUrls,
+          status: submissions.status,
+          isDraft: submissions.isDraft,
+          submittedAt: submissions.submittedAt,
+          isLate: submissions.isLate,
+          score: submissions.score,
+          feedback: submissions.feedback,
+          gradedAt: submissions.gradedAt,
+          gradedBy: submissions.gradedBy,
+          isVerifiedByParent: submissions.isVerifiedByParent,
+          parentVerifiedAt: submissions.parentVerifiedAt,
+          parentComments: submissions.parentComments,
+          needsRevision: submissions.needsRevision,
+          revisionFeedback: submissions.revisionFeedback,
+          revisionCount: submissions.revisionCount,
+          createdAt: submissions.createdAt,
+          updatedAt: submissions.updatedAt,
+          student: {
+            id: students.id,
+            userId: students.userId,
+            gradeLevel: students.gradeLevel,
+            user: {
+              id: users.id,
+              firstName: users.firstName,
+              lastName: users.lastName,
+              email: users.email,
+            }
+          }
+        })
+          .from(submissions)
+          .leftJoin(students, eq(submissions.studentId, students.id))
+          .leftJoin(users, eq(students.userId, users.id))
+          .where(eq(submissions.assignmentId, assignment.id))
+          .orderBy(desc(submissions.submittedAt));
+
+        return {
+          ...assignment,
+          submissions: submissionData
+        };
+      })
+    );
+
+    return assignmentsWithSubmissions;
   }
 
   async updateAssignmentStatus(id: string, status: string): Promise<Assignment> {
@@ -475,7 +527,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]> {
-    return await db.select({
+    const assignmentData = await db.select({
       id: assignments.id,
       title: assignments.title,
       description: assignments.description,
@@ -508,6 +560,58 @@ export class DatabaseStorage implements IStorage {
         )
       ))
       .orderBy(desc(assignments.createdAt));
+
+    // Get submissions for each assignment with student details
+    const assignmentsWithSubmissions = await Promise.all(
+      assignmentData.map(async (assignment) => {
+        const submissionData = await db.select({
+          id: submissions.id,
+          assignmentId: submissions.assignmentId,
+          studentId: submissions.studentId,
+          content: submissions.content,
+          fileUrls: submissions.fileUrls,
+          status: submissions.status,
+          isDraft: submissions.isDraft,
+          submittedAt: submissions.submittedAt,
+          isLate: submissions.isLate,
+          score: submissions.score,
+          feedback: submissions.feedback,
+          gradedAt: submissions.gradedAt,
+          gradedBy: submissions.gradedBy,
+          isVerifiedByParent: submissions.isVerifiedByParent,
+          parentVerifiedAt: submissions.parentVerifiedAt,
+          parentComments: submissions.parentComments,
+          needsRevision: submissions.needsRevision,
+          revisionFeedback: submissions.revisionFeedback,
+          revisionCount: submissions.revisionCount,
+          createdAt: submissions.createdAt,
+          updatedAt: submissions.updatedAt,
+          student: {
+            id: students.id,
+            userId: students.userId,
+            gradeLevel: students.gradeLevel,
+            user: {
+              id: users.id,
+              firstName: users.firstName,
+              lastName: users.lastName,
+              email: users.email,
+            }
+          }
+        })
+          .from(submissions)
+          .leftJoin(students, eq(submissions.studentId, students.id))
+          .leftJoin(users, eq(students.userId, users.id))
+          .where(eq(submissions.assignmentId, assignment.id))
+          .orderBy(desc(submissions.submittedAt));
+
+        return {
+          ...assignment,
+          submissions: submissionData
+        };
+      })
+    );
+
+    return assignmentsWithSubmissions;
   }
 
   async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
