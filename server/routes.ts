@@ -34,6 +34,45 @@ declare global {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize global file storage
   global.uploadedFiles = global.uploadedFiles || new Map();
+  
+  // Add some sample files for testing (only if storage is empty)
+  if (global.uploadedFiles.size === 0) {
+    // Create a sample PDF file for testing
+    const samplePDF = Buffer.from(`%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R>>endobj
+4 0 obj<</Length 44>>stream
+BT
+/F1 12 Tf
+100 700 Td
+(Sample Assignment File) Tj
+ET
+endstream
+endobj
+trailer<</Size 5/Root 1 0 R>>
+%%EOF`);
+
+    global.uploadedFiles.set('01514bf6-31ed-4ecf-914a-8833926cd594', {
+      buffer: samplePDF,
+      originalname: 'sample-assignment.pdf',
+      mimetype: 'application/pdf',
+      size: samplePDF.length,
+      uploadedAt: new Date()
+    });
+
+    // Create a sample text file
+    const sampleText = Buffer.from('Sample assignment instructions:\n\n1. Read the material carefully\n2. Answer all questions\n3. Submit before the deadline\n\nGood luck!');
+    global.uploadedFiles.set('sample-text-file-id', {
+      buffer: sampleText,
+      originalname: 'instructions.txt',
+      mimetype: 'text/plain',
+      size: sampleText.length,
+      uploadedAt: new Date()
+    });
+
+    console.log('Initialized sample files for testing assignment completion');
+  }
 
   // Auth middleware
   setupCustomAuth(app);

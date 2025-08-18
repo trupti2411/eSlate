@@ -3,6 +3,10 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
 const app = express();
+
+// Initialize global file storage
+global.uploadedFiles = global.uploadedFiles || new Map();
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
