@@ -18,7 +18,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { assignments, submissions } from "@shared/schema";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Global declaration for file storage
 declare global {
@@ -592,15 +592,31 @@ trailer<</Size 5/Root 1 0 R>>
       console.log("File not found in memory, checking object storage...");
       try {
         const objectStorageService = new ObjectStorageService();
-        const objectPath = `/uploads/${fileId}`;
+        
+        // The file should be in the private directory as uploads/[fileId]
+        const privateDir = objectStorageService.getPrivateObjectDir();
+        const objectPath = `${privateDir}/uploads/${fileId}`;
         console.log("Trying to fetch from object storage path:", objectPath);
         
-        // Try to get the file from object storage
-        const objectFile = await objectStorageService.getObjectEntityFile(`/objects${objectPath}`);
-        if (objectFile) {
+        // Parse the object path to get bucket and object name
+        const pathParts = objectPath.split('/');
+        const bucketName = pathParts[1]; // First part after leading slash
+        const objectName = pathParts.slice(2).join('/'); // Rest of the path
+        
+        console.log("Bucket:", bucketName, "Object:", objectName);
+        
+        // Get the file directly from the bucket
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectName);
+        
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (exists) {
           console.log("Found file in object storage, streaming...");
-          await objectStorageService.downloadObject(objectFile, res);
+          await objectStorageService.downloadObject(file, res);
           return;
+        } else {
+          console.log("File does not exist in object storage");
         }
       } catch (error) {
         console.log("Object storage error:", error instanceof ObjectNotFoundError ? "File not found" : error);
