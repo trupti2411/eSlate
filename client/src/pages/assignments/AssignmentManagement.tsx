@@ -163,7 +163,8 @@ export function AssignmentManagement() {
     }
     
     if (editingAssignment) {
-      updateAssignmentMutation.mutate({ ...data, id: editingAssignment.id });
+      console.log("Calling updateAssignmentMutation.mutate with:", { id: editingAssignment.id, data });
+      updateAssignmentMutation.mutate({ id: editingAssignment.id, data });
     } else {
       console.log("Calling createAssignmentMutation.mutate");
       createAssignmentMutation.mutate(data);
@@ -171,9 +172,11 @@ export function AssignmentManagement() {
   };
 
   const handleEdit = (assignment: Assignment) => {
+    console.log("Editing assignment:", assignment);
     setEditingAssignment(assignment);
     setIsCreateDialogOpen(true);
-    form.reset({
+    
+    const formData = {
       title: assignment.title,
       description: assignment.description || '',
       instructions: assignment.instructions || '',
@@ -182,9 +185,16 @@ export function AssignmentManagement() {
       submissionDate: assignment.submissionDate 
         ? new Date(assignment.submissionDate).toISOString().slice(0, 16) 
         : '',
-      totalMarks: assignment.totalMarks || 0,
+      totalMarks: assignment.totalMarks || 100,
       attachmentUrls: assignment.attachmentUrls || [],
-    });
+      allowedFileTypes: assignment.allowedFileTypes || ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg'],
+      maxFileSize: assignment.maxFileSize || 31457280,
+      status: assignment.status || 'assigned',
+      isActive: assignment.isActive ?? true,
+    };
+    
+    console.log("Form data for editing:", formData);
+    form.reset(formData);
   };
 
   const handleDelete = (assignment: Assignment) => {
@@ -260,7 +270,7 @@ export function AssignmentManagement() {
                   name="title"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Title *</FormLabel>
+                      <FormLabel htmlFor="assignment-title">Title *</FormLabel>
                       <FormControl>
                         <Input 
                           id="assignment-title"
@@ -279,7 +289,7 @@ export function AssignmentManagement() {
                   name="subject"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Subject/Topic</FormLabel>
+                      <FormLabel htmlFor="assignment-subject">Subject/Topic</FormLabel>
                       <FormControl>
                         <Input 
                           id="assignment-subject"
@@ -313,7 +323,7 @@ export function AssignmentManagement() {
                     name="classId"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Class *</FormLabel>
+                        <FormLabel htmlFor="assignment-class">Class *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger id="assignment-class" name="classId">
@@ -339,9 +349,16 @@ export function AssignmentManagement() {
                   name="description"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Description</FormLabel>
+                      <FormLabel htmlFor="assignment-description">Description</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Assignment details and instructions" rows={3} {...field} value={field.value || ""} />
+                        <Textarea 
+                          id="assignment-description"
+                          name="description"
+                          placeholder="Assignment details and instructions" 
+                          rows={3} 
+                          {...field} 
+                          value={field.value || ""} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -353,9 +370,16 @@ export function AssignmentManagement() {
                   name="instructions"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Instructions/Notes</FormLabel>
+                      <FormLabel htmlFor="assignment-instructions">Instructions/Notes</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Additional instructions for students" rows={3} {...field} value={field.value || ""} />
+                        <Textarea 
+                          id="assignment-instructions"
+                          name="instructions"
+                          placeholder="Additional instructions for students" 
+                          rows={3} 
+                          {...field} 
+                          value={field.value || ""} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -368,9 +392,14 @@ export function AssignmentManagement() {
                     name="submissionDate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Submission Date *</FormLabel>
+                        <FormLabel htmlFor="assignment-submission-date">Submission Date *</FormLabel>
                         <FormControl>
-                          <Input type="datetime-local" {...field} />
+                          <Input 
+                            id="assignment-submission-date"
+                            name="submissionDate"
+                            type="datetime-local" 
+                            {...field} 
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -382,9 +411,11 @@ export function AssignmentManagement() {
                     name="totalMarks"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Total Marks</FormLabel>
+                        <FormLabel htmlFor="assignment-total-marks">Total Marks</FormLabel>
                         <FormControl>
                           <Input 
+                            id="assignment-total-marks"
+                            name="totalMarks"
                             type="number" 
                             min="1" 
                             {...field} 
