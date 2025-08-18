@@ -574,22 +574,40 @@ trailer<</Size 5/Root 1 0 R>>
       // The filename parameter is actually the file ID
       const fileId = filename;
       console.log(`Looking for assignment file with ID: ${fileId}`);
-      console.log("Available files:", Array.from((global.uploadedFiles || new Map()).keys()));
+      console.log("Available files in memory:", Array.from((global.uploadedFiles || new Map()).keys()));
       
-      // Check if this file ID exists in uploaded files
+      // First try to find the file in memory storage
       const uploadedFiles = global.uploadedFiles || new Map();
       const fileData = uploadedFiles.get(fileId);
       
-      if (!fileData) {
-        console.error(`File ${fileId} not found in uploaded files`);
-        return res.status(404).json({ message: "File not found" });
+      if (fileData) {
+        console.log("Found assignment file in memory:", fileData.originalname);
+        res.setHeader('Content-Disposition', `inline; filename="${fileData.originalname}"`);
+        res.setHeader('Content-Type', fileData.mimetype || 'application/octet-stream');
+        res.setHeader('Content-Length', fileData.size);
+        return res.send(fileData.buffer);
       }
       
-      console.log("Found assignment file:", fileData.originalname);
-      res.setHeader('Content-Disposition', `inline; filename="${fileData.originalname}"`);
-      res.setHeader('Content-Type', fileData.mimetype || 'application/octet-stream');
-      res.setHeader('Content-Length', fileData.size);
-      res.send(fileData.buffer);
+      // If not found in memory, try object storage
+      console.log("File not found in memory, checking object storage...");
+      try {
+        const objectStorageService = new ObjectStorageService();
+        const objectPath = `/uploads/${fileId}`;
+        console.log("Trying to fetch from object storage path:", objectPath);
+        
+        // Try to get the file from object storage
+        const objectFile = await objectStorageService.getObjectEntityFile(`/objects${objectPath}`);
+        if (objectFile) {
+          console.log("Found file in object storage, streaming...");
+          await objectStorageService.downloadObject(objectFile, res);
+          return;
+        }
+      } catch (error) {
+        console.log("Object storage error:", error instanceof ObjectNotFoundError ? "File not found" : error);
+      }
+      
+      console.error(`File ${fileId} not found in either memory storage or object storage`);
+      return res.status(404).json({ message: "File not found" });
     } catch (error) {
       console.error("Error serving assignment file:", error);
       res.status(500).json({ message: "Failed to serve file" });
