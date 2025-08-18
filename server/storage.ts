@@ -396,39 +396,7 @@ export class DatabaseStorage implements IStorage {
 
 
 
-  async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
-    return await db.select({
-      id: students.id,
-      userId: students.userId,
-      gradeLevel: students.gradeLevel,
-      parentId: students.parentId,
-      tutorId: students.tutorId,
-      companyId: students.companyId,
-      classId: students.classId, // Include classId for class assignments
-      schoolName: students.schoolName,
-      dateOfBirth: students.dateOfBirth,
-      user: {
-        id: users.id,
-        email: users.email,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        isActive: users.isActive,
-        createdAt: users.createdAt
-      }
-    }).from(students)
-      .innerJoin(users, eq(students.userId, users.id))
-      .leftJoin(tutors, eq(students.tutorId, tutors.id))
-      .where(
-        and(
-          // Either direct company assignment OR tutor's company matches
-          and(
-            eq(students.companyId, companyId)
-          ),
-          eq(users.isDeleted, false)
-        )
-      )
-      .orderBy(users.firstName, users.lastName);
-  }
+
 
 
 
