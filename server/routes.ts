@@ -162,7 +162,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const validatedData = insertAssignmentSchema.partial().parse(req.body);
+      // Convert submissionDate string to Date if present
+      const updateData = { ...req.body };
+      if (updateData.submissionDate && typeof updateData.submissionDate === 'string') {
+        updateData.submissionDate = new Date(updateData.submissionDate);
+      }
+      
+      const validatedData = insertAssignmentSchema.partial().parse(updateData);
       const updatedAssignment = await storage.updateAssignment(assignmentId, validatedData);
       res.json(updatedAssignment);
     } catch (error) {

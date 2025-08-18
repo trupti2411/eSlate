@@ -112,18 +112,29 @@ export function AssignmentManagement() {
   // Update assignment mutation
   const updateAssignmentMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<AssignmentFormData> }) => {
-      const submissionDate = data.submissionDate ? new Date(data.submissionDate).toISOString() : undefined;
-      return apiRequest(`/api/assignments/${id}`, 'PATCH', {
-        ...data,
-        submissionDate,
-      });
+      console.log("Update mutation data before processing:", data);
+      const payload = { ...data };
+      if (data.submissionDate) {
+        payload.submissionDate = new Date(data.submissionDate).toISOString();
+      }
+      console.log("Update mutation payload:", payload);
+      return apiRequest(`/api/assignments/${id}`, 'PATCH', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'assignments'] });
       setEditingAssignment(null);
+      setIsCreateDialogOpen(false);
       toast({
         title: "Success",
         description: "Assignment updated successfully",
+      });
+    },
+    onError: (error: any) => {
+      console.error("Assignment update error:", error);
+      toast({
+        title: "Error", 
+        description: error?.message || "Failed to update assignment",
+        variant: "destructive",
       });
     },
   });
@@ -274,7 +285,6 @@ export function AssignmentManagement() {
                       <FormControl>
                         <Input 
                           id="assignment-title"
-                          name="title"
                           placeholder="Assignment title" 
                           {...field} 
                         />
@@ -293,7 +303,6 @@ export function AssignmentManagement() {
                       <FormControl>
                         <Input 
                           id="assignment-subject"
-                          name="subject"
                           placeholder="e.g., Mathematics, English" 
                           {...field} 
                           value={field.value || ""} 
@@ -326,7 +335,7 @@ export function AssignmentManagement() {
                         <FormLabel htmlFor="assignment-class">Class *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
-                            <SelectTrigger id="assignment-class" name="classId">
+                            <SelectTrigger id="assignment-class">
                               <SelectValue placeholder="Select a class" />
                             </SelectTrigger>
                           </FormControl>
@@ -353,7 +362,6 @@ export function AssignmentManagement() {
                       <FormControl>
                         <Textarea 
                           id="assignment-description"
-                          name="description"
                           placeholder="Assignment details and instructions" 
                           rows={3} 
                           {...field} 
@@ -374,7 +382,6 @@ export function AssignmentManagement() {
                       <FormControl>
                         <Textarea 
                           id="assignment-instructions"
-                          name="instructions"
                           placeholder="Additional instructions for students" 
                           rows={3} 
                           {...field} 
@@ -396,7 +403,6 @@ export function AssignmentManagement() {
                         <FormControl>
                           <Input 
                             id="assignment-submission-date"
-                            name="submissionDate"
                             type="datetime-local" 
                             {...field} 
                           />
@@ -415,7 +421,6 @@ export function AssignmentManagement() {
                         <FormControl>
                           <Input 
                             id="assignment-total-marks"
-                            name="totalMarks"
                             type="number" 
                             min="1" 
                             {...field} 
@@ -448,7 +453,7 @@ export function AssignmentManagement() {
                     }}
                     onComplete={(result) => {
                       console.log("Files uploaded:", result);
-                      if (result.successful.length > 0) {
+                      if (result.successful && result.successful.length > 0) {
                         const uploadedUrls = result.successful.map((file: any) => file.uploadURL);
                         const currentUrls = form.getValues('attachmentUrls') || [];
                         form.setValue('attachmentUrls', [...currentUrls, ...uploadedUrls]);
@@ -465,11 +470,11 @@ export function AssignmentManagement() {
                   </ObjectUploader>
 
                   {/* Show uploaded files */}
-                  {form.watch('attachmentUrls')?.length > 0 && (
+                  {form.watch('attachmentUrls') && form.watch('attachmentUrls')!.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-medium">Uploaded Files:</p>
                       <div className="space-y-1">
-                        {form.watch('attachmentUrls').map((url: string, index: number) => (
+                        {form.watch('attachmentUrls')!.map((url: string, index: number) => (
                           <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
                             <span className="text-sm">File {index + 1}</span>
                             <div className="flex gap-2">
