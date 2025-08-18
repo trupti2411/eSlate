@@ -126,9 +126,25 @@ export function AssignmentManagement() {
   });
 
   const onSubmit = (data: AssignmentFormData) => {
+    console.log("Form submission triggered!");
+    console.log("Form submission data:", data);
+    console.log("Company ID:", companyId);
+    console.log("Form errors:", form.formState.errors);
+    
+    if (!companyId) {
+      console.error("No company ID available!");
+      toast({
+        title: "Error",
+        description: "Company information not loaded. Please refresh the page.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (editingAssignment) {
       updateAssignmentMutation.mutate({ id: editingAssignment.id, data });
     } else {
+      console.log("Calling createAssignmentMutation.mutate");
       createAssignmentMutation.mutate(data);
     }
   };
@@ -349,8 +365,14 @@ export function AssignmentManagement() {
                   <Button type="button" variant="outline" onClick={resetForm}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}>
-                    {editingAssignment ? 'Update Assignment' : 'Create Assignment'}
+                  <Button 
+                    type="submit" 
+                    disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
+                    onClick={() => console.log("Submit button clicked!")}
+                  >
+                    {createAssignmentMutation.isPending ? 'Creating...' : 
+                     updateAssignmentMutation.isPending ? 'Updating...' :
+                     editingAssignment ? 'Update Assignment' : 'Create Assignment'}
                   </Button>
                 </div>
               </form>
