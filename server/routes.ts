@@ -546,6 +546,63 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Student submission routes
+  app.post('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { assignmentId, content, status = 'submitted' } = req.body;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) {
+        return res.status(404).json({ message: 'Student profile not found' });
+      }
+      
+      const submission = await storage.createSubmission({
+        assignmentId,
+        studentId: student.id,
+        content,
+        status,
+        submittedAt: new Date()
+      });
+      
+      res.json(submission);
+    } catch (error) {
+      console.error('Error creating submission:', error);
+      res.status(500).json({ message: 'Failed to create submission' });
+    }
+  });
+
+  app.patch('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { id, content, status } = req.body;
+      const userId = req.user?.id;
+      
+      if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) {
+        return res.status(404).json({ message: 'Student profile not found' });
+      }
+      
+      const submission = await storage.updateSubmission(id, {
+        content,
+        status,
+        submittedAt: new Date()
+      });
+      
+      res.json(submission);
+    } catch (error) {
+      console.error('Error updating submission:', error);
+      res.status(500).json({ message: 'Failed to update submission' });
+    }
+  });
+
   // Simple file upload route
   app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res: any) => {
     try {

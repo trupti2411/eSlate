@@ -49,13 +49,14 @@ function Router() {
       ) : (
         <>
           <Route path="/">
-            {user?.role === 'student' && <StudentDashboard />}
+            {user?.role === 'student' && <StudentPortal />}
             {user?.role === 'parent' && <ParentDashboard />}
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
             {user?.role === 'company_admin' && <CompanyDashboard />}
           </Route>
-          <Route path="/student" component={StudentDashboard} />
+          <Route path="/student" component={StudentPortal} />
+          <Route path="/student/dashboard" component={StudentDashboard} />
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
           <Route path="/admin" component={AdminDashboard} />

@@ -184,9 +184,7 @@ export function StudentPortal() {
                       <Calendar className="h-4 w-4 mr-2" />
                       {format(new Date(term.startDate), 'MMM dd, yyyy')} - {format(new Date(term.endDate), 'MMM dd, yyyy')}
                     </div>
-                    {term.description && (
-                      <p className="text-gray-600 mt-2">{term.description}</p>
-                    )}
+
                   </div>
                 </CardContent>
               </Card>
@@ -326,21 +324,10 @@ export function StudentPortal() {
 
                     {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
                       <div>
-                        <h4 className="font-semibold mb-2">Files:</h4>
-                        <div className="space-y-1">
-                          {assignment.attachmentUrls.map((url, index) => (
-                            <div key={index} className="flex items-center">
-                              <FileText className="h-4 w-4 mr-2" />
-                              <a 
-                                href={url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="text-blue-600 hover:underline text-sm"
-                              >
-                                Assignment File {index + 1}
-                              </a>
-                            </div>
-                          ))}
+                        <h4 className="font-semibold mb-2">Assignment Materials:</h4>
+                        <div className="bg-gray-100 p-3 border rounded text-sm">
+                          <p className="text-gray-700">📄 {assignment.attachmentUrls.length} file(s) attached</p>
+                          <p className="text-xs text-gray-500 mt-1">Files will be accessible when you start completing the assignment.</p>
                         </div>
                       </div>
                     )}
@@ -352,7 +339,7 @@ export function StudentPortal() {
                         <div className="bg-gray-50 p-3 rounded border text-sm">
                           <div className="flex justify-between mb-2">
                             <span>Submitted: {format(new Date(submission.submittedAt!), 'MMM dd, yyyy HH:mm')}</span>
-                            {submission.grade && <span>Grade: {submission.grade}/{assignment.totalMarks}</span>}
+                            {submission.totalMarks && <span>Grade: {submission.totalMarks}/{assignment.totalMarks}</span>}
                           </div>
                           {submission.content && (
                             <p className="text-gray-700">{submission.content}</p>
@@ -498,8 +485,20 @@ function AssignmentCompletionArea({
 
     setIsSubmitting(true);
     try {
-      // Here you would make the API call to submit/update the assignment
-      console.log("Submitting assignment:", { assignmentId: assignment.id, content });
+      const response = await fetch('/api/submissions', {
+        method: submission ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(submission && { id: submission.id }),
+          assignmentId: assignment.id,
+          content: content.trim(),
+          status: 'submitted'
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to submit assignment');
+      }
       
       toast({
         title: "Success", 
