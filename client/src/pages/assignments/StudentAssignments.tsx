@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiRequest } from "@/lib/queryClient";
 import { type Assignment, type Submission, type AcademicTerm, type Class } from "@shared/schema";
-import { BookOpen, Calendar, Clock, FileText, PenTool, Upload, CheckCircle, AlertCircle, Eye } from "lucide-react";
+import { BookOpen, Calendar, Clock, FileText, PenTool, Upload, CheckCircle, AlertCircle, Eye, Download } from "lucide-react";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import { format, isAfter, parseISO } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -26,7 +27,7 @@ export function StudentAssignments() {
   const [inputMethod, setInputMethod] = useState<string>("pen");
 
   // Get student profile
-  const { data: studentProfile } = useQuery({
+  const { data: studentProfile } = useQuery<any>({
     queryKey: ['/api/auth/student-profile'],
     enabled: !!user && user.role === 'student',
   });
@@ -34,24 +35,24 @@ export function StudentAssignments() {
   const studentId = studentProfile?.id;
 
   // Get student's terms and classes
-  const { data: studentTerms = [] } = useQuery({
+  const { data: studentTerms = [] } = useQuery<AcademicTerm[]>({
     queryKey: ['/api/students', studentId, 'terms'],
     enabled: !!studentId,
   });
 
-  const { data: studentClasses = [] } = useQuery({
+  const { data: studentClasses = [] } = useQuery<Class[]>({
     queryKey: ['/api/students', studentId, 'classes'],
     enabled: !!studentId,
   });
 
   // Get student's assignments
-  const { data: assignments = [], isLoading: isLoadingAssignments } = useQuery({
+  const { data: assignments = [], isLoading: isLoadingAssignments } = useQuery<Assignment[]>({
     queryKey: ['/api/students', studentId, 'assignments'],
     enabled: !!studentId,
   });
 
   // Get submissions for assignments
-  const { data: submissions = [] } = useQuery({
+  const { data: submissions = [] } = useQuery<Submission[]>({
     queryKey: ['/api/students', studentId, 'submissions'],
     enabled: !!studentId,
   });
@@ -64,51 +65,108 @@ export function StudentAssignments() {
       digitalContent?: string;
       deviceType: string;
       inputMethod: string;
-      isDraft: boolean;
+      submissionFiles?: string[];
     }) => {
-      const existingSubmission = submissions.find((s: Submission) => s.assignmentId === data.assignmentId);
-      
-      if (existingSubmission) {
-        return apiRequest(`/api/submissions/${existingSubmission.id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({
-            ...data,
-            submittedAt: !data.isDraft ? new Date().toISOString() : null,
-            status: data.isDraft ? 'draft' : 'submitted',
-          }),
-        });
-      } else {
-        return apiRequest(`/api/assignments/${data.assignmentId}/submissions`, {
-          method: 'POST',
-          body: JSON.stringify({
-            ...data,
-            submittedAt: !data.isDraft ? new Date().toISOString() : null,
-            status: data.isDraft ? 'draft' : 'submitted',
-          }),
-        });
-      }
+      return apiRequest('/api/submissions', 'POST', data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/students', studentId, 'submissions'] });
       setSelectedAssignment(null);
-      setSubmissionContent("");
-      setDigitalContent("");
+      setSubmissionContent('');
+      setDigitalContent('');
       toast({
-        title: "Success",
-        description: "Assignment submission saved successfully",
+        title: 'Success',
+        description: 'Assignment submitted successfully!',
       });
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Submission error:', error);
       toast({
-        title: "Error",
-        description: "Failed to save submission",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Failed to submit assignment. Please try again.',
+        variant: 'destructive',
       });
     },
   });
 
+  // File upload state
+  const [submissionFiles, setSubmissionFiles] = useState<string[]>([]);
+
+  // Helper function to get assignment status
+  const getAssignmentStatus = (assignment: Assignment) => {
+    const submission = submissions.find((s: Submission) => s.assignmentId === assignment.id);
+    const now = new Date();
+    const dueDate = assignment.submissionDate ? new Date(assignment.submissionDate) : null;
+    
+    if (submission) {
+      if (submission.grade !== null && submission.grade !== undefined) {
+        return {
+          label: 'Graded',
+          variant: 'default' as const,
+          icon: CheckCircle
+        };
+      }
+      return {
+        label: 'Submitted',
+        variant: 'secondary' as const,
+        icon: CheckCircle
+      };
+    }
+    
+    if (dueDate && now > dueDate) {
+      return {
+        label: 'Overdue',
+        variant: 'destructive' as const,
+        icon: AlertCircle
+      };
+    }
+    
+    return {
+      label: 'Active',
+      variant: 'outline' as const,
+      icon: Clock
+    };
+  };
+
   const getSubmissionForAssignment = (assignmentId: string) => {
     return submissions.find((s: Submission) => s.assignmentId === assignmentId);
+  };
+
+  const handleFileUploadComplete = (result: any) => {
+    if (result.successful && result.successful.length > 0) {
+      const uploadedUrl = result.successful[0].uploadURL;
+      setSubmissionFiles(prev => [...prev, uploadedUrl]);
+      toast({
+        title: "Success", 
+        description: "File uploaded successfully",
+      });
+    }
+  };
+
+  const handleGetUploadParameters = async () => {
+    try {
+      const response = await apiRequest('/api/objects/upload', 'POST');
+      return {
+        method: 'PUT' as const,
+        url: response.uploadURL,
+      };
+    } catch (error) {
+      console.error('Error getting upload parameters:', error);
+      throw error;
+    }
+  };
+
+  const handleSubmitAssignment = () => {
+    if (!selectedAssignment) return;
+
+    submitAssignmentMutation.mutate({
+      assignmentId: selectedAssignment.id,
+      content: submissionContent,
+      digitalContent,
+      deviceType,
+      inputMethod,
+      submissionFiles,
+    });
   };
 
   const isAssignmentOverdue = (assignment: Assignment) => {
@@ -116,44 +174,7 @@ export function StudentAssignments() {
     return isAfter(new Date(), parseISO(assignment.submissionDate));
   };
 
-  const getAssignmentStatus = (assignment: Assignment) => {
-    const submission = getSubmissionForAssignment(assignment.id);
-    const isOverdue = isAssignmentOverdue(assignment);
-    
-    if (!submission) {
-      return {
-        status: isOverdue ? 'overdue' : 'pending',
-        label: isOverdue ? 'Overdue' : 'Not Started',
-        variant: isOverdue ? 'destructive' : 'secondary' as const,
-        icon: isOverdue ? AlertCircle : Clock,
-      };
-    }
-    
-    if (submission.isDraft) {
-      return {
-        status: 'draft',
-        label: 'Draft Saved',
-        variant: 'outline' as const,
-        icon: FileText,
-      };
-    }
-    
-    if (submission.status === 'submitted') {
-      return {
-        status: 'submitted',
-        label: 'Submitted',
-        variant: 'default' as const,
-        icon: CheckCircle,
-      };
-    }
-    
-    return {
-      status: 'pending',
-      label: 'Pending',
-      variant: 'secondary' as const,
-      icon: Clock,
-    };
-  };
+
 
   const handleAssignmentSubmit = (isDraft: boolean) => {
     if (!selectedAssignment) return;

@@ -11,11 +11,9 @@ import { Button } from "@/components/ui/button";
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;
-  allowedFileTypes?: string[];
   onGetUploadParameters: () => Promise<{
-    method?: string;
+    method: "PUT";
     url: string;
-    fields?: Record<string, any>;
   }>;
   onComplete?: (
     result: UploadResult<Record<string, unknown>, Record<string, unknown>>
@@ -27,10 +25,34 @@ interface ObjectUploaderProps {
 /**
  * A file upload component that renders as a button and provides a modal interface for
  * file management.
+ * 
+ * Features:
+ * - Renders as a customizable button that opens a file upload modal
+ * - Provides a modal interface for:
+ *   - File selection
+ *   - File preview
+ *   - Upload progress tracking
+ *   - Upload status display
+ * 
+ * The component uses Uppy under the hood to handle all file upload functionality.
+ * All file management features are automatically handled by the Uppy dashboard modal.
+ * 
+ * @param props - Component props
+ * @param props.maxNumberOfFiles - Maximum number of files allowed to be uploaded
+ *   (default: 1)
+ * @param props.maxFileSize - Maximum file size in bytes (default: 10MB)
+ * @param props.onGetUploadParameters - Function to get upload parameters (method and URL).
+ *   Typically used to fetch a presigned URL from the backend server for direct-to-S3
+ *   uploads.
+ * @param props.onComplete - Callback function called when upload is complete. Typically
+ *   used to make post-upload API calls to update server state and set object ACL
+ *   policies.
+ * @param props.buttonClassName - Optional CSS class name for the button
+ * @param props.children - Content to be rendered inside the button
  */
 export function ObjectUploader({
   maxNumberOfFiles = 1,
-  maxFileSize = 10485760, // 10MB default
+  maxFileSize = 31457280, // 30MB default
   onGetUploadParameters,
   onComplete,
   buttonClassName,
@@ -42,43 +64,16 @@ export function ObjectUploader({
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
+        allowedFileTypes: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpeg', '.jpg'],
       },
       autoProceed: false,
     })
       .use(AwsS3, {
         shouldUseMultipart: false,
-        getUploadParameters: async (file) => {
-          try {
-            console.log("Getting upload parameters for file:", file.name);
-            const params = await onGetUploadParameters();
-            console.log("Upload parameters received:", params);
-
-            // Handle both 'url' and 'uploadURL' property names
-            const uploadUrl = params.url || params.uploadURL;
-            
-            if (!params || !uploadUrl) {
-              console.error("Invalid upload parameters:", params);
-              throw new Error("Upload URL is undefined or missing");
-            }
-
-            return {
-              method: params.method || "PUT",
-              url: uploadUrl,
-              fields: params.fields || {},
-              headers: {},
-            };
-          } catch (error) {
-            console.error("Error getting upload parameters:", error);
-            throw error;
-          }
-        },
+        getUploadParameters: onGetUploadParameters,
       })
       .on("complete", (result) => {
-        console.log("Upload complete:", result);
         onComplete?.(result);
-      })
-      .on("upload-error", (file, error) => {
-        console.error("Upload error for file", file?.name, ":", error);
       })
   );
 

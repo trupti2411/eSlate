@@ -1025,6 +1025,20 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateAssignment(id: string, updates: Partial<InsertAssignment>): Promise<Assignment> {
+    const [assignment] = await db.update(assignments)
+      .set(updates)
+      .where(eq(assignments.id, id))
+      .returning();
+    return assignment;
+  }
+
+  async deleteAssignment(id: string): Promise<void> {
+    await db.update(assignments)
+      .set({ isActive: false })
+      .where(eq(assignments.id, id));
+  }
+
+  async updateAssignment(id: string, updates: Partial<InsertAssignment>): Promise<Assignment> {
     const [updatedAssignment] = await db.update(assignments)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(assignments.id, id))

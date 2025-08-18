@@ -15,6 +15,7 @@ import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { insertAssignmentSchema, type Assignment, type Class } from "@shared/schema";
 import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload } from "lucide-react";
+import { ObjectUploader } from "@/components/ObjectUploader";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -34,6 +35,8 @@ export function AssignmentManagement() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [preSelectedClass, setPreSelectedClass] = useState<{ id: string; name: string } | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
 
   // Get user's company ID from roleData
   const companyId = (user as any)?.roleData?.companyId;
@@ -48,6 +51,30 @@ export function AssignmentManagement() {
   const { data: classes = [] } = useQuery<Class[]>({
     queryKey: ['/api/companies', companyId, 'classes'],
     enabled: !!companyId,
+  });
+
+  // Delete assignment mutation
+  const deleteAssignmentMutation = useMutation({
+    mutationFn: async (assignmentId: string) => {
+      return apiRequest(`/api/assignments/${assignmentId}`, 'DELETE');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'assignments'] });
+      setDeleteDialogOpen(false);
+      setAssignmentToDelete(null);
+      toast({
+        title: "Success",
+        description: "Assignment deleted successfully",
+      });
+    },
+    onError: (error) => {
+      console.error("Error deleting assignment:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete assignment",
+        variant: "destructive",
+      });
+    },
   });
 
   // Create assignment mutation
@@ -101,20 +128,6 @@ export function AssignmentManagement() {
     },
   });
 
-  // Delete assignment mutation
-  const deleteAssignmentMutation = useMutation({
-    mutationFn: async (id: string) => {
-      return apiRequest(`/api/assignments/${id}`, 'DELETE');
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'assignments'] });
-      toast({
-        title: "Success",
-        description: "Assignment deleted successfully",
-      });
-    },
-  });
-
   const form = useForm<AssignmentFormData>({
     resolver: zodResolver(assignmentFormSchema),
     defaultValues: {
@@ -150,7 +163,7 @@ export function AssignmentManagement() {
     }
     
     if (editingAssignment) {
-      updateAssignmentMutation.mutate({ id: editingAssignment.id, data });
+      updateAssignmentMutation.mutate({ ...data, id: editingAssignment.id });
     } else {
       console.log("Calling createAssignmentMutation.mutate");
       createAssignmentMutation.mutate(data);
@@ -159,21 +172,24 @@ export function AssignmentManagement() {
 
   const handleEdit = (assignment: Assignment) => {
     setEditingAssignment(assignment);
+    setIsCreateDialogOpen(true);
     form.reset({
       title: assignment.title,
-      description: assignment.description || "",
-      instructions: assignment.instructions || "",
-      submissionDate: assignment.submissionDate ? format(new Date(assignment.submissionDate), "yyyy-MM-dd'T'HH:mm") : "",
-      classId: assignment.classId || "",
-      subject: assignment.subject || "",
-      totalMarks: assignment.totalMarks || 100,
+      description: assignment.description || '',
+      instructions: assignment.instructions || '',
+      subject: assignment.subject || '',
+      classId: assignment.classId,
+      submissionDate: assignment.submissionDate 
+        ? new Date(assignment.submissionDate).toISOString().slice(0, 16) 
+        : '',
+      totalMarks: assignment.totalMarks || 0,
+      attachmentUrls: assignment.attachmentUrls || [],
     });
   };
 
   const handleDelete = (assignment: Assignment) => {
-    if (confirm(`Are you sure you want to delete "${assignment.title}"?`)) {
-      deleteAssignmentMutation.mutate(assignment.id);
-    }
+    setAssignmentToDelete(assignment);
+    setDeleteDialogOpen(true);
   };
 
   const resetForm = () => {
@@ -371,6 +387,68 @@ export function AssignmentManagement() {
                   />
                 </div>
 
+                {/* File Upload Section */}
+                <div className="space-y-4 border-t pt-4">
+                  <h3 className="text-lg font-medium">Upload Files (Optional)</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Upload assignment files for students. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, PNG, JPEG (Max 30MB)
+                  </p>
+                  
+                  <ObjectUploader
+                    maxNumberOfFiles={5}
+                    maxFileSize={31457280} // 30MB
+                    onGetUploadParameters={async () => {
+                      const response = await apiRequest('/api/objects/upload', 'POST');
+                      return {
+                        method: 'PUT' as const,
+                        url: response.uploadURL,
+                      };
+                    }}
+                    onComplete={(result) => {
+                      console.log("Files uploaded:", result);
+                      if (result.successful.length > 0) {
+                        const uploadedUrls = result.successful.map((file: any) => file.uploadURL);
+                        const currentUrls = form.getValues('attachmentUrls') || [];
+                        form.setValue('attachmentUrls', [...currentUrls, ...uploadedUrls]);
+                        toast({
+                          title: "Success",
+                          description: `${result.successful.length} file(s) uploaded successfully`,
+                        });
+                      }
+                    }}
+                    buttonClassName="w-full"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload Assignment Files
+                  </ObjectUploader>
+
+                  {/* Show uploaded files */}
+                  {form.watch('attachmentUrls')?.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium">Uploaded Files:</p>
+                      <div className="space-y-1">
+                        {form.watch('attachmentUrls').map((url: string, index: number) => (
+                          <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
+                            <span className="text-sm">File {index + 1}</span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const currentUrls = form.getValues('attachmentUrls') || [];
+                                const newUrls = currentUrls.filter((_: string, i: number) => i !== index);
+                                form.setValue('attachmentUrls', newUrls);
+                              }}
+                            >
+                              Remove
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button type="button" variant="outline" onClick={resetForm}>
                     Cancel
@@ -466,6 +544,34 @@ export function AssignmentManagement() {
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Assignment</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{assignmentToDelete?.title}"? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={() => {
+                if (assignmentToDelete) {
+                  deleteAssignmentMutation.mutate(assignmentToDelete.id);
+                }
+              }}
+              disabled={deleteAssignmentMutation.isPending}
+            >
+              {deleteAssignmentMutation.isPending ? 'Deleting...' : 'Delete'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

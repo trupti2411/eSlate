@@ -67,26 +67,6 @@ export class ObjectStorageService {
     return dir;
   }
 
-  // Search for a public object from the search paths.
-  async searchPublicObject(filePath: string): Promise<File | null> {
-    for (const searchPath of this.getPublicObjectSearchPaths()) {
-      const fullPath = `${searchPath}/${filePath}`;
-
-      // Full path format: /<bucket_name>/<object_name>
-      const { bucketName, objectName } = parseObjectPath(fullPath);
-      const bucket = objectStorageClient.bucket(bucketName);
-      const file = bucket.file(objectName);
-
-      // Check if file exists
-      const [exists] = await file.exists();
-      if (exists) {
-        return file;
-      }
-    }
-
-    return null;
-  }
-
   // Downloads an object to the response.
   async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600) {
     try {
@@ -97,7 +77,7 @@ export class ObjectStorageService {
       res.set({
         "Content-Type": metadata.contentType || "application/octet-stream",
         "Content-Length": metadata.size,
-        "Cache-Control": `private, max-age=${cacheTtlSec}`,
+        "Cache-Control": `public, max-age=${cacheTtlSec}`,
       });
 
       // Stream the file to the response
@@ -119,131 +99,53 @@ export class ObjectStorageService {
     }
   }
 
-  // Gets the upload URL for homework submissions
-  async getHomeworkUploadURL(): Promise<string> {
-    try {
-      console.log("Generating homework upload URL...");
-      console.log("PRIVATE_OBJECT_DIR:", process.env.PRIVATE_OBJECT_DIR);
-      console.log("PUBLIC_OBJECT_SEARCH_PATHS:", process.env.PUBLIC_OBJECT_SEARCH_PATHS);
-
-      // Check if object storage is properly configured
-      if (!process.env.PRIVATE_OBJECT_DIR && !process.env.PUBLIC_OBJECT_SEARCH_PATHS) {
-        console.log("No object storage configured, using fallback approach");
-        // Return a valid placeholder URL that indicates object storage is not configured
-        const uploadURL = `https://uploads.example.com/homework/${randomUUID()}`;
-        console.log("Generated fallback upload URL:", uploadURL);
-        return uploadURL;
-      }
-
-      const fileName = `homework_${Date.now()}_${randomUUID()}.pdf`;
-      console.log("Generating upload URL for file:", fileName);
-
-      const uploadURL = await signObjectURL({
-        bucketName: parseObjectPath(this.getPrivateObjectDir()).bucketName,
-        objectName: `${this.getPrivateObjectDir()}/homework/${fileName}`,
-        method: "PUT",
-        ttlSec: 900,
-      });
-      console.log("Generated upload URL:", uploadURL);
-
-      // Validate the URL
-      if (!uploadURL || !uploadURL.startsWith('https://')) {
-        throw new Error(`Invalid upload URL generated: ${uploadURL}`);
-      }
-
-      return uploadURL;
-    } catch (error) {
-      console.error("Error generating homework upload URL:", error);
-      console.error("Error details:", {
-        message: error.message,
-        stack: error.stack,
-        privateDir: process.env.PRIVATE_OBJECT_DIR,
-        publicPaths: process.env.PUBLIC_OBJECT_SEARCH_PATHS
-      });
-      throw new Error(`Failed to generate upload URL: ${error.message}`);
+  // Gets the upload URL for an object entity.
+  async getObjectEntityUploadURL(): Promise<string> {
+    const privateObjectDir = this.getPrivateObjectDir();
+    if (!privateObjectDir) {
+      throw new Error(
+        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
+          "tool and set PRIVATE_OBJECT_DIR env var."
+      );
     }
+
+    const objectId = randomUUID();
+    const fullPath = `${privateObjectDir}/uploads/${objectId}`;
+
+    const { bucketName, objectName } = parseObjectPath(fullPath);
+
+    // Sign URL for PUT method with TTL
+    return signObjectURL({
+      bucketName,
+      objectName,
+      method: "PUT",
+      ttlSec: 900,
+    });
   }
 
-  // Gets the homework file
-  async getHomeworkFile(objectPath: string): Promise<File> {
-    if (!objectPath.startsWith("/homework/")) {
-      throw new ObjectNotFoundError();
-    }
-
-    const parts = objectPath.slice(1).split("/");
-    if (parts.length < 2) {
-      throw new ObjectNotFoundError();
-    }
-
-    const fileId = parts.slice(1).join("/");
-    let privateDir = this.getPrivateObjectDir();
-    if (!privateDir.endsWith("/")) {
-      privateDir = `${privateDir}/`;
-    }
-    const homeworkPath = `${privateDir}homework/${fileId}`;
-    const { bucketName, objectName } = parseObjectPath(homeworkPath);
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-    const [exists] = await file.exists();
-    if (!exists) {
-      throw new ObjectNotFoundError();
-    }
-    return file;
-  }
-
-  // Upload homework file directly to object storage
-  async uploadHomeworkFile(file: Express.Multer.File): Promise<string> {
-    try {
-      const fileName = `${Date.now()}_${file.originalname}`;
-      let privateDir = this.getPrivateObjectDir();
-      if (!privateDir.endsWith("/")) {
-        privateDir = `${privateDir}/`;
-      }
-      
-      const objectPath = `${privateDir}homework/${fileName}`;
-      const { bucketName, objectName } = parseObjectPath(objectPath);
-      
-      const bucket = objectStorageClient.bucket(bucketName);
-      const object = bucket.file(objectName);
-      
-      // Upload the file buffer
-      await object.save(file.buffer, {
-        metadata: {
-          contentType: file.mimetype,
-          cacheControl: 'private, max-age=3600',
-        },
-      });
-      
-      console.log(`File uploaded to object storage: ${objectPath}`);
-      return `/homework/${fileName}`;
-    } catch (error) {
-      console.error("Error uploading file to object storage:", error);
-      throw error;
-    }
-  }
-
-  normalizeHomeworkPath(rawPath: string): string {
+  normalizeObjectEntityPath(
+    rawPath: string,
+  ): string {
     if (!rawPath.startsWith("https://storage.googleapis.com/")) {
       return rawPath;
     }
-
+  
     // Extract the path from the URL by removing query parameters and domain
     const url = new URL(rawPath);
     const rawObjectPath = url.pathname;
-
-    let privateDir = this.getPrivateObjectDir();
-    if (!privateDir.endsWith("/")) {
-      privateDir = `${privateDir}/`;
+  
+    let objectEntityDir = this.getPrivateObjectDir();
+    if (!objectEntityDir.endsWith("/")) {
+      objectEntityDir = `${objectEntityDir}/`;
     }
-
-    const homeworkPrefix = `${privateDir}homework/`;
-    if (!rawObjectPath.startsWith(homeworkPrefix)) {
+  
+    if (!rawObjectPath.startsWith(objectEntityDir)) {
       return rawObjectPath;
     }
-
-    // Extract the file ID from the path
-    const fileId = rawObjectPath.slice(homeworkPrefix.length);
-    return `/homework/${fileId}`;
+  
+    // Extract the entity ID from the path
+    const entityId = rawObjectPath.slice(objectEntityDir.length);
+    return `/objects/${entityId}`;
   }
 }
 
