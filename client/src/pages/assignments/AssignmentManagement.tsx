@@ -30,6 +30,7 @@ export function AssignmentManagement() {
   const queryClient = useQueryClient();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [preSelectedClass, setPreSelectedClass] = useState<{ id: string; name: string } | null>(null);
 
   // Get user's company ID
   const { data: userCompany } = useQuery({
@@ -161,6 +162,7 @@ export function AssignmentManagement() {
   const resetForm = () => {
     form.reset();
     setEditingAssignment(null);
+    setPreSelectedClass(null);
   };
 
   // Handle URL parameters for pre-selecting class
@@ -170,6 +172,8 @@ export function AssignmentManagement() {
     const className = urlParams.get('className');
     
     if (classId && className) {
+      // Store pre-selected class info
+      setPreSelectedClass({ id: classId, name: decodeURIComponent(className) });
       // Pre-populate form with class and open dialog
       form.setValue('classId', classId);
       setIsCreateDialogOpen(true);
@@ -241,30 +245,45 @@ export function AssignmentManagement() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
-                  name="classId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Class *</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a class" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {classes.map((cls: Class) => (
-                            <SelectItem key={cls.id} value={cls.id}>
-                              {cls.name} - {cls.subject}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                {preSelectedClass ? (
+                  <FormItem>
+                    <FormLabel>Class</FormLabel>
+                    <FormControl>
+                      <div className="flex items-center p-3 bg-gray-50 border rounded-md">
+                        <span className="font-medium">{preSelectedClass.name}</span>
+                        <Badge variant="secondary" className="ml-2">Pre-selected</Badge>
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      This assignment will be created for the selected class.
+                    </FormDescription>
+                  </FormItem>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="classId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Class *</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a class" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {classes.map((cls: Class) => (
+                              <SelectItem key={cls.id} value={cls.id}>
+                                {cls.name} - {cls.subject}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
                 <FormField
                   control={form.control}
