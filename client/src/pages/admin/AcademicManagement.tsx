@@ -360,7 +360,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     queryKey: [`/api/companies/${companyId}/students`],
     enabled: !!companyId && activeTab === 'classes',
     staleTime: 0, // Always refetch fresh data
-    cacheTime: 0, // Don't cache
+    gcTime: 0, // Don't cache
   });
 
   const getDayName = (dayNumber: number) => {
@@ -770,7 +770,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </div>
           ) : (
             <div className="grid gap-4">
-              {(classes as Class[]).map((classItem: Class) => (
+              {Array.isArray(classes) && classes.map((classItem: Class) => (
                 <Card key={classItem.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">

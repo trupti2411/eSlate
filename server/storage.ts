@@ -112,8 +112,8 @@ export interface IStorage {
   getAllUsers(): Promise<User[]>;
   getDeletedUsers(): Promise<User[]>;
   getUsersByRole(role: string): Promise<User[]>;
-  createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User>;
-  updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
+  createUserWithRole(userData: Partial<InsertUser> & { role: string }): Promise<User>;
+  updateUser(id: string, updates: Partial<InsertUser>): Promise<User>;
   deleteUser(userId: string, deletedBy: string): Promise<void>;
   updateUserStatus(userId: string, isActive: boolean): Promise<void>;
 
@@ -723,7 +723,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(users.createdAt));
   }
 
-  async createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User> {
+  async createUserWithRole(userData: Partial<InsertUser> & { role: string }): Promise<User> {
     const [user] = await db.insert(users).values({
       id: userData.id,
       email: userData.email,
@@ -736,7 +736,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async updateUser(id: string, updates: Partial<UpsertUser>): Promise<User> {
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User> {
     const [user] = await db.update(users)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(users.id, id))
@@ -765,8 +765,9 @@ export class DatabaseStorage implements IStorage {
         const student = await this.getStudentByUserId(userId);
         if (student) {
           // Delete all records that reference this student
-          await db.delete(assignments).where(eq(assignments.studentId, student.id));
-          await db.delete(submissions).where(eq(submissions.studentId, student.id));
+          // Assignment functionality has been removed from the application
+          // await db.delete(assignments).where(eq(assignments.studentId, student.id));
+          // await db.delete(submissions).where(eq(submissions.studentId, student.id));
           await db.delete(progress).where(eq(progress.studentId, student.id));
           await db.delete(calendarEvents).where(eq(calendarEvents.studentId, student.id));
           // Delete the student record itself
@@ -778,7 +779,8 @@ export class DatabaseStorage implements IStorage {
           // Update students to remove tutor assignment (set to null)
           await db.update(students).set({ tutorId: null }).where(eq(students.tutorId, tutor.id));
           // Delete assignments and calendar events created by this tutor
-          await db.delete(assignments).where(eq(assignments.tutorId, tutor.id));
+          // Assignment functionality has been removed from the application
+          // await db.delete(assignments).where(eq(assignments.tutorId, tutor.id));
           await db.delete(calendarEvents).where(eq(calendarEvents.tutorId, tutor.id));
           // Delete the tutor record itself
           await db.delete(tutors).where(eq(tutors.id, tutor.id));
@@ -991,7 +993,7 @@ export class DatabaseStorage implements IStorage {
   async getStudentsByClass(classId: string): Promise<StudentClassAssignment[]> {
     return await db.select().from(studentClassAssignments)
       .where(and(eq(studentClassAssignments.classId, classId), eq(studentClassAssignments.isActive, true)))
-      .orderBy(studentClassAssignment.assignedDate);
+      .orderBy(studentClassAssignments.assignedDate);
   }
 
   async getClassesByStudent(studentId: string): Promise<StudentClassAssignment[]> {
