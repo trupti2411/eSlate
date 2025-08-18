@@ -38,16 +38,16 @@ export function AssignmentManagement() {
     enabled: !!user && (user.role === 'company_admin' || user.role === 'tutor'),
   });
 
-  const companyId = userCompany?.id;
+  const companyId = (userCompany as { id: string })?.id;
 
   // Fetch assignments for the company
-  const { data: assignments = [], isLoading: isLoadingAssignments } = useQuery({
+  const { data: assignments = [], isLoading: isLoadingAssignments } = useQuery<Assignment[]>({
     queryKey: ['/api/companies', companyId, 'assignments'],
     enabled: !!companyId,
   });
 
   // Fetch classes for assignment creation
-  const { data: classes = [] } = useQuery({
+  const { data: classes = [] } = useQuery<Class[]>({
     queryKey: ['/api/companies', companyId, 'classes'],
     enabled: !!companyId,
   });
@@ -56,13 +56,10 @@ export function AssignmentManagement() {
   const createAssignmentMutation = useMutation({
     mutationFn: async (data: AssignmentFormData) => {
       const submissionDate = new Date(data.submissionDate);
-      return apiRequest(`/api/assignments`, {
-        method: 'POST',
-        body: JSON.stringify({
-          ...data,
-          submissionDate: submissionDate.toISOString(),
-          companyId,
-        }),
+      return apiRequest(`/api/assignments`, 'POST', {
+        ...data,
+        submissionDate: submissionDate.toISOString(),
+        companyId,
       });
     },
     onSuccess: () => {
@@ -86,12 +83,9 @@ export function AssignmentManagement() {
   const updateAssignmentMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<AssignmentFormData> }) => {
       const submissionDate = data.submissionDate ? new Date(data.submissionDate).toISOString() : undefined;
-      return apiRequest(`/api/assignments/${id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({
-          ...data,
-          submissionDate,
-        }),
+      return apiRequest(`/api/assignments/${id}`, 'PATCH', {
+        ...data,
+        submissionDate,
       });
     },
     onSuccess: () => {
@@ -107,9 +101,7 @@ export function AssignmentManagement() {
   // Delete assignment mutation
   const deleteAssignmentMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest(`/api/assignments/${id}`, {
-        method: 'DELETE',
-      });
+      return apiRequest(`/api/assignments/${id}`, 'DELETE');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'assignments'] });
@@ -129,6 +121,7 @@ export function AssignmentManagement() {
       submissionDate: "",
       subject: "",
       totalMarks: 100,
+      classId: "",
     },
   });
 
@@ -241,7 +234,7 @@ export function AssignmentManagement() {
                     <FormItem>
                       <FormLabel>Subject/Topic</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Mathematics, English" {...field} />
+                        <Input placeholder="e.g., Mathematics, English" {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -268,7 +261,7 @@ export function AssignmentManagement() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Class *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a class" />
@@ -295,7 +288,7 @@ export function AssignmentManagement() {
                     <FormItem>
                       <FormLabel>Description</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Assignment details and instructions" rows={3} {...field} />
+                        <Textarea placeholder="Assignment details and instructions" rows={3} {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -309,7 +302,7 @@ export function AssignmentManagement() {
                     <FormItem>
                       <FormLabel>Instructions/Notes</FormLabel>
                       <FormControl>
-                        <Textarea placeholder="Additional instructions for students" rows={3} {...field} />
+                        <Textarea placeholder="Additional instructions for students" rows={3} {...field} value={field.value || ""} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -342,6 +335,7 @@ export function AssignmentManagement() {
                             type="number" 
                             min="1" 
                             {...field} 
+                            value={field.value || 0}
                             onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
                           />
                         </FormControl>
