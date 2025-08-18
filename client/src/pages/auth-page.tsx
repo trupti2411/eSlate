@@ -50,8 +50,7 @@ export default function AuthPage() {
   // Login mutation
   const loginMutation = useMutation({
     mutationFn: async (data: LoginData) => {
-      const response = await apiRequest('/api/auth/login', 'POST', data);
-      return response.json();
+      return await apiRequest('/api/auth/login', 'POST', data);
     },
     onSuccess: (data) => {
       // Store the JWT token if needed
@@ -79,8 +78,7 @@ export default function AuthPage() {
   // Registration mutation
   const registerMutation = useMutation({
     mutationFn: async (data: RegisterData) => {
-      const response = await apiRequest('/api/auth/register', 'POST', data);
-      return response.json();
+      return await apiRequest('/api/auth/register', 'POST', data);
     },
     onSuccess: (data) => {
       setSuccessMessage("Registration successful! Please check your email to verify your account before logging in.");
@@ -103,8 +101,7 @@ export default function AuthPage() {
   // Forgot password mutation
   const forgotPasswordMutation = useMutation({
     mutationFn: async (email: string) => {
-      const response = await apiRequest('/api/auth/forgot-password', 'POST', { email });
-      return response.json();
+      return await apiRequest('/api/auth/forgot-password', 'POST', { email });
     },
     onSuccess: (data) => {
       setSuccessMessage(data.message);
@@ -194,11 +191,12 @@ export default function AuthPage() {
               {showForgotPassword ? (
                 <div className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                    <label htmlFor="forgot-password-email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       Email Address
                     </label>
                     <div className="relative mt-1">
                       <Input
+                        id="forgot-password-email"
                         type="email"
                         placeholder="Enter your email"
                         value={forgotPasswordEmail}
