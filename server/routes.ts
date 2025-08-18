@@ -613,7 +613,27 @@ trailer<</Size 5/Root 1 0 R>>
         const [exists] = await file.exists();
         if (exists) {
           console.log("Found file in object storage, streaming...");
-          await objectStorageService.downloadObject(file, res);
+          
+          // Try to get the assignment to find the original filename
+          let originalFileName = undefined;
+          try {
+            const assignment = await storage.getAssignment(assignmentId);
+            if (assignment) {
+              // Find the attachment URL that contains this file ID
+              const attachmentUrl = assignment.attachmentUrls?.find(url => url.includes(fileId));
+              if (attachmentUrl) {
+                // Get filename from file metadata if available
+                const [metadata] = await file.getMetadata();
+                originalFileName = metadata.metadata?.originalName || 
+                                 metadata.metadata?.filename ||
+                                 `assignment-file.${metadata.contentType?.split('/')[1] || 'bin'}`;
+              }
+            }
+          } catch (error) {
+            console.log("Could not get assignment details for filename:", error);
+          }
+          
+          await objectStorageService.downloadObject(file, res, 3600, originalFileName);
           return;
         } else {
           console.log("File does not exist in object storage");

@@ -68,15 +68,25 @@ export class ObjectStorageService {
   }
 
   // Downloads an object to the response.
-  async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600) {
+  async downloadObject(file: File, res: Response, cacheTtlSec: number = 3600, originalFileName?: string) {
     try {
       // Get file metadata
       const [metadata] = await file.getMetadata();
+
+      // Use original filename if provided, otherwise extract from file name or metadata
+      let fileName = originalFileName;
+      if (!fileName) {
+        // Try to get filename from metadata first
+        fileName = metadata.metadata?.originalName || 
+                  (typeof metadata.name === 'string' ? metadata.name.split('/').pop() : null) || 
+                  'download';
+      }
 
       // Set appropriate headers
       res.set({
         "Content-Type": metadata.contentType || "application/octet-stream",
         "Content-Length": metadata.size,
+        "Content-Disposition": `inline; filename="${fileName}"`,
         "Cache-Control": `public, max-age=${cacheTtlSec}`,
       });
 
