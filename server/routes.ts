@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 
 import { storage } from "./storage";
-import { setupCustomAuth, isAuthenticated, type AuthenticatedRequest } from "./customAuth";
+import { setupCustomAuth, isAuthenticated } from "./customAuth";
 import {
   insertMessageSchema,
   insertProgressSchema,
@@ -59,7 +59,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Company Portal - Assignment Management (Company Admin & Tutor access)
   
   // Get assignments by company
-  app.get('/api/companies/:companyId/assignments', isAuthenticated, async (req, res) => {
+  app.get('/api/companies/:companyId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       const companyId = req.params.companyId;
@@ -100,7 +100,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create assignment
-  app.post('/api/assignments', isAuthenticated, async (req, res) => {
+  app.post('/api/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       
@@ -123,7 +123,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update assignment
-  app.patch('/api/assignments/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       const assignmentId = req.params.id;
@@ -155,7 +155,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete assignment
-  app.delete('/api/assignments/:id', isAuthenticated, async (req, res) => {
+  app.delete('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       const assignmentId = req.params.id;
@@ -240,7 +240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Student Portal - Assignment Viewing and Submission
   
   // Get student's assignments
-  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req, res) => {
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       const studentId = req.params.studentId;
@@ -272,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create submission
-  app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req, res) => {
+  app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       const assignmentId = req.params.assignmentId;
@@ -302,7 +302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update submission
-  app.patch('/api/submissions/:id', isAuthenticated, async (req, res) => {
+  app.patch('/api/submissions/:id', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       const submissionId = req.params.id;
@@ -330,7 +330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get submissions for assignment (for tutors/admins)
-  app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req, res) => {
+  app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = (req as any).user;
       const assignmentId = req.params.assignmentId;
@@ -349,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company students route
-  app.get('/api/company/students', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/company/students', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       let students: any[] = [];
@@ -369,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Simple file upload route
-  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -406,7 +406,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Simple file download route
-  app.get('/api/files/:fileId', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/files/:fileId', isAuthenticated, async (req: any, res: any) => {
     try {
       const { fileId } = req.params;
       console.log(`Looking for file with ID: ${fileId}`);
@@ -438,7 +438,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Message routes
-  app.get('/api/messages/:receiverId', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/messages/:receiverId', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const senderId = user.id;
@@ -452,7 +452,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/messages', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/messages', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const senderId = user.id;
@@ -471,7 +471,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Student profile routes
-  app.get("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get("/api/students/:studentId", isAuthenticated, async (req: any, res: any) => {
     const { studentId } = req.params;
     const user = req.user;
     if (!user) return res.status(401).json({ message: "Authentication required" });
@@ -505,7 +505,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update student profile
-  app.patch("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.patch("/api/students/:studentId", isAuthenticated, async (req: any, res: any) => {
     const { studentId } = req.params;
     const user = req.user;
     if (!user) return res.status(401).json({ message: "Authentication required" });
@@ -551,7 +551,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Progress routes (without assignments)
-  app.get('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/progress', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       let progress: any[] = [];
@@ -570,7 +570,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/progress', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
 
@@ -597,7 +597,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar routes
-  app.get('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/calendar', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const events = await storage.getCalendarEventsByTutor(user.id);
@@ -608,7 +608,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/calendar', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
 
@@ -626,7 +626,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Administrative routes
-  app.get('/api/admin/users', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/admin/users', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
 
@@ -643,7 +643,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company management routes
-  app.get('/api/companies', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
 
@@ -671,7 +671,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/companies/:companyId/tutors', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId/tutors', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -695,7 +695,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/companies/:companyId/students', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId/students', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -720,7 +720,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company detail route - ADD THIS MISSING ROUTE
-  app.get('/api/companies/:companyId', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -749,7 +749,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Academic management routes
-  app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: any, res: any) => {
     try {
       const { userId } = req.params;
       const user = req.user!;
@@ -766,7 +766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/admin/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/admin/academic-years', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
 
@@ -793,7 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/admin/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/admin/academic-years', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
 
@@ -820,7 +820,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Academic Years routes
-  app.get('/api/companies/:companyId/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId/academic-years', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -844,7 +844,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies/:companyId/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/companies/:companyId/academic-years', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -874,7 +874,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Academic Terms routes
-  app.get('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const { yearId } = req.query;
@@ -905,7 +905,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -935,7 +935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Classes routes
-  app.get('/api/companies/:companyId/classes', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId/classes', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const { termId } = req.query;
@@ -966,7 +966,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/companies/:companyId/classes', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/companies/:companyId/classes', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -995,7 +995,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put('/api/companies/:companyId/classes/:classId', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.put('/api/companies/:companyId/classes/:classId', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId, classId } = req.params;
       const user = req.user!;
@@ -1025,7 +1025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Academic hierarchy route
-  app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -1071,7 +1071,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Data clearing routes (admin only)
-  app.delete('/api/admin/clear-assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.delete('/api/admin/clear-assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
 
