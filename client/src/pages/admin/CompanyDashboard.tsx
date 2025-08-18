@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
 import { StudentProfileDialog } from "@/components/StudentProfileDialog";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, Clock, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
@@ -444,6 +444,13 @@ export default function CompanyDashboard() {
                 <Button variant="outline" className="w-full">
                   <Calendar className="h-4 w-4 mr-2" />
                   Academic Management
+                </Button>
+              </Link>
+
+              <Link href="/assignments">
+                <Button variant="outline" className="w-full">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Assignment Management
                 </Button>
               </Link>
             </CardContent>

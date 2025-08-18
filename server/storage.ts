@@ -12,6 +12,8 @@ import {
   academicTerms,
   classes,
   studentClassAssignments,
+  assignments,
+  submissions,
   type User,
   type Student,
   type InsertStudent,
@@ -35,8 +37,11 @@ import {
   type InsertClass,
   type StudentClassAssignment,
   type InsertStudentClassAssignment,
+  type Assignment,
+  type InsertAssignment,
+  type Submission,
+  type InsertSubmission,
   type InsertUser,
-
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains } from "drizzle-orm";
@@ -154,9 +159,21 @@ export interface IStorage {
   getClassesByStudent(studentId: string): Promise<StudentClassAssignment[]>;
   removeStudentFromClass(studentId: string, classId: string): Promise<void>;
 
-  // Clear all assignment and submission data
-  clearAllAssignments(): Promise<void>;
-  clearAllSubmissions(): Promise<void>;
+  // Assignment operations
+  createAssignment(assignmentData: InsertAssignment): Promise<Assignment>;
+  getAssignment(id: string): Promise<Assignment | undefined>;
+  getAssignmentsByClass(classId: string): Promise<Assignment[]>;
+  getAssignmentsByCompany(companyId: string): Promise<Assignment[]>;
+  updateAssignment(id: string, updates: Partial<InsertAssignment>): Promise<Assignment>;
+  deleteAssignment(id: string): Promise<void>;
+  
+  // Submission operations
+  createSubmission(submissionData: InsertSubmission): Promise<Submission>;
+  getSubmission(id: string): Promise<Submission | undefined>;
+  getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]>;
+  getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
+  updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
+  deleteSubmission(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -985,7 +1002,77 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
+  // Assignment operations
+  async createAssignment(assignmentData: InsertAssignment): Promise<Assignment> {
+    const [assignment] = await db.insert(assignments).values(assignmentData).returning();
+    return assignment;
+  }
 
+  async getAssignment(id: string): Promise<Assignment | undefined> {
+    const [assignment] = await db.select().from(assignments).where(eq(assignments.id, id));
+    return assignment;
+  }
+
+  async getAssignmentsByClass(classId: string): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .where(and(eq(assignments.classId, classId), eq(assignments.isActive, true)))
+      .orderBy(desc(assignments.createdAt));
+  }
+
+  async getAssignmentsByCompany(companyId: string): Promise<Assignment[]> {
+    return await db.select().from(assignments)
+      .where(and(eq(assignments.companyId, companyId), eq(assignments.isActive, true)))
+      .orderBy(desc(assignments.createdAt));
+  }
+
+  async updateAssignment(id: string, updates: Partial<InsertAssignment>): Promise<Assignment> {
+    const [updatedAssignment] = await db.update(assignments)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(assignments.id, id))
+      .returning();
+    return updatedAssignment;
+  }
+
+  async deleteAssignment(id: string): Promise<void> {
+    await db.update(assignments)
+      .set({ isActive: false, updatedAt: new Date() })
+      .where(eq(assignments.id, id));
+  }
+
+  // Submission operations
+  async createSubmission(submissionData: InsertSubmission): Promise<Submission> {
+    const [submission] = await db.insert(submissions).values(submissionData).returning();
+    return submission;
+  }
+
+  async getSubmission(id: string): Promise<Submission | undefined> {
+    const [submission] = await db.select().from(submissions).where(eq(submissions.id, id));
+    return submission;
+  }
+
+  async getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]> {
+    return await db.select().from(submissions)
+      .where(eq(submissions.assignmentId, assignmentId))
+      .orderBy(desc(submissions.createdAt));
+  }
+
+  async getSubmissionsByStudent(studentId: string): Promise<Submission[]> {
+    return await db.select().from(submissions)
+      .where(eq(submissions.studentId, studentId))
+      .orderBy(desc(submissions.createdAt));
+  }
+
+  async updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission> {
+    const [updatedSubmission] = await db.update(submissions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(submissions.id, id))
+      .returning();
+    return updatedSubmission;
+  }
+
+  async deleteSubmission(id: string): Promise<void> {
+    await db.delete(submissions).where(eq(submissions.id, id));
+  }
 }
 
 export const storage = new DatabaseStorage();

@@ -117,47 +117,42 @@ export const assignments = pgTable("assignments", {
   title: varchar("title").notNull(),
   description: text("description"),
   instructions: text("instructions"),
-  dueDate: timestamp("due_date"),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id), // Link to company instead of tutor
-  createdBy: varchar("created_by").notNull().references(() => users.id), // Track who created it
-  studentIds: text("student_ids").array(), // Support multiple students per assignment
+  submissionDate: timestamp("submission_date").notNull(), // Required deadline field
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
   classId: varchar("class_id").references(() => classes.id), // Assign to entire class
+  subject: varchar("subject"), // Optional subject/topic field
+  totalMarks: integer("total_marks").default(100), // Total marks/weightage
+  attachmentUrls: text("attachment_urls").array().default([]), // Files uploaded by admin/tutor
+  allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg']), // Specified file types
+  maxFileSize: integer("max_file_size").default(31457280), // 30MB in bytes
   status: assignmentStatusEnum("status").notNull().default('assigned'),
-  maxPoints: integer("max_points").default(100),
-  attachmentUrls: text("attachment_urls").array(), // Tutor can attach files
-  allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'txt', 'jpg', 'png']),
-  isRecurring: boolean("is_recurring").default(false),
-  recurringPattern: varchar("recurring_pattern"), // 'daily', 'weekly', 'monthly'
-  visibleFrom: timestamp("visible_from"),
-  autoGrade: boolean("auto_grade").default(false),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Submissions table
+// Submissions table - optimized for e-ink devices
 export const submissions = pgTable("submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   assignmentId: varchar("assignment_id").notNull().references(() => assignments.id),
   studentId: varchar("student_id").notNull().references(() => students.id),
-  content: text("content"), // Text response
-  fileUrls: text("file_urls").array(), // Multiple uploaded files
+  content: text("content"), // Text response for pen/touchscreen input
+  digitalContent: text("digital_content"), // Digitized handwriting content
+  fileUrls: text("file_urls").array().default([]), // Multiple uploaded files
   status: submissionStatusEnum("status").notNull().default('draft'),
   isDraft: boolean("is_draft").notNull().default(true),
   submittedAt: timestamp("submitted_at"),
   isLate: boolean("is_late").notNull().default(false),
-  // Parent verification
-  isVerifiedByParent: boolean("is_verified_by_parent").notNull().default(false),
-  parentVerifiedAt: timestamp("parent_verified_at"),
-  parentComments: text("parent_comments"),
+  // E-ink device specific fields
+  deviceType: varchar("device_type"), // 'e-ink', 'tablet', 'desktop'
+  inputMethod: varchar("input_method"), // 'pen', 'touch', 'keyboard'
   // Grading
   score: integer("score"),
+  totalMarks: integer("total_marks"), // Copy from assignment for historical record
   feedback: text("feedback"),
   gradedAt: timestamp("graded_at"),
-  gradedBy: varchar("graded_by").references(() => tutors.id),
-  // Revision workflow
-  needsRevision: boolean("needs_revision").notNull().default(false),
-  revisionFeedback: text("revision_feedback"),
-  revisionCount: integer("revision_count").default(0),
+  gradedBy: varchar("graded_by").references(() => users.id), // Can be tutor or admin
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -281,6 +276,10 @@ export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
   creator: one(users, {
     fields: [assignments.createdBy],
     references: [users.id],
+  }),
+  class: one(classes, {
+    fields: [assignments.classId],
+    references: [classes.id],
   }),
   submissions: many(submissions),
   progress: many(progress),
@@ -513,6 +512,7 @@ export const classesRelations = relations(classes, ({ one, many }) => ({
     references: [tutors.id],
   }),
   studentAssignments: many(studentClassAssignments),
+  assignments: many(assignments),
 }));
 
 export const studentClassAssignmentsRelations = relations(studentClassAssignments, ({ one }) => ({

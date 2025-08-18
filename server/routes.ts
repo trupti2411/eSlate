@@ -10,7 +10,9 @@ import {
   insertAcademicYearSchema,
   insertAcademicTermSchema,
   insertClassSchema,
-  insertStudentClassAssignmentSchema
+  insertStudentClassAssignmentSchema,
+  insertAssignmentSchema,
+  insertSubmissionSchema
 } from "@shared/schema";
 import multer from "multer";
 import { randomUUID } from "crypto";
@@ -52,7 +54,299 @@ export async function registerRoutes(app: Express): Promise<Server> {
     },
   });
 
-  // Assignment functionality removed per user request
+  // ===== ASSIGNMENT SYSTEM ROUTES =====
+  
+  // Company Portal - Assignment Management (Company Admin & Tutor access)
+  
+  // Get assignments by company
+  app.get('/api/companies/:companyId/assignments', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const companyId = req.params.companyId;
+      
+      // Verify user has access to this company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor || tutor.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const assignments = await storage.getAssignmentsByCompany(companyId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Get assignments by class
+  app.get('/api/classes/:classId/assignments', isAuthenticated, async (req, res) => {
+    try {
+      const classId = req.params.classId;
+      const assignments = await storage.getAssignmentsByClass(classId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching class assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Create assignment
+  app.post('/api/assignments', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      
+      // Only company_admin and tutor can create assignments
+      if (!['company_admin', 'tutor'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const validatedData = insertAssignmentSchema.parse({
+        ...req.body,
+        createdBy: user.id
+      });
+      
+      const assignment = await storage.createAssignment(validatedData);
+      res.status(201).json(assignment);
+    } catch (error) {
+      console.error("Error creating assignment:", error);
+      res.status(500).json({ message: "Failed to create assignment" });
+    }
+  });
+
+  // Update assignment
+  app.patch('/api/assignments/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const assignmentId = req.params.id;
+      
+      // Verify user created this assignment or is company admin
+      const existingAssignment = await storage.getAssignment(assignmentId);
+      if (!existingAssignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      if (user.role === 'tutor' && existingAssignment.createdBy !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== existingAssignment.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      const validatedData = insertAssignmentSchema.partial().parse(req.body);
+      const updatedAssignment = await storage.updateAssignment(assignmentId, validatedData);
+      res.json(updatedAssignment);
+    } catch (error) {
+      console.error("Error updating assignment:", error);
+      res.status(500).json({ message: "Failed to update assignment" });
+    }
+  });
+
+  // Delete assignment
+  app.delete('/api/assignments/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const assignmentId = req.params.id;
+      
+      // Verify user created this assignment or is company admin
+      const existingAssignment = await storage.getAssignment(assignmentId);
+      if (!existingAssignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      if (user.role === 'tutor' && existingAssignment.createdBy !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== existingAssignment.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      await storage.deleteAssignment(assignmentId);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting assignment:", error);
+      res.status(500).json({ message: "Failed to delete assignment" });
+    }
+  });
+
+  // File upload for assignments
+  app.post('/api/assignments/:id/upload', isAuthenticated, upload.array('files', 10), async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const assignmentId = req.params.id;
+      const files = req.files as Express.Multer.File[];
+      
+      if (!files || files.length === 0) {
+        return res.status(400).json({ message: "No files uploaded" });
+      }
+      
+      // Verify user has access to this assignment
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      if (user.role === 'tutor' && assignment.createdBy !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Store files in memory
+      const fileUrls: string[] = [];
+      for (const file of files) {
+        const fileId = randomUUID();
+        global.uploadedFiles.set(fileId, {
+          buffer: file.buffer,
+          originalname: file.originalname,
+          mimetype: file.mimetype,
+          size: file.size,
+          uploadedAt: new Date()
+        });
+        fileUrls.push(`/api/files/${fileId}`);
+      }
+      
+      // Update assignment with file URLs
+      const currentUrls = assignment.attachmentUrls || [];
+      const updatedAssignment = await storage.updateAssignment(assignmentId, {
+        attachmentUrls: [...currentUrls, ...fileUrls]
+      });
+      
+      res.json({ 
+        message: "Files uploaded successfully", 
+        fileUrls,
+        assignment: updatedAssignment 
+      });
+    } catch (error) {
+      console.error("Error uploading files:", error);
+      res.status(500).json({ message: "Failed to upload files" });
+    }
+  });
+
+  // Student Portal - Assignment Viewing and Submission
+  
+  // Get student's assignments
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const studentId = req.params.studentId;
+      
+      // Verify user is the student or has access
+      const student = await storage.getStudent(studentId);
+      if (!student) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+      
+      if (user.role === 'student' && student.userId !== user.id) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      // Get assignments for student's classes
+      const studentClasses = await storage.getClassesByStudent(studentId);
+      const assignments: any[] = [];
+      
+      for (const classAssignment of studentClasses) {
+        const classAssignments = await storage.getAssignmentsByClass(classAssignment.classId);
+        assignments.push(...classAssignments);
+      }
+      
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching student assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Create submission
+  app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const assignmentId = req.params.assignmentId;
+      
+      // Only students can create submissions
+      if (user.role !== 'student') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const student = await storage.getStudentByUserId(user.id);
+      if (!student) {
+        return res.status(404).json({ message: "Student profile not found" });
+      }
+      
+      const validatedData = insertSubmissionSchema.parse({
+        ...req.body,
+        assignmentId,
+        studentId: student.id
+      });
+      
+      const submission = await storage.createSubmission(validatedData);
+      res.status(201).json(submission);
+    } catch (error) {
+      console.error("Error creating submission:", error);
+      res.status(500).json({ message: "Failed to create submission" });
+    }
+  });
+
+  // Update submission
+  app.patch('/api/submissions/:id', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const submissionId = req.params.id;
+      
+      const existingSubmission = await storage.getSubmission(submissionId);
+      if (!existingSubmission) {
+        return res.status(404).json({ message: "Submission not found" });
+      }
+      
+      // Students can only update their own submissions
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student || existingSubmission.studentId !== student.id) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      const validatedData = insertSubmissionSchema.partial().parse(req.body);
+      const updatedSubmission = await storage.updateSubmission(submissionId, validatedData);
+      res.json(updatedSubmission);
+    } catch (error) {
+      console.error("Error updating submission:", error);
+      res.status(500).json({ message: "Failed to update submission" });
+    }
+  });
+
+  // Get submissions for assignment (for tutors/admins)
+  app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req, res) => {
+    try {
+      const user = (req as any).user;
+      const assignmentId = req.params.assignmentId;
+      
+      // Verify user has access to this assignment
+      if (!['company_admin', 'tutor'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const submissions = await storage.getSubmissionsByAssignment(assignmentId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching submissions:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
 
   // Company students route
   app.get('/api/company/students', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
