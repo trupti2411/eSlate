@@ -564,39 +564,39 @@ export class DatabaseStorage implements IStorage {
 
   async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
     try {
-      // Get students with direct company assignment OR assigned to tutors in this company
-      const companyStudents = await db.select({
-        id: students.id,
-        userId: students.userId,
-        gradeLevel: students.gradeLevel,
-        parentId: students.parentId,
-        tutorId: students.tutorId,
-        companyId: students.companyId,
-        classId: students.classId, // Include classId for class assignments
-        schoolName: students.schoolName,
-        dateOfBirth: students.dateOfBirth,
-        user: {
-          id: users.id,
-          email: users.email,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          isActive: users.isActive,
-          createdAt: users.createdAt
-        }
-      })
+      // Get students with direct company assignment
+      const companyStudents = await db.select()
       .from(students)
       .innerJoin(users, eq(students.userId, users.id))
-      .leftJoin(tutors, eq(students.tutorId, tutors.id))
       .where(
         and(
-          // Either direct company assignment OR tutor's company matches
-          and(
-            eq(students.companyId, companyId)
-          ),
-          eq(users.isDeleted, false)
+          eq(students.companyId, companyId),
+          eq(users.isDeleted, false),
+          eq(users.isActive, true)
         )
       )
       .orderBy(users.firstName, users.lastName);
+
+      // Transform the result to match expected structure
+      return companyStudents.map((row: any) => ({
+        id: row.students.id,
+        userId: row.students.userId,
+        gradeLevel: row.students.gradeLevel,
+        parentId: row.students.parentId,
+        tutorId: row.students.tutorId,
+        companyId: row.students.companyId,
+        classId: row.students.classId,
+        schoolName: row.students.schoolName,
+        dateOfBirth: row.students.dateOfBirth,
+        user: {
+          id: row.users.id,
+          email: row.users.email,
+          firstName: row.users.firstName,
+          lastName: row.users.lastName,
+          isActive: row.users.isActive,
+          createdAt: row.users.createdAt
+        }
+      }));
 
       return companyStudents;
     } catch (error) {
