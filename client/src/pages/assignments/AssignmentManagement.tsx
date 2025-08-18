@@ -228,7 +228,9 @@ export function AssignmentManagement() {
               </DialogDescription>
             </DialogHeader>
             <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                console.log("Form submission failed with errors:", errors);
+              })} className="space-y-4">
                 <FormField
                   control={form.control}
                   name="title"
