@@ -70,6 +70,7 @@ export default function Layout({ children }: LayoutProps) {
           { href: '/company/tutors', icon: Users, label: 'Tutors' },
           { href: '/company/students', icon: Users, label: 'Students' },
           { href: '/company/academic', icon: Calendar, label: 'Academic Management' },
+          { href: '/company/assignments', icon: BookOpen, label: 'Assignment Management' },
           { href: '/company/reports', icon: BookOpen, label: 'Reports' },
         ];
       default:

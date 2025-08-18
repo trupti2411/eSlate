@@ -117,7 +117,7 @@ export default function CompanyDashboard() {
     enabled: !!companyAdmin,
   });
 
-  const company = companies?.[0];
+  const company = Array.isArray(companies) ? companies[0] : companies;
 
   // Fetch tutors
   const { data: tutors } = useQuery({
@@ -303,7 +303,7 @@ export default function CompanyDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{tutors?.length || 0}</div>
+              <div className="text-2xl font-bold">{Array.isArray(tutors) ? tutors.length : 0}</div>
               <p className="text-sm text-gray-600">Active tutors</p>
             </CardContent>
           </Card>
@@ -316,7 +316,7 @@ export default function CompanyDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{students?.length || 0}</div>
+              <div className="text-2xl font-bold">{Array.isArray(students) ? students.length : 0}</div>
               <p className="text-sm text-gray-600">Enrolled students</p>
             </CardContent>
           </Card>
@@ -447,7 +447,7 @@ export default function CompanyDashboard() {
                 </Button>
               </Link>
 
-              <Link href="/assignments">
+              <Link href="/company/assignments">
                 <Button variant="outline" className="w-full">
                   <FileText className="h-4 w-4 mr-2" />
                   Assignment Management
@@ -461,9 +461,9 @@ export default function CompanyDashboard() {
               <CardTitle>Recent Students</CardTitle>
             </CardHeader>
             <CardContent>
-              {students && students.length > 0 ? (
+              {students && Array.isArray(students) && students.length > 0 ? (
                 <div className="space-y-2">
-                  {students.slice(0, 5).map((student) => (
+                  {students.slice(0, 5).map((student: CompanyStudent) => (
                     <div key={student.id} className="flex items-center justify-between p-2 border rounded">
                       <div>
                         <p className="font-medium">
@@ -518,7 +518,7 @@ export default function CompanyDashboard() {
                     <SelectValue placeholder="Choose a tutor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {tutors?.map((tutor) => (
+                    {Array.isArray(tutors) && tutors.map((tutor: CompanyTutor) => (
                       <SelectItem key={tutor.id} value={tutor.id}>
                         {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : 'Unknown Tutor'}
                         {tutor.specialization && ` - ${tutor.specialization}`}
@@ -539,9 +539,10 @@ export default function CompanyDashboard() {
         </Dialog>
 
         {/* Student Profile Dialog */}
-        {selectedStudentId && (
+        {selectedStudentId && companyAdmin?.companyId && (
           <StudentProfileDialog
             studentId={selectedStudentId}
+            companyId={companyAdmin.companyId}
             isOpen={isStudentProfileOpen}
             onClose={() => {
               setIsStudentProfileOpen(false);
