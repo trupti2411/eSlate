@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -162,6 +162,23 @@ export function AssignmentManagement() {
     form.reset();
     setEditingAssignment(null);
   };
+
+  // Handle URL parameters for pre-selecting class
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const classId = urlParams.get('classId');
+    const className = urlParams.get('className');
+    
+    if (classId && className) {
+      // Pre-populate form with class and open dialog
+      form.setValue('classId', classId);
+      setIsCreateDialogOpen(true);
+      
+      // Clear URL parameters after handling
+      const newUrl = window.location.pathname;
+      window.history.replaceState(null, '', newUrl);
+    }
+  }, [form]);
 
   if (!user || !['company_admin', 'tutor'].includes(user.role)) {
     return (

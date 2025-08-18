@@ -24,7 +24,8 @@ import {
   GraduationCap,
   MoreHorizontal,
   Edit,
-  Trash2
+  Trash2,
+  FileText
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -830,6 +831,15 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           >
                             <Users className="w-4 h-4 mr-2" />
                             Add Student
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              // Navigate to assignment creation with class pre-selected
+                              window.location.href = `/company/assignments?classId=${classItem.id}&className=${encodeURIComponent(classItem.name)}`;
+                            }}
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            Create Assignment
                           </DropdownMenuItem>
                           <DropdownMenuItem className="text-red-600">
                             <Trash2 className="w-4 h-4 mr-2" />
