@@ -30,8 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      const res = await apiRequest("/api/auth/login", "POST", credentials);
-      return await res.json();
+      return await apiRequest("/api/auth/login", "POST", credentials);
     },
     onSuccess: (data) => {
       // Store JWT token
@@ -55,8 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: RegisterData) => {
-      const res = await apiRequest("/api/auth/register", "POST", credentials);
-      return await res.json();
+      return await apiRequest("/api/auth/register", "POST", credentials);
     },
     onSuccess: (data) => {
       toast({

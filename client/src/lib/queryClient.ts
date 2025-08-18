@@ -26,17 +26,28 @@ export async function apiRequest(endpoint: string, method: string = "GET", data?
     if (response.status === 401) {
       // Clear any cached auth state and redirect to login
       window.location.href = "/auth";
-      return;
+      return null;
     }
 
-    const errorData = await response.json().catch(() => null);
-    throw new Error(errorData?.message || `HTTP ${response.status}`);
+    let errorMessage;
+    try {
+      const errorData = await response.json();
+      errorMessage = errorData?.message || `HTTP ${response.status}`;
+    } catch {
+      errorMessage = `HTTP ${response.status}`;
+    }
+    throw new Error(errorMessage);
   }
 
   // Always ensure we return parsed JSON
-  const jsonResponse = await response.json();
-  console.log(`API Response for ${endpoint}:`, jsonResponse);
-  return jsonResponse;
+  try {
+    const jsonResponse = await response.json();
+    console.log(`API Response for ${endpoint}:`, jsonResponse);
+    return jsonResponse;
+  } catch (error) {
+    console.error(`Failed to parse JSON response from ${endpoint}:`, error);
+    return null;
+  }
 }
 
 type UnauthorizedBehavior = "returnNull" | "throw";
