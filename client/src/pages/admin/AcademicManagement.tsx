@@ -316,10 +316,6 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     },
   });
 
-  // Debug log
-  console.log('AcademicManagement component loaded with:', { companyId, companyName });
-  console.log('Academic terms data:', { academicTerms, termsLoading, isArray: Array.isArray(academicTerms) });
-
   // Fetch academic years
   const { data: academicYears = [], isLoading: yearsLoading, error: yearsError } = useQuery({
     queryKey: [`/api/companies/${companyId}/academic-years`],
@@ -363,6 +359,10 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     staleTime: 0, // Always refetch fresh data
     gcTime: 0, // Don't cache
   });
+
+  // Debug logs after all queries are defined
+  console.log('AcademicManagement component loaded with:', { companyId, companyName });
+  console.log('Academic terms data:', { academicTerms, termsLoading, isArray: Array.isArray(academicTerms) });
 
   const getDayName = (dayNumber: number) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
