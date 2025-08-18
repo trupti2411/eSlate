@@ -232,10 +232,15 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
 
   const createClassMutation = useMutation({
     mutationFn: async (data: ClassFormData) => {
-      return await apiRequest(`/api/companies/${companyId}/classes`, 'POST', {
+      // Transform the data to match the expected schema
+      const classData = {
         ...data,
         companyId,
-      });
+        // Convert single dayOfWeek to daysOfWeek array for the backend
+        daysOfWeek: data.dayOfWeek !== undefined ? [data.dayOfWeek] : [],
+        dayOfWeek: data.dayOfWeek, // Keep for backwards compatibility
+      };
+      return await apiRequest(`/api/companies/${companyId}/classes`, 'POST', classData);
     },
     onSuccess: () => {
       toast({
@@ -291,10 +296,15 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const updateClassMutation = useMutation({
     mutationFn: async (data: ClassFormData) => {
       if (!editingClass) throw new Error("No class selected for editing");
-      return await apiRequest(`/api/companies/${companyId}/classes/${editingClass.id}`, 'PUT', {
+      // Transform the data to match the expected schema
+      const classData = {
         ...data,
         companyId,
-      });
+        // Convert single dayOfWeek to daysOfWeek array for the backend
+        daysOfWeek: data.dayOfWeek !== undefined ? [data.dayOfWeek] : [],
+        dayOfWeek: data.dayOfWeek, // Keep for backwards compatibility
+      };
+      return await apiRequest(`/api/companies/${companyId}/classes/${editingClass.id}`, 'PUT', classData);
     },
     onSuccess: () => {
       toast({

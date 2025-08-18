@@ -457,7 +457,8 @@ export const classes = pgTable("classes", {
   description: text("description"),
   location: varchar("location"),
   tutorId: varchar("tutor_id").references(() => tutors.id, { onDelete: "set null" }),
-  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday, 1 = Monday, etc.
+  dayOfWeek: integer("day_of_week"), // 0 = Sunday, 1 = Monday, etc. (nullable for backwards compatibility)
+  daysOfWeek: integer("days_of_week").array().notNull().default([]), // Array of days for multi-day classes
   startTime: varchar("start_time").notNull(), // e.g., "09:00"
   endTime: varchar("end_time").notNull(), // e.g., "10:30"
   maxStudents: integer("max_students").default(20),

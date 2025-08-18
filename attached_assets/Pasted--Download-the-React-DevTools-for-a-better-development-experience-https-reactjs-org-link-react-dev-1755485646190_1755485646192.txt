@@ -1,0 +1,414 @@
+ Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+ CompanyAcademicManagement loaded. User: Object
+ Company admin query state: Object
+ Company query state: Object
+ Loading state triggered: Object
+ CompanyAcademicManagement loaded. User: Object
+ Company admin query state: Object
+ Company query state: Object
+ Loading state triggered: Object
+ CompanyAcademicManagement loaded. User: Object
+ Company admin query state: Object
+ Company query state: Object
+ Rendering AcademicManagement with: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(0)
+ Debug - Student data structure sample: undefined
+ Debug - Student names: Array(0)
+ Debug - Class IDs in students: Array(0)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(0)
+ Debug - Student data structure sample: undefined
+ Debug - Student names: Array(0)
+ Debug - Class IDs in students: Array(0)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+ Academic terms data: Object
+ Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+ Debug - All students: Array(3)
+ Debug - Student data structure sample: Object
+ Debug - Student names: Array(3)
+ Debug - Class IDs in students: Array(3)
+ Debug - Assigned students for this class: Array(0)
+ AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
+AcademicManagement.tsx:866 Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:866 Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:364 AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
+AcademicManagement.tsx:866 Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:866 Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:364 AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
+AcademicManagement.tsx:866 Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:866 Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:364 AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
+AcademicManagement.tsx:866 Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:866 Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:364 AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
+AcademicManagement.tsx:866 Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:866 Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:364 AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
+AcademicManagement.tsx:866 Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:866 Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:364 AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
+AcademicManagement.tsx:866 Debug - Class ID: 0d32f8c1-2a2a-4e4e-af9b-37695577558d
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+AcademicManagement.tsx:866 Debug - Class ID: 7658c77c-d525-4d89-b53d-bf15f24550f8
+AcademicManagement.tsx:867 Debug - All students: Array(3)
+AcademicManagement.tsx:868 Debug - Student data structure sample: Object
+AcademicManagement.tsx:869 Debug - Student names: Array(3)
+AcademicManagement.tsx:870 Debug - Class IDs in students: Array(3)
+AcademicManagement.tsx:871 Debug - Assigned students for this class: Array(0)
+/api/companies/fe80a24c-ad97-445f-8241-5ead71bccfd2/classes:1  Failed to load resource: the server responded with a status of 500 (Internal Server Error)
+CompanyAcademicManagement.tsx:26 CompanyAcademicManagement loaded. User: Object
+CompanyAcademicManagement.tsx:34 Company admin query state: Object
+CompanyAcademicManagement.tsx:42 Company query state: Object
+CompanyAcademicManagement.tsx:84 Rendering AcademicManagement with: Object
+AcademicManagement.tsx:364 AcademicManagement component loaded with: Object
+AcademicManagement.tsx:365 Academic terms data: Object
