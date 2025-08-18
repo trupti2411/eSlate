@@ -50,12 +50,16 @@ export function AssignmentManagement() {
   // Create assignment mutation
   const createAssignmentMutation = useMutation({
     mutationFn: async (data: AssignmentFormData) => {
+      console.log("Creating assignment with data:", data);
+      console.log("Using company ID:", companyId);
       const submissionDate = new Date(data.submissionDate);
-      return apiRequest(`/api/assignments`, 'POST', {
+      const payload = {
         ...data,
         submissionDate: submissionDate.toISOString(),
         companyId,
-      });
+      };
+      console.log("Assignment payload:", payload);
+      return apiRequest(`/api/assignments`, 'POST', payload);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'assignments'] });
@@ -65,10 +69,11 @@ export function AssignmentManagement() {
         description: "Assignment created successfully",
       });
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Assignment creation error:", error);
       toast({
         title: "Error",
-        description: "Failed to create assignment",
+        description: error?.message || "Failed to create assignment",
         variant: "destructive",
       });
     },

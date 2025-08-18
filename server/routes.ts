@@ -103,22 +103,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
+      console.log("Assignment creation request received:", {
+        body: req.body,
+        userId: user.id,
+        userRole: user.role
+      });
       
       // Only company_admin and tutor can create assignments
       if (!['company_admin', 'tutor'].includes(user.role)) {
+        console.log("Access denied for role:", user.role);
         return res.status(403).json({ message: "Access denied" });
       }
       
-      const validatedData = insertAssignmentSchema.parse({
+      const assignmentData = {
         ...req.body,
         createdBy: user.id
-      });
+      };
+      console.log("Processing assignment data:", assignmentData);
+      
+      const validatedData = insertAssignmentSchema.parse(assignmentData);
+      console.log("Validated assignment data:", validatedData);
       
       const assignment = await storage.createAssignment(validatedData);
+      console.log("Assignment created successfully:", assignment.id);
       res.status(201).json(assignment);
     } catch (error) {
       console.error("Error creating assignment:", error);
-      res.status(500).json({ message: "Failed to create assignment" });
+      if (error instanceof Error) {
+        res.status(400).json({ message: error.message });
+      } else {
+        res.status(500).json({ message: "Failed to create assignment" });
+      }
     }
   });
 
