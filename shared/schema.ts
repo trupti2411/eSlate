@@ -563,24 +563,7 @@ export type InsertAcademicTerm = z.infer<typeof insertAcademicTermSchema>;
 export type InsertClass = z.infer<typeof insertClassSchema>;
 export type InsertStudentAssignment = z.infer<typeof insertStudentClassAssignmentSchema>;
 
-export type InsertStudent = z.infer<typeof insertStudentSchema>;
-export type Student = typeof students.$inferSelect;
-export type InsertParent = z.infer<typeof insertParentSchema>;
-export type Parent = typeof parents.$inferSelect;
-export type InsertTutor = z.infer<typeof insertTutorSchema>;
-export type Tutor = typeof tutors.$inferSelect;
-export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
-export type Assignment = typeof assignments.$inferSelect;
-export type InsertSubmission = z.infer<typeof insertSubmissionSchema>;
-export type Submission = typeof submissions.$inferSelect;
-export type InsertMessage = z.infer<typeof insertMessageSchema>;
-export type Message = typeof messages.$inferSelect;
-export type InsertProgress = z.infer<typeof insertProgressSchema>;
-export type Progress = typeof progress.$inferSelect;
-export type InsertCalendarEvent = z.infer<typeof insertCalendarEventSchema>;
-export type CalendarEvent = typeof calendarEvents.$inferSelect;
-export type InsertTutoringCompany = z.infer<typeof insertTutoringCompanySchema>;
-export type TutoringCompany = typeof tutoringCompanies.$inferSelect;
+
 export type InsertCompanyAdmin = z.infer<typeof insertCompanyAdminSchema>;
 export type CompanyAdmin = typeof companyAdmins.$inferSelect;
 

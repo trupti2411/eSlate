@@ -14,7 +14,8 @@ import {
 } from "@shared/schema";
 import multer from "multer";
 import { randomUUID } from "crypto";
-import { db, assignments, submissions } from "./db"; // Assuming db, assignments, and submissions are exported from './db'
+import { db } from "./db";
+import { assignments, submissions } from "@shared/schema";
 
 // Global declaration for file storage
 declare global {
