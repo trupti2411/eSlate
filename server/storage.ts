@@ -44,7 +44,7 @@ import {
   type InsertUser,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, isNull, sql, arrayContains } from "drizzle-orm";
+import { eq, and, or, desc, isNull, sql, arrayContains, inArray } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (supports both Replit Auth and Custom Auth)
@@ -174,6 +174,12 @@ export interface IStorage {
   getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
   deleteSubmission(id: string): Promise<void>;
+
+  // Student portal methods
+  getStudentTerms(studentId: string): Promise<AcademicTerm[]>;
+  getStudentClasses(studentId: string): Promise<Class[]>;
+  getStudentAssignments(studentId: string): Promise<Assignment[]>;
+  getStudentSubmissions(studentId: string): Promise<Submission[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1025,20 +1031,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateAssignment(id: string, updates: Partial<InsertAssignment>): Promise<Assignment> {
-    const [assignment] = await db.update(assignments)
-      .set(updates)
-      .where(eq(assignments.id, id))
-      .returning();
-    return assignment;
-  }
-
-  async deleteAssignment(id: string): Promise<void> {
-    await db.update(assignments)
-      .set({ isActive: false })
-      .where(eq(assignments.id, id));
-  }
-
-  async updateAssignment(id: string, updates: Partial<InsertAssignment>): Promise<Assignment> {
     const [updatedAssignment] = await db.update(assignments)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(assignments.id, id))
@@ -1085,6 +1077,61 @@ export class DatabaseStorage implements IStorage {
 
   async deleteSubmission(id: string): Promise<void> {
     await db.delete(submissions).where(eq(submissions.id, id));
+  }
+
+  // Student Portal Methods
+  async getStudentTerms(studentId: string): Promise<AcademicTerm[]> {
+    const student = await this.getStudent(studentId);
+    if (!student) {
+      throw new Error("Student not found");
+    }
+    
+    // Get all terms for the student's company
+    return await db.select().from(academicTerms)
+      .where(eq(academicTerms.companyId, student.companyId))
+      .orderBy(desc(academicTerms.startDate));
+  }
+
+  async getStudentClasses(studentId: string): Promise<Class[]> {
+    const student = await this.getStudent(studentId);
+    if (!student) {
+      throw new Error("Student not found");
+    }
+    
+    // Get classes for the student's company
+    return await db.select().from(classes)
+      .where(eq(classes.companyId, student.companyId))
+      .orderBy(classes.name);
+  }
+
+  async getStudentAssignments(studentId: string): Promise<Assignment[]> {
+    const student = await this.getStudent(studentId);
+    if (!student) {
+      throw new Error("Student not found");
+    }
+    
+    // Get classes for this student's company
+    const studentClasses = await db.select().from(classes)
+      .where(eq(classes.companyId, student.companyId));
+    const classIds = studentClasses.map(cls => cls.id);
+    
+    if (classIds.length === 0) {
+      return [];
+    }
+    
+    // Get assignments for these classes
+    return await db.select().from(assignments)
+      .where(and(
+        inArray(assignments.classId, classIds),
+        eq(assignments.isActive, true)
+      ))
+      .orderBy(desc(assignments.createdAt));
+  }
+
+  async getStudentSubmissions(studentId: string): Promise<Submission[]> {
+    return await db.select().from(submissions)
+      .where(eq(submissions.studentId, studentId))
+      .orderBy(desc(submissions.createdAt));
   }
 }
 

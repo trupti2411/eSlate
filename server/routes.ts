@@ -100,6 +100,96 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===== STUDENT PORTAL ROUTES =====
+  
+  // Get student's terms
+  app.get('/api/students/:studentId/terms', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const user = req.user!;
+      const { studentId } = req.params;
+      
+      // Verify student access
+      if (user.role === 'student') {
+        const studentProfile = await storage.getStudentByUserId(user.id);
+        if (!studentProfile || studentProfile.id !== studentId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      const terms = await storage.getStudentTerms(studentId);
+      res.json(terms);
+    } catch (error) {
+      console.error("Error fetching student terms:", error);
+      res.status(500).json({ message: "Failed to fetch terms" });
+    }
+  });
+
+  // Get student's classes
+  app.get('/api/students/:studentId/classes', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const user = req.user!;
+      const { studentId } = req.params;
+      
+      // Verify student access
+      if (user.role === 'student') {
+        const studentProfile = await storage.getStudentByUserId(user.id);
+        if (!studentProfile || studentProfile.id !== studentId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      const classes = await storage.getStudentClasses(studentId);
+      res.json(classes);
+    } catch (error) {
+      console.error("Error fetching student classes:", error);
+      res.status(500).json({ message: "Failed to fetch classes" });
+    }
+  });
+
+  // Get student's assignments
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const user = req.user!;
+      const { studentId } = req.params;
+      
+      // Verify student access
+      if (user.role === 'student') {
+        const studentProfile = await storage.getStudentByUserId(user.id);
+        if (!studentProfile || studentProfile.id !== studentId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      const assignments = await storage.getStudentAssignments(studentId);
+      res.json(assignments);
+    } catch (error) {
+      console.error("Error fetching student assignments:", error);
+      res.status(500).json({ message: "Failed to fetch assignments" });
+    }
+  });
+
+  // Get student's submissions
+  app.get('/api/students/:studentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const user = req.user!;
+      const { studentId } = req.params;
+      
+      // Verify student access
+      if (user.role === 'student') {
+        const studentProfile = await storage.getStudentByUserId(user.id);
+        if (!studentProfile || studentProfile.id !== studentId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      const submissions = await storage.getStudentSubmissions(studentId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching student submissions:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
   // Create assignment
   app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
@@ -388,6 +478,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching company students:", error);
       res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  // Student Portal API Routes
+  app.get('/api/students/:studentId/terms', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const terms = await storage.getStudentTerms(studentId);
+      res.json(terms);
+    } catch (error) {
+      console.error('Error fetching student terms:', error);
+      res.status(500).json({ message: 'Failed to fetch terms' });
+    }
+  });
+
+  app.get('/api/students/:studentId/classes', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const classes = await storage.getStudentClasses(studentId);
+      res.json(classes);
+    } catch (error) {
+      console.error('Error fetching student classes:', error);
+      res.status(500).json({ message: 'Failed to fetch classes' });
+    }
+  });
+
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const assignments = await storage.getStudentAssignments(studentId);
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error fetching student assignments:', error);
+      res.status(500).json({ message: 'Failed to fetch assignments' });
+    }
+  });
+
+  app.get('/api/students/:studentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const submissions = await storage.getStudentSubmissions(studentId);
+      res.json(submissions);
+    } catch (error) {
+      console.error('Error fetching student submissions:', error);
+      res.status(500).json({ message: 'Failed to fetch submissions' });
+    }
+  });
+
+  // Get student profile from user ID
+  app.get('/api/auth/student-profile', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
+      
+      const student = await storage.getStudentByUserId(userId);
+      if (!student) {
+        return res.status(404).json({ message: 'Student profile not found' });
+      }
+      
+      res.json(student);
+    } catch (error) {
+      console.error('Error fetching student profile:', error);
+      res.status(500).json({ message: 'Failed to fetch student profile' });
     }
   });
 

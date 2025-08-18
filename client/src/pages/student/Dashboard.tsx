@@ -7,7 +7,9 @@ import ProgressChart from "@/components/ProgressChart";
 import MessageCenter from "@/components/MessageCenter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Clock, CheckCircle, MessageSquare } from "lucide-react";
+import { BookOpen, Clock, CheckCircle, MessageSquare, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Link } from "wouter";
 
 export default function StudentDashboard() {
   const { toast } = useToast();
@@ -28,7 +30,7 @@ export default function StudentDashboard() {
     }
   }, [isAuthenticated, isLoading, toast]);
 
-  const { data: progress, isLoading: progressLoading } = useQuery({
+  const { data: progress = [], isLoading: progressLoading } = useQuery<any[]>({
     queryKey: ["/api/progress"],
     enabled: !!user,
   });
@@ -52,6 +54,29 @@ export default function StudentDashboard() {
           <p className="text-gray-600">Welcome back, {user?.firstName || 'Student'}!</p>
         </div>
 
+        {/* Quick Actions */}
+        <div className="mb-8">
+          <Card className="eink-card bg-gray-50 border-2 border-black">
+            <CardHeader>
+              <CardTitle className="text-xl flex items-center">
+                <BookOpen className="h-6 w-6 mr-2" />
+                Student Portal
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-gray-700">
+                Access your comprehensive learning portal with assignments, classes, terms, and online completion tools optimized for e-ink devices.
+              </p>
+              <Link href="/student/portal">
+                <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 shadow-none">
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Open Student Portal
+                </Button>
+              </Link>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Stats Overview */}
         <div className="dashboard-grid mb-8">
           <Card className="eink-card">
@@ -62,7 +87,7 @@ export default function StudentDashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{progress?.length || 0}</div>
+              <div className="text-2xl font-bold">{progress.length || 0}</div>
               <p className="text-sm text-gray-600">Study sessions</p>
             </CardContent>
           </Card>
@@ -76,7 +101,7 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {progress?.reduce((total, p) => total + (p.timeSpent || 0), 0) || 0}
+                {progress.reduce((total: number, p: any) => total + (p.timeSpent || 0), 0) || 0}
               </div>
               <p className="text-sm text-gray-600">Minutes studied</p>
             </CardContent>
@@ -91,7 +116,7 @@ export default function StudentDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {progress?.filter(p => p.completionPercentage === 100).length || 0}
+                {progress.filter((p: any) => p.completionPercentage === 100).length || 0}
               </div>
               <p className="text-sm text-gray-600">Activities completed</p>
             </CardContent>
