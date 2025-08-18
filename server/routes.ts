@@ -532,22 +532,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Find the file in the attachment URLs
-      const fileUrl = assignment.attachmentUrls?.find(url => url.includes(filename));
-      if (!fileUrl) {
-        return res.status(404).json({ message: "File not found" });
-      }
+      // The filename parameter is actually the file ID
+      const fileId = filename;
+      console.log(`Looking for assignment file with ID: ${fileId}`);
+      console.log("Available files:", Array.from((global.uploadedFiles || new Map()).keys()));
       
-      // Extract file ID from URL and serve the file
-      const fileId = fileUrl.split('/').pop();
-      const fileData = global.uploadedFiles.get(fileId!);
+      // Check if this file ID exists in uploaded files
+      const uploadedFiles = global.uploadedFiles || new Map();
+      const fileData = uploadedFiles.get(fileId);
       
       if (!fileData) {
+        console.error(`File ${fileId} not found in uploaded files`);
         return res.status(404).json({ message: "File not found" });
       }
       
+      console.log("Found assignment file:", fileData.originalname);
       res.setHeader('Content-Disposition', `inline; filename="${fileData.originalname}"`);
-      res.setHeader('Content-Type', fileData.mimetype);
+      res.setHeader('Content-Type', fileData.mimetype || 'application/octet-stream');
+      res.setHeader('Content-Length', fileData.size);
       res.send(fileData.buffer);
     } catch (error) {
       console.error("Error serving assignment file:", error);

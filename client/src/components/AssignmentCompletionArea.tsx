@@ -131,16 +131,7 @@ export function AssignmentCompletionArea({
     });
   };
 
-  const downloadFile = (url: string, filename: string) => {
-    // Create a link to download the file
-    const link = document.createElement('a');
-    link.href = `/api/assignments/${assignment.id}/files/${filename}`;
-    link.download = filename;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+
 
   const eInkStyles = {
     card: "bg-white border-2 border-black rounded shadow-sm",
@@ -232,7 +223,10 @@ export function AssignmentCompletionArea({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => window.open(`/api/assignments/${assignment.id}/files/${filename}`, '_blank')}
+                          onClick={() => {
+                            const fileId = url.split('/').pop();
+                            window.open(`/api/assignments/${assignment.id}/files/${fileId}`, '_blank');
+                          }}
                           className={eInkStyles.button}
                         >
                           <Eye className="h-3 w-3 mr-1" />
@@ -241,7 +235,16 @@ export function AssignmentCompletionArea({
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => downloadFile(url, filename)}
+                          onClick={() => {
+                            const fileId = url.split('/').pop();
+                            const link = document.createElement('a');
+                            link.href = `/api/assignments/${assignment.id}/files/${fileId}`;
+                            link.download = filename;
+                            link.target = '_blank';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
                           className={eInkStyles.button}
                         >
                           <Download className="h-3 w-3 mr-1" />
