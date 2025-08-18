@@ -14,6 +14,7 @@ import {
 } from "@shared/schema";
 import multer from "multer";
 import { randomUUID } from "crypto";
+import { db, assignments, submissions } from "./db"; // Assuming db, assignments, and submissions are exported from './db'
 
 // Global declaration for file storage
 declare global {
@@ -84,7 +85,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Simple in-memory storage
       const fileId = randomUUID();
       const fileUrl = `/api/files/${fileId}`;
-      
+
       // Store file in memory with file ID
       global.uploadedFiles = global.uploadedFiles || new Map();
       global.uploadedFiles.set(fileId, {
@@ -117,16 +118,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const uploadedFiles = global.uploadedFiles || new Map();
       console.log("Available files:", Array.from(uploadedFiles.keys()));
-      
+
       if (uploadedFiles.has(fileId)) {
         const file = uploadedFiles.get(fileId);
         console.log("Found file:", file.originalname);
-        
+
         // Set proper headers for download
         res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
         res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
         res.setHeader('Content-Length', file.size);
-        
+
         // Send the file buffer
         return res.send(file.buffer);
       }
@@ -331,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/users', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin') {
         return res.status(403).json({ message: "Admin access required" });
       }
@@ -348,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/companies', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin or company admin access required" });
       }
@@ -365,7 +366,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           companies = [];
         }
       }
-      
+
       res.json(companies);
     } catch (error) {
       console.error("Error fetching companies:", error);
@@ -377,7 +378,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { companyId } = req.params;
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin or company admin access required" });
       }
@@ -401,7 +402,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { companyId } = req.params;
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin or company admin access required" });
       }
@@ -426,7 +427,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { userId } = req.params;
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.id !== userId) {
         return res.status(403).json({ message: "Access denied" });
       }
@@ -442,7 +443,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin or company admin access required" });
       }
@@ -458,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           years = [];
         }
       }
-      
+
       res.json(years);
     } catch (error) {
       console.error("Error fetching academic years:", error);
@@ -469,7 +470,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
       const user = req.user!;
-      
+
       if (user.role !== 'admin' && user.role !== 'company_admin') {
         return res.status(403).json({ message: "Admin or company admin access required" });
       }
@@ -492,11 +493,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Data clearing routes (admin only)
+  app.delete('/api/admin/clear-assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const user = req.user!;
+
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      await storage.clearAllAssignments();
+      await storage.clearAllSubmissions();
+
+      res.json({ message: "All assignments and submissions cleared successfully" });
+    } catch (error) {
+      console.error("Error clearing assignments:", error);
+      res.status(500).json({ message: "Failed to clear assignments" });
+    }
+  });
+
   // Create HTTP server without WebSocket conflicts
   const httpServer = createServer(app);
-  
+
   // Note: WebSocket setup disabled to prevent conflicts with Vite HMR
   // Real-time messaging can be implemented with polling or SSE if needed
-  
+
   return httpServer;
+}
+
+// Clear all assignment and submission data
+async function clearAllAssignments(): Promise<void> {
+  console.log("Deleting all assignments...");
+  await db.delete(assignments);
+  console.log("All assignments deleted");
+}
+
+async function clearAllSubmissions(): Promise<void> {
+  console.log("Deleting all submissions...");
+  await db.delete(submissions);
+  console.log("All submissions deleted");
 }

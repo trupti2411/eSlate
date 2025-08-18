@@ -454,10 +454,12 @@ export const classes = pgTable("classes", {
   companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
   name: varchar("name").notNull(), // e.g., "Mathematics A", "English Literature"
   subject: varchar("subject").notNull(),
+  description: text("description"),
+  location: varchar("location"),
   tutorId: varchar("tutor_id").references(() => tutors.id, { onDelete: "set null" }),
+  dayOfWeek: integer("day_of_week").notNull(), // 0 = Sunday, 1 = Monday, etc.
   startTime: varchar("start_time").notNull(), // e.g., "09:00"
   endTime: varchar("end_time").notNull(), // e.g., "10:30"
-  daysOfWeek: varchar("days_of_week").array().notNull(), // e.g., ["Monday", "Wednesday", "Friday"]
   maxStudents: integer("max_students").default(20),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

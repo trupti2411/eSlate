@@ -103,8 +103,10 @@ const classSchema = z.object({
   subject: z.string().min(1, "Subject is required"),
   startTime: z.string().min(1, "Start time is required"),
   endTime: z.string().min(1, "End time is required"),
-  daysOfWeek: z.array(z.string()).min(1, "At least one day is required"),
+  dayOfWeek: z.number().int().min(0).max(6), // Changed from daysOfWeek array to single dayOfWeek number
   maxStudents: z.number().min(1).optional(),
+  description: z.string().optional(),
+  location: z.string().optional(),
 });
 
 type AcademicYearFormData = z.infer<typeof academicYearSchema>;
@@ -116,7 +118,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [activeTab, setActiveTab] = useState<'overview' | 'years' | 'terms' | 'classes'>('overview');
   const [selectedYearId, setSelectedYearId] = useState<string | null>(null);
   const [selectedTermId, setSelectedTermId] = useState<string | null>(null);
-  
+
   // Dialog states
   const [isAddYearOpen, setIsAddYearOpen] = useState(false);
   const [isAddTermOpen, setIsAddTermOpen] = useState(false);
@@ -155,8 +157,10 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       subject: '',
       startTime: '',
       endTime: '',
-      daysOfWeek: [],
+      dayOfWeek: undefined, // Initialize as undefined or a default day
       maxStudents: 20,
+      description: '',
+      location: '',
     },
   });
 
@@ -531,7 +535,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                               </div>
                                               <div className="flex flex-wrap gap-1 mt-2">
                                                 <Badge variant="outline" className="text-xs px-1 py-0">
-                                                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][cls.dayOfWeek]}
+                                                  {getDayName(cls.dayOfWeek)}
                                                 </Badge>
                                               </div>
                                             </div>
@@ -796,10 +800,10 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                 subject: classItem.subject,
                                 startTime: classItem.startTime,
                                 endTime: classItem.endTime,
-                                daysOfWeek: classItem.daysOfWeek || [],
+                                dayOfWeek: classItem.dayOfWeek, // Use dayOfWeek directly
                                 maxStudents: classItem.maxStudents,
-                                location: classItem.location || '',
                                 description: classItem.description || '',
+                                location: classItem.location || '',
                               });
                             }}
                           >
@@ -853,7 +857,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       <Badge variant={classItem.isActive ? "default" : "secondary"}>
                         {classItem.isActive ? "Active" : "Inactive"}
                       </Badge>
-                      
+
                       {/* Show assigned students */}
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         {(() => {
@@ -1167,32 +1171,55 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                   )}
                 />
               </div>
+              {/* Updated dayOfWeek selection */}
               <FormField
                 control={classForm.control}
-                name="daysOfWeek"
+                name="dayOfWeek"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Days of Week</FormLabel>
-                    <div className="grid grid-cols-4 gap-2">
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                        <label key={day} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={field.value?.includes(day) || false}
-                            onChange={(e) => {
-                              const current = field.value || [];
-                              if (e.target.checked) {
-                                field.onChange([...current, day]);
-                              } else {
-                                field.onChange(current.filter((d) => d !== day));
-                              }
-                            }}
-                            className="rounded border-gray-300"
-                          />
-                          <span className="text-sm">{day.slice(0, 3)}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <FormLabel>Day of Week</FormLabel>
+                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a day" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="1">Monday</SelectItem>
+                        <SelectItem value="2">Tuesday</SelectItem>
+                        <SelectItem value="3">Wednesday</SelectItem>
+                        <SelectItem value="4">Thursday</SelectItem>
+                        <SelectItem value="5">Friday</SelectItem>
+                        <SelectItem value="6">Saturday</SelectItem>
+                        <SelectItem value="0">Sunday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={classForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Brief description of the class" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={classForm.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Room 101, Online" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -1394,32 +1421,55 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                   )}
                 />
               </div>
+              {/* Updated dayOfWeek selection for editing */}
               <FormField
                 control={classForm.control}
-                name="daysOfWeek"
+                name="dayOfWeek"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Days of Week</FormLabel>
-                    <div className="grid grid-cols-4 gap-2">
-                      {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                        <label key={day} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            checked={field.value?.includes(day) || false}
-                            onChange={(e) => {
-                              const current = field.value || [];
-                              if (e.target.checked) {
-                                field.onChange([...current, day]);
-                              } else {
-                                field.onChange(current.filter((d) => d !== day));
-                              }
-                            }}
-                            className="rounded border-gray-300"
-                          />
-                          <span className="text-sm">{day.slice(0, 3)}</span>
-                        </label>
-                      ))}
-                    </div>
+                    <FormLabel>Day of Week</FormLabel>
+                    <Select onValueChange={(value) => field.onChange(parseInt(value))} value={field.value?.toString()}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a day" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="1">Monday</SelectItem>
+                        <SelectItem value="2">Tuesday</SelectItem>
+                        <SelectItem value="3">Wednesday</SelectItem>
+                        <SelectItem value="4">Thursday</SelectItem>
+                        <SelectItem value="5">Friday</SelectItem>
+                        <SelectItem value="6">Saturday</SelectItem>
+                        <SelectItem value="0">Sunday</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={classForm.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Brief description of the class" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={classForm.control}
+                name="location"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Location (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Room 101, Online" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -43,6 +43,7 @@ import {
   type StudentClassAssignment,
   type InsertStudentClassAssignment,
   type UpsertUser,
+  type InsertTutoringCompany,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains } from "drizzle-orm";
@@ -117,6 +118,10 @@ export interface IStorage {
   getAllTutoringCompanies(): Promise<TutoringCompany[]>;
   updateTutoringCompany(id: string, updates: Partial<InsertTutoringCompany>): Promise<TutoringCompany>;
   getCompanyStudentsByCompanyId(companyId: string): Promise<any[]>;
+  getCompanyUsersByCompanyId(companyId: string): Promise<User[]>;
+  getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]>;
+  updateCompanyStatus(companyId: string, isActive: boolean): Promise<void>;
+
 
   // Company Admin operations
   getCompanyAdmin(id: string): Promise<CompanyAdmin | undefined>;
@@ -132,6 +137,13 @@ export interface IStorage {
   createUserWithRole(userData: Partial<UpsertUser> & { role: string }): Promise<User>;
   updateUser(id: string, updates: Partial<UpsertUser>): Promise<User>;
   deleteUser(userId: string, deletedBy: string): Promise<void>;
+  updateUserStatus(userId: string, isActive: boolean): Promise<void>;
+
+
+  // Tutor assignment operations
+  assignTutorToCompany(tutorId: string, companyId: string): Promise<void>;
+  unassignTutorFromCompany(tutorId: string): Promise<void>;
+  getUnassignedTutors(): Promise<any[]>;
 
   // Academic management methods
   // Academic Years
