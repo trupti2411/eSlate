@@ -364,7 +364,6 @@ export const insertAssignmentSchema = createInsertSchema(assignments).omit({
 export const insertSubmissionSchema = createInsertSchema(submissions).omit({
   id: true,
   submittedAt: true,
-  parentVerifiedAt: true,
   gradedAt: true,
   createdAt: true,
   updatedAt: true,

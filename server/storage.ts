@@ -519,7 +519,7 @@ export class DatabaseStorage implements IStorage {
     return company;
   }
 
-  async getUsersByCompany(companyId: string): Promise<User[]> {
+  async getCompanyUsersByCompanyId(companyId: string): Promise<User[]> {
     try {
       // Get all tutors for this company
       const companyTutors = await db.select({
@@ -716,8 +716,7 @@ export class DatabaseStorage implements IStorage {
 
   async createUserWithRole(userData: Partial<InsertUser> & { role: string }): Promise<User> {
     const [user] = await db.insert(users).values({
-      id: userData.id,
-      email: userData.email,
+      email: userData.email!,
       firstName: userData.firstName,
       lastName: userData.lastName,
       profileImageUrl: userData.profileImageUrl,
