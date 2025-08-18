@@ -32,13 +32,8 @@ export function AssignmentManagement() {
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [preSelectedClass, setPreSelectedClass] = useState<{ id: string; name: string } | null>(null);
 
-  // Get user's company ID
-  const { data: userCompany } = useQuery({
-    queryKey: ['/api/auth/company'],
-    enabled: !!user && (user.role === 'company_admin' || user.role === 'tutor'),
-  });
-
-  const companyId = (userCompany as { id: string })?.id;
+  // Get user's company ID from roleData
+  const companyId = (user as any)?.roleData?.companyId;
 
   // Fetch assignments for the company
   const { data: assignments = [], isLoading: isLoadingAssignments } = useQuery<Assignment[]>({

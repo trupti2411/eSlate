@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 
 import { storage } from "./storage";
-import { setupCustomAuth, isAuthenticated } from "./customAuth";
+import { setupCustomAuth, isAuthenticated, type AuthenticatedRequest } from "./customAuth";
 import {
   insertMessageSchema,
   insertProgressSchema,
@@ -59,9 +59,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Company Portal - Assignment Management (Company Admin & Tutor access)
   
   // Get assignments by company
-  app.get('/api/companies/:companyId/assignments', isAuthenticated, async (req: any, res: any) => {
+  app.get('/api/companies/:companyId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const companyId = req.params.companyId;
       
       // Verify user has access to this company
@@ -88,7 +88,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get assignments by class
-  app.get('/api/classes/:classId/assignments', isAuthenticated, async (req, res) => {
+  app.get('/api/classes/:classId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const classId = req.params.classId;
       const assignments = await storage.getAssignmentsByClass(classId);
@@ -100,9 +100,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create assignment
-  app.post('/api/assignments', isAuthenticated, async (req: any, res: any) => {
+  app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       
       // Only company_admin and tutor can create assignments
       if (!['company_admin', 'tutor'].includes(user.role)) {
@@ -123,9 +123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update assignment
-  app.patch('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
+  app.patch('/api/assignments/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const assignmentId = req.params.id;
       
       // Verify user created this assignment or is company admin
@@ -155,9 +155,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete assignment
-  app.delete('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
+  app.delete('/api/assignments/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const assignmentId = req.params.id;
       
       // Verify user created this assignment or is company admin
@@ -186,9 +186,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // File upload for assignments
-  app.post('/api/assignments/:id/upload', isAuthenticated, upload.array('files', 10), async (req, res) => {
+  app.post('/api/assignments/:id/upload', isAuthenticated, upload.array('files', 10), async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const assignmentId = req.params.id;
       const files = req.files as Express.Multer.File[];
       
@@ -240,9 +240,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Student Portal - Assignment Viewing and Submission
   
   // Get student's assignments
-  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: any, res: any) => {
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const studentId = req.params.studentId;
       
       // Verify user is the student or has access
@@ -272,9 +272,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create submission
-  app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: any, res: any) => {
+  app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const assignmentId = req.params.assignmentId;
       
       // Only students can create submissions
@@ -302,9 +302,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update submission
-  app.patch('/api/submissions/:id', isAuthenticated, async (req: any, res: any) => {
+  app.patch('/api/submissions/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const submissionId = req.params.id;
       
       const existingSubmission = await storage.getSubmission(submissionId);
@@ -330,9 +330,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get submissions for assignment (for tutors/admins)
-  app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: any, res: any) => {
+  app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
-      const user = (req as any).user;
+      const user = req.user!;
       const assignmentId = req.params.assignmentId;
       
       // Verify user has access to this assignment
@@ -349,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company students route
-  app.get('/api/company/students', isAuthenticated, async (req: any, res: any) => {
+  app.get('/api/company/students', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
       let students: any[] = [];
@@ -369,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Simple file upload route
-  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
+  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res: any) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
