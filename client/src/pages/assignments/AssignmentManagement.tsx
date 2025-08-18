@@ -20,6 +20,9 @@ import { useToast } from "@/hooks/use-toast";
 
 const assignmentFormSchema = insertAssignmentSchema.extend({
   submissionDate: z.string(),
+}).omit({
+  companyId: true,
+  createdBy: true,
 });
 
 type AssignmentFormData = z.infer<typeof assignmentFormSchema>;
@@ -122,6 +125,11 @@ export function AssignmentManagement() {
       subject: "",
       totalMarks: 100,
       classId: "",
+      attachmentUrls: [],
+      allowedFileTypes: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg'],
+      maxFileSize: 31457280,
+      status: 'assigned',
+      isActive: true,
     },
   });
 
