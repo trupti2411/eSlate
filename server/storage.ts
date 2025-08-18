@@ -756,6 +756,17 @@ export class DatabaseStorage implements IStorage {
     return company;
   }
 
+  async getCompany(id: string): Promise<TutoringCompany | undefined> {
+    const [company] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, id));
+    return company;
+  }
+
+  async getAllCompanies(): Promise<TutoringCompany[]> {
+    return await db.select().from(tutoringCompanies)
+      .where(eq(tutoringCompanies.isActive, true))
+      .orderBy(tutoringCompanies.name);
+  }
+
   async getTutoringCompanyById(id: string): Promise<TutoringCompany | undefined> {
     const [company] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, id));
     return company;

@@ -493,6 +493,257 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Academic Years routes
+  app.get('/api/companies/:companyId/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const years = await storage.getAcademicYearsByCompany(companyId);
+      res.json(years);
+    } catch (error) {
+      console.error("Error fetching academic years:", error);
+      res.status(500).json({ message: "Failed to fetch academic years" });
+    }
+  });
+
+  app.post('/api/companies/:companyId/academic-years', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const validatedData = insertAcademicYearSchema.parse({
+        ...req.body,
+        companyId
+      });
+
+      const year = await storage.createAcademicYear(validatedData);
+      res.json(year);
+    } catch (error) {
+      console.error("Error creating academic year:", error);
+      res.status(500).json({ message: "Failed to create academic year" });
+    }
+  });
+
+  // Academic Terms routes
+  app.get('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const { yearId } = req.query;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      let terms;
+      if (yearId) {
+        terms = await storage.getAcademicTermsByYear(yearId as string);
+      } else {
+        terms = await storage.getAcademicTermsByCompany(companyId);
+      }
+
+      res.json(terms);
+    } catch (error) {
+      console.error("Error fetching academic terms:", error);
+      res.status(500).json({ message: "Failed to fetch academic terms" });
+    }
+  });
+
+  app.post('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const validatedData = insertAcademicTermSchema.parse({
+        ...req.body,
+        companyId
+      });
+
+      const term = await storage.createAcademicTerm(validatedData);
+      res.json(term);
+    } catch (error) {
+      console.error("Error creating academic term:", error);
+      res.status(500).json({ message: "Failed to create academic term" });
+    }
+  });
+
+  // Classes routes
+  app.get('/api/companies/:companyId/classes', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const { termId } = req.query;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      let classes;
+      if (termId) {
+        classes = await storage.getClassesByTerm(termId as string);
+      } else {
+        classes = await storage.getClassesByCompany(companyId);
+      }
+
+      res.json(classes);
+    } catch (error) {
+      console.error("Error fetching classes:", error);
+      res.status(500).json({ message: "Failed to fetch classes" });
+    }
+  });
+
+  app.post('/api/companies/:companyId/classes', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const validatedData = insertClassSchema.parse({
+        ...req.body,
+        companyId
+      });
+
+      const classItem = await storage.createClass(validatedData);
+      res.json(classItem);
+    } catch (error) {
+      console.error("Error creating class:", error);
+      res.status(500).json({ message: "Failed to create class" });
+    }
+  });
+
+  app.put('/api/companies/:companyId/classes/:classId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId, classId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const validatedData = insertClassSchema.parse({
+        ...req.body,
+        companyId
+      });
+
+      const classItem = await storage.updateClass(classId, validatedData);
+      res.json(classItem);
+    } catch (error) {
+      console.error("Error updating class:", error);
+      res.status(500).json({ message: "Failed to update class" });
+    }
+  });
+
+  // Academic hierarchy route
+  app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const academicYears = await storage.getAcademicYearsByCompany(companyId);
+      
+      // Build hierarchical structure
+      const hierarchy = await Promise.all(
+        academicYears.map(async (year) => {
+          const terms = await storage.getAcademicTermsByYear(year.id);
+          const termsWithClasses = await Promise.all(
+            terms.map(async (term) => {
+              const classes = await storage.getClassesByTerm(term.id);
+              return {
+                ...term,
+                classes
+              };
+            })
+          );
+          return {
+            ...year,
+            terms: termsWithClasses
+          };
+        })
+      );
+
+      res.json(hierarchy);
+    } catch (error) {
+      console.error("Error fetching academic hierarchy:", error);
+      res.status(500).json({ message: "Failed to fetch academic hierarchy" });
+    }
+  });
+
   // Data clearing routes (admin only)
   app.delete('/api/admin/clear-assignments', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {
