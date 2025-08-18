@@ -277,8 +277,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       // Force refetch of students data to show updated assignments
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
-      queryClient.refetchQueries({ queryKey: [`/api/companies/${companyId}/students`] });
-      // Also force a fresh refetch to ensure we see the latest data
+      // Force a fresh refetch
       refetchStudents();
       setAssigningStudentId(null);
       setIsAddStudentToClassOpen(false);

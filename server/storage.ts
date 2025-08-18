@@ -404,6 +404,9 @@ export class DatabaseStorage implements IStorage {
       parentId: students.parentId,
       tutorId: students.tutorId,
       companyId: students.companyId,
+      classId: students.classId, // Include classId for class assignments
+      schoolName: students.schoolName,
+      dateOfBirth: students.dateOfBirth,
       user: {
         id: users.id,
         email: users.email,
@@ -601,6 +604,9 @@ export class DatabaseStorage implements IStorage {
         parentId: students.parentId,
         tutorId: students.tutorId,
         companyId: students.companyId,
+        classId: students.classId, // Include classId for class assignments
+        schoolName: students.schoolName,
+        dateOfBirth: students.dateOfBirth,
         user: {
           id: users.id,
           email: users.email,
