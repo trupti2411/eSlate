@@ -278,6 +278,8 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
       queryClient.refetchQueries({ queryKey: [`/api/companies/${companyId}/students`] });
+      // Also force a fresh refetch to ensure we see the latest data
+      refetchStudents();
       setAssigningStudentId(null);
       setIsAddStudentToClassOpen(false);
       setSelectedClassForStudents(null);
@@ -365,7 +367,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   // Fetch active students for the company
   const { data: activeStudents = [], isLoading: studentsLoading, refetch: refetchStudents } = useQuery({
     queryKey: [`/api/companies/${companyId}/students`],
-    enabled: !!companyId && activeTab === 'classes',
+    enabled: !!companyId,  // Enable for all tabs so student assignments are always visible
     staleTime: 0, // Always refetch fresh data
     gcTime: 0, // Don't cache
   });
@@ -872,12 +874,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       {/* Show assigned students */}
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         {(() => {
-                          const assignedStudents = (activeStudents || []).filter((student: any) => student.classId === classItem.id);
+                          // Ensure activeStudents is an array and handle the filtering safely
+                          const studentsArray = Array.isArray(activeStudents) ? activeStudents : [];
+                          const assignedStudents = studentsArray.filter((student: any) => student.classId === classItem.id);
                           console.log('Debug - Class ID:', classItem.id);
-                          console.log('Debug - All students:', activeStudents);
-                          console.log('Debug - Student data structure sample:', activeStudents?.[0]);
-                          console.log('Debug - Student names:', activeStudents?.map(s => `${s.user?.firstName} ${s.user?.lastName} (classId: ${s.classId})`));
-                          console.log('Debug - Class IDs in students:', activeStudents?.map(s => s.classId));
+                          console.log('Debug - All students:', studentsArray);
+                          console.log('Debug - Student data structure sample:', studentsArray[0]);
+                          console.log('Debug - Student names:', studentsArray.map(s => `${s.user?.firstName} ${s.user?.lastName} (classId: ${s.classId})`));
+                          console.log('Debug - Class IDs in students:', studentsArray.map(s => s.classId));
                           console.log('Debug - Assigned students for this class:', assignedStudents);
                           return (
                             <>
@@ -898,9 +902,9 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                                 )}
                                 {assignedStudents.length === 0 && (
                                   <div className="text-xs text-gray-400 dark:text-gray-500">
-                                    No students assigned (Debug: Total students: {(activeStudents || []).length}, Class ID: {classItem.id})
+                                    No students assigned (Debug: Total students: {studentsArray.length}, Class ID: {classItem.id})
                                     <br />
-                                    <span>All students: {(activeStudents || []).map(s => `${s.user?.firstName || 'N/A'} ${s.user?.lastName || 'N/A'} (${s.classId || 'no class'})`).join(', ')}</span>
+                                    <span>All students: {studentsArray.map(s => `${s.user?.firstName || 'N/A'} ${s.user?.lastName || 'N/A'} (${s.classId || 'no class'})`).join(', ')}</span>
                                   </div>
                                 )}
                               </div>
@@ -1295,11 +1299,11 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
-            {activeStudents.length === 0 ? (
+            {!Array.isArray(activeStudents) || activeStudents.length === 0 ? (
               <p className="text-gray-500 text-center py-4">No active students available</p>
             ) : (
               <div className="max-h-96 overflow-y-auto space-y-2">
-                {activeStudents.map((student: any) => (
+                {(Array.isArray(activeStudents) ? activeStudents : []).map((student: any) => (
                   <div 
                     key={student.id} 
                     className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
