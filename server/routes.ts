@@ -614,6 +614,15 @@ trailer<</Size 5/Root 1 0 R>>
         if (exists) {
           console.log("Found file in object storage, streaming...");
           
+          // Get file metadata for debugging
+          const [metadata] = await file.getMetadata();
+          console.log("File metadata:", {
+            name: metadata.name,
+            contentType: metadata.contentType,
+            size: metadata.size,
+            metadata: metadata.metadata
+          });
+          
           // Try to get the assignment to find the original filename
           let originalFileName = undefined;
           try {
@@ -622,10 +631,9 @@ trailer<</Size 5/Root 1 0 R>>
               // Find the attachment URL that contains this file ID
               const attachmentUrl = assignment.attachmentUrls?.find(url => url.includes(fileId));
               if (attachmentUrl) {
-                // Get filename from file metadata if available
-                const [metadata] = await file.getMetadata();
                 originalFileName = metadata.metadata?.originalName || 
                                  metadata.metadata?.filename ||
+                                 metadata.metadata?.['original-name'] ||
                                  `assignment-file.${metadata.contentType?.split('/')[1] || 'bin'}`;
               }
             }
@@ -633,6 +641,7 @@ trailer<</Size 5/Root 1 0 R>>
             console.log("Could not get assignment details for filename:", error);
           }
           
+          console.log("Using filename:", originalFileName);
           await objectStorageService.downloadObject(file, res, 3600, originalFileName);
           return;
         } else {

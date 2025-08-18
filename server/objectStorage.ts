@@ -88,19 +88,14 @@ export class ObjectStorageService {
         "Content-Length": metadata.size,
         "Content-Disposition": `inline; filename="${fileName}"`,
         "Cache-Control": `public, max-age=${cacheTtlSec}`,
+        "Accept-Ranges": "bytes",
       });
 
-      // Stream the file to the response
-      const stream = file.createReadStream();
-
-      stream.on("error", (err) => {
-        console.error("Stream error:", err);
-        if (!res.headersSent) {
-          res.status(500).json({ error: "Error streaming file" });
-        }
-      });
-
-      stream.pipe(res);
+      // Download the entire file to buffer first to avoid streaming corruption
+      const [fileContents] = await file.download();
+      
+      // Send the complete buffer
+      res.end(fileContents);
     } catch (error) {
       console.error("Error downloading file:", error);
       if (!res.headersSent) {
