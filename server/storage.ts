@@ -5,8 +5,6 @@ import {
   tutors,
   tutoringCompanies,
   companyAdmins,
-  assignments,
-  submissions,
   messages,
   progress,
   calendarEvents,
@@ -22,16 +20,11 @@ import {
   type Tutor,
   type InsertTutor,
   type TutoringCompany,
-  type Assignment,
-  type InsertAssignment,
-  type Submission,
-  type InsertSubmission,
   type Message,
   type InsertMessage,
   type Progress,
   type InsertProgress,
   type CalendarEvent,
-  type InsertCalendarEvent,
   type CompanyAdmin,
   type InsertCompanyAdmin,
   type AcademicYear,
@@ -42,8 +35,8 @@ import {
   type InsertClass,
   type StudentClassAssignment,
   type InsertStudentClassAssignment,
-  type UpsertUser,
-  type InsertTutoringCompany,
+  type InsertUser,
+
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains } from "drizzle-orm";
@@ -78,21 +71,7 @@ export interface IStorage {
   createTutor(tutorData: InsertTutor): Promise<Tutor>;
   updateTutor(id: string, updates: Partial<InsertTutor>): Promise<Tutor>;
 
-  // Assignment operations
-  getAssignment(id: string): Promise<Assignment | undefined>;
-  createAssignment(assignmentData: InsertAssignment): Promise<Assignment>;
-  getAssignmentsByStudent(studentId: string): Promise<Assignment[]>;
-  getAssignmentsByCompany(companyId: string): Promise<Assignment[]>;
-  updateAssignmentStatus(id: string, status: string): Promise<Assignment>;
 
-  // Submission operations
-  getSubmission(id: string): Promise<Submission | undefined>;
-  createSubmission(submissionData: InsertSubmission): Promise<Submission>;
-  getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
-  getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]>;
-  updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
-  gradeSubmission(submissionId: string, score: number, feedback: string, graderId: string): Promise<Submission | undefined>;
-  verifySubmissionByParent(id: string): Promise<Submission>;
 
   // Message operations
   getMessage(id: string): Promise<Message | undefined>;
@@ -108,18 +87,17 @@ export interface IStorage {
 
   // Calendar operations
   getCalendarEvent(id: string): Promise<CalendarEvent | undefined>;
-  createCalendarEvent(eventData: InsertCalendarEvent): Promise<CalendarEvent>;
+  createCalendarEvent(eventData: any): Promise<CalendarEvent>;
   getCalendarEventsByTutor(tutorId: string): Promise<CalendarEvent[]>;
   getCalendarEventsByStudent(studentId: string): Promise<CalendarEvent[]>;
 
   // Company operations
   getTutoringCompany(id: string): Promise<TutoringCompany | undefined>;
-  createTutoringCompany(companyData: InsertTutoringCompany): Promise<TutoringCompany>;
+  createTutoringCompany(companyData: any): Promise<TutoringCompany>;
   getAllTutoringCompanies(): Promise<TutoringCompany[]>;
-  updateTutoringCompany(id: string, updates: Partial<InsertTutoringCompany>): Promise<TutoringCompany>;
+  updateTutoringCompany(id: string, updates: any): Promise<TutoringCompany>;
   getCompanyStudentsByCompanyId(companyId: string): Promise<any[]>;
   getCompanyUsersByCompanyId(companyId: string): Promise<User[]>;
-  getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]>;
   updateCompanyStatus(companyId: string, isActive: boolean): Promise<void>;
 
 
@@ -193,7 +171,7 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async upsertUser(userData: UpsertUser): Promise<User> {
+  async upsertUser(userData: any): Promise<User> {
     const [user] = await db
       .insert(users)
       .values(userData)
@@ -260,9 +238,7 @@ export class DatabaseStorage implements IStorage {
       .from(users)
       .where(and(
         eq(users.passwordResetToken, token),
-        isNull(users.passwordResetExpires) ? eq(users.passwordResetExpires, null) :
-        // Check if token hasn't expired
-        new Date() < users.passwordResetExpires as any
+        sql`${users.passwordResetExpires} > ${new Date()}`
       ));
 
     if (!user) return false;
@@ -372,59 +348,7 @@ export class DatabaseStorage implements IStorage {
     .leftJoin(users, eq(students.userId, users.id))
     .where(eq(students.parentId, parentId));
 
-    // Get assignments and submissions for each student
-    const studentsWithDetails = await Promise.all(
-      studentData.map(async (student) => {
-        // Get assignments with full details
-        const assignmentData = await db.select({
-          id: assignments.id,
-          title: assignments.title,
-          description: assignments.description,
-          instructions: assignments.instructions,
-          dueDate: assignments.dueDate,
-          status: assignments.status,
-          maxPoints: assignments.maxPoints,
-          attachmentUrls: assignments.attachmentUrls,
-          createdAt: assignments.createdAt,
-        })
-          .from(assignments)
-          .where(arrayContains(assignments.studentIds, [student.id]))
-          .orderBy(desc(assignments.dueDate));
-
-        // Get submissions with all details including content and files
-        const submissionData = await db.select({
-          id: submissions.id,
-          assignmentId: submissions.assignmentId,
-          content: submissions.content,
-          fileUrls: submissions.fileUrls,
-          status: submissions.status,
-          isDraft: submissions.isDraft,
-          submittedAt: submissions.submittedAt,
-          isLate: submissions.isLate,
-          score: submissions.score,
-          feedback: submissions.feedback,
-          gradedAt: submissions.gradedAt,
-          isVerifiedByParent: submissions.isVerifiedByParent,
-          parentVerifiedAt: submissions.parentVerifiedAt,
-          parentComments: submissions.parentComments,
-          needsRevision: submissions.needsRevision,
-          revisionFeedback: submissions.revisionFeedback,
-          createdAt: submissions.createdAt,
-          updatedAt: submissions.updatedAt,
-        })
-          .from(submissions)
-          .where(eq(submissions.studentId, student.id))
-          .orderBy(desc(submissions.submittedAt));
-
-        return {
-          ...student,
-          assignments: assignmentData,
-          submissions: submissionData
-        };
-      })
-    );
-
-    return studentsWithDetails;
+    return studentData;
   }
 
   // Parent operations
@@ -468,127 +392,7 @@ export class DatabaseStorage implements IStorage {
     return updatedTutor;
   }
 
-  // Assignment operations
-  async getAssignment(id: string): Promise<Assignment | undefined> {
-    const [assignment] = await db.select().from(assignments).where(eq(assignments.id, id));
-    return assignment;
-  }
 
-  async createAssignment(assignmentData: InsertAssignment): Promise<Assignment> {
-    const [assignment] = await db.insert(assignments).values(assignmentData).returning();
-    return assignment;
-  }
-
-  async getAssignmentsByStudent(studentId: string): Promise<Assignment[]> {
-    try {
-      const student = await this.getStudent(studentId);
-      if (!student) {
-        return [];
-      }
-      const companyId = student.companyId;
-
-      if (!companyId) {
-        console.warn(`Student ${studentId} is not associated with a company.`);
-        return [];
-      }
-
-      const assignmentList = await db.select()
-        .from(assignments)
-        .where(eq(assignments.companyId, companyId))
-        .orderBy(desc(assignments.createdAt));
-
-      return assignmentList;
-    } catch (error) {
-      console.error("Error fetching assignments for student:", error);
-      return [];
-    }
-  }
-
-  async getAssignmentsByCompany(companyId: string): Promise<Assignment[]> {
-    const assignmentData = await db.select({
-        id: assignments.id,
-        title: assignments.title,
-        description: assignments.description,
-        instructions: assignments.instructions,
-        dueDate: assignments.dueDate,
-        companyId: assignments.companyId,
-        studentIds: assignments.studentIds,
-        status: assignments.status,
-        maxPoints: assignments.maxPoints,
-        attachmentUrls: assignments.attachmentUrls,
-        allowedFileTypes: assignments.allowedFileTypes,
-        createdAt: assignments.createdAt,
-        updatedAt: assignments.updatedAt,
-      }).from(assignments)
-        .where(eq(assignments.companyId, companyId))
-        .orderBy(desc(assignments.createdAt));
-
-    console.log(`Found ${assignmentData.length} assignments for company ${companyId}`);
-
-    // Get submissions for each assignment with student details
-    const assignmentsWithSubmissions = await Promise.all(
-      assignmentData.map(async (assignment) => {
-        console.log(`Getting submissions for assignment ${assignment.id}`);
-
-        const submissionData = await db.select({
-          id: submissions.id,
-          assignmentId: submissions.assignmentId,
-          studentId: submissions.studentId,
-          content: submissions.content,
-          fileUrls: submissions.fileUrls,
-          status: submissions.status,
-          isDraft: submissions.isDraft,
-          submittedAt: submissions.submittedAt,
-          isLate: submissions.isLate,
-          score: submissions.score,
-          feedback: submissions.feedback,
-          gradedAt: submissions.gradedAt,
-          gradedBy: submissions.gradedBy,
-          isVerifiedByParent: submissions.isVerifiedByParent,
-          parentVerifiedAt: submissions.parentVerifiedAt,
-          parentComments: submissions.parentComments,
-          needsRevision: submissions.needsRevision,
-          revisionFeedback: submissions.revisionFeedback,
-          revisionCount: submissions.revisionCount,
-          createdAt: submissions.createdAt,
-          updatedAt: submissions.updatedAt,
-          student: {
-            id: students.id,
-            userId: students.userId,
-            gradeLevel: students.gradeLevel,
-            user: {
-              id: users.id,
-              firstName: users.firstName,
-              lastName: users.lastName,
-              email: users.email,
-            }
-          }
-        })
-          .from(submissions)
-          .leftJoin(students, eq(submissions.studentId, students.id))
-          .leftJoin(users, eq(students.userId, users.id))
-          .where(eq(submissions.assignmentId, assignment.id))
-          .orderBy(desc(submissions.submittedAt));
-
-        console.log(`Found ${submissionData.length} submissions for assignment ${assignment.id}`);
-
-        return {
-          ...assignment,
-          submissions: submissionData
-        };
-      })
-    );
-
-    return assignmentsWithSubmissions;
-  }
-
-  async updateAssignmentStatus(id: string, status: string): Promise<Assignment> {
-    const [assignment] = await db.update(assignments)
-      .set({ status: status as any, updatedAt: new Date() })
-      .where(eq(assignments.id, id))
-      .returning();
-    return assignment;
-  }
 
 
 
@@ -625,52 +429,7 @@ export class DatabaseStorage implements IStorage {
 
 
 
-  // Submission operations
-  async getSubmission(id: string): Promise<Submission | undefined> {
-    const [submission] = await db.select().from(submissions).where(eq(submissions.id, id));
-    return submission;
-  }
 
-  async createSubmission(submissionData: InsertSubmission): Promise<Submission> {
-    const [submission] = await db.insert(submissions).values(submissionData).returning();
-    return submission;
-  }
-
-  async getSubmissionsByStudent(studentId: string): Promise<Submission[]> {
-    try {
-      return await db.select().from(submissions)
-        .where(eq(submissions.studentId, studentId))
-        .orderBy(desc(submissions.submittedAt));
-    } catch (error) {
-      console.error("Error fetching submissions for student:", error);
-      return [];
-    }
-  }
-
-  async getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]> {
-    return await db.select().from(submissions)
-      .where(eq(submissions.assignmentId, assignmentId))
-      .orderBy(desc(submissions.submittedAt));
-  }
-
-  async updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission> {
-    const [submission] = await db.update(submissions)
-      .set(updates)
-      .where(eq(submissions.id, id))
-      .returning();
-    return submission;
-  }
-
-  async verifySubmissionByParent(id: string): Promise<Submission> {
-    const [submission] = await db.update(submissions)
-      .set({
-        isVerifiedByParent: true,
-        parentVerifiedAt: new Date()
-      })
-      .where(eq(submissions.id, id))
-      .returning();
-    return submission;
-  }
 
   // Message operations
   async getMessage(id: string): Promise<Message | undefined> {
@@ -733,7 +492,7 @@ export class DatabaseStorage implements IStorage {
     return event;
   }
 
-  async createCalendarEvent(eventData: InsertCalendarEvent): Promise<CalendarEvent> {
+  async createCalendarEvent(eventData: any): Promise<CalendarEvent> {
     const [event] = await db.insert(calendarEvents).values(eventData).returning();
     return event;
   }
@@ -872,46 +631,9 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  // Homework and Assignment operations
-  async getAssignmentsByCompanyId(companyId: string): Promise<Assignment[]> {
-    try {
-      const companyAssignments = await db
-        .select()
-        .from(assignments)
-        .innerJoin(tutors, eq(assignments.tutorId, tutors.id))
-        .where(eq(tutors.companyId, companyId))
-        .orderBy(desc(assignments.createdAt));
 
-      return companyAssignments.map(item => item.assignments);
-    } catch (error) {
-      console.error("Error fetching company assignments:", error);
-      return [];
-    }
-  }
 
-  async gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission | undefined> {
-    try {
-      const [graded] = await db
-        .update(submissions)
-        .set({
-          score,
-          feedback,
-          gradedAt: new Date(),
-          gradedBy,
-          status: 'graded',
-          updatedAt: new Date(),
-        })
-        .where(eq(submissions.id, submissionId))
-        .returning();
-
-      return graded;
-    } catch (error) {
-      console.error("Error grading submission:", error);
-      return undefined;
-    }
-  }
-
-  async createTutoringCompany(companyData: InsertTutoringCompany): Promise<TutoringCompany> {
+  async createTutoringCompany(companyData: any): Promise<TutoringCompany> {
     const [company] = await db.insert(tutoringCompanies).values(companyData).returning();
     return company;
   }
@@ -922,7 +644,7 @@ export class DatabaseStorage implements IStorage {
       .orderBy(tutoringCompanies.name);
   }
 
-  async updateTutoringCompany(id: string, updates: Partial<InsertTutoringCompany>): Promise<TutoringCompany> {
+  async updateTutoringCompany(id: string, updates: any): Promise<TutoringCompany> {
     const [company] = await db.update(tutoringCompanies)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(tutoringCompanies.id, id))
@@ -1287,18 +1009,7 @@ export class DatabaseStorage implements IStorage {
       ));
   }
 
-  // Clear all assignment and submission data
-  async clearAllAssignments(): Promise<void> {
-    console.log("Deleting all assignments...");
-    await db.delete(assignments);
-    console.log("All assignments deleted");
-  }
 
-  async clearAllSubmissions(): Promise<void> {
-    console.log("Deleting all submissions...");
-    await db.delete(submissions);
-    console.log("All submissions deleted");
-  }
 }
 
 export const storage = new DatabaseStorage();

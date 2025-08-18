@@ -55,7 +55,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Assignment functionality removed per user request
 
   // Company students route
-  app.get('/api/company/students', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/company/students', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
       let students: any[] = [];
@@ -75,7 +75,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Simple file upload route
-  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res: any) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -107,12 +107,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error uploading file:", error);
-      res.status(500).json({ error: "Failed to upload file", details: error.message });
+      res.status(500).json({ error: "Failed to upload file", details: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   // Simple file download route
-  app.get('/api/files/:fileId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/files/:fileId', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const { fileId } = req.params;
       console.log(`Looking for file with ID: ${fileId}`);
@@ -122,15 +122,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (uploadedFiles.has(fileId)) {
         const file = uploadedFiles.get(fileId);
-        console.log("Found file:", file.originalname);
+        if (file) {
+          console.log("Found file:", file.originalname);
 
-        // Set proper headers for download
-        res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
-        res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
-        res.setHeader('Content-Length', file.size);
+          // Set proper headers for download
+          res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
+          res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
+          res.setHeader('Content-Length', file.size);
 
-        // Send the file buffer
-        return res.send(file.buffer);
+          // Send the file buffer
+          return res.send(file.buffer);
+        }
       }
 
       console.error(`File ${fileId} not found`);
@@ -142,7 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Message routes
-  app.get('/api/messages/:receiverId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/messages/:receiverId', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
       const senderId = user.id;
@@ -156,7 +158,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/messages', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/messages', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
       const senderId = user.id;
@@ -175,7 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Student profile routes
-  app.get("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     const { studentId } = req.params;
     const user = req.user;
     if (!user) return res.status(401).json({ message: "Authentication required" });
@@ -209,7 +211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update student profile
-  app.patch("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.patch("/api/students/:studentId", isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     const { studentId } = req.params;
     const user = req.user;
     if (!user) return res.status(401).json({ message: "Authentication required" });
@@ -250,12 +252,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(updatedStudent);
     } catch (error) {
       console.error("Error updating student:", error);
-      res.status(500).json({ message: "Internal server error", error: error.message });
+      res.status(500).json({ message: "Internal server error", error: error instanceof Error ? error.message : 'Unknown error' });
     }
   });
 
   // Progress routes (without assignments)
-  app.get('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
       let progress: any[] = [];
@@ -274,7 +276,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/progress', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
 
@@ -301,10 +303,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Calendar routes
-  app.get('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
-      const events = await storage.getCalendarEventsByUser(user.id);
+      const events = await storage.getCalendarEventsByTutor(user.id);
       res.json(events);
     } catch (error) {
       console.error("Error fetching calendar events:", error);
@@ -312,7 +314,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.post('/api/calendar', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
 
@@ -330,7 +332,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Administrative routes
-  app.get('/api/admin/users', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/admin/users', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
 
@@ -347,7 +349,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Company management routes
-  app.get('/api/companies', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/companies', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
 
@@ -355,7 +357,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin or company admin access required" });
       }
 
-      let companies;
+      let companies: any[] = [];
       if (user.role === 'admin') {
         companies = await storage.getAllCompanies();
       } else {
@@ -375,7 +377,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get('/api/companies/:companyId/tutors', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/companies/:companyId/tutors', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const { companyId } = req.params;
       const user = req.user!;
@@ -451,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let years;
       if (user.role === 'admin') {
-        years = await storage.getAllAcademicYears();
+        years = await storage.getAcademicYearsByCompany("");
       } else {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (companyAdmin) {

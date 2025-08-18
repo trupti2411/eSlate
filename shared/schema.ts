@@ -50,7 +50,7 @@ export const users = pgTable("users", {
   replitId: varchar("replit_id"), // Keep for existing users
   isDeleted: boolean("is_deleted").notNull().default(false),
   deletedAt: timestamp("deleted_at"),
-  deletedBy: varchar("deleted_by").references(() => users.id),
+  deletedBy: varchar("deleted_by"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

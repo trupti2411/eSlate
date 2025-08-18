@@ -261,7 +261,7 @@ export function setupCustomAuth(app: Express) {
   });
 
   // Get current user endpoint
-  app.get('/api/auth/user', isAuthenticated, async (req: AuthenticatedRequest, res: Response) => {
+  app.get('/api/auth/user', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       if (!req.user) {
         return res.status(401).json({ message: 'User not found' });
@@ -328,7 +328,7 @@ export function setupCustomAuth(app: Express) {
       const expires = new Date(Date.now() + 3600000); // 1 hour
 
       await storage.setPasswordResetToken(user.id, resetToken, expires);
-      await sendPasswordResetEmail(email, resetToken, user.firstName);
+      await sendPasswordResetEmail(email, resetToken, user.firstName || 'User');
 
       res.json({ message: 'If an account with this email exists, a reset link has been sent.' });
     } catch (error) {
