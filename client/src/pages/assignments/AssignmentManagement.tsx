@@ -368,7 +368,15 @@ export function AssignmentManagement() {
                   <Button 
                     type="submit" 
                     disabled={createAssignmentMutation.isPending || updateAssignmentMutation.isPending}
-                    onClick={() => console.log("Submit button clicked!")}
+                    onClick={() => {
+                      console.log("Submit button clicked!");
+                      console.log("Form state:", form.formState);
+                      console.log("Form errors:", form.formState.errors);
+                      console.log("Form values:", form.getValues());
+                      // Force form validation check
+                      const isValid = form.trigger();
+                      console.log("Form validation result:", isValid);
+                    }}
                   >
                     {createAssignmentMutation.isPending ? 'Creating...' : 
                      updateAssignmentMutation.isPending ? 'Updating...' :
