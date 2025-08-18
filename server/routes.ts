@@ -117,7 +117,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const assignmentData = {
         ...req.body,
-        createdBy: user.id
+        createdBy: user.id,
+        submissionDate: new Date(req.body.submissionDate) // Convert string to Date
       };
       console.log("Processing assignment data:", assignmentData);
       
