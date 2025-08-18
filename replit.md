@@ -8,6 +8,14 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes
 
+**August 18, 2025 - Academic Management Class Creation Fixed**
+- ✅ **Database Schema Alignment**: Fixed mismatch between schema and database for classes table
+- ✅ **Academic Term Dropdown**: Fixed loading issue by enabling terms query regardless of active tab
+- ✅ **Class Creation Success**: Resolved "days_of_week violates not-null constraint" error
+- ✅ **Data Transformation**: Added proper mapping from single dayOfWeek to daysOfWeek array
+- ✅ **Form Validation**: Enhanced error handling and loading states for class creation
+- ✅ **Complete Workflow**: Academic Management now supports full Years → Terms → Classes creation flow
+
 **August 15, 2025 - Complete Assignment Functionality Removal**
 - ✅ **Assignment System Removed**: Completely removed all assignment-related functionality per user request
 - ✅ **Simplified File System**: Replaced complex object storage with simple in-memory file storage
