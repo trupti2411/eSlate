@@ -384,7 +384,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create submission
+  // Create or update submission (unified endpoint)
+  app.post('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const user = req.user!;
+      
+      // Only students can create submissions
+      if (user.role !== 'student') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const student = await storage.getStudentByUserId(user.id);
+      if (!student) {
+        return res.status(404).json({ message: "Student profile not found" });
+      }
+      
+      const submissionData = {
+        ...req.body,
+        studentId: student.id,
+        submittedAt: req.body.isDraft ? undefined : new Date(),
+        status: req.body.isDraft ? 'draft' : 'submitted'
+      };
+      
+      const validatedData = insertSubmissionSchema.parse(submissionData);
+      
+      // Check if submission already exists
+      const existingSubmissions = await storage.getStudentSubmissions(student.id);
+      const existingSubmission = existingSubmissions.find(s => s.assignmentId === req.body.assignmentId);
+      
+      let submission;
+      if (existingSubmission) {
+        // Update existing submission
+        submission = await storage.updateSubmission(existingSubmission.id, validatedData);
+      } else {
+        // Create new submission
+        submission = await storage.createSubmission(validatedData);
+      }
+      
+      res.status(existingSubmission ? 200 : 201).json(submission);
+    } catch (error) {
+      console.error("Error creating/updating submission:", error);
+      res.status(500).json({ message: "Failed to save submission" });
+    }
+  });
+
+  // Legacy create submission endpoint
   app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     try {
       const user = req.user!;
@@ -458,6 +502,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching submissions:", error);
       res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
+  // Assignment file serving route
+  app.get('/api/assignments/:assignmentId/files/:filename', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { assignmentId, filename } = req.params;
+      const user = req.user!;
+      
+      // Verify user has access to this assignment
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      // Students can only access assignments for their classes
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        // Check if student is enrolled in the class for this assignment
+        const studentClasses = await storage.getStudentClasses(student.id);
+        const hasAccess = studentClasses.some(c => c.id === assignment.classId);
+        if (!hasAccess) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      // Find the file in the attachment URLs
+      const fileUrl = assignment.attachmentUrls?.find(url => url.includes(filename));
+      if (!fileUrl) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      
+      // Extract file ID from URL and serve the file
+      const fileId = fileUrl.split('/').pop();
+      const fileData = global.uploadedFiles.get(fileId!);
+      
+      if (!fileData) {
+        return res.status(404).json({ message: "File not found" });
+      }
+      
+      res.setHeader('Content-Disposition', `inline; filename="${fileData.originalname}"`);
+      res.setHeader('Content-Type', fileData.mimetype);
+      res.send(fileData.buffer);
+    } catch (error) {
+      console.error("Error serving assignment file:", error);
+      res.status(500).json({ message: "Failed to serve file" });
     }
   });
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -29,10 +29,12 @@ import {
 } from "lucide-react";
 import { format, isAfter, parseISO, isPast } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { AssignmentCompletionArea } from "@/components/AssignmentCompletionArea";
 
 export function StudentPortal() {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [submissionContent, setSubmissionContent] = useState("");
   const [selectedTab, setSelectedTab] = useState("dashboard");
@@ -69,86 +71,119 @@ export function StudentPortal() {
     enabled: !!studentId,
   });
 
-  // E-ink optimized colors and styling
   const eInkStyles = {
-    card: "bg-white border-2 border-black shadow-none",
-    activeCard: "bg-gray-100 border-2 border-black shadow-none",
-    button: "bg-white border-2 border-black text-black hover:bg-gray-100 shadow-none",
-    primaryButton: "bg-black text-white border-2 border-black hover:bg-gray-800 shadow-none",
-    badge: "bg-white border border-black text-black shadow-none",
-    activeBadge: "bg-black text-white border border-black shadow-none",
-    textarea: "border-2 border-black bg-white text-black text-lg leading-relaxed min-h-[200px]"
+    card: "bg-white border-2 border-black rounded shadow-sm",
+    activeCard: "bg-white border-2 border-black rounded shadow-md ring-2 ring-gray-300",
+    badge: "border border-black bg-white text-black font-medium",
+    activeBadge: "border border-black bg-black text-white font-medium",
+    button: "bg-white border-2 border-black text-black hover:bg-gray-100 font-medium px-4 py-2",
+    primaryButton: "bg-black border-2 border-black text-white hover:bg-gray-800 font-medium px-4 py-2",
+    textarea: "border-2 border-black bg-white text-black text-lg leading-relaxed font-serif resize-none",
   };
 
-  // Helper functions
   const getAssignmentStatus = (assignment: Assignment) => {
     const submission = submissions.find(s => s.assignmentId === assignment.id);
-    if (submission) {
-      return submission.status || 'submitted';
-    }
-    return isPast(new Date(assignment.submissionDate)) ? 'overdue' : 'pending';
+    if (submission && submission.status === 'submitted') return 'submitted';
+    if (submission && submission.status === 'draft') return 'draft';
+    if (isPast(new Date(assignment.submissionDate))) return 'overdue';
+    return 'pending';
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'submitted': return 'bg-green-100 text-green-800 border-green-800';
-      case 'graded': return 'bg-blue-100 text-blue-800 border-blue-800';
-      case 'overdue': return 'bg-red-100 text-red-800 border-red-800';
-      default: return 'bg-yellow-100 text-yellow-800 border-yellow-800';
+      case 'submitted': return 'border-green-500 bg-green-50 text-green-700';
+      case 'draft': return 'border-yellow-500 bg-yellow-50 text-yellow-700';
+      case 'overdue': return 'border-red-500 bg-red-50 text-red-700';
+      case 'pending': return 'border-blue-500 bg-blue-50 text-blue-700';
+      default: return 'border-gray-500 bg-gray-50 text-gray-700';
     }
   };
 
-  const renderDashboard = () => (
-    <div className="space-y-8">
-      {/* Welcome Section */}
-      <div className="text-center space-y-4 p-6 border-2 border-black bg-white">
-        <h1 className="text-3xl font-bold text-black">Student Portal</h1>
-        <p className="text-lg text-gray-700">Welcome back, {user?.firstName || 'Student'}!</p>
+  // Dashboard Summary
+  const renderDashboard = () => {
+    const totalAssignments = assignments.length;
+    const submittedAssignments = assignments.filter(a => 
+      submissions.find(s => s.assignmentId === a.id && s.status === 'submitted')
+    ).length;
+    const draftAssignments = assignments.filter(a => 
+      submissions.find(s => s.assignmentId === a.id && s.status === 'draft')
+    ).length;
+    const overdueAssignments = assignments.filter(a => 
+      isPast(new Date(a.submissionDate)) && !submissions.find(s => s.assignmentId === a.id && s.status === 'submitted')
+    ).length;
+    const upcomingAssignments = assignments.filter(a => 
+      !isPast(new Date(a.submissionDate)) && !submissions.find(s => s.assignmentId === a.id && s.status === 'submitted')
+    ).length;
+
+    return (
+      <div className="space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-black">Welcome, {studentProfile?.firstName || user?.email}!</h1>
+          <p className="text-gray-600 mt-2">Your student portal dashboard</p>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className={eInkStyles.card}>
+            <CardContent className="p-6 text-center">
+              <BookOpen className="h-8 w-8 mx-auto text-blue-600 mb-2" />
+              <div className="text-2xl font-bold text-black">{totalAssignments}</div>
+              <div className="text-sm text-gray-600">Total Assignments</div>
+            </CardContent>
+          </Card>
+          <Card className={eInkStyles.card}>
+            <CardContent className="p-6 text-center">
+              <CheckCircle className="h-8 w-8 mx-auto text-green-600 mb-2" />
+              <div className="text-2xl font-bold text-black">{submittedAssignments}</div>
+              <div className="text-sm text-gray-600">Submitted</div>
+            </CardContent>
+          </Card>
+          <Card className={eInkStyles.card}>
+            <CardContent className="p-6 text-center">
+              <PenTool className="h-8 w-8 mx-auto text-yellow-600 mb-2" />
+              <div className="text-2xl font-bold text-black">{draftAssignments}</div>
+              <div className="text-sm text-gray-600">Drafts</div>
+            </CardContent>
+          </Card>
+          <Card className={eInkStyles.card}>
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-2" />
+              <div className="text-2xl font-bold text-black">{overdueAssignments}</div>
+              <div className="text-sm text-gray-600">Overdue</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="space-y-4">
+          <h3 className="text-xl font-semibold text-black">Quick Actions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button 
+              className={eInkStyles.primaryButton} 
+              onClick={() => setSelectedTab("assignments")}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              View All Assignments
+            </Button>
+            <Button 
+              className={eInkStyles.button}
+              onClick={() => setSelectedTab("classes")}
+            >
+              <Users className="h-4 w-4 mr-2" />
+              View Classes
+            </Button>
+            <Button 
+              className={eInkStyles.button}
+              onClick={() => setSelectedTab("terms")}
+            >
+              <GraduationCap className="h-4 w-4 mr-2" />
+              View Terms
+            </Button>
+          </div>
+        </div>
       </div>
-
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className={eInkStyles.card}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center">
-              <BookOpen className="h-5 w-5 mr-2" />
-              Terms
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{studentTerms.length}</div>
-            <p className="text-sm text-gray-600">Academic terms</p>
-          </CardContent>
-        </Card>
-
-        <Card className={eInkStyles.card}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center">
-              <Users className="h-5 w-5 mr-2" />
-              Classes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{studentClasses.length}</div>
-            <p className="text-sm text-gray-600">Enrolled classes</p>
-          </CardContent>
-        </Card>
-
-        <Card className={eInkStyles.card}>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center">
-              <FileText className="h-5 w-5 mr-2" />
-              Assignments
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{assignments.length}</div>
-            <p className="text-sm text-gray-600">Total assignments</p>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderTerms = () => (
     <div className="space-y-6">
@@ -167,7 +202,7 @@ export function StudentPortal() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {studentTerms.map((term) => {
-            const isActive = new Date() >= new Date(term.startDate) && new Date() <= new Date(term.endDate);
+            const isActive = term.isActive ?? true;
             return (
               <Card key={term.id} className={isActive ? eInkStyles.activeCard : eInkStyles.card}>
                 <CardHeader>
@@ -368,8 +403,7 @@ export function StudentPortal() {
                             assignment={assignment} 
                             submission={submission}
                             onSubmissionUpdate={() => {
-                              // Refetch submissions
-                              // queryClient.invalidateQueries...
+                              queryClient.invalidateQueries({ queryKey: ['/api/students', studentId, 'submissions'] });
                             }}
                           />
                         </DialogContent>
@@ -443,151 +477,6 @@ export function StudentPortal() {
           {renderAssignments()}
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-// Assignment Completion Component optimized for e-ink/pen input
-function AssignmentCompletionArea({ 
-  assignment, 
-  submission, 
-  onSubmissionUpdate 
-}: { 
-  assignment: Assignment; 
-  submission?: Submission;
-  onSubmissionUpdate: () => void; 
-}) {
-  const [content, setContent] = useState(submission?.content || "");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
-
-  // E-ink optimized styling for writing area
-  const writingAreaStyles = {
-    fontSize: "18px",
-    lineHeight: "1.8",
-    fontFamily: "serif",
-    padding: "24px",
-    border: "2px solid black",
-    backgroundColor: "white",
-    minHeight: "400px",
-    resize: "vertical" as const
-  };
-
-  const handleSubmit = async () => {
-    if (!content.trim()) {
-      toast({
-        title: "Error",
-        description: "Please write your answer before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      const response = await fetch('/api/submissions', {
-        method: submission ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...(submission && { id: submission.id }),
-          assignmentId: assignment.id,
-          content: content.trim(),
-          status: 'submitted'
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to submit assignment');
-      }
-      
-      toast({
-        title: "Success", 
-        description: submission ? "Answer updated successfully!" : "Assignment submitted successfully!",
-      });
-      onSubmissionUpdate();
-    } catch (error) {
-      console.error("Submission error:", error);
-      toast({
-        title: "Error",
-        description: "Failed to submit assignment. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Assignment Details */}
-      <div className="border-2 border-black bg-gray-50 p-4">
-        <h3 className="font-bold text-lg mb-2">{assignment.title}</h3>
-        <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-          <div>Subject: {assignment.subject}</div>
-          <div>Total Marks: {assignment.totalMarks}</div>
-          <div>Due: {format(new Date(assignment.submissionDate), 'MMM dd, yyyy HH:mm')}</div>
-          <div>Status: {submission ? 'Submitted' : 'Not submitted'}</div>
-        </div>
-        {assignment.instructions && (
-          <div>
-            <h4 className="font-semibold mb-1">Instructions:</h4>
-            <p className="text-gray-700">{assignment.instructions}</p>
-          </div>
-        )}
-      </div>
-
-      {/* Writing Area - Optimized for pen/touchscreen input */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Your Answer:</h3>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Optimized for pen/touchscreen input</span>
-            <PenTool className="h-4 w-4" />
-          </div>
-        </div>
-        
-        <Textarea
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          placeholder="Write your answer here... This area is optimized for pen and touchscreen input on e-ink devices."
-          style={writingAreaStyles}
-          className="w-full font-serif text-lg leading-relaxed"
-        />
-        
-        <div className="text-sm text-gray-600">
-          Character count: {content.length} • Word count: {content.trim().split(/\s+/).filter(w => w.length > 0).length}
-        </div>
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-4 pt-4 border-t">
-        <Button
-          onClick={handleSubmit}
-          disabled={isSubmitting || !content.trim()}
-          className="bg-black text-white border-2 border-black hover:bg-gray-800 px-6"
-        >
-          {isSubmitting ? (
-            <>
-              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-              {submission ? 'Updating...' : 'Submitting...'}
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4 mr-2" />
-              {submission ? 'Update Answer' : 'Submit Assignment'}
-            </>
-          )}
-        </Button>
-        
-        <Button
-          onClick={() => setContent("")}
-          variant="outline"
-          className="border-2 border-black bg-white text-black hover:bg-gray-100"
-        >
-          <RotateCcw className="h-4 w-4 mr-2" />
-          Clear
-        </Button>
-      </div>
     </div>
   );
 }
