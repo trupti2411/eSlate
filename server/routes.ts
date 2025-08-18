@@ -18,7 +18,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { assignments, submissions } from "@shared/schema";
-import { ObjectStorageService } from "./objectStorage";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 
 // Global declaration for file storage
 declare global {
@@ -195,7 +195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.deleteAssignment(assignmentId);
-      res.status(204).send();
+      res.json({ message: "Assignment deleted successfully" });
     } catch (error) {
       console.error("Error deleting assignment:", error);
       res.status(500).json({ message: "Failed to delete assignment" });
@@ -1107,42 +1107,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update assignment endpoint
-  app.patch('/api/assignments/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
-    try {
-      const { id } = req.params;
-      const user = req.user!;
-      const updateData = req.body;
 
-      if (!user || (user.role !== 'admin' && user.role !== 'company_admin' && user.role !== 'tutor')) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      const updatedAssignment = await storage.updateAssignment(id, updateData);
-      res.json(updatedAssignment);
-    } catch (error) {
-      console.error("Error updating assignment:", error);
-      res.status(500).json({ message: "Failed to update assignment" });
-    }
-  });
-
-  // Delete assignment endpoint
-  app.delete('/api/assignments/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
-    try {
-      const { id } = req.params;
-      const user = req.user!;
-
-      if (!user || (user.role !== 'admin' && user.role !== 'company_admin' && user.role !== 'tutor')) {
-        return res.status(403).json({ message: "Access denied" });
-      }
-
-      await storage.deleteAssignment(id);
-      res.json({ message: "Assignment deleted successfully" });
-    } catch (error) {
-      console.error("Error deleting assignment:", error);
-      res.status(500).json({ message: "Failed to delete assignment" });
-    }
-  });
 
   // Object storage upload endpoint
   app.post('/api/objects/upload', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
@@ -1153,6 +1118,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating upload URL:", error);
       res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  // Serve uploaded objects (for file viewing)
+  app.get('/objects/:objectPath(*)', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        req.path,
+      );
+      objectStorageService.downloadObject(objectFile, res);
+    } catch (error) {
+      console.error("Error accessing object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
     }
   });
 

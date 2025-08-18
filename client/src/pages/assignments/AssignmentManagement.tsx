@@ -262,7 +262,12 @@ export function AssignmentManagement() {
                     <FormItem>
                       <FormLabel>Title *</FormLabel>
                       <FormControl>
-                        <Input placeholder="Assignment title" {...field} />
+                        <Input 
+                          id="assignment-title"
+                          name="title"
+                          placeholder="Assignment title" 
+                          {...field} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -276,7 +281,13 @@ export function AssignmentManagement() {
                     <FormItem>
                       <FormLabel>Subject/Topic</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g., Mathematics, English" {...field} value={field.value || ""} />
+                        <Input 
+                          id="assignment-subject"
+                          name="subject"
+                          placeholder="e.g., Mathematics, English" 
+                          {...field} 
+                          value={field.value || ""} 
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -305,7 +316,7 @@ export function AssignmentManagement() {
                         <FormLabel>Class *</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value || ""}>
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger id="assignment-class" name="classId">
                               <SelectValue placeholder="Select a class" />
                             </SelectTrigger>
                           </FormControl>
@@ -430,18 +441,34 @@ export function AssignmentManagement() {
                         {form.watch('attachmentUrls').map((url: string, index: number) => (
                           <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
                             <span className="text-sm">File {index + 1}</span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => {
-                                const currentUrls = form.getValues('attachmentUrls') || [];
-                                const newUrls = currentUrls.filter((_: string, i: number) => i !== index);
-                                form.setValue('attachmentUrls', newUrls);
-                              }}
-                            >
-                              Remove
-                            </Button>
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  // Convert uploaded URL to viewable path
+                                  const objectPath = url.includes('/uploads/') 
+                                    ? url.split('/uploads/').pop()
+                                    : url.split('/').pop();
+                                  window.open(`/objects/uploads/${objectPath}`, '_blank');
+                                }}
+                              >
+                                View
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  const currentUrls = form.getValues('attachmentUrls') || [];
+                                  const newUrls = currentUrls.filter((_: string, i: number) => i !== index);
+                                  form.setValue('attachmentUrls', newUrls);
+                                }}
+                              >
+                                Remove
+                              </Button>
+                            </div>
                           </div>
                         ))}
                       </div>
