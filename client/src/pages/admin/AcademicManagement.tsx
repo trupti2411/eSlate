@@ -318,6 +318,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
 
   // Debug log
   console.log('AcademicManagement component loaded with:', { companyId, companyName });
+  console.log('Academic terms data:', { academicTerms, termsLoading, isArray: Array.isArray(academicTerms) });
 
   // Fetch academic years
   const { data: academicYears = [], isLoading: yearsLoading, error: yearsError } = useQuery({
@@ -334,7 +335,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
         : `/api/companies/${companyId}/academic-terms`;
       return fetch(url).then(res => res.json());
     },
-    enabled: !!companyId && activeTab === 'terms',
+    enabled: !!companyId, // Always enabled to populate the dropdown in dialogs
   });
 
   // Fetch classes (with optional term filter)
@@ -1104,11 +1105,21 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {(academicTerms as AcademicTerm[]).map((term) => (
-                          <SelectItem key={term.id} value={term.id}>
-                            {term.name}
+                        {termsLoading ? (
+                          <SelectItem value="" disabled>
+                            Loading terms...
                           </SelectItem>
-                        ))}
+                        ) : Array.isArray(academicTerms) && academicTerms.length > 0 ? (
+                          academicTerms.map((term: AcademicTerm) => (
+                            <SelectItem key={term.id} value={term.id}>
+                              {term.name}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="" disabled>
+                            No terms available - Please create an academic term first
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                     <FormMessage />
