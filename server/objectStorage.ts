@@ -78,7 +78,7 @@ export class ObjectStorageService {
       if (!fileName) {
         // Try to get filename from metadata first
         fileName = metadata.metadata?.originalName || 
-                  (typeof metadata.name === 'string' ? metadata.name.split('/').pop() : null) || 
+                  (typeof metadata.name === 'string' ? metadata.name.split('/').pop() : metadata.name?.toString()?.split('/').pop()) || 
                   'download';
       }
 
@@ -126,6 +126,34 @@ export class ObjectStorageService {
       method: "PUT",
       ttlSec: 900,
     });
+  }
+
+  // Set metadata for an uploaded object
+  async setObjectMetadata(uploadURL: string, metadata: { originalName: string }): Promise<void> {
+    try {
+      // Extract the object path from the upload URL
+      const url = new URL(uploadURL);
+      const pathParts = url.pathname.split('/');
+      const bucketName = pathParts[1];
+      const objectName = pathParts.slice(2).join('/');
+
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+
+      // Check if file exists
+      const [exists] = await file.exists();
+      if (!exists) {
+        throw new Error(`Object not found: ${objectName}`);
+      }
+
+      // Set the metadata
+      await file.setMetadata({
+        metadata: metadata
+      });
+    } catch (error) {
+      console.error("Error setting object metadata:", error);
+      throw error;
+    }
   }
 
   normalizeObjectEntityPath(

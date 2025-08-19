@@ -16,6 +16,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { insertAssignmentSchema, type Assignment, type Class } from "@shared/schema";
 import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload } from "lucide-react";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -27,6 +28,63 @@ const assignmentFormSchema = insertAssignmentSchema.extend({
 });
 
 type AssignmentFormData = z.infer<typeof assignmentFormSchema>;
+
+// Component to display uploaded files with metadata
+function UploadedFilesList({ 
+  attachmentUrls, 
+  onRemoveFile 
+}: { 
+  attachmentUrls: string[]; 
+  onRemoveFile: (index: number) => void; 
+}) {
+  const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(attachmentUrls);
+
+  if (attachmentUrls.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm font-medium">Uploaded Files:</p>
+      <div className="space-y-1">
+        {attachmentUrls.map((url: string, index: number) => {
+          const metadata = fileMetadata?.[index];
+          const displayFilename = getDisplayFilename(url, metadata, index);
+          
+          return (
+            <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
+              <span className="text-sm">
+                {isLoadingMetadata ? `Loading file ${index + 1}...` : displayFilename}
+              </span>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Convert uploaded URL to viewable path
+                    const objectPath = url.includes('/uploads/') 
+                      ? url.split('/uploads/').pop()
+                      : url.split('/').pop();
+                    window.open(`/objects/uploads/${objectPath}`, '_blank');
+                  }}
+                >
+                  View
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemoveFile(index)}
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export function AssignmentManagement() {
   const { user } = useAuth();
@@ -432,9 +490,21 @@ export function AssignmentManagement() {
                         url: response.uploadURL,
                       };
                     }}
-                    onComplete={(result) => {
+                    onComplete={async (result) => {
                       console.log("Files uploaded:", result);
                       if (result.successful && result.successful.length > 0) {
+                        // Set metadata for each uploaded file to preserve original filename
+                        for (const file of result.successful) {
+                          try {
+                            await apiRequest('/api/objects/metadata', 'POST', {
+                              uploadURL: file.uploadURL,
+                              originalFileName: file.name
+                            });
+                          } catch (error) {
+                            console.error("Failed to set file metadata:", error);
+                          }
+                        }
+                        
                         const uploadedUrls = result.successful.map((file: any) => file.uploadURL);
                         const currentUrls = form.getValues('attachmentUrls') || [];
                         form.setValue('attachmentUrls', [...currentUrls, ...uploadedUrls]);
@@ -450,47 +520,15 @@ export function AssignmentManagement() {
                     Upload Assignment Files
                   </ObjectUploader>
 
-                  {/* Show uploaded files */}
-                  {form.watch('attachmentUrls') && form.watch('attachmentUrls')!.length > 0 && (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium">Uploaded Files:</p>
-                      <div className="space-y-1">
-                        {form.watch('attachmentUrls')!.map((url: string, index: number) => (
-                          <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
-                            <span className="text-sm">File {index + 1}</span>
-                            <div className="flex gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  // Convert uploaded URL to viewable path
-                                  const objectPath = url.includes('/uploads/') 
-                                    ? url.split('/uploads/').pop()
-                                    : url.split('/').pop();
-                                  window.open(`/objects/uploads/${objectPath}`, '_blank');
-                                }}
-                              >
-                                View
-                              </Button>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                  const currentUrls = form.getValues('attachmentUrls') || [];
-                                  const newUrls = currentUrls.filter((_: string, i: number) => i !== index);
-                                  form.setValue('attachmentUrls', newUrls);
-                                }}
-                              >
-                                Remove
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
+                  {/* Show uploaded files with metadata */}
+                  <UploadedFilesList 
+                    attachmentUrls={form.watch('attachmentUrls') || []}
+                    onRemoveFile={(index: number) => {
+                      const currentUrls = form.getValues('attachmentUrls') || [];
+                      const newUrls = currentUrls.filter((_: string, i: number) => i !== index);
+                      form.setValue('attachmentUrls', newUrls);
+                    }}
+                  />
                 </div>
 
                 <div className="flex justify-end space-x-2 pt-4">

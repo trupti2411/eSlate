@@ -339,7 +339,7 @@ export function StudentPortal() {
                       </div>
                       <div className="flex items-center">
                         <BookOpen className="h-4 w-4 mr-2" />
-                        <span>Total Marks: {assignment.totalMarks}</span>
+                        <span>Assignment</span>
                       </div>
                     </div>
 
@@ -374,7 +374,7 @@ export function StudentPortal() {
                         <div className="bg-gray-50 p-3 rounded border text-sm">
                           <div className="flex justify-between mb-2">
                             <span>Submitted: {format(new Date(submission.submittedAt!), 'MMM dd, yyyy HH:mm')}</span>
-                            {submission.totalMarks && <span>Grade: {submission.totalMarks}/{assignment.totalMarks}</span>}
+
                           </div>
                           {submission.content && (
                             <p className="text-gray-700">{submission.content}</p>

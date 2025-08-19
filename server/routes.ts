@@ -1535,6 +1535,25 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Set metadata for uploaded object
+  app.post('/api/objects/metadata', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const { uploadURL, originalFileName } = req.body;
+      
+      if (!uploadURL || !originalFileName) {
+        return res.status(400).json({ message: "uploadURL and originalFileName are required" });
+      }
+
+      const objectStorageService = new ObjectStorageService();
+      await objectStorageService.setObjectMetadata(uploadURL, { originalName: originalFileName });
+      
+      res.json({ message: "Metadata set successfully" });
+    } catch (error) {
+      console.error("Error setting object metadata:", error);
+      res.status(500).json({ message: "Failed to set metadata" });
+    }
+  });
+
   // Serve uploaded objects (for file viewing)
   app.get('/objects/:objectPath(*)', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     const objectStorageService = new ObjectStorageService();
@@ -1545,6 +1564,28 @@ trailer<</Size 5/Root 1 0 R>>
       objectStorageService.downloadObject(objectFile, res);
     } catch (error) {
       console.error("Error accessing object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
+  // Get object metadata including original filename
+  app.get('/api/objects/:objectPath(*)/metadata', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    const objectStorageService = new ObjectStorageService();
+    try {
+      const objectFile = await objectStorageService.getObjectEntityFile(
+        req.path.replace('/api', ''),
+      );
+      const [metadata] = await objectFile.getMetadata();
+      res.json({
+        originalName: metadata.metadata?.originalName || 'Unknown file',
+        contentType: metadata.contentType,
+        size: metadata.size
+      });
+    } catch (error) {
+      console.error("Error getting object metadata:", error);
       if (error instanceof ObjectNotFoundError) {
         return res.sendStatus(404);
       }

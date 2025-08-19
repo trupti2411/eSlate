@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { type Assignment, type Submission } from "@shared/schema";
 import { 
   FileText, 
@@ -45,6 +46,10 @@ export function AssignmentCompletionArea({
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch metadata for assignment files
+  const attachmentUrls = assignment.attachmentUrls || [];
+  const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(attachmentUrls);
 
   // Auto-save every 30 seconds
   useEffect(() => {
@@ -183,7 +188,7 @@ export function AssignmentCompletionArea({
                 <BookOpen className="h-4 w-4 mr-2" />
                 <div>
                   <div className="text-xs text-gray-600">Total Marks</div>
-                  <div className="text-sm font-medium">{assignment.totalMarks}</div>
+                  <div className="text-sm font-medium">Assignment</div>
                 </div>
               </div>
               <div className="flex items-center">
@@ -222,56 +227,70 @@ export function AssignmentCompletionArea({
           {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
             <div className={`${eInkStyles.card} p-4`}>
               <h3 className="font-semibold mb-3">Assignment Materials</h3>
-              <div className="space-y-2">
-                {assignment.attachmentUrls.map((url, index) => {
-                  const filename = url.split('/').pop() || `file-${index + 1}`;
-                  const fileExtension = filename.split('.').pop()?.toLowerCase();
-                  
-                  return (
-                    <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded">
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 mr-2 text-blue-600" />
-                        <span className="font-medium">{filename}</span>
-                        <span className="text-sm text-gray-500 ml-2">
-                          ({fileExtension?.toUpperCase()})
-                        </span>
+              {isLoadingMetadata ? (
+                <div className="text-center py-4">
+                  <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
+                  <p className="text-sm text-gray-600 mt-2">Loading file information...</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {assignment.attachmentUrls.map((url, index) => {
+                    const metadata = fileMetadata?.[index];
+                    const displayFilename = getDisplayFilename(url, metadata, index);
+                    const fileExtension = displayFilename.split('.').pop()?.toLowerCase();
+                    
+                    return (
+                      <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded">
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2 text-blue-600" />
+                          <span className="font-medium">{displayFilename}</span>
+                          {fileExtension && (
+                            <span className="text-sm text-gray-500 ml-2">
+                              ({fileExtension.toUpperCase()})
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const objectPath = url.includes('/uploads/') 
+                                ? url.split('/uploads/').pop()
+                                : url.split('/').pop();
+                              window.open(`/objects/uploads/${objectPath}`, '_blank');
+                            }}
+                            className={eInkStyles.button}
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const objectPath = url.includes('/uploads/') 
+                                ? url.split('/uploads/').pop()
+                                : url.split('/').pop();
+                              const link = document.createElement('a');
+                              link.href = `/objects/uploads/${objectPath}`;
+                              link.download = displayFilename;
+                              link.target = '_blank';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                            }}
+                            className={eInkStyles.button}
+                          >
+                            <Download className="h-3 w-3 mr-1" />
+                            Download
+                          </Button>
+                        </div>
                       </div>
-                      <div className="flex space-x-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const fileId = url.split('/').pop();
-                            window.open(`/api/assignments/${assignment.id}/files/${fileId}`, '_blank');
-                          }}
-                          className={eInkStyles.button}
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            const fileId = url.split('/').pop();
-                            const link = document.createElement('a');
-                            link.href = `/api/assignments/${assignment.id}/files/${fileId}`;
-                            link.download = filename;
-                            link.target = '_blank';
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
-                          className={eInkStyles.button}
-                        >
-                          <Download className="h-3 w-3 mr-1" />
-                          Download
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </TabsContent>
