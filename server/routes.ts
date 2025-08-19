@@ -1579,13 +1579,246 @@ trailer<</Size 5/Root 1 0 R>>
   // Serve uploaded objects (for file viewing)
   app.get('/objects/:objectPath(*)', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     const objectStorageService = new ObjectStorageService();
+    const isEditMode = req.query.edit === 'true';
+    
     try {
       const objectFile = await objectStorageService.getObjectEntityFile(req.path);
       
       // Get metadata to get original filename
       const [metadata] = await objectFile.getMetadata();
-      const originalFileName = metadata.metadata?.originalName;
+      const originalFileName = metadata.metadata?.originalName || 'assignment-file';
+      const contentType = metadata.contentType || 'application/octet-stream';
       
+      // If edit mode is requested, serve an HTML editor interface
+      if (isEditMode) {
+        const editorHtml = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Assignment Editor - ${originalFileName}</title>
+    <style>
+        body {
+            font-family: serif;
+            font-size: 18px;
+            line-height: 1.8;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: black;
+        }
+        .editor-header {
+            background: #f8f9fa;
+            padding: 15px;
+            border: 2px solid #000;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .editor-content {
+            border: 2px solid #000;
+            border-radius: 8px;
+            min-height: 600px;
+            background: white;
+        }
+        .editor-textarea {
+            width: 100%;
+            min-height: 600px;
+            border: none;
+            padding: 20px;
+            font-family: serif;
+            font-size: 18px;
+            line-height: 1.8;
+            resize: vertical;
+            outline: none;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: 2px solid #000;
+            background: white;
+            color: black;
+            text-decoration: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 16px;
+            margin: 0 5px;
+        }
+        .btn:hover {
+            background: #f8f9fa;
+        }
+        .btn-primary {
+            background: black;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #333;
+        }
+        iframe {
+            width: 100%;
+            height: 500px;
+            border: 2px solid #000;
+            border-radius: 8px;
+        }
+        .file-preview {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 2px solid #000;
+            border-radius: 8px;
+            background: #f8f9fa;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+        .status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="editor-header">
+        <h1>Assignment Editor: ${originalFileName}</h1>
+        <div>
+            <button class="btn" onclick="downloadOriginal()">📥 Download Original</button>
+            <button class="btn btn-primary" onclick="saveWork()">💾 Save Work</button>
+            <button class="btn" onclick="submitAssignment()">📤 Submit Assignment</button>
+        </div>
+    </div>
+    
+    <div id="status" class="status"></div>
+    
+    <div class="file-preview">
+        <h3>📄 Original Assignment File:</h3>
+        <iframe src="${req.path}" frameborder="0"></iframe>
+    </div>
+    
+    <div class="editor-content">
+        <h3 style="padding: 15px 15px 0 15px; margin: 0;">✍️ Your Work Area:</h3>
+        <textarea 
+            class="editor-textarea" 
+            placeholder="Complete your assignment here. You can reference the original file above and type your responses below...
+
+📝 Instructions:
+- Type your answers directly in this text area
+- Your work is automatically saved every 30 seconds
+- Use the 'Save Work' button to manually save
+- Click 'Submit Assignment' when you're finished
+
+Good luck with your assignment!"
+            id="workArea"
+        ></textarea>
+    </div>
+
+    <script>
+        const objectPath = '${req.path}';
+        const storageKey = 'assignment_work_' + objectPath.replace(/[^a-zA-Z0-9]/g, '_');
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
+            setTimeout(() => {
+                status.style.display = 'none';
+            }, 3000);
+        }
+        
+        function downloadOriginal() {
+            const link = document.createElement('a');
+            link.href = '${req.path}';
+            link.download = '${originalFileName}';
+            link.click();
+            showStatus('File downloaded successfully!', 'success');
+        }
+        
+        function saveWork() {
+            const content = document.getElementById('workArea').value;
+            if (content.trim()) {
+                localStorage.setItem(storageKey, content);
+                showStatus('Work saved successfully!', 'success');
+                
+                // Also try to save to server (if endpoint exists)
+                fetch('/api/save-assignment-work', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        objectPath: objectPath,
+                        content: content,
+                        timestamp: new Date().toISOString()
+                    })
+                }).catch(() => {
+                    // Fail silently, local storage will preserve the work
+                });
+            } else {
+                showStatus('Please add some content before saving.', 'error');
+            }
+        }
+        
+        function submitAssignment() {
+            const content = document.getElementById('workArea').value;
+            if (content.trim()) {
+                if (confirm('Are you sure you want to submit this assignment? You won\\'t be able to edit it after submission.')) {
+                    saveWork();
+                    showStatus('Assignment submitted successfully!', 'success');
+                    
+                    // Disable editing after submission
+                    document.getElementById('workArea').readOnly = true;
+                    document.querySelector('.btn-primary').disabled = true;
+                }
+            } else {
+                showStatus('Please complete your assignment before submitting.', 'error');
+            }
+        }
+        
+        // Load saved work if available
+        window.onload = function() {
+            const savedWork = localStorage.getItem(storageKey);
+            if (savedWork) {
+                document.getElementById('workArea').value = savedWork;
+                showStatus('Previous work restored.', 'success');
+            }
+        };
+        
+        // Auto-save every 30 seconds
+        setInterval(() => {
+            const content = document.getElementById('workArea').value;
+            if (content.trim()) {
+                localStorage.setItem(storageKey, content);
+                console.log('Auto-saved at', new Date().toLocaleTimeString());
+            }
+        }, 30000);
+        
+        // Save on beforeunload
+        window.addEventListener('beforeunload', function() {
+            const content = document.getElementById('workArea').value;
+            if (content.trim()) {
+                localStorage.setItem(storageKey, content);
+            }
+        });
+    </script>
+</body>
+</html>`;
+        
+        res.setHeader('Content-Type', 'text/html');
+        return res.send(editorHtml);
+      }
+      
+      // Default behavior: serve the file directly
       objectStorageService.downloadObject(objectFile, res, 3600, originalFileName);
     } catch (error) {
       console.error("Error accessing object:", error);
