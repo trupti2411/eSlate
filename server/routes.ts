@@ -754,6 +754,30 @@ trailer<</Size 5/Root 1 0 R>>
 
 
 
+  // Get all submissions for company review
+  app.get('/api/company/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+    try {
+      const user = req.user!;
+      
+      // Only company admins can access this
+      if (user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) {
+        return res.status(404).json({ message: "Company admin profile not found" });
+      }
+      
+      // Get all submissions for students in this company
+      const submissions = await storage.getCompanySubmissions(companyAdmin.companyId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching company submissions:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
   // Simple file upload route
   app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res: any) => {
     try {

@@ -21,6 +21,7 @@ import CompanyAcademicManagement from "@/pages/admin/CompanyAcademicManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
 import { StudentAssignments } from "@/pages/assignments/StudentAssignments";
 import { StudentPortal } from "@/pages/student/StudentPortal";
+import SubmittedHomework from "@/pages/company/SubmittedHomework";
 
 import NotFound from "@/pages/not-found";
 
@@ -69,6 +70,7 @@ function Router() {
           <Route path="/company/students" component={CompanyStudents} />
           <Route path="/company/academic" component={() => <CompanyAcademicManagement />} />
           <Route path="/company/assignments" component={AssignmentManagement} />
+          <Route path="/company/homework" component={SubmittedHomework} />
           <Route path="/assignments" component={StudentAssignments} />
           <Route path="/student/assignments" component={StudentAssignments} />
           <Route path="/student/portal" component={StudentPortal} />

@@ -172,6 +172,7 @@ export interface IStorage {
   getSubmission(id: string): Promise<Submission | undefined>;
   getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]>;
   getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
+  getCompanySubmissions(companyId: string): Promise<any[]>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
   deleteSubmission(id: string): Promise<void>;
 
@@ -1132,6 +1133,53 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(submissions)
       .where(eq(submissions.studentId, studentId))
       .orderBy(desc(submissions.createdAt));
+  }
+
+  async getCompanySubmissions(companyId: string): Promise<any[]> {
+    const results = await db.select({
+      id: submissions.id,
+      assignmentId: submissions.assignmentId,
+      studentId: submissions.studentId,
+      content: submissions.content,
+      digitalContent: submissions.digitalContent,
+      deviceType: submissions.deviceType,
+      inputMethod: submissions.inputMethod,
+      status: submissions.status,
+      score: submissions.score,
+      feedback: submissions.feedback,
+      submittedAt: submissions.submittedAt,
+      createdAt: submissions.createdAt,
+      updatedAt: submissions.updatedAt,
+      studentInfo: {
+        id: students.id,
+        user: {
+          id: users.id,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        }
+      },
+      assignmentInfo: {
+        id: assignments.id,
+        title: assignments.title,
+        description: assignments.description,
+        totalMarks: assignments.totalMarks,
+        submissionDate: assignments.submissionDate,
+      }
+    })
+    .from(submissions)
+    .innerJoin(students, eq(submissions.studentId, students.id))
+    .innerJoin(users, eq(students.userId, users.id))
+    .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+    .where(eq(students.companyId, companyId))
+    .orderBy(desc(submissions.createdAt));
+
+    // Transform to match expected structure
+    return results.map(result => ({
+      ...result,
+      student: result.studentInfo,
+      assignment: result.assignmentInfo,
+    }));
   }
 }
 
