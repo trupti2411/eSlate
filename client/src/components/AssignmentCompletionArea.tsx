@@ -66,10 +66,27 @@ export function AssignmentCompletionArea({
       inputMethod: string;
       isDraft: boolean;
     }) => {
-      return apiRequest('/api/submissions', submission ? 'PATCH' : 'POST', {
-        ...data,
-        id: submission?.id,
-      });
+      if (submission) {
+        // Update existing submission
+        return apiRequest(`/api/submissions/${submission.id}`, 'PATCH', {
+          content: data.content,
+          digitalContent: data.digitalContent,
+          deviceType: data.deviceType,
+          inputMethod: data.inputMethod,
+          status: data.isDraft ? 'draft' : 'submitted',
+          submittedAt: data.isDraft ? undefined : new Date(),
+        });
+      } else {
+        // Create new submission
+        return apiRequest('/api/submissions', 'POST', {
+          assignmentId: data.assignmentId,
+          content: data.content,
+          digitalContent: data.digitalContent,
+          deviceType: data.deviceType,
+          inputMethod: data.inputMethod,
+          isDraft: data.isDraft,
+        });
+      }
     },
     onSuccess: (data) => {
       onSubmissionUpdate();
