@@ -1580,10 +1580,13 @@ trailer<</Size 5/Root 1 0 R>>
   app.get('/objects/:objectPath(*)', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
     const objectStorageService = new ObjectStorageService();
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(
-        req.path,
-      );
-      objectStorageService.downloadObject(objectFile, res);
+      const objectFile = await objectStorageService.getObjectEntityFile(req.path);
+      
+      // Get metadata to get original filename
+      const [metadata] = await objectFile.getMetadata();
+      const originalFileName = metadata.metadata?.originalName;
+      
+      objectStorageService.downloadObject(objectFile, res, 3600, originalFileName);
     } catch (error) {
       console.error("Error accessing object:", error);
       if (error instanceof ObjectNotFoundError) {

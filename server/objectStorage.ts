@@ -78,7 +78,7 @@ export class ObjectStorageService {
       if (!fileName) {
         // Try to get filename from metadata first
         fileName = metadata.metadata?.originalName || 
-                  (typeof metadata.name === 'string' ? metadata.name.split('/').pop() : metadata.name?.toString()?.split('/').pop()) || 
+                  metadata.name?.split('/').pop() || 
                   'download';
       }
 
@@ -131,21 +131,25 @@ export class ObjectStorageService {
   // Set metadata for an uploaded object
   async setObjectMetadata(uploadURL: string, metadata: { originalName: string }): Promise<void> {
     try {
-      // Extract the object path from the upload URL
+      // Parse the upload URL to get bucket and object name
       const url = new URL(uploadURL);
       const pathParts = url.pathname.split('/');
+      if (pathParts.length < 3) {
+        throw new Error("Invalid upload URL format");
+      }
+      
       const bucketName = pathParts[1];
       const objectName = pathParts.slice(2).join('/');
-
+      
       const bucket = objectStorageClient.bucket(bucketName);
       const file = bucket.file(objectName);
-
+      
       // Check if file exists
       const [exists] = await file.exists();
       if (!exists) {
-        throw new Error(`Object not found: ${objectName}`);
+        throw new Error("File not found");
       }
-
+      
       // Set the metadata
       await file.setMetadata({
         metadata: metadata
@@ -155,6 +159,35 @@ export class ObjectStorageService {
       throw error;
     }
   }
+
+  // Get object entity file from path
+  async getObjectEntityFile(objectPath: string): Promise<any> {
+    if (!objectPath.startsWith("/objects/")) {
+      throw new ObjectNotFoundError();
+    }
+
+    const parts = objectPath.slice(1).split("/");
+    if (parts.length < 2) {
+      throw new ObjectNotFoundError();
+    }
+
+    const entityId = parts.slice(1).join("/");
+    let entityDir = this.getPrivateObjectDir();
+    if (!entityDir.endsWith("/")) {
+      entityDir = `${entityDir}/`;
+    }
+    const objectEntityPath = `${entityDir}${entityId}`;
+    const { bucketName, objectName } = parseObjectPath(objectEntityPath);
+    const bucket = objectStorageClient.bucket(bucketName);
+    const objectFile = bucket.file(objectName);
+    const [exists] = await objectFile.exists();
+    if (!exists) {
+      throw new ObjectNotFoundError();
+    }
+    return objectFile;
+  }
+
+
 
   normalizeObjectEntityPath(
     rawPath: string,
