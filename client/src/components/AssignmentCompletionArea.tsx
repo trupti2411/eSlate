@@ -141,7 +141,7 @@ export function AssignmentCompletionArea({
                               const objectPath = url.includes('/uploads/') 
                                 ? url.split('/uploads/').pop()
                                 : url.split('/').pop();
-                              window.open(`/objects/uploads/${objectPath}`, '_blank');
+                              window.open(`/objects/uploads/${objectPath}?edit=true`, '_blank');
                             }}
                             className={eInkStyles.button}
                           >
@@ -228,8 +228,13 @@ export function AssignmentCompletionArea({
 
               <Button
                 onClick={() => {
-                  // Open the online editing interface
-                  setActiveTab("online-editor");
+                  // Open the editor directly without intermediate dialog
+                  if (attachmentUrls.length > 0) {
+                    const objectPath = attachmentUrls[0].includes('/uploads/') 
+                      ? attachmentUrls[0].split('/uploads/').pop()
+                      : attachmentUrls[0].split('/').pop();
+                    window.open(`/objects/uploads/${objectPath}?edit=true`, '_blank');
+                  }
                 }}
                 className={`${eInkStyles.primaryButton} w-full`}
                 disabled={submission?.status === 'submitted' || attachmentUrls.length === 0}
@@ -317,123 +322,7 @@ export function AssignmentCompletionArea({
 
 
 
-        {/* Online Editor Tab */}
-        <TabsContent value="online-editor" className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="outline"
-              onClick={() => setActiveTab("completion")}
-              className={eInkStyles.button}
-            >
-              ← Back to Options
-            </Button>
-            <h2 className="text-lg font-semibold">Online Assignment Editor</h2>
-            <div></div>
-          </div>
 
-          {/* File Viewer/Editor */}
-          {attachmentUrls.length > 0 && (
-            <div className={`${eInkStyles.card} p-4`}>
-              <div className="mb-4">
-                <Label className="text-base font-semibold mb-2 block">Assignment Files</Label>
-                <div className="grid grid-cols-1 gap-4">
-                  {attachmentUrls.map((url, index) => {
-                    const metadata = fileMetadata?.[index];
-                    const filename = getDisplayFilename(url, metadata, index);
-                    const objectPath = url.includes('/uploads/') 
-                      ? url.split('/uploads/').pop()
-                      : url.split('/').pop();
-                    
-                    return (
-                      <div key={index} className="border-2 border-gray-300 rounded-lg">
-                        <div className="bg-gray-50 p-3 border-b border-gray-300 flex items-center justify-between">
-                          <div className="flex items-center">
-                            <FileText className="h-4 w-4 mr-2" />
-                            <span className="font-medium">{filename}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                // Open in new tab for editing
-                                const editUrl = `/objects/uploads/${objectPath}?edit=true`;
-                                window.open(editUrl, '_blank');
-                              }}
-                              className="text-xs"
-                            >
-                              <Eye className="h-3 w-3 mr-1" />
-                              Open Editor
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                // Download option
-                                const link = document.createElement('a');
-                                link.href = `/objects/uploads/${objectPath}`;
-                                link.download = filename;
-                                link.target = '_blank';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                              }}
-                              className="text-xs"
-                            >
-                              <Download className="h-3 w-3 mr-1" />
-                              Download
-                            </Button>
-                          </div>
-                        </div>
-                        
-                        {/* Embedded Viewer */}
-                        <div className="p-4">
-                          <div className="border-2 border-dashed border-gray-300 rounded-lg min-h-96 flex items-center justify-center bg-white">
-                            <iframe
-                              src={`/objects/uploads/${objectPath}`}
-                              className="w-full h-96 border-0 rounded"
-                              title={`Assignment file: ${filename}`}
-                              onError={() => {
-                                console.log("Iframe load error, falling back to direct link");
-                              }}
-                            />
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Work Area */}
-              <div className="mt-6">
-                <Label className="text-base font-semibold mb-2 block">Your Work</Label>
-                <div className="border-2 border-gray-300 rounded-lg p-4 bg-white min-h-64">
-                  <textarea
-                    placeholder="Type your assignment response here, or use the editor above to modify the assignment files directly..."
-                    className="w-full h-full min-h-48 border-0 resize-none focus:outline-none text-lg leading-relaxed font-serif"
-                    style={{ 
-                      fontSize: '18px',
-                      lineHeight: '1.8',
-                      fontFamily: 'serif'
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Submit Work */}
-              <div className="flex justify-end mt-4">
-                <Button
-                  className={`${eInkStyles.primaryButton} px-6`}
-                  disabled={submission?.status === 'submitted'}
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  {submission?.status === 'submitted' ? 'Submitted' : 'Submit Assignment'}
-                </Button>
-              </div>
-            </div>
-          )}
-        </TabsContent>
 
         {/* Offline Upload Tab */}
         <TabsContent value="offline-upload" className="space-y-6">
