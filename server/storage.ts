@@ -1137,6 +1137,7 @@ export class DatabaseStorage implements IStorage {
 
   async getCompanySubmissions(companyId: string): Promise<any[]> {
     const results = await db.select({
+      // Submission fields
       id: submissions.id,
       assignmentId: submissions.assignmentId,
       studentId: submissions.studentId,
@@ -1150,22 +1151,21 @@ export class DatabaseStorage implements IStorage {
       submittedAt: submissions.submittedAt,
       createdAt: submissions.createdAt,
       updatedAt: submissions.updatedAt,
-      studentInfo: {
-        id: students.id,
-        user: {
-          id: users.id,
-          firstName: users.firstName,
-          lastName: users.lastName,
-          email: users.email,
-        }
-      },
-      assignmentInfo: {
-        id: assignments.id,
-        title: assignments.title,
-        description: assignments.description,
-        totalMarks: assignments.totalMarks,
-        submissionDate: assignments.submissionDate,
-      }
+      // Student fields - flattened
+      studentId_: students.id,
+      studentUserId: students.userId,
+      studentCompanyId: students.companyId,
+      // User fields for the student
+      userId: users.id,
+      userFirstName: users.firstName,
+      userLastName: users.lastName,
+      userEmail: users.email,
+      // Assignment fields - flattened
+      assignmentId_: assignments.id,
+      assignmentTitle: assignments.title,
+      assignmentDescription: assignments.description,
+      assignmentTotalMarks: assignments.totalMarks,
+      assignmentSubmissionDate: assignments.submissionDate,
     })
     .from(submissions)
     .innerJoin(students, eq(submissions.studentId, students.id))
@@ -1176,9 +1176,37 @@ export class DatabaseStorage implements IStorage {
 
     // Transform to match expected structure
     return results.map(result => ({
-      ...result,
-      student: result.studentInfo,
-      assignment: result.assignmentInfo,
+      id: result.id,
+      assignmentId: result.assignmentId,
+      studentId: result.studentId,
+      content: result.content,
+      digitalContent: result.digitalContent,
+      deviceType: result.deviceType,
+      inputMethod: result.inputMethod,
+      status: result.status,
+      score: result.score,
+      feedback: result.feedback,
+      submittedAt: result.submittedAt,
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
+      student: {
+        id: result.studentId_,
+        userId: result.studentUserId,
+        companyId: result.studentCompanyId,
+        user: {
+          id: result.userId,
+          firstName: result.userFirstName,
+          lastName: result.userLastName,
+          email: result.userEmail,
+        }
+      },
+      assignment: {
+        id: result.assignmentId_,
+        title: result.assignmentTitle,
+        description: result.assignmentDescription,
+        totalMarks: result.assignmentTotalMarks,
+        submissionDate: result.assignmentSubmissionDate,
+      }
     }));
   }
 }
