@@ -1136,78 +1136,87 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getCompanySubmissions(companyId: string): Promise<any[]> {
-    const results = await db.select({
-      // Submission fields
-      id: submissions.id,
-      assignmentId: submissions.assignmentId,
-      studentId: submissions.studentId,
-      content: submissions.content,
-      digitalContent: submissions.digitalContent,
-      deviceType: submissions.deviceType,
-      inputMethod: submissions.inputMethod,
-      status: submissions.status,
-      score: submissions.score,
-      feedback: submissions.feedback,
-      submittedAt: submissions.submittedAt,
-      createdAt: submissions.createdAt,
-      updatedAt: submissions.updatedAt,
-      // Student fields - flattened
-      studentId_: students.id,
-      studentUserId: students.userId,
-      studentCompanyId: students.companyId,
-      // User fields for the student
-      userId: users.id,
-      userFirstName: users.firstName,
-      userLastName: users.lastName,
-      userEmail: users.email,
-      // Assignment fields - flattened
-      assignmentId_: assignments.id,
-      assignmentTitle: assignments.title,
-      assignmentDescription: assignments.description,
-      assignmentTotalMarks: assignments.totalMarks,
-      assignmentSubmissionDate: assignments.submissionDate,
-    })
-    .from(submissions)
-    .innerJoin(students, eq(submissions.studentId, students.id))
-    .innerJoin(users, eq(students.userId, users.id))
-    .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
-    .where(eq(students.companyId, companyId))
-    .orderBy(desc(submissions.createdAt));
+    try {
+      console.log("Getting submissions for company:", companyId);
+      
+      // Get all submissions for students in this company with proper field names
+      const results = await db
+        .select({
+          // Submission fields (using actual schema fields)
+          submissionId: submissions.id,
+          assignmentId: submissions.assignmentId,
+          studentId: submissions.studentId,
+          content: submissions.content,
+          digitalContent: submissions.digitalContent,
+          fileUrls: submissions.fileUrls,
+          status: submissions.status,
+          isDraft: submissions.isDraft,
+          submittedAt: submissions.submittedAt,
+          isLate: submissions.isLate,
+          deviceType: submissions.deviceType,
+          inputMethod: submissions.inputMethod,
+          submissionCreatedAt: submissions.createdAt,
+          submissionUpdatedAt: submissions.updatedAt,
+          // Student fields
+          studentUserId: students.userId,
+          studentCompanyId: students.companyId,
+          // User fields for the student
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+          userEmail: users.email,
+          // Assignment fields (using actual schema fields)
+          assignmentTitle: assignments.title,
+          assignmentDescription: assignments.description,
+          assignmentInstructions: assignments.instructions,
+          assignmentSubmissionDate: assignments.submissionDate,
+        })
+        .from(submissions)
+        .innerJoin(students, eq(submissions.studentId, students.id))
+        .innerJoin(users, eq(students.userId, users.id))
+        .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+        .where(eq(students.companyId, companyId))
+        .orderBy(desc(submissions.createdAt));
 
-    // Transform to match expected structure
-    return results.map(result => ({
-      id: result.id,
-      assignmentId: result.assignmentId,
-      studentId: result.studentId,
-      content: result.content,
-      digitalContent: result.digitalContent,
-      deviceType: result.deviceType,
-      inputMethod: result.inputMethod,
-      status: result.status,
-      score: result.score,
-      feedback: result.feedback,
-      submittedAt: result.submittedAt,
-      createdAt: result.createdAt,
-      updatedAt: result.updatedAt,
-      student: {
-        id: result.studentId_,
-        userId: result.studentUserId,
-        companyId: result.studentCompanyId,
-        user: {
-          id: result.userId,
-          firstName: result.userFirstName,
-          lastName: result.userLastName,
-          email: result.userEmail,
+      console.log("Found submissions:", results.length);
+
+      // Transform to match expected structure
+      return results.map(result => ({
+        id: result.submissionId,
+        assignmentId: result.assignmentId,
+        studentId: result.studentId,
+        content: result.content,
+        digitalContent: result.digitalContent,
+        fileUrls: result.fileUrls,
+        status: result.status,
+        isDraft: result.isDraft,
+        submittedAt: result.submittedAt,
+        isLate: result.isLate,
+        deviceType: result.deviceType,
+        inputMethod: result.inputMethod,
+        createdAt: result.submissionCreatedAt,
+        updatedAt: result.submissionUpdatedAt,
+        student: {
+          id: result.studentId,
+          userId: result.studentUserId,
+          companyId: result.studentCompanyId,
+          user: {
+            firstName: result.userFirstName,
+            lastName: result.userLastName,
+            email: result.userEmail,
+          }
+        },
+        assignment: {
+          id: result.assignmentId,
+          title: result.assignmentTitle,
+          description: result.assignmentDescription,
+          instructions: result.assignmentInstructions,
+          submissionDate: result.assignmentSubmissionDate,
         }
-      },
-      assignment: {
-        id: result.assignmentId_,
-        title: result.assignmentTitle,
-        description: result.assignmentDescription,
-        totalMarks: result.assignmentTotalMarks,
-        submissionDate: result.assignmentSubmissionDate,
-      }
-    }));
+      }));
+    } catch (error) {
+      console.error("Error in getCompanySubmissions:", error);
+      return [];
+    }
   }
 }
 
