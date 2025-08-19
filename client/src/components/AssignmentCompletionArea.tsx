@@ -296,16 +296,162 @@ export function AssignmentCompletionArea({
         </TabsContent>
 
         <TabsContent value="completion" className="space-y-6">
-          {/* Device Optimization Settings */}
+          {/* Assignment Completion Options */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Option 1: Complete Online */}
+            <div className={`${eInkStyles.card} p-6`}>
+              <div className="text-center mb-4">
+                <Monitor className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                <h3 className="text-lg font-semibold mb-2">Complete Online</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  View and complete the assignment directly in your browser with stylus/pen input
+                </p>
+              </div>
+              
+              {/* Show assignment files for online completion */}
+              {attachmentUrls.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  <Label className="text-sm font-medium">Assignment Files:</Label>
+                  {attachmentUrls.map((url, index) => {
+                    const filename = getDisplayFilename(url, fileMetadata);
+                    return (
+                      <div key={index} className="flex items-center justify-between p-2 border rounded">
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          <span className="text-sm">{filename}</span>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              const objectPath = url.includes('/uploads/') 
+                                ? url.split('/uploads/').pop()
+                                : url.split('/').pop();
+                              window.open(`/objects/uploads/${objectPath}`, '_blank');
+                            }}
+                            className="text-xs"
+                          >
+                            <Eye className="h-3 w-3 mr-1" />
+                            View
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <Button
+                onClick={() => setActiveTab("online-work")}
+                className={`${eInkStyles.primaryButton} w-full`}
+                disabled={submission?.status === 'submitted'}
+              >
+                <PenTool className="h-4 w-4 mr-2" />
+                Start Online Completion
+              </Button>
+            </div>
+
+            {/* Option 2: Complete Offline */}
+            <div className={`${eInkStyles.card} p-6`}>
+              <div className="text-center mb-4">
+                <Download className="h-12 w-12 mx-auto mb-3 text-green-600" />
+                <h3 className="text-lg font-semibold mb-2">Complete Offline</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Download assignment files, complete externally, then upload your completed work
+                </p>
+              </div>
+
+              {/* Download assignment files */}
+              {attachmentUrls.length > 0 && (
+                <div className="space-y-2 mb-4">
+                  <Label className="text-sm font-medium">Download Files:</Label>
+                  {attachmentUrls.map((url, index) => {
+                    const filename = getDisplayFilename(url, fileMetadata);
+                    return (
+                      <div key={index} className="flex items-center justify-between p-2 border rounded">
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          <span className="text-sm">{filename}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const objectPath = url.includes('/uploads/') 
+                              ? url.split('/uploads/').pop()
+                              : url.split('/').pop();
+                            const link = document.createElement('a');
+                            link.href = `/objects/uploads/${objectPath}`;
+                            link.download = filename;
+                            link.target = '_blank';
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                          className="text-xs"
+                        >
+                          <Download className="h-3 w-3 mr-1" />
+                          Download
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              <Button
+                onClick={() => setActiveTab("offline-upload")}
+                className={`${eInkStyles.button} w-full`}
+                disabled={submission?.status === 'submitted'}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Upload Completed Work
+              </Button>
+            </div>
+          </div>
+
+          {/* Submission Status */}
+          {submission?.status === 'submitted' && (
+            <div className={`${eInkStyles.card} p-4 bg-green-50 border-green-200`}>
+              <div className="flex items-center text-green-800">
+                <Send className="h-4 w-4 mr-2" />
+                <span className="font-medium">Assignment Successfully Submitted</span>
+              </div>
+              {submission.submittedAt && (
+                <p className="text-sm text-green-600 mt-1">
+                  Submitted on {format(new Date(submission.submittedAt), 'MMM dd, yyyy HH:mm')}
+                </p>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Online Work Tab */}
+        <TabsContent value="online-work" className="space-y-6">
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="outline"
+              onClick={() => setActiveTab("completion")}
+              className={eInkStyles.button}
+            >
+              ← Back to Options
+            </Button>
+            <h2 className="text-lg font-semibold">Online Assignment Completion</h2>
+            <div></div>
+          </div>
+
+          {/* Device Settings */}
           <div className={`${eInkStyles.card} p-4`}>
-            <h3 className="font-semibold mb-3">Device Settings</h3>
-            <div className="grid grid-cols-2 gap-4">
+            <Label className="text-base font-semibold mb-4 block">Device Settings</Label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label className="font-medium">Device Type</Label>
-                <select 
-                  value={deviceType} 
+                <Label htmlFor="device-type" className="text-sm">Device Type</Label>
+                <select
+                  id="device-type"
+                  value={deviceType}
                   onChange={(e) => setDeviceType(e.target.value)}
-                  className="w-full p-2 border-2 border-black rounded bg-white text-black mt-1"
+                  className="w-full mt-1 p-2 border-2 border-black bg-white rounded"
                 >
                   <option value="e-ink">E-ink Device</option>
                   <option value="tablet">Tablet</option>
@@ -313,78 +459,183 @@ export function AssignmentCompletionArea({
                 </select>
               </div>
               <div>
-                <Label className="font-medium">Input Method</Label>
-                <select 
-                  value={inputMethod} 
+                <Label htmlFor="input-method" className="text-sm">Input Method</Label>
+                <select
+                  id="input-method"
+                  value={inputMethod}
                   onChange={(e) => setInputMethod(e.target.value)}
-                  className="w-full p-2 border-2 border-black rounded bg-white text-black mt-1"
+                  className="w-full mt-1 p-2 border-2 border-black bg-white rounded"
                 >
                   <option value="pen">Stylus/Pen</option>
-                  <option value="touch">Touch Screen</option>
+                  <option value="touch">Touch</option>
                   <option value="keyboard">Keyboard</option>
                 </select>
               </div>
             </div>
           </div>
 
-          {/* Response Area */}
-          <div className={`${eInkStyles.card} p-4 space-y-4`}>
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Your Response</h3>
-              <div className="flex items-center text-sm text-gray-600">
-                {isAutoSaving && <><Save className="h-3 w-3 mr-1" />Saving...</>}
-                {lastSaved && !isAutoSaving && (
-                  <>Last saved: {format(lastSaved, 'HH:mm:ss')}</>
-                )}
-              </div>
+          {/* Text Response Area */}
+          <div className={`${eInkStyles.card} p-4`}>
+            <div className="flex justify-between items-center mb-4">
+              <Label className="text-base font-semibold">Your Response</Label>
+              {lastSaved && (
+                <span className="text-sm text-gray-500 flex items-center">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Last saved: {format(lastSaved, 'HH:mm:ss')}
+                </span>
+              )}
             </div>
-            
             <Textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              placeholder="Type your answer here..."
-              rows={12}
-              className={eInkStyles.textarea}
-              style={{
+              placeholder="Enter your assignment response here..."
+              className={`${eInkStyles.textarea} min-h-96 text-lg leading-8`}
+              style={{ 
                 fontSize: '18px',
                 lineHeight: '1.8',
-                fontFamily: 'serif',
+                fontFamily: 'serif'
               }}
             />
+          </div>
 
-            {/* Digital Content Area for pen input */}
-            {inputMethod === 'pen' && (
-              <div>
-                <Label className="font-medium">Digital Handwriting</Label>
-                <Textarea
-                  value={digitalContent}
-                  onChange={(e) => setDigitalContent(e.target.value)}
-                  placeholder="Digitized handwriting content will appear here..."
-                  rows={4}
-                  className="w-full p-4 border-2 border-gray-400 rounded bg-gray-50 text-black text-lg leading-relaxed mt-2"
-                  readOnly
-                />
-                <p className="text-sm text-gray-600 mt-1">
-                  This field will be automatically populated when using pen input on compatible devices
-                </p>
-              </div>
-            )}
+          {/* Digital Handwriting Section */}
+          <div className={`${eInkStyles.card} p-4`}>
+            <div className="flex justify-between items-center mb-4">
+              <Label className="text-base font-semibold">Digital Handwriting</Label>
+              <Button
+                type="button"
+                className={eInkStyles.button}
+                onClick={() => {
+                  // Screenshot functionality placeholder
+                  setDigitalContent("Screenshot captured at " + new Date().toISOString());
+                }}
+              >
+                Screenshot
+              </Button>
+            </div>
+            <div className="min-h-32 border-2 border-dashed border-gray-300 rounded p-4 text-center text-gray-500">
+              {digitalContent || "Digitized handwriting content will appear here..."}
+            </div>
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-4 pt-4 border-t-2 border-black">
-            <Button 
+          <div className="flex gap-4 justify-end">
+            <Button
+              type="button"
               onClick={handleSaveDraft}
-              disabled={saveSubmissionMutation.isPending || !content.trim()}
-              className={eInkStyles.button}
+              disabled={saveSubmissionMutation.isPending || !content.trim() || isAutoSaving}
+              className={`${eInkStyles.button} px-6`}
             >
               <Save className="h-4 w-4 mr-2" />
-              Save Draft
+              {isAutoSaving ? 'Saving...' : 'Save Draft'}
             </Button>
-            <Button 
+            <Button
+              type="button"
               onClick={handleSubmit}
               disabled={saveSubmissionMutation.isPending || !content.trim() || submission?.status === 'submitted'}
-              className={eInkStyles.primaryButton}
+              className={`${eInkStyles.primaryButton} px-6`}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {submission?.status === 'submitted' ? 'Submitted' : 'Submit Assignment'}
+            </Button>
+          </div>
+        </TabsContent>
+
+        {/* Offline Upload Tab */}
+        <TabsContent value="offline-upload" className="space-y-6">
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="outline"
+              onClick={() => setActiveTab("completion")}
+              className={eInkStyles.button}
+            >
+              ← Back to Options
+            </Button>
+            <h2 className="text-lg font-semibold">Upload Completed Assignment</h2>
+            <div></div>
+          </div>
+
+          {/* File Upload Area */}
+          <div className={`${eInkStyles.card} p-6`}>
+            <div className="text-center">
+              <FileText className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-semibold mb-2">Upload Your Completed Assignment</h3>
+              <p className="text-sm text-gray-600 mb-6">
+                Select the completed assignment file(s) from your device
+              </p>
+              
+              {/* File Upload Input */}
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 mb-4">
+                <input
+                  type="file"
+                  multiple
+                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                  className="hidden"
+                  id="assignment-upload"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    // Handle file upload logic here
+                    console.log("Files selected:", files);
+                  }}
+                />
+                <label
+                  htmlFor="assignment-upload"
+                  className="cursor-pointer inline-flex items-center px-6 py-3 border-2 border-black bg-white text-black hover:bg-gray-100 font-medium rounded"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Choose Files
+                </label>
+                <p className="text-xs text-gray-500 mt-2">
+                  Supported formats: PDF, DOC, DOCX, PNG, JPG (Max 30MB per file)
+                </p>
+              </div>
+
+              {/* Show existing submission files if any */}
+              {submission?.fileUrls && submission.fileUrls.length > 0 && (
+                <div className="mt-4">
+                  <Label className="text-sm font-medium mb-2 block">Previously Uploaded Files:</Label>
+                  <div className="space-y-2">
+                    {submission.fileUrls.map((url, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 border rounded">
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2" />
+                          <span className="text-sm">File {index + 1}</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(url, '_blank')}
+                          className="text-xs"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div className={`${eInkStyles.card} p-4 bg-blue-50 border-blue-200`}>
+            <h4 className="font-medium text-blue-800 mb-2">Upload Instructions:</h4>
+            <ul className="text-sm text-blue-700 space-y-1">
+              <li>• Complete the assignment in your preferred application (Word, PDF editor, etc.)</li>
+              <li>• Save your completed work</li>
+              <li>• Upload the file(s) using the upload area above</li>
+              <li>• Click "Submit Assignment" when ready</li>
+            </ul>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              onClick={handleSubmit}
+              disabled={saveSubmissionMutation.isPending || submission?.status === 'submitted'}
+              className={`${eInkStyles.primaryButton} px-6`}
             >
               <Send className="h-4 w-4 mr-2" />
               {submission?.status === 'submitted' ? 'Submitted' : 'Submit Assignment'}
