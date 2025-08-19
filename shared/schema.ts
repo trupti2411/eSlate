@@ -122,7 +122,7 @@ export const assignments = pgTable("assignments", {
   createdBy: varchar("created_by").notNull().references(() => users.id),
   classId: varchar("class_id").references(() => classes.id), // Assign to entire class
   subject: varchar("subject"), // Optional subject/topic field
-  totalMarks: integer("total_marks").default(100), // Total marks/weightage
+
   attachmentUrls: text("attachment_urls").array().default([]), // Files uploaded by admin/tutor
   allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg']), // Specified file types
   maxFileSize: integer("max_file_size").default(31457280), // 30MB in bytes
@@ -147,12 +147,7 @@ export const submissions = pgTable("submissions", {
   // E-ink device specific fields
   deviceType: varchar("device_type"), // 'e-ink', 'tablet', 'desktop'
   inputMethod: varchar("input_method"), // 'pen', 'touch', 'keyboard'
-  // Grading
-  score: integer("score"),
-  totalMarks: integer("total_marks"), // Copy from assignment for historical record
-  feedback: text("feedback"),
-  gradedAt: timestamp("graded_at"),
-  gradedBy: varchar("graded_by").references(() => users.id), // Can be tutor or admin
+
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -293,10 +288,6 @@ export const submissionsRelations = relations(submissions, ({ one }) => ({
   student: one(students, {
     fields: [submissions.studentId],
     references: [students.id],
-  }),
-  grader: one(tutors, {
-    fields: [submissions.gradedBy],
-    references: [tutors.id],
   }),
 }));
 

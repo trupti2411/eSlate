@@ -147,7 +147,7 @@ export function AssignmentManagement() {
       instructions: "",
       submissionDate: "",
       subject: "",
-      totalMarks: 100,
+
       classId: "",
       attachmentUrls: [],
       allowedFileTypes: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg'],
@@ -196,7 +196,7 @@ export function AssignmentManagement() {
       submissionDate: assignment.submissionDate 
         ? new Date(assignment.submissionDate).toISOString().slice(0, 16) 
         : '',
-      totalMarks: assignment.totalMarks || 100,
+
       attachmentUrls: assignment.attachmentUrls || [],
       allowedFileTypes: assignment.allowedFileTypes || ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg'],
       maxFileSize: assignment.maxFileSize || 31457280,
@@ -412,26 +412,7 @@ export function AssignmentManagement() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="totalMarks"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel htmlFor="assignment-total-marks">Total Marks</FormLabel>
-                        <FormControl>
-                          <Input 
-                            id="assignment-total-marks"
-                            type="number" 
-                            min="1" 
-                            {...field} 
-                            value={field.value || 0}
-                            onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+
                 </div>
 
                 {/* File Upload Section */}
@@ -587,10 +568,7 @@ export function AssignmentManagement() {
                       <Badge variant="secondary">{assignment.subject}</Badge>
                     </div>
                   )}
-                  <div className="flex items-center space-x-2">
-                    <span className="text-muted-foreground">Marks:</span>
-                    <span className="font-medium">{assignment.totalMarks || 100}</span>
-                  </div>
+
                   <div className="flex items-center space-x-2">
                     <Users className="w-4 h-4 text-muted-foreground" />
                     <span>Class Assignment</span>

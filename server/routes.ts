@@ -631,26 +631,47 @@ trailer<</Size 5/Root 1 0 R>>
             metadata: metadata.metadata
           });
           
-          // Try to get the assignment to find the original filename
-          let originalFileName = undefined;
-          try {
-            const assignment = await storage.getAssignment(assignmentId);
-            if (assignment) {
-              // Find the attachment URL that contains this file ID
-              const attachmentUrl = assignment.attachmentUrls?.find(url => url.includes(fileId));
-              if (attachmentUrl) {
-                originalFileName = metadata.metadata?.originalName || 
-                                 metadata.metadata?.filename ||
-                                 metadata.metadata?.['original-name'] ||
-                                 `assignment-file.${metadata.contentType?.split('/')[1] || 'bin'}`;
-              }
-            }
-          } catch (error) {
-            console.log("Could not get assignment details for filename:", error);
+          // Get proper filename from content type and metadata
+          let filename = `assignment-file`;
+          
+          // Try to get original filename from object metadata
+          if (metadata.metadata?.originalName) {
+            filename = metadata.metadata.originalName;
+          } else if (metadata.metadata?.filename) {
+            filename = metadata.metadata.filename;
+          } else if (metadata.contentType) {
+            // Map content types to proper extensions
+            const contentTypeMap: Record<string, string> = {
+              'application/pdf': 'pdf',
+              'application/msword': 'doc',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+              'application/vnd.ms-excel': 'xls',
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+              'image/png': 'png',
+              'image/jpeg': 'jpg',
+              'text/plain': 'txt'
+            };
+            
+            const extension = contentTypeMap[metadata.contentType] || 'bin';
+            filename = `assignment-file.${extension}`;
           }
           
-          console.log("Using filename:", originalFileName);
-          await objectStorageService.downloadObject(file, res, 3600, originalFileName);
+          console.log("Using filename:", filename);
+          
+          // Set proper headers for download
+          res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+          res.setHeader('Content-Type', metadata.contentType || 'application/octet-stream');
+          res.setHeader('Content-Length', metadata.size);
+          
+          // Stream the file directly without using downloadObject method
+          const stream = file.createReadStream();
+          stream.on('error', (err) => {
+            console.error('Stream error:', err);
+            if (!res.headersSent) {
+              res.status(500).json({ error: 'Error streaming file' });
+            }
+          });
+          stream.pipe(res);
           return;
         } else {
           console.log("File does not exist in object storage");

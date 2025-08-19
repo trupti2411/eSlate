@@ -14,8 +14,7 @@ import {
   Calendar, 
   User, 
   BookOpen, 
-  Clock, 
-  Star,
+  Clock,
   Eye,
   Download,
   Search,
@@ -38,7 +37,6 @@ interface SubmissionWithDetails extends Submission {
     id: string;
     title: string;
     description: string;
-    totalMarks: number;
     submissionDate: string;
   };
 }
@@ -47,9 +45,7 @@ export default function SubmittedHomework() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionWithDetails | null>(null);
-  const [grade, setGrade] = useState("");
-  const [feedback, setFeedback] = useState("");
-  const [isGrading, setIsGrading] = useState(false);
+
 
   // Fetch all submissions for the company
   const { data: submissions = [], isLoading } = useQuery<SubmissionWithDetails[]>({
@@ -65,8 +61,7 @@ export default function SubmittedHomework() {
     
     const matchesStatus = statusFilter === "all" || 
       (statusFilter === "submitted" && submission.status === "submitted") ||
-      (statusFilter === "graded" && submission.score !== null) ||
-      (statusFilter === "pending" && submission.status === "submitted" && submission.score === null);
+      (statusFilter === "pending" && submission.status === "submitted");
     
     return matchesSearch && matchesStatus;
   });
@@ -78,33 +73,16 @@ export default function SubmittedHomework() {
   };
 
   const getStatusColor = (submission: SubmissionWithDetails) => {
-    if (submission.score !== null) return "bg-green-100 text-green-800";
     if (submission.status === "submitted") return "bg-blue-100 text-blue-800";
     return "bg-gray-100 text-gray-800";
   };
 
   const getStatusText = (submission: SubmissionWithDetails) => {
-    if (submission.score !== null) return "Graded";
-    if (submission.status === "submitted") return "Pending Review";
+    if (submission.status === "submitted") return "Submitted";
     return "Draft";
   };
 
-  const handleGradeSubmission = async () => {
-    if (!selectedSubmission || !grade) return;
-    
-    setIsGrading(true);
-    try {
-      // Implementation for grading would go here
-      console.log("Grading submission:", selectedSubmission.id, "Score:", grade, "Feedback:", feedback);
-      setSelectedSubmission(null);
-      setGrade("");
-      setFeedback("");
-    } catch (error) {
-      console.error("Error grading submission:", error);
-    } finally {
-      setIsGrading(false);
-    }
-  };
+
 
   if (isLoading) {
     return (
@@ -154,23 +132,9 @@ export default function SubmittedHomework() {
                 <Clock className="h-8 w-8 text-orange-600" />
                 <div className="ml-3">
                   <p className="text-2xl font-bold">
-                    {submissions.filter(s => s.status === "submitted" && s.score === null).length}
+                    {submissions.filter(s => s.status === "submitted").length}
                   </p>
-                  <p className="text-gray-600 text-sm">Pending Review</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={eInkStyles.card}>
-            <CardContent className="p-4">
-              <div className="flex items-center">
-                <Star className="h-8 w-8 text-green-600" />
-                <div className="ml-3">
-                  <p className="text-2xl font-bold">
-                    {submissions.filter(s => s.score !== null).length}
-                  </p>
-                  <p className="text-gray-600 text-sm">Graded</p>
+                  <p className="text-gray-600 text-sm">Submitted</p>
                 </div>
               </div>
             </CardContent>
@@ -183,9 +147,9 @@ export default function SubmittedHomework() {
                 <div className="ml-3">
                   <p className="text-2xl font-bold">
                     {submissions.length > 0 ? 
-                      Math.round((submissions.filter(s => s.score !== null).length / submissions.length) * 100) : 0}%
+                      Math.round((submissions.filter(s => s.status === "submitted").length / submissions.length) * 100) : 0}%
                   </p>
-                  <p className="text-gray-600 text-sm">Completion Rate</p>
+                  <p className="text-gray-600 text-sm">Submission Rate</p>
                 </div>
               </div>
             </CardContent>
@@ -213,8 +177,7 @@ export default function SubmittedHomework() {
               <SelectContent>
                 <SelectItem value="all">All Submissions</SelectItem>
                 <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="pending">Pending Review</SelectItem>
-                <SelectItem value="graded">Graded</SelectItem>
+                <SelectItem value="pending">Draft</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -261,14 +224,8 @@ export default function SubmittedHomework() {
                         </div>
                         <div className="flex items-center gap-1">
                           <BookOpen className="h-4 w-4" />
-                          <span>{submission.assignment.totalMarks} points</span>
+                          <span>Assignment</span>
                         </div>
-                        {submission.score !== null && (
-                          <div className="flex items-center gap-1">
-                            <Star className="h-4 w-4" />
-                            <span>{submission.score}/{submission.assignment.totalMarks} points</span>
-                          </div>
-                        )}
                       </div>
 
                       {submission.assignment.description && (
@@ -284,26 +241,22 @@ export default function SubmittedHomework() {
                           <Button 
                             size="sm" 
                             className={eInkStyles.button}
-                            onClick={() => {
-                              setSelectedSubmission(submission);
-                              setGrade(submission.score?.toString() || "");
-                              setFeedback(submission.feedback || "");
-                            }}
+                            onClick={() => setSelectedSubmission(submission)}
                           >
                             <Eye className="h-4 w-4 mr-2" />
-                            Review
+                            View
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                           <DialogHeader>
-                            <DialogTitle>Review Submission</DialogTitle>
+                            <DialogTitle>View Submission</DialogTitle>
                           </DialogHeader>
                           {selectedSubmission && (
                             <div className="space-y-6">
                               {/* Assignment Info */}
                               <div className={`${eInkStyles.card} p-4`}>
                                 <h3 className="font-semibold mb-2">{selectedSubmission.assignment.title}</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                   <div>
                                     <span className="font-medium">Student:</span><br />
                                     {selectedSubmission.student.user.firstName} {selectedSubmission.student.user.lastName}
@@ -311,10 +264,6 @@ export default function SubmittedHomework() {
                                   <div>
                                     <span className="font-medium">Due Date:</span><br />
                                     {format(new Date(selectedSubmission.assignment.submissionDate), 'MMM dd, yyyy HH:mm')}
-                                  </div>
-                                  <div>
-                                    <span className="font-medium">Total Points:</span><br />
-                                    {selectedSubmission.assignment.totalMarks}
                                   </div>
                                 </div>
                               </div>
@@ -326,47 +275,6 @@ export default function SubmittedHomework() {
                                   <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">
                                     {selectedSubmission.content || "No content provided"}
                                   </p>
-                                </div>
-                              </div>
-
-                              {/* Grading Section */}
-                              <div className={`${eInkStyles.card} p-4`}>
-                                <h3 className="font-semibold mb-3">Grade Assignment</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                  <div>
-                                    <Label htmlFor="grade">Score (out of {selectedSubmission.assignment.totalMarks})</Label>
-                                    <Input
-                                      id="grade"
-                                      type="number"
-                                      min="0"
-                                      max={selectedSubmission.assignment.totalMarks}
-                                      value={grade}
-                                      onChange={(e) => setGrade(e.target.value)}
-                                      className="border-2 border-gray-300"
-                                      placeholder="Enter score"
-                                    />
-                                  </div>
-                                </div>
-                                
-                                <div className="mt-4">
-                                  <Label htmlFor="feedback">Feedback</Label>
-                                  <Textarea
-                                    id="feedback"
-                                    value={feedback}
-                                    onChange={(e) => setFeedback(e.target.value)}
-                                    className="border-2 border-gray-300 min-h-[100px]"
-                                    placeholder="Provide feedback to the student..."
-                                  />
-                                </div>
-
-                                <div className="flex justify-end gap-2 mt-4">
-                                  <Button
-                                    onClick={handleGradeSubmission}
-                                    disabled={!grade || isGrading}
-                                    className={eInkStyles.primaryButton}
-                                  >
-                                    {isGrading ? "Saving..." : "Save Grade"}
-                                  </Button>
                                 </div>
                               </div>
                             </div>
