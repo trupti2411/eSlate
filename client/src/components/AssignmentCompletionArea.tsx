@@ -1,26 +1,18 @@
-import { useState, useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Separator } from "@/components/ui/separator";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { type Assignment, type Submission } from "@shared/schema";
 import { 
   FileText, 
   Download, 
   Eye, 
-  Save, 
   Send, 
-  Clock, 
   BookOpen, 
   Calendar,
   PenTool,
-  Keyboard,
   Monitor
 } from "lucide-react";
 import { format } from "date-fns";
@@ -36,122 +28,13 @@ export function AssignmentCompletionArea({
   submission, 
   onSubmissionUpdate 
 }: AssignmentCompletionAreaProps) {
-  const [content, setContent] = useState(submission?.content || "");
-  const [digitalContent, setDigitalContent] = useState(submission?.digitalContent || "");
-  const [deviceType, setDeviceType] = useState<string>("e-ink");
-  const [inputMethod, setInputMethod] = useState<string>("pen");
   const [activeTab, setActiveTab] = useState("assignment");
-  const [isAutoSaving, setIsAutoSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(submission?.updatedAt ? new Date(submission.updatedAt) : null);
-  
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // Fetch metadata for assignment files
   const attachmentUrls = assignment.attachmentUrls || [];
   const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(attachmentUrls);
 
-  // Auto-save every 30 seconds
-  useEffect(() => {
-    if (!content.trim()) return;
-    
-    const autoSaveTimer = setInterval(() => {
-      handleSaveDraft();
-    }, 30000);
 
-    return () => clearInterval(autoSaveTimer);
-  }, [content, digitalContent]);
-
-  const saveSubmissionMutation = useMutation({
-    mutationFn: async (data: {
-      assignmentId: string;
-      content: string;
-      digitalContent?: string;
-      deviceType: string;
-      inputMethod: string;
-      isDraft: boolean;
-    }) => {
-      if (submission) {
-        // Update existing submission
-        return apiRequest(`/api/submissions/${submission.id}`, 'PATCH', {
-          content: data.content,
-          digitalContent: data.digitalContent,
-          deviceType: data.deviceType,
-          inputMethod: data.inputMethod,
-          status: data.isDraft ? 'draft' : 'submitted',
-          submittedAt: data.isDraft ? undefined : new Date(),
-        });
-      } else {
-        // Create new submission
-        return apiRequest('/api/submissions', 'POST', {
-          assignmentId: data.assignmentId,
-          content: data.content,
-          digitalContent: data.digitalContent,
-          deviceType: data.deviceType,
-          inputMethod: data.inputMethod,
-          isDraft: data.isDraft,
-        });
-      }
-    },
-    onSuccess: (data) => {
-      onSubmissionUpdate();
-      setLastSaved(new Date());
-      setIsAutoSaving(false);
-      if (!data.isDraft) {
-        toast({
-          title: "Assignment Submitted!",
-          description: "Your assignment has been successfully submitted.",
-        });
-      } else {
-        toast({
-          title: "Draft Saved",
-          description: "Your progress has been saved.",
-        });
-      }
-    },
-    onError: (error: any) => {
-      setIsAutoSaving(false);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to save submission",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleSaveDraft = async () => {
-    if (!content.trim()) return;
-    
-    setIsAutoSaving(true);
-    saveSubmissionMutation.mutate({
-      assignmentId: assignment.id,
-      content,
-      digitalContent,
-      deviceType,
-      inputMethod,
-      isDraft: true,
-    });
-  };
-
-  const handleSubmit = () => {
-    if (!content.trim()) {
-      toast({
-        title: "Content Required",
-        description: "Please add your response before submitting.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    saveSubmissionMutation.mutate({
-      assignmentId: assignment.id,
-      content,
-      digitalContent,
-      deviceType,
-      inputMethod,
-      isDraft: false,
-    });
-  };
 
 
 
@@ -192,7 +75,7 @@ export function AssignmentCompletionArea({
                 </div>
               </div>
               <div className="flex items-center">
-                <Clock className="h-4 w-4 mr-2" />
+                <Send className="h-4 w-4 mr-2" />
                 <div>
                   <div className="text-xs text-gray-600">Status</div>
                   <Badge className={eInkStyles.badge}>
@@ -313,7 +196,8 @@ export function AssignmentCompletionArea({
                 <div className="space-y-2 mb-4">
                   <Label className="text-sm font-medium">Assignment Files:</Label>
                   {attachmentUrls.map((url, index) => {
-                    const filename = getDisplayFilename(url, fileMetadata);
+                    const metadata = fileMetadata?.[index];
+                    const filename = getDisplayFilename(url, metadata, index);
                     return (
                       <div key={index} className="flex items-center justify-between p-2 border rounded">
                         <div className="flex items-center">
@@ -343,9 +227,17 @@ export function AssignmentCompletionArea({
               )}
 
               <Button
-                onClick={() => setActiveTab("online-work")}
+                onClick={() => {
+                  // Open the first assignment file directly in browser for editing
+                  if (attachmentUrls.length > 0) {
+                    const objectPath = attachmentUrls[0].includes('/uploads/') 
+                      ? attachmentUrls[0].split('/uploads/').pop()
+                      : attachmentUrls[0].split('/').pop();
+                    window.open(`/objects/uploads/${objectPath}`, '_blank');
+                  }
+                }}
                 className={`${eInkStyles.primaryButton} w-full`}
-                disabled={submission?.status === 'submitted'}
+                disabled={submission?.status === 'submitted' || attachmentUrls.length === 0}
               >
                 <PenTool className="h-4 w-4 mr-2" />
                 Start Online Completion
@@ -367,7 +259,8 @@ export function AssignmentCompletionArea({
                 <div className="space-y-2 mb-4">
                   <Label className="text-sm font-medium">Download Files:</Label>
                   {attachmentUrls.map((url, index) => {
-                    const filename = getDisplayFilename(url, fileMetadata);
+                    const metadata = fileMetadata?.[index];
+                    const filename = getDisplayFilename(url, metadata, index);
                     return (
                       <div key={index} className="flex items-center justify-between p-2 border rounded">
                         <div className="flex items-center">
@@ -427,119 +320,7 @@ export function AssignmentCompletionArea({
           )}
         </TabsContent>
 
-        {/* Online Work Tab */}
-        <TabsContent value="online-work" className="space-y-6">
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="outline"
-              onClick={() => setActiveTab("completion")}
-              className={eInkStyles.button}
-            >
-              ← Back to Options
-            </Button>
-            <h2 className="text-lg font-semibold">Online Assignment Completion</h2>
-            <div></div>
-          </div>
 
-          {/* Device Settings */}
-          <div className={`${eInkStyles.card} p-4`}>
-            <Label className="text-base font-semibold mb-4 block">Device Settings</Label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="device-type" className="text-sm">Device Type</Label>
-                <select
-                  id="device-type"
-                  value={deviceType}
-                  onChange={(e) => setDeviceType(e.target.value)}
-                  className="w-full mt-1 p-2 border-2 border-black bg-white rounded"
-                >
-                  <option value="e-ink">E-ink Device</option>
-                  <option value="tablet">Tablet</option>
-                  <option value="desktop">Desktop</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="input-method" className="text-sm">Input Method</Label>
-                <select
-                  id="input-method"
-                  value={inputMethod}
-                  onChange={(e) => setInputMethod(e.target.value)}
-                  className="w-full mt-1 p-2 border-2 border-black bg-white rounded"
-                >
-                  <option value="pen">Stylus/Pen</option>
-                  <option value="touch">Touch</option>
-                  <option value="keyboard">Keyboard</option>
-                </select>
-              </div>
-            </div>
-          </div>
-
-          {/* Text Response Area */}
-          <div className={`${eInkStyles.card} p-4`}>
-            <div className="flex justify-between items-center mb-4">
-              <Label className="text-base font-semibold">Your Response</Label>
-              {lastSaved && (
-                <span className="text-sm text-gray-500 flex items-center">
-                  <Clock className="h-3 w-3 mr-1" />
-                  Last saved: {format(lastSaved, 'HH:mm:ss')}
-                </span>
-              )}
-            </div>
-            <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder="Enter your assignment response here..."
-              className={`${eInkStyles.textarea} min-h-96 text-lg leading-8`}
-              style={{ 
-                fontSize: '18px',
-                lineHeight: '1.8',
-                fontFamily: 'serif'
-              }}
-            />
-          </div>
-
-          {/* Digital Handwriting Section */}
-          <div className={`${eInkStyles.card} p-4`}>
-            <div className="flex justify-between items-center mb-4">
-              <Label className="text-base font-semibold">Digital Handwriting</Label>
-              <Button
-                type="button"
-                className={eInkStyles.button}
-                onClick={() => {
-                  // Screenshot functionality placeholder
-                  setDigitalContent("Screenshot captured at " + new Date().toISOString());
-                }}
-              >
-                Screenshot
-              </Button>
-            </div>
-            <div className="min-h-32 border-2 border-dashed border-gray-300 rounded p-4 text-center text-gray-500">
-              {digitalContent || "Digitized handwriting content will appear here..."}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex gap-4 justify-end">
-            <Button
-              type="button"
-              onClick={handleSaveDraft}
-              disabled={saveSubmissionMutation.isPending || !content.trim() || isAutoSaving}
-              className={`${eInkStyles.button} px-6`}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {isAutoSaving ? 'Saving...' : 'Save Draft'}
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSubmit}
-              disabled={saveSubmissionMutation.isPending || !content.trim() || submission?.status === 'submitted'}
-              className={`${eInkStyles.primaryButton} px-6`}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              {submission?.status === 'submitted' ? 'Submitted' : 'Submit Assignment'}
-            </Button>
-          </div>
-        </TabsContent>
 
         {/* Offline Upload Tab */}
         <TabsContent value="offline-upload" className="space-y-6">
@@ -633,8 +414,11 @@ export function AssignmentCompletionArea({
           <div className="flex justify-end">
             <Button
               type="button"
-              onClick={handleSubmit}
-              disabled={saveSubmissionMutation.isPending || submission?.status === 'submitted'}
+              onClick={() => {
+                // Placeholder for submission logic
+                console.log("Submit assignment - offline upload");
+              }}
+              disabled={submission?.status === 'submitted'}
               className={`${eInkStyles.primaryButton} px-6`}
             >
               <Send className="h-4 w-4 mr-2" />
