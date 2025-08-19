@@ -31,6 +31,28 @@ declare global {
   }>;
 }
 
+// Helper function to parse object path
+function parseObjectPath(path: string): {
+  bucketName: string;
+  objectName: string;
+} {
+  if (!path.startsWith("/")) {
+    path = `/${path}`;
+  }
+  const pathParts = path.split("/");
+  if (pathParts.length < 3) {
+    throw new Error("Invalid path: must contain at least a bucket name");
+  }
+
+  const bucketName = pathParts[1];
+  const objectName = pathParts.slice(2).join("/");
+
+  return {
+    bucketName,
+    objectName,
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize global file storage
   global.uploadedFiles = global.uploadedFiles || new Map();
@@ -1573,11 +1595,33 @@ trailer<</Size 5/Root 1 0 R>>
 
   // Get object metadata including original filename
   app.get('/api/objects/:objectPath(*)/metadata', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
-    const objectStorageService = new ObjectStorageService();
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(
-        req.path.replace('/api', ''),
-      );
+      const objectPath = `/objects/${req.params.objectPath}`;
+      console.log("Getting metadata for object path:", objectPath);
+      
+      // Get the file path from the object storage bucket
+      const privateObjectDir = process.env.PRIVATE_OBJECT_DIR || "";
+      if (!privateObjectDir) {
+        throw new Error("PRIVATE_OBJECT_DIR not set");
+      }
+      
+      let entityDir = privateObjectDir;
+      if (!entityDir.endsWith("/")) {
+        entityDir = `${entityDir}/`;
+      }
+      
+      const entityId = req.params.objectPath;
+      const objectEntityPath = `${entityDir}${entityId}`;
+      const { bucketName, objectName } = parseObjectPath(objectEntityPath);
+      
+      const bucket = objectStorageClient.bucket(bucketName);
+      const objectFile = bucket.file(objectName);
+      
+      const [exists] = await objectFile.exists();
+      if (!exists) {
+        return res.status(404).json({ error: "File not found" });
+      }
+      
       const [metadata] = await objectFile.getMetadata();
       res.json({
         originalName: metadata.metadata?.originalName || 'Unknown file',
@@ -1586,10 +1630,7 @@ trailer<</Size 5/Root 1 0 R>>
       });
     } catch (error) {
       console.error("Error getting object metadata:", error);
-      if (error instanceof ObjectNotFoundError) {
-        return res.sendStatus(404);
-      }
-      return res.sendStatus(500);
+      return res.status(500).json({ error: "Failed to get metadata" });
     }
   });
 
