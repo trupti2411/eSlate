@@ -1870,6 +1870,81 @@ Good luck with your assignment!"
     }
   });
 
+  // PDF Proxy endpoint for serving protected PDFs with authentication
+  app.get('/api/pdf-proxy/:assignmentId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    try {
+      const { assignmentId } = req.params;
+      
+      // Get assignment to find the PDF URL
+      const assignment = await storage.getAssignmentById(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ error: 'Assignment not found' });
+      }
+      
+      // Get the first attachment URL (assuming it's the PDF)
+      const pdfUrl = assignment.attachmentUrls?.[0];
+      if (!pdfUrl) {
+        return res.status(404).json({ error: 'No PDF attachment found' });
+      }
+      
+      // Extract object path from Google Cloud Storage URL
+      const match = pdfUrl.match(/googleapis\.com\/([^\/]+)\/(.+)$/);
+      if (!match) {
+        return res.status(400).json({ error: 'Invalid PDF URL format' });
+      }
+      
+      const bucketName = match[1];
+      const objectName = match[2];
+      
+      console.log(`Serving PDF: gs://${bucketName}/${objectName}`);
+      
+      try {
+        // Get the file from Google Cloud Storage using the authenticated client
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectName);
+        
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          return res.status(404).json({ error: 'PDF file not found in storage' });
+        }
+        
+        // Get file metadata
+        const [metadata] = await file.getMetadata();
+        
+        // Set appropriate headers
+        res.set({
+          'Content-Type': 'application/pdf',
+          'Content-Length': metadata.size?.toString() || '0',
+          'Content-Disposition': 'inline', // Display in browser, not download
+          'Cache-Control': 'private, max-age=3600', // Cache for 1 hour
+        });
+        
+        // Stream the file to the response
+        const stream = file.createReadStream();
+        stream.pipe(res);
+        
+        stream.on('error', (error) => {
+          console.error('Error streaming PDF:', error);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Error streaming PDF file' });
+          }
+        });
+        
+      } catch (storageError: any) {
+        console.error('Google Cloud Storage error:', storageError);
+        if (storageError.code === 403) {
+          return res.status(403).json({ error: 'Access denied to PDF file' });
+        }
+        return res.status(500).json({ error: 'Failed to access PDF file' });
+      }
+      
+    } catch (error) {
+      console.error('PDF proxy error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Create HTTP server without WebSocket conflicts
   const httpServer = createServer(app);
 
