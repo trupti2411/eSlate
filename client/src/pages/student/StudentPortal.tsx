@@ -101,6 +101,7 @@ export function StudentPortal() {
   const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
   const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
 
+
   if (!user || user.role !== 'student') {
     return (
       <div className="flex items-center justify-center h-64">
