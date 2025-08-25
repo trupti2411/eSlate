@@ -487,7 +487,6 @@ export function StudentPortal() {
                           className={eInkStyles.primaryButton}
                           size="sm"
                           data-testid={`button-complete-online-${assignment.id}`}
-                          disabled={!!submission}
                         >
                           <Edit className="h-4 w-4 mr-2" />
                           {submission ? 'View Submission' : 'Complete Online'}
