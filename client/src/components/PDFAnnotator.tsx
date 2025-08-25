@@ -56,9 +56,9 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to match container
+    // Set canvas size to match PDF area
     canvas.width = 800;
-    canvas.height = 800;
+    canvas.height = 1200;
     
     // Configure context for high-quality drawing
     ctx.lineCap = 'round';
@@ -229,58 +229,89 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     if (!canvasRef.current || isSaving) return;
 
     setIsSaving(true);
+    console.log('Starting save process...');
+    
     try {
-      // Get canvas data
-      const canvasDataURL = canvasRef.current.toDataURL('image/png');
+      const canvas = canvasRef.current;
+      const ctx = canvas.getContext('2d');
       
-      // Convert to blob
-      const response = await fetch(canvasDataURL);
-      const blob = await response.blob();
-      
-      // Upload the annotated image
-      const uploadResponse = await apiRequest('/api/objects/upload', 'POST');
-      
-      const uploadResult = await fetch(uploadResponse.uploadURL, {
-        method: 'PUT',
-        body: blob,
-        headers: {
-          'Content-Type': 'image/png'
+      // Check if canvas has any annotations
+      const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
+      let hasContent = false;
+      if (imageData) {
+        const data = imageData.data;
+        for (let i = 3; i < data.length; i += 4) {
+          if (data[i] !== 0) { // Alpha channel not zero
+            hasContent = true;
+            break;
+          }
         }
+      }
+
+      if (!hasContent) {
+        toast({
+          title: "No Annotations",
+          description: "Please add some annotations before saving.",
+          variant: "destructive",
+        });
+        setIsSaving(false);
+        return;
+      }
+
+      // Convert canvas to blob
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob((blob) => {
+          if (blob) resolve(blob);
+          else reject(new Error('Failed to create blob'));
+        }, 'image/png', 1.0);
       });
 
-      if (uploadResult.ok) {
-        const fileUrl = uploadResponse.uploadURL.split('?')[0];
-        const objectPath = fileUrl.includes('/uploads/') 
-          ? fileUrl.split('/uploads/')[1] 
-          : fileUrl.split('/').pop();
-        
-        // Set metadata for the annotated file
-        try {
-          await apiRequest('/api/objects/metadata', 'POST', {
-            objectPath,
-            metadata: {
-              originalFilename: `annotated-assignment-${assignmentId}.png`,
-              annotated: true,
-              assignmentId: assignmentId
-            }
-          });
-        } catch (metadataError) {
-          console.warn('Failed to set metadata, but upload succeeded:', metadataError);
-        }
-        
-        onSave(fileUrl);
-        toast({
-          title: "Assignment saved successfully",
-          description: "Your annotated assignment has been saved.",
-        });
-      } else {
-        throw new Error('Upload failed');
+      console.log('Canvas blob created:', blob.size, 'bytes');
+
+      // Create a File from the blob
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const file = new File([blob], `annotated-assignment-${assignmentId}-${timestamp}.png`, { 
+        type: 'image/png' 
+      });
+
+      // Upload using FormData
+      const formData = new FormData();
+      formData.append('file', file);
+
+      console.log('Uploading file:', file.name);
+      
+      const response = await fetch('/api/objects/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Upload failed: ${response.status} ${errorText}`);
       }
+
+      const result = await response.json();
+      console.log('Upload successful:', result);
+      
+      if (!result.uploadURL) {
+        throw new Error('No upload URL received');
+      }
+
+      // Clean URL and call onSave
+      const cleanUrl = result.uploadURL.replace(/\?.*$/, '');
+      console.log('Calling onSave with URL:', cleanUrl);
+      
+      await onSave(cleanUrl);
+
+      toast({
+        title: "Assignment saved successfully",
+        description: "Your annotated assignment has been saved.",
+      });
     } catch (error) {
       console.error('Save error:', error);
       toast({
         title: "Failed to save",
-        description: "There was an error saving your annotated assignment.",
+        description: `There was an error saving your annotated assignment: ${error.message}`,
         variant: "destructive",
       });
     } finally {
@@ -507,47 +538,40 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
           {/* PDF and Canvas Container */}
           <Card className={`${eInkStyles.card} col-span-12 md:col-span-9`}>
             <div className="p-4">
-              <div className="relative bg-white border rounded overflow-hidden" ref={containerRef}>
-                {/* Container that moves together */}
-                <div 
-                  className="relative"
+              <div className="relative bg-white border rounded overflow-auto" ref={containerRef} style={{ height: '800px' }}>
+                {/* PDF Iframe */}
+                <iframe
+                  ref={pdfViewerRef}
+                  src={`${pdfUrl}#view=FitH`}
+                  className="w-full block border-0"
                   style={{
-                    transform: `scale(${scale})`,
-                    transformOrigin: 'top left',
-                    width: `${100 / scale}%`,
-                    height: `${800 / scale}px`,
+                    height: '1200px', // Taller than container to allow scrolling
+                    minHeight: '800px'
                   }}
-                >
-                  {/* PDF Iframe */}
-                  <iframe
-                    ref={pdfViewerRef}
-                    src={`${pdfUrl}#view=FitH`}
-                    className="w-full h-[800px] border-0 block"
-                    onLoad={() => setPdfLoaded(true)}
-                  />
+                  onLoad={() => setPdfLoaded(true)}
+                />
 
-                  {/* Annotation Canvas Overlay - positioned relative to PDF */}
-                  <canvas
-                    ref={canvasRef}
-                    className="absolute top-0 left-0 opacity-90"
-                    width={800}
-                    height={800}
-                    style={{
-                      width: '100%',
-                      height: '800px',
-                      cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                      pointerEvents: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 'auto' : 'none',
-                      zIndex: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 10 : 1,
-                    }}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
-                  />
-                </div>
+                {/* Annotation Canvas Overlay - synchronized with PDF */}
+                <canvas
+                  ref={canvasRef}
+                  className="absolute top-0 left-0"
+                  width={800}
+                  height={1200}
+                  style={{
+                    width: '100%',
+                    height: '1200px',
+                    cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
+                    pointerEvents: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 'auto' : 'none',
+                    zIndex: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 10 : 1,
+                  }}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={handleTouchStart}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                />
               </div>
 
               {/* Instructions */}
