@@ -99,17 +99,31 @@ export function PDFAnnotatorPage() {
     console.log('Canvas initialized as fixed overlay:', { width: canvas.width, height: canvas.height });
   }, []);
 
+  // Check if mouse is over scrollbar area
+  const isOverScrollbar = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!pdfContainerRef.current) return false;
+    
+    const container = pdfContainerRef.current;
+    const rect = container.getBoundingClientRect();
+    
+    // Check if cursor is near right edge (vertical scrollbar area)
+    const isNearRightEdge = e.clientX > rect.right - 20;
+    // Check if cursor is near bottom edge (horizontal scrollbar area)  
+    const isNearBottomEdge = e.clientY > rect.bottom - 20;
+    
+    return isNearRightEdge || isNearBottomEdge;
+  };
+
   // Get viewport coordinates and convert to absolute PDF coordinates
   const getAbsoluteCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !pdfContainerRef.current) return { x: 0, y: 0 };
     
-    const canvas = canvasRef.current;
     const container = pdfContainerRef.current;
-    const rect = canvas.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
     
-    // Get mouse position relative to canvas
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Get mouse position relative to the PDF container (not canvas)
+    const x = e.clientX - containerRect.left;
+    const y = e.clientY - containerRect.top;
     
     // Add scroll offset to get absolute position in PDF document
     return {
@@ -173,6 +187,9 @@ export function PDFAnnotatorPage() {
 
   // Drawing functions with absolute coordinate storage
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Don't draw if over scrollbar or no tool selected
+    if (!activeTool || isOverScrollbar(e)) return;
+    
     if (activeTool === 'text') {
       addTextAtPosition(e);
       return;
@@ -184,7 +201,7 @@ export function PDFAnnotatorPage() {
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !activeTool) return;
+    if (!isDrawing || !activeTool || isOverScrollbar(e)) return;
     
     const coords = getAbsoluteCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
@@ -252,6 +269,9 @@ export function PDFAnnotatorPage() {
   };
 
   const addTextAtPosition = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Don't add text if over scrollbar
+    if (isOverScrollbar(e)) return;
+    
     const text = prompt('Enter text:');
     if (!text) return;
 
@@ -530,18 +550,6 @@ export function PDFAnnotatorPage() {
         {/* Toolbar */}
         <div className="w-64 bg-white border-r p-4 overflow-y-auto">
           <div className="space-y-6">
-            {/* Mode Selection */}
-            <div>
-              <h3 className="font-medium mb-3">Mode</h3>
-              <Button
-                onClick={() => setActiveTool(null)}
-                variant={activeTool === null ? 'default' : 'outline'}
-                className={`w-full justify-start text-black ${activeTool === null ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
-              >
-                <span className="mr-2">📄</span>
-                <span className="font-medium">Navigate PDF</span>
-              </Button>
-            </div>
 
             {/* Drawing Tools */}
             <div>
@@ -638,16 +646,44 @@ export function PDFAnnotatorPage() {
             
             <canvas
               ref={canvasRef}
-              className="pointer-events-auto absolute top-0 left-0 w-full h-full"
+              className="absolute top-0 left-0 w-full h-full"
               style={{
                 cursor: activeTool === 'text' ? 'text' : 
                        activeTool === 'eraser' ? 'crosshair' : 
                        activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                pointerEvents: activeTool ? 'auto' : 'none',
-                zIndex: activeTool ? 10 : 1
+                pointerEvents: 'none',
+                zIndex: 2
               }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+            />
+            
+            {/* Invisible overlay for drawing events only */}
+            <div
+              className="absolute top-0 left-0 w-full h-full"
+              style={{
+                pointerEvents: activeTool ? 'auto' : 'none',
+                zIndex: 3,
+                cursor: activeTool === 'text' ? 'text' : 
+                       activeTool === 'eraser' ? 'crosshair' : 
+                       activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default'
+              }}
+              onMouseDown={(e) => {
+                const canvasEvent = {
+                  ...e,
+                  currentTarget: canvasRef.current
+                } as any;
+                startDrawing(canvasEvent);
+              }}
+              onMouseMove={(e) => {
+                const canvasEvent = {
+                  ...e,
+                  currentTarget: canvasRef.current
+                } as any;
+                draw(canvasEvent);
+              }}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
             />
@@ -658,11 +694,11 @@ export function PDFAnnotatorPage() {
       {/* Status Bar */}
       <div className="bg-white border-t p-2 text-sm text-gray-600 flex justify-between items-center">
         <div>
-          Current Tool: {activeTool ? activeTool.charAt(0).toUpperCase() + activeTool.slice(1) : 'Navigate'} | 
+          Current Tool: {activeTool ? activeTool.charAt(0).toUpperCase() + activeTool.slice(1) : 'None'} | 
           PDF Status: {pdfLoaded ? 'Loaded' : 'Loading...'}
         </div>
         <div>
-          Tip: Select "Navigate PDF" to scroll, then choose a tool to annotate
+          Tip: Select a drawing tool to annotate, scroll naturally to navigate the PDF
         </div>
       </div>
     </div>
