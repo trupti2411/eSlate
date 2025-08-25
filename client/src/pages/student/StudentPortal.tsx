@@ -1,97 +1,113 @@
-import { useState, useEffect } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { type Assignment, type Submission, type AcademicTerm, type Class } from "@shared/schema";
-import { 
-  BookOpen, 
-  Calendar, 
-  Clock, 
-  FileText, 
-  PenTool, 
-  CheckCircle, 
-  AlertCircle, 
-  Eye, 
-  Download,
-  Upload,
-  Send,
-  GraduationCap,
-  Users,
-  PlayCircle,
-  Pause,
-  RotateCcw,
-  Save
-} from "lucide-react";
-import { format, isAfter, parseISO, isPast } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
-import { AssignmentCompletionArea } from "@/components/AssignmentCompletionArea";
-import { ObjectUploader } from "@/components/ObjectUploader";
-import { PDFAnnotator } from "@/components/PDFAnnotator";
-import { useMutation } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
+import { Assignment, Submission, AcademicTerm, Class } from '@shared/schema';
+import { BookOpen, Clock, CheckCircle, GraduationCap, Calendar, FileText, Upload, Download, Edit, Eye } from 'lucide-react';
+import { format, isPast } from 'date-fns';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import { useFileMetadata } from '@/hooks/useFileMetadata';
+import { PDFAnnotator } from '@/components/PDFAnnotator';
 
-// Component to display submitted files with original filenames in submission area
-function SubmittedFilesInSubmission({ fileUrls }: { fileUrls: string[] }) {
-  const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(fileUrls);
+function UploadedFilesList({ fileUrls, className }: { fileUrls: string[], className?: string }) {
+  const { data: fileMetadata, isLoading, error } = useFileMetadata(fileUrls);
+
+  if (isLoading) {
+    return (
+      <div className={`space-y-2 ${className}`}>
+        <h4 className="font-medium text-sm">Uploaded Files:</h4>
+        <div className="space-y-1">
+          {fileUrls.map((url, index) => (
+            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded text-xs">
+              <div className="flex items-center gap-2">
+                <FileText className="h-3 w-3" />
+                <span>Loading...</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !fileMetadata) {
+    return (
+      <div className={`space-y-2 ${className}`}>
+        <h4 className="font-medium text-sm">Uploaded Files:</h4>
+        <div className="space-y-1">
+          {fileUrls.map((url, index) => (
+            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded text-xs">
+              <div className="flex items-center gap-2">
+                <FileText className="h-3 w-3" />
+                <span>File {index + 1}</span>
+              </div>
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const objectPath = url.includes('/uploads/') 
+                      ? url.split('/uploads/').pop()
+                      : url.split('/').pop();
+                    window.open(`/objects/uploads/${objectPath}`, '_blank');
+                  }}
+                  className="h-6 px-2 text-xs"
+                >
+                  View
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="mt-3">
-      <div className="text-xs text-gray-600 mb-2">Uploaded Files ({fileUrls.length}):</div>
-      {isLoadingMetadata ? (
-        <div className="text-center py-2">
-          <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {fileUrls.map((url, index) => {
-            const metadata = fileMetadata?.[index];
-            const displayFilename = getDisplayFilename(url, metadata, index);
-            const fileExtension = displayFilename.split('.').pop()?.toLowerCase();
-            
-            return (
-              <div key={index} className="flex items-center justify-between p-2 bg-white border rounded text-xs">
-                <div className="flex items-center">
-                  <FileText className="h-3 w-3 mr-2 text-blue-600" />
-                  <div>
-                    <span className="font-medium">{displayFilename}</span>
-                    {fileExtension && (
-                      <span className="text-gray-500 ml-1">({fileExtension.toUpperCase()})</span>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      const objectPath = url.includes('/uploads/') 
-                        ? url.split('/uploads/').pop()
-                        : url.split('/').pop();
-                      window.open(`/objects/uploads/${objectPath}`, '_blank');
-                    }}
-                    className="h-6 px-2 text-xs"
-                  >
-                    View
-                  </Button>
-                </div>
+    <div className={`space-y-2 ${className}`}>
+      <h4 className="font-medium text-sm">Uploaded Files:</h4>
+      <div className="space-y-1">
+        {fileUrls.map((url, index) => {
+          const metadata = fileMetadata[url];
+          const fileName = metadata?.originalFileName || `File ${index + 1}`;
+          
+          return (
+            <div key={index} className="flex items-center justify-between p-2 bg-gray-50 border border-gray-200 rounded text-xs">
+              <div className="flex items-center gap-2">
+                <FileText className="h-3 w-3" />
+                <span title={fileName}>{fileName}</span>
               </div>
-            );
-          })}
-        </div>
-      )}
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    const objectPath = url.includes('/uploads/') 
+                      ? url.split('/uploads/').pop()
+                      : url.split('/').pop();
+                    window.open(`/objects/uploads/${objectPath}`, '_blank');
+                  }}
+                  className="h-6 px-2 text-xs"
+                >
+                  View
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
 export function StudentPortal() {
+  // ALL HOOKS MUST BE DECLARED FIRST - NO EXCEPTIONS!
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -100,44 +116,6 @@ export function StudentPortal() {
   const [selectedTab, setSelectedTab] = useState("dashboard");
   const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
   const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
-
-
-  if (!user || user.role !== 'student') {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-600">Access denied. Student role required.</p>
-      </div>
-    );
-  }
-
-  // Show PDF Annotator when annotation mode is active
-  if (showPDFAnnotator && annotatingAssignment) {
-    return (
-      <PDFAnnotator
-        pdfUrl={annotatingAssignment.attachmentUrls![0]}
-        assignmentId={annotatingAssignment.id}
-        onSave={async (annotatedFileUrl: string) => {
-          // Submit the annotated file as the assignment
-          try {
-            submitAssignmentMutation.mutate({
-              assignmentId: annotatingAssignment.id,
-              fileUrls: [annotatedFileUrl]
-            });
-            setShowPDFAnnotator(false);
-            setAnnotatingAssignment(null);
-          } catch (error) {
-            console.error('Error submitting annotated assignment:', error);
-          }
-        }}
-        onClose={() => {
-          setShowPDFAnnotator(false);
-          setAnnotatingAssignment(null);
-        }}
-      />
-    );
-  }
-
-
 
   const studentId = user?.id ? `student-${user.id}` : '';
 
@@ -206,7 +184,13 @@ export function StudentPortal() {
     }
   });
 
-
+  // E-ink optimized styles
+  const eInkStyles = {
+    card: "bg-white border-2 border-black rounded-none",
+    button: "bg-white border-2 border-black text-black hover:bg-gray-100 rounded-none",
+    primaryButton: "bg-black text-white border-2 border-black hover:bg-gray-800 rounded-none",
+    badge: "bg-white border border-black text-black rounded-none"
+  };
 
   const getAssignmentStatus = (assignment: Assignment) => {
     const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
@@ -235,13 +219,41 @@ export function StudentPortal() {
     return colors[status as keyof typeof colors] || colors.pending;
   };
 
-  // E-ink optimized styles
-  const eInkStyles = {
-    card: "bg-white border-2 border-black rounded-none",
-    button: "bg-white border-2 border-black text-black hover:bg-gray-100 rounded-none",
-    primaryButton: "bg-black text-white border-2 border-black hover:bg-gray-800 rounded-none",
-    badge: "bg-white border border-black text-black rounded-none"
-  };
+  // NOW we can have conditional returns AFTER all hooks are declared
+  if (!user || user.role !== 'student') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-600">Access denied. Student role required.</p>
+      </div>
+    );
+  }
+
+  // Show PDF Annotator when annotation mode is active
+  if (showPDFAnnotator && annotatingAssignment) {
+    return (
+      <PDFAnnotator
+        pdfUrl={annotatingAssignment.attachmentUrls![0]}
+        assignmentId={annotatingAssignment.id}
+        onSave={async (annotatedFileUrl: string) => {
+          // Submit the annotated file as the assignment
+          try {
+            submitAssignmentMutation.mutate({
+              assignmentId: annotatingAssignment.id,
+              fileUrls: [annotatedFileUrl]
+            });
+            setShowPDFAnnotator(false);
+            setAnnotatingAssignment(null);
+          } catch (error) {
+            console.error('Error submitting annotated assignment:', error);
+          }
+        }}
+        onClose={() => {
+          setShowPDFAnnotator(false);
+          setAnnotatingAssignment(null);
+        }}
+      />
+    );
+  }
 
   const renderDashboard = () => (
     <div className="space-y-6">
@@ -339,30 +351,25 @@ export function StudentPortal() {
       ) : typedStudentClasses.length === 0 ? (
         <Card className={eInkStyles.card}>
           <CardContent className="text-center py-8">
-            <Users className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+            <BookOpen className="h-12 w-12 mx-auto text-gray-400 mb-4" />
             <p className="text-gray-600">No classes found</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {typedStudentClasses.map((classItem: Class) => (
-            <Card key={classItem.id} className={eInkStyles.card}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {typedStudentClasses.map((cls: Class) => (
+            <Card key={cls.id} className={eInkStyles.card}>
               <CardHeader>
-                <CardTitle className="text-lg">{classItem.name}</CardTitle>
-                <CardDescription>{classItem.description || 'No description available'}</CardDescription>
+                <CardTitle className="text-lg">{cls.name}</CardTitle>
+                <CardDescription>{cls.description || 'No description available'}</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="text-sm">
-                    <span className="font-medium">Schedule:</span> {classItem.daysOfWeek?.join(', ') || 'Not specified'}
+                <div className="text-sm space-y-1">
+                  <div>
+                    <span className="font-medium">Days:</span> {cls.daysOfWeek.join(', ')}
                   </div>
-                  {classItem.startTime && classItem.endTime && (
-                    <div className="text-sm">
-                      <span className="font-medium">Time:</span> {classItem.startTime} - {classItem.endTime}
-                    </div>
-                  )}
-                  <div className="text-sm">
-                    <span className="font-medium">Status:</span> {classItem.isActive ? 'Active' : 'Inactive'}
+                  <div>
+                    <span className="font-medium">Time:</span> {cls.startTime} - {cls.endTime}
                   </div>
                 </div>
               </CardContent>
@@ -392,183 +399,107 @@ export function StudentPortal() {
           {typedAssignments.map((assignment: Assignment) => {
             const status = getAssignmentStatus(assignment);
             const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
-            const classInfo = typedStudentClasses.find((c: Class) => c.id === assignment.classId);
-            
+            const hasAttachments = assignment.attachmentUrls && assignment.attachmentUrls.length > 0;
+            const isPDF = hasAttachments && assignment.attachmentUrls![0].toLowerCase().endsWith('.pdf');
+
             return (
               <Card key={assignment.id} className={eInkStyles.card}>
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div>
                       <CardTitle className="text-lg">{assignment.title}</CardTitle>
-                      <CardDescription>
-                        {classInfo?.name} • {assignment.subject}
-                      </CardDescription>
+                      <CardDescription>{assignment.description}</CardDescription>
                     </div>
-                    <Badge className={`border ${getStatusColor(status)}`}>
-                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    <Badge className={`${getStatusColor(status)} ${eInkStyles.badge}`}>
+                      {status}
                     </Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {/* Assignment Info */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                      <div className="flex items-center">
-                        <Calendar className="h-4 w-4 mr-2" />
-                        <span>Due: {format(new Date(assignment.submissionDate), 'MMM dd, yyyy HH:mm')}</span>
+                    <div className="text-sm space-y-1">
+                      <div>
+                        <span className="font-medium">Due:</span> {format(new Date(assignment.submissionDate), 'MMM dd, yyyy h:mm a')}
                       </div>
-                      <div className="flex items-center">
-                        <BookOpen className="h-4 w-4 mr-2" />
-                        <span>Assignment</span>
+                      <div>
+                        <span className="font-medium">Type:</span> {assignment.submissionType}
+                      </div>
+                      <div>
+                        <span className="font-medium">Max Score:</span> {assignment.maxScore || 'Not specified'}
                       </div>
                     </div>
 
-                    {assignment.description && (
-                      <div>
-                        <h4 className="font-semibold mb-2">Description:</h4>
-                        <p className="text-gray-700 text-sm leading-relaxed">{assignment.description}</p>
-                      </div>
-                    )}
-
-                    {assignment.instructions && (
-                      <div>
-                        <h4 className="font-semibold mb-2">Instructions:</h4>
-                        <p className="text-gray-700 text-sm leading-relaxed">{assignment.instructions}</p>
-                      </div>
-                    )}
-
-                    {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
-                      <div>
-                        <h4 className="font-semibold mb-2">Assignment Materials:</h4>
-                        <div className="bg-gray-100 p-3 border rounded text-sm">
-                          <p className="text-gray-700">📄 {assignment.attachmentUrls.length} file(s) attached</p>
-                          <p className="text-xs text-gray-500 mt-1">Files will be accessible when you start completing the assignment.</p>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Submission Info */}
-                    {submission && (
-                      <div className="border-t pt-4">
-                        <h4 className="font-semibold mb-2">Your Submission:</h4>
-                        <div className="bg-gray-50 p-3 rounded border text-sm">
-                          <div className="flex justify-between mb-2">
-                            <span>Submitted: {format(new Date(submission.submittedAt!), 'MMM dd, yyyy HH:mm')}</span>
-                          </div>
-                          {submission.content && (
-                            <p className="text-gray-700 mb-3">{submission.content}</p>
-                          )}
-                          {/* Display uploaded files */}
-                          {submission.fileUrls && submission.fileUrls.length > 0 && (
-                            <SubmittedFilesInSubmission fileUrls={submission.fileUrls} />
-                          )}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex gap-2 pt-2">
-                      {submission ? (
-                        // If there's a submission, show dialog with options
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button 
-                              className={eInkStyles.primaryButton}
-                              onClick={() => setSelectedAssignment(assignment)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View & Edit
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent className="max-w-4xl max-h-[80vh] bg-white border-2 border-black">
-                            <DialogHeader>
-                              <DialogTitle className="text-xl">{assignment.title}</DialogTitle>
-                            </DialogHeader>
-                            <AssignmentCompletionArea 
-                              assignment={selectedAssignment!} 
-                              submission={typedSubmissions.find((s: Submission) => s.assignmentId === selectedAssignment?.id)}
-                              onSubmissionUpdate={() => {
-                                queryClient.invalidateQueries({ queryKey: ['/api/students', studentDbId, 'submissions'] });
+                    {/* Assignment Materials */}
+                    {hasAttachments && (
+                      <div className="space-y-2">
+                        <h4 className="font-medium text-sm">Assignment Materials:</h4>
+                        <div className="space-y-1">
+                          {assignment.attachmentUrls!.map((url: string, index: number) => (
+                            <Button
+                              key={index}
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                const objectPath = url.includes('/uploads/') 
+                                  ? url.split('/uploads/').pop()
+                                  : url.split('/').pop();
+                                window.open(`/objects/uploads/${objectPath}`, '_blank');
                               }}
-                            />
-                          </DialogContent>
-                        </Dialog>
-                      ) : (
-                        // If no submission, go directly to PDF annotator
-                        <Button 
-                          className={eInkStyles.primaryButton}
+                              className={`${eInkStyles.button} w-full justify-start text-xs`}
+                            >
+                              <Download className="h-3 w-3 mr-2" />
+                              View Assignment Material {index + 1}
+                            </Button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Show uploaded files if submission exists */}
+                    {submission && submission.fileUrls && submission.fileUrls.length > 0 && (
+                      <UploadedFilesList 
+                        fileUrls={submission.fileUrls} 
+                        className="border-t pt-3"
+                      />
+                    )}
+
+                    {/* Assignment Actions */}
+                    <div className="flex flex-wrap gap-2 pt-3 border-t">
+                      {/* Complete Online for PDFs */}
+                      {isPDF && !submission && (
+                        <Button
                           onClick={() => {
                             setAnnotatingAssignment(assignment);
                             setShowPDFAnnotator(true);
                           }}
-                          disabled={!assignment.attachmentUrls || assignment.attachmentUrls.length === 0}
+                          className={eInkStyles.primaryButton}
+                          size="sm"
+                          data-testid={`button-complete-online-${assignment.id}`}
                         >
-                          <Eye className="h-4 w-4 mr-2" />
+                          <Edit className="h-4 w-4 mr-2" />
                           Complete Online
                         </Button>
                       )}
-                      
-                      {/* Download Assignment Button */}
-                      {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
-                        <Button 
-                          className={eInkStyles.button}
-                          onClick={() => {
-                            // Download all assignment files
-                            assignment.attachmentUrls!.forEach((url: string, index: number) => {
-                              const filename = url.split('/').pop() || `assignment-file-${index + 1}`;
-                              const objectPath = url.includes('/uploads/') 
-                                ? url.split('/uploads/').pop()
-                                : url.split('/').pop();
-                              
-                              const link = document.createElement('a');
-                              link.href = `/objects/uploads/${objectPath}`;
-                              link.download = filename;
-                              link.target = '_blank';
-                              document.body.appendChild(link);
-                              link.click();
-                              document.body.removeChild(link);
-                              
-                              // Add small delay between downloads
-                              if (index < assignment.attachmentUrls!.length - 1) {
-                                setTimeout(() => {}, 100);
-                              }
-                            });
-                          }}
-                          data-testid="button-download-assignment"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Download Assignment
-                        </Button>
-                      )}
 
-                      {/* Upload Completed Assignment Button */}
-                      {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
+                      {/* Upload Files */}
+                      {!submission && (
                         <ObjectUploader
-                          maxNumberOfFiles={5}
-                          maxFileSize={31457280} // 30MB
-                          onGetUploadParameters={async () => {
-                            const response = await apiRequest('/api/objects/upload', 'POST');
-                            return {
-                              method: 'PUT' as const,
-                              url: response.uploadURL,
-                            };
-                          }}
-                          onComplete={async (result) => {
+                          multiple={true}
+                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
+                          maxFileSize={30 * 1024 * 1024} // 30MB
+                          onUploadComplete={async (result) => {
                             if (result.successful && result.successful.length > 0) {
                               try {
-                                // Set metadata for each uploaded file
+                                // Set original filename metadata for each uploaded file
                                 const metadataPromises = result.successful.map(async (file: any) => {
-                                  const uploadURL = file.uploadURL as string;
-                                  const originalFileName = file.data?.name;
+                                  const originalFileName = file.originalName || file.name || 'Unknown file';
+                                  const objectPath = file.uploadURL.includes('/uploads/') 
+                                    ? file.uploadURL.split('/uploads/').pop().split('?')[0]
+                                    : file.uploadURL.split('/').pop().split('?')[0];
                                   
                                   try {
-                                    await apiRequest('/api/objects/metadata', 'POST', {
-                                      objectPath: uploadURL.includes('/uploads/') 
-                                        ? uploadURL.split('/uploads/')[1] 
-                                        : uploadURL.split('/').pop(),
-                                      metadata: {
-                                        originalFilename: originalFileName || 'unknown'
-                                      }
+                                    await apiRequest(`/api/objects/uploads/${objectPath}/metadata`, 'POST', {
+                                      originalFileName
                                     });
                                   } catch (error) {
                                     console.warn('Failed to set metadata for file:', originalFileName, error);
@@ -643,14 +574,14 @@ export function StudentPortal() {
             value="terms" 
             className="data-[state=active]:bg-black data-[state=active]:text-white border-r border-black"
           >
-            <GraduationCap className="h-4 w-4 mr-2" />
+            <Calendar className="h-4 w-4 mr-2" />
             Terms
           </TabsTrigger>
           <TabsTrigger 
             value="classes" 
             className="data-[state=active]:bg-black data-[state=active]:text-white border-r border-black"
           >
-            <Users className="h-4 w-4 mr-2" />
+            <GraduationCap className="h-4 w-4 mr-2" />
             Classes
           </TabsTrigger>
           <TabsTrigger 
@@ -662,19 +593,19 @@ export function StudentPortal() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard">
+        <TabsContent value="dashboard" className="mt-6">
           {renderDashboard()}
         </TabsContent>
 
-        <TabsContent value="terms">
+        <TabsContent value="terms" className="mt-6">
           {renderTerms()}
         </TabsContent>
 
-        <TabsContent value="classes">
+        <TabsContent value="classes" className="mt-6">
           {renderClasses()}
         </TabsContent>
 
-        <TabsContent value="assignments">
+        <TabsContent value="assignments" className="mt-6">
           {renderAssignments()}
         </TabsContent>
       </Tabs>
