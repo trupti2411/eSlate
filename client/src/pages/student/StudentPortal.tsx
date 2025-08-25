@@ -98,220 +98,189 @@ export function StudentPortal() {
   const [submissionContent, setSubmissionContent] = useState("");
   const [selectedTab, setSelectedTab] = useState("dashboard");
 
-  // Get student profile
-  const { data: studentProfile } = useQuery<any>({
+  // E-ink optimized styles
+  const eInkStyles = {
+    card: "bg-white border-2 border-black rounded-none",
+    button: "bg-white border-2 border-black text-black hover:bg-gray-100 rounded-none",
+    primaryButton: "bg-black text-white border-2 border-black hover:bg-gray-800 rounded-none",
+    badge: "bg-white border border-black text-black rounded-none"
+  };
+
+  const studentId = user?.id ? `student-${user.id}` : '';
+
+  // Get student profile to fetch the student-specific ID
+  const { data: studentProfile, isLoading: isLoadingProfile } = useQuery({
     queryKey: ['/api/auth/student-profile'],
-    enabled: !!user && user.role === 'student',
+    enabled: !!user && user.role === 'student'
   });
 
-  const studentId = studentProfile?.id;
+  const studentDbId = studentProfile?.id || '';
 
-  // Submission mutation for uploading completed assignments
+  // Query for student terms
+  const { data: studentTerms = [], isLoading: isLoadingTerms } = useQuery({
+    queryKey: ['/api/students', studentDbId, 'terms'],
+    enabled: !!studentDbId
+  });
+
+  // Query for student classes
+  const { data: studentClasses = [], isLoading: isLoadingClasses } = useQuery({
+    queryKey: ['/api/students', studentDbId, 'classes'],
+    enabled: !!studentDbId
+  });
+
+  // Query for student assignments
+  const { data: assignments = [], isLoading: isLoadingAssignments } = useQuery({
+    queryKey: ['/api/students', studentDbId, 'assignments'],
+    enabled: !!studentDbId
+  });
+
+  // Query for student submissions
+  const { data: submissions = [], isLoading: isLoadingSubmissions } = useQuery({
+    queryKey: ['/api/students', studentDbId, 'submissions'],
+    enabled: !!studentDbId
+  });
+
+  // Type assertions for the query data
+  const typedStudentTerms = studentTerms as AcademicTerm[];
+  const typedStudentClasses = studentClasses as Class[];
+  const typedAssignments = assignments as Assignment[];
+  const typedSubmissions = submissions as Submission[];
+
+  // Mutation for submitting assignments
   const submitAssignmentMutation = useMutation({
-    mutationFn: async ({ assignmentId, fileUrls }: { assignmentId: string; fileUrls: string[] }) => {
-      return await apiRequest('/api/submissions', 'POST', {
+    mutationFn: async ({ assignmentId, content, fileUrls }: { assignmentId: string; content?: string; fileUrls?: string[] }) => {
+      return apiRequest('/api/submissions', 'POST', {
         assignmentId,
-        fileUrls,
-        content: '',
-        isDraft: false,
-        status: 'submitted'
+        content: content || '',
+        fileUrls: fileUrls || []
       });
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/students', studentDbId, 'submissions'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/students', studentDbId, 'assignments'] });
       toast({
-        title: "Assignment submitted successfully!",
-        description: "Your completed assignment has been uploaded and submitted.",
+        title: "Assignment submitted successfully",
+        description: "Your assignment has been submitted for review.",
       });
-      queryClient.invalidateQueries({ queryKey: ['/api/students', studentId, 'assignments'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/students', studentId, 'submissions'] });
     },
-    onError: (error: Error) => {
+    onError: (error) => {
+      console.error('Submit assignment error:', error);
       toast({
-        title: "Submission failed",
-        description: error.message,
+        title: "Failed to submit assignment",
+        description: "Please try again.",
         variant: "destructive",
       });
-    },
+    }
   });
-
-  // Get student's terms (active and non-active)
-  const { data: studentTerms = [], isLoading: isLoadingTerms } = useQuery<AcademicTerm[]>({
-    queryKey: ['/api/students', studentId, 'terms'],
-    enabled: !!studentId,
-  });
-
-  // Get student's classes (active and non-active) 
-  const { data: studentClasses = [], isLoading: isLoadingClasses } = useQuery<Class[]>({
-    queryKey: ['/api/students', studentId, 'classes'],
-    enabled: !!studentId,
-  });
-
-  // Get student's assignments
-  const { data: assignments = [], isLoading: isLoadingAssignments } = useQuery<Assignment[]>({
-    queryKey: ['/api/students', studentId, 'assignments'],
-    enabled: !!studentId,
-  });
-
-  // Get submissions for assignments
-  const { data: submissions = [] } = useQuery<Submission[]>({
-    queryKey: ['/api/students', studentId, 'submissions'],
-    enabled: !!studentId,
-  });
-
-  const eInkStyles = {
-    card: "bg-white border-2 border-black rounded shadow-sm",
-    activeCard: "bg-white border-2 border-black rounded shadow-md ring-2 ring-gray-300",
-    badge: "border border-black bg-white text-black font-medium",
-    activeBadge: "border border-black bg-black text-white font-medium",
-    button: "bg-white border-2 border-black text-black hover:bg-gray-100 font-medium px-4 py-2",
-    primaryButton: "bg-black border-2 border-black text-white hover:bg-gray-800 font-medium px-4 py-2",
-    textarea: "border-2 border-black bg-white text-black text-lg leading-relaxed font-serif resize-none",
-  };
 
   const getAssignmentStatus = (assignment: Assignment) => {
-    const submission = submissions.find(s => s.assignmentId === assignment.id);
-    if (submission && submission.status === 'submitted') return 'submitted';
-    if (submission && submission.status === 'draft') return 'draft';
-    if (isPast(new Date(assignment.submissionDate))) return 'overdue';
+    const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
+    if (submission) {
+      return submission.status;
+    }
+    
+    const now = new Date();
+    const submissionDate = new Date(assignment.submissionDate);
+    
+    if (isPast(submissionDate)) {
+      return 'overdue';
+    }
+    
     return 'pending';
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'submitted': return 'border-green-500 bg-green-50 text-green-700';
-      case 'draft': return 'border-yellow-500 bg-yellow-50 text-yellow-700';
-      case 'overdue': return 'border-red-500 bg-red-50 text-red-700';
-      case 'pending': return 'border-blue-500 bg-blue-50 text-blue-700';
-      default: return 'border-gray-500 bg-gray-50 text-gray-700';
-    }
+    const colors = {
+      'submitted': 'bg-green-100 text-green-800 border-green-300',
+      'graded': 'bg-blue-100 text-blue-800 border-blue-300',
+      'pending': 'bg-yellow-100 text-yellow-800 border-yellow-300',
+      'overdue': 'bg-red-100 text-red-800 border-red-300',
+      'needs_revision': 'bg-orange-100 text-orange-800 border-orange-300'
+    };
+    return colors[status as keyof typeof colors] || colors.pending;
   };
 
-  // Dashboard Summary
-  const renderDashboard = () => {
-    const totalAssignments = assignments.length;
-    const submittedAssignments = assignments.filter(a => 
-      submissions.find(s => s.assignmentId === a.id && s.status === 'submitted')
-    ).length;
-    const draftAssignments = assignments.filter(a => 
-      submissions.find(s => s.assignmentId === a.id && s.status === 'draft')
-    ).length;
-    const overdueAssignments = assignments.filter(a => 
-      isPast(new Date(a.submissionDate)) && !submissions.find(s => s.assignmentId === a.id && s.status === 'submitted')
-    ).length;
-    const upcomingAssignments = assignments.filter(a => 
-      !isPast(new Date(a.submissionDate)) && !submissions.find(s => s.assignmentId === a.id && s.status === 'submitted')
-    ).length;
+  const renderDashboard = () => (
+    <div className="space-y-6">
+      <h2 className="text-2xl font-bold text-black">Dashboard</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <Card className={eInkStyles.card}>
+          <CardContent className="text-center py-8">
+            <BookOpen className="h-12 w-12 mx-auto text-black mb-4" />
+            <h3 className="text-xl font-bold text-black mb-2">Assignments</h3>
+            <p className="text-3xl font-bold text-black">{typedAssignments.length}</p>
+            <p className="text-sm text-gray-600 mt-2">Total assignments</p>
+          </CardContent>
+        </Card>
 
-    return (
-      <div className="space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-black">Welcome, {studentProfile?.firstName || user?.email}!</h1>
-          <p className="text-gray-600 mt-2">Your student portal dashboard</p>
-        </div>
+        <Card className={eInkStyles.card}>
+          <CardContent className="text-center py-8">
+            <CheckCircle className="h-12 w-12 mx-auto text-black mb-4" />
+            <h3 className="text-xl font-bold text-black mb-2">Completed</h3>
+            <p className="text-3xl font-bold text-black">
+              {typedSubmissions.filter((s: Submission) => s.status === 'submitted' || s.status === 'graded').length}
+            </p>
+            <p className="text-sm text-gray-600 mt-2">Assignments submitted</p>
+          </CardContent>
+        </Card>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card className={eInkStyles.card}>
-            <CardContent className="p-6 text-center">
-              <BookOpen className="h-8 w-8 mx-auto text-blue-600 mb-2" />
-              <div className="text-2xl font-bold text-black">{totalAssignments}</div>
-              <div className="text-sm text-gray-600">Total Assignments</div>
-            </CardContent>
-          </Card>
-          <Card className={eInkStyles.card}>
-            <CardContent className="p-6 text-center">
-              <CheckCircle className="h-8 w-8 mx-auto text-green-600 mb-2" />
-              <div className="text-2xl font-bold text-black">{submittedAssignments}</div>
-              <div className="text-sm text-gray-600">Submitted</div>
-            </CardContent>
-          </Card>
-          <Card className={eInkStyles.card}>
-            <CardContent className="p-6 text-center">
-              <PenTool className="h-8 w-8 mx-auto text-yellow-600 mb-2" />
-              <div className="text-2xl font-bold text-black">{draftAssignments}</div>
-              <div className="text-sm text-gray-600">Drafts</div>
-            </CardContent>
-          </Card>
-          <Card className={eInkStyles.card}>
-            <CardContent className="p-6 text-center">
-              <AlertCircle className="h-8 w-8 mx-auto text-red-600 mb-2" />
-              <div className="text-2xl font-bold text-black">{overdueAssignments}</div>
-              <div className="text-sm text-gray-600">Overdue</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="space-y-4">
-          <h3 className="text-xl font-semibold text-black">Quick Actions</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button 
-              className={eInkStyles.primaryButton} 
-              onClick={() => setSelectedTab("assignments")}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              View All Assignments
-            </Button>
-            <Button 
-              className={eInkStyles.button}
-              onClick={() => setSelectedTab("classes")}
-            >
-              <Users className="h-4 w-4 mr-2" />
-              View Classes
-            </Button>
-            <Button 
-              className={eInkStyles.button}
-              onClick={() => setSelectedTab("terms")}
-            >
-              <GraduationCap className="h-4 w-4 mr-2" />
-              View Terms
-            </Button>
-          </div>
-        </div>
+        <Card className={eInkStyles.card}>
+          <CardContent className="text-center py-8">
+            <Clock className="h-12 w-12 mx-auto text-black mb-4" />
+            <h3 className="text-xl font-bold text-black mb-2">Due Soon</h3>
+            <p className="text-3xl font-bold text-black">
+              {typedAssignments.filter((assignment: Assignment) => {
+                const dueDate = new Date(assignment.submissionDate);
+                const now = new Date();
+                const diffTime = dueDate.getTime() - now.getTime();
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                return diffDays <= 3 && diffDays > 0;
+              }).length}
+            </p>
+            <p className="text-sm text-gray-600 mt-2">In next 3 days</p>
+          </CardContent>
+        </Card>
       </div>
-    );
-  };
+    </div>
+  );
 
   const renderTerms = () => (
     <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-black">Academic Terms</h2>
+      <h2 className="text-2xl font-bold text-black">Terms</h2>
       {isLoadingTerms ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
         </div>
-      ) : studentTerms.length === 0 ? (
+      ) : typedStudentTerms.length === 0 ? (
         <Card className={eInkStyles.card}>
           <CardContent className="text-center py-8">
             <GraduationCap className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600">No academic terms found</p>
+            <p className="text-gray-600">No terms found</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {studentTerms.map((term) => {
-            const isActive = term.isActive ?? true;
-            return (
-              <Card key={term.id} className={isActive ? eInkStyles.activeCard : eInkStyles.card}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg">{term.name}</CardTitle>
-                    <Badge className={isActive ? eInkStyles.activeBadge : eInkStyles.badge}>
-                      {isActive ? 'Active' : 'Inactive'}
-                    </Badge>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {typedStudentTerms.map((term: AcademicTerm) => (
+            <Card key={term.id} className={eInkStyles.card}>
+              <CardHeader>
+                <CardTitle className="text-lg">{term.name}</CardTitle>
+                <CardDescription>No description available</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm space-y-1">
+                  <div>
+                    <span className="font-medium">Start:</span> {format(new Date(term.startDate), 'MMM dd, yyyy')}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex items-center">
-                      <Calendar className="h-4 w-4 mr-2" />
-                      {format(new Date(term.startDate), 'MMM dd, yyyy')} - {format(new Date(term.endDate), 'MMM dd, yyyy')}
-                    </div>
-
+                  <div>
+                    <span className="font-medium">End:</span> {format(new Date(term.endDate), 'MMM dd, yyyy')}
                   </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+                  <div>
+                    <span className="font-medium">Status:</span> {term.isActive ? 'Active' : 'Inactive'}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>
@@ -324,7 +293,7 @@ export function StudentPortal() {
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
         </div>
-      ) : studentClasses.length === 0 ? (
+      ) : typedStudentClasses.length === 0 ? (
         <Card className={eInkStyles.card}>
           <CardContent className="text-center py-8">
             <Users className="h-12 w-12 mx-auto text-gray-400 mb-4" />
@@ -332,49 +301,30 @@ export function StudentPortal() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {studentClasses.map((cls) => {
-            const classAssignments = assignments.filter(a => a.classId === cls.id);
-            const isActive = cls.isActive ?? true;
-            return (
-              <Card key={cls.id} className={isActive ? eInkStyles.activeCard : eInkStyles.card}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <CardTitle className="text-lg">{cls.name}</CardTitle>
-                    <Badge className={isActive ? eInkStyles.activeBadge : eInkStyles.badge}>
-                      {isActive ? 'Active' : 'Inactive'}
-                    </Badge>
+        <div className="space-y-4">
+          {typedStudentClasses.map((classItem: Class) => (
+            <Card key={classItem.id} className={eInkStyles.card}>
+              <CardHeader>
+                <CardTitle className="text-lg">{classItem.name}</CardTitle>
+                <CardDescription>{classItem.description || 'No description available'}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="text-sm">
+                    <span className="font-medium">Schedule:</span> {classItem.daysOfWeek?.join(', ') || 'Not specified'}
                   </div>
-                  <CardDescription>
-                    {cls.subject} • {cls.daysOfWeek?.join(', ')}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Assignments:</span>
-                      <Badge className={eInkStyles.badge}>{classAssignments.length}</Badge>
+                  {classItem.startTime && classItem.endTime && (
+                    <div className="text-sm">
+                      <span className="font-medium">Time:</span> {classItem.startTime} - {classItem.endTime}
                     </div>
-                    <div className="flex items-center">
-                      <Clock className="h-4 w-4 mr-2" />
-                      <span className="text-sm">{cls.startTime} - {cls.endTime}</span>
-                    </div>
-                  </div>
-                  {classAssignments.length > 0 && (
-                    <Button 
-                      className={`${eInkStyles.button} w-full mt-4`}
-                      onClick={() => {
-                        setSelectedTab("assignments");
-                        // You could add filtering here
-                      }}
-                    >
-                      View Assignments
-                    </Button>
                   )}
-                </CardContent>
-              </Card>
-            );
-          })}
+                  <div className="text-sm">
+                    <span className="font-medium">Status:</span> {classItem.isActive ? 'Active' : 'Inactive'}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </div>
       )}
     </div>
@@ -387,7 +337,7 @@ export function StudentPortal() {
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
         </div>
-      ) : assignments.length === 0 ? (
+      ) : typedAssignments.length === 0 ? (
         <Card className={eInkStyles.card}>
           <CardContent className="text-center py-8">
             <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
@@ -396,10 +346,10 @@ export function StudentPortal() {
         </Card>
       ) : (
         <div className="space-y-4">
-          {assignments.map((assignment) => {
+          {typedAssignments.map((assignment: Assignment) => {
             const status = getAssignmentStatus(assignment);
-            const submission = submissions.find(s => s.assignmentId === assignment.id);
-            const classInfo = studentClasses.find(c => c.id === assignment.classId);
+            const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
+            const classInfo = typedStudentClasses.find((c: Class) => c.id === assignment.classId);
             
             return (
               <Card key={assignment.id} className={eInkStyles.card}>
@@ -475,135 +425,159 @@ export function StudentPortal() {
 
                     {/* Action Buttons */}
                     <div className="flex gap-2 pt-2">
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button 
-                            className={eInkStyles.primaryButton}
-                            onClick={() => setSelectedAssignment(assignment)}
-                          >
-                            <Eye className="h-4 w-4 mr-2" />
-                            {submission ? 'View & Edit' : 'Complete Online'}
-                          </Button>
-                        </DialogTrigger>
-                        
-                        {/* Download Assignment Button */}
-                        {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
-                          <Button 
-                            className={eInkStyles.button}
-                            onClick={() => {
-                              // Download all assignment files
-                              assignment.attachmentUrls!.forEach((url, index) => {
-                                const filename = url.split('/').pop() || `assignment-file-${index + 1}`;
-                                const objectPath = url.includes('/uploads/') 
-                                  ? url.split('/uploads/').pop()
-                                  : url.split('/').pop();
-                                
-                                const link = document.createElement('a');
-                                link.href = `/objects/uploads/${objectPath}`;
-                                link.download = filename;
-                                link.target = '_blank';
-                                document.body.appendChild(link);
-                                link.click();
-                                document.body.removeChild(link);
-                                
-                                // Add small delay between downloads
-                                if (index < assignment.attachmentUrls!.length - 1) {
-                                  setTimeout(() => {}, 100);
-                                }
-                              });
-                            }}
-                            data-testid="button-download-assignment"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download Assignment
-                          </Button>
-                        )}
+                      {submission ? (
+                        // If there's a submission, show dialog with options
+                        <Dialog>
+                          <DialogTrigger asChild>
+                            <Button 
+                              className={eInkStyles.primaryButton}
+                              onClick={() => setSelectedAssignment(assignment)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View & Edit
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-4xl max-h-[80vh] bg-white border-2 border-black">
+                            <DialogHeader>
+                              <DialogTitle className="text-xl">{assignment.title}</DialogTitle>
+                            </DialogHeader>
+                            <AssignmentCompletionArea 
+                              assignment={selectedAssignment!} 
+                              submission={typedSubmissions.find((s: Submission) => s.assignmentId === selectedAssignment?.id)}
+                              onSubmissionUpdate={() => {
+                                queryClient.invalidateQueries({ queryKey: ['/api/students', studentDbId, 'submissions'] });
+                              }}
+                            />
+                          </DialogContent>
+                        </Dialog>
+                      ) : (
+                        // If no submission, go directly to editor
+                        <Button 
+                          className={eInkStyles.primaryButton}
+                          onClick={() => {
+                            if (assignment.attachmentUrls && assignment.attachmentUrls.length > 0) {
+                              const objectPath = assignment.attachmentUrls[0].includes('/uploads/') 
+                                ? assignment.attachmentUrls[0].split('/uploads/').pop()
+                                : assignment.attachmentUrls[0].split('/').pop();
+                              window.open(`/objects/uploads/${objectPath}?edit=true`, '_blank');
+                            }
+                          }}
+                          disabled={!assignment.attachmentUrls || assignment.attachmentUrls.length === 0}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Complete Online
+                        </Button>
+                      )}
+                      
+                      {/* Download Assignment Button */}
+                      {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
+                        <Button 
+                          className={eInkStyles.button}
+                          onClick={() => {
+                            // Download all assignment files
+                            assignment.attachmentUrls!.forEach((url: string, index: number) => {
+                              const filename = url.split('/').pop() || `assignment-file-${index + 1}`;
+                              const objectPath = url.includes('/uploads/') 
+                                ? url.split('/uploads/').pop()
+                                : url.split('/').pop();
+                              
+                              const link = document.createElement('a');
+                              link.href = `/objects/uploads/${objectPath}`;
+                              link.download = filename;
+                              link.target = '_blank';
+                              document.body.appendChild(link);
+                              link.click();
+                              document.body.removeChild(link);
+                              
+                              // Add small delay between downloads
+                              if (index < assignment.attachmentUrls!.length - 1) {
+                                setTimeout(() => {}, 100);
+                              }
+                            });
+                          }}
+                          data-testid="button-download-assignment"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Download Assignment
+                        </Button>
+                      )}
 
-                        {/* Upload Completed Assignment Button */}
-                        {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
-                          <ObjectUploader
-                            maxNumberOfFiles={5}
-                            maxFileSize={31457280} // 30MB
-                            onGetUploadParameters={async () => {
-                              const response = await apiRequest('/api/objects/upload', 'POST');
-                              return {
-                                method: 'PUT' as const,
-                                url: response.uploadURL,
-                              };
-                            }}
-                            onComplete={async (result) => {
-                              if (result.successful && result.successful.length > 0) {
-                                try {
-                                  // Set metadata for each uploaded file
-                                  const metadataPromises = result.successful.map(async (file: any) => {
-                                    const uploadURL = file.uploadURL as string;
-                                    const originalFileName = file.name || file.fileName || `file-${Date.now()}`;
-                                    
-                                    try {
-                                      await apiRequest('/api/objects/metadata', 'POST', {
-                                        uploadURL: uploadURL,
-                                        originalFileName: originalFileName
-                                      });
-                                    } catch (error) {
-                                      console.warn('Failed to set metadata for file:', originalFileName, error);
-                                    }
-                                  });
+                      {/* Upload Completed Assignment Button */}
+                      {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
+                        <ObjectUploader
+                          maxNumberOfFiles={5}
+                          maxFileSize={31457280} // 30MB
+                          onGetUploadParameters={async () => {
+                            const response = await apiRequest('/api/objects/upload', 'POST');
+                            return {
+                              method: 'PUT' as const,
+                              url: response.uploadURL,
+                            };
+                          }}
+                          onComplete={async (result) => {
+                            if (result.successful && result.successful.length > 0) {
+                              try {
+                                // Set metadata for each uploaded file
+                                const metadataPromises = result.successful.map(async (file: any) => {
+                                  const uploadURL = file.uploadURL as string;
+                                  const originalFileName = file.data?.name;
                                   
-                                  // Wait for all metadata to be set
-                                  await Promise.allSettled(metadataPromises);
-                                  
-                                  const newFileUrls = result.successful.map((file: any) => {
-                                    const url = file.uploadURL as string;
-                                    return url.replace(/\?.*$/, ''); // Remove query parameters
-                                  });
-                                  
-                                  // Get existing file URLs from the current submission
-                                  const existingFileUrls = submission?.fileUrls || [];
-                                  
-                                  // Merge existing and new files
-                                  const allFileUrls = [...existingFileUrls, ...newFileUrls];
-                                  
-                                  submitAssignmentMutation.mutate({
-                                    assignmentId: assignment.id,
-                                    fileUrls: allFileUrls
-                                  });
-                                } catch (error) {
-                                  console.error('Error processing upload:', error);
-                                  toast({
-                                    title: "Upload processing failed", 
-                                    description: "Files uploaded but failed to process. Please contact support.",
-                                    variant: "destructive",
-                                  });
-                                }
-                              } else {
+                                  try {
+                                    await apiRequest('/api/objects/metadata', 'POST', {
+                                      objectPath: uploadURL.includes('/uploads/') 
+                                        ? uploadURL.split('/uploads/')[1] 
+                                        : uploadURL.split('/').pop(),
+                                      metadata: {
+                                        originalFilename: originalFileName || 'unknown'
+                                      }
+                                    });
+                                  } catch (error) {
+                                    console.warn('Failed to set metadata for file:', originalFileName, error);
+                                  }
+                                });
+                                
+                                // Wait for all metadata to be set
+                                await Promise.allSettled(metadataPromises);
+                                
+                                const newFileUrls = result.successful.map((file: any) => {
+                                  const url = file.uploadURL as string;
+                                  return url.replace(/\?.*$/, ''); // Remove query parameters
+                                });
+                                
+                                // Get existing file URLs from the current submission
+                                const existingFileUrls = submission?.fileUrls || [];
+                                
+                                // Merge existing and new files
+                                const allFileUrls = [...existingFileUrls, ...newFileUrls];
+                                
+                                submitAssignmentMutation.mutate({
+                                  assignmentId: assignment.id,
+                                  fileUrls: allFileUrls
+                                });
+                              } catch (error) {
+                                console.error('Error processing upload:', error);
                                 toast({
-                                  title: "Upload failed", 
-                                  description: result.failed && result.failed.length > 0 
-                                    ? `Failed to upload ${result.failed.length} file(s). Please try again.`
-                                    : "No files were uploaded successfully. Please try again.",
+                                  title: "Upload processing failed", 
+                                  description: "Files uploaded but failed to process. Please contact support.",
                                   variant: "destructive",
                                 });
                               }
-                            }}
-                            buttonClassName={eInkStyles.button}
-                          >
-                            <Upload className="h-4 w-4 mr-2" />
-                            Upload Completed Assignment
-                          </ObjectUploader>
-                        )}
-                        <DialogContent className="max-w-4xl max-h-[80vh] bg-white border-2 border-black">
-                          <DialogHeader>
-                            <DialogTitle className="text-xl">{assignment.title}</DialogTitle>
-                          </DialogHeader>
-                          <AssignmentCompletionArea 
-                            assignment={assignment} 
-                            submission={submission}
-                            onSubmissionUpdate={() => {
-                              queryClient.invalidateQueries({ queryKey: ['/api/students', studentId, 'submissions'] });
-                            }}
-                          />
-                        </DialogContent>
-                      </Dialog>
+                            } else {
+                              toast({
+                                title: "Upload failed", 
+                                description: result.failed && result.failed.length > 0 
+                                  ? `Failed to upload ${result.failed.length} file(s). Please try again.`
+                                  : "No files were uploaded successfully. Please try again.",
+                                variant: "destructive",
+                              });
+                            }
+                          }}
+                          buttonClassName={eInkStyles.button}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Upload Completed Assignment
+                        </ObjectUploader>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -657,19 +631,19 @@ export function StudentPortal() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="dashboard" className="space-y-6">
+        <TabsContent value="dashboard">
           {renderDashboard()}
         </TabsContent>
 
-        <TabsContent value="terms" className="space-y-6">
+        <TabsContent value="terms">
           {renderTerms()}
         </TabsContent>
 
-        <TabsContent value="classes" className="space-y-6">
+        <TabsContent value="classes">
           {renderClasses()}
         </TabsContent>
 
-        <TabsContent value="assignments" className="space-y-6">
+        <TabsContent value="assignments">
           {renderAssignments()}
         </TabsContent>
       </Tabs>
