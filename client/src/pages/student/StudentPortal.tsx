@@ -34,6 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { AssignmentCompletionArea } from "@/components/AssignmentCompletionArea";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { PDFAnnotator } from "@/components/PDFAnnotator";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -97,6 +98,8 @@ export function StudentPortal() {
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [submissionContent, setSubmissionContent] = useState("");
   const [selectedTab, setSelectedTab] = useState("dashboard");
+  const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
+  const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
 
   // E-ink optimized styles
   const eInkStyles = {
@@ -451,16 +454,12 @@ export function StudentPortal() {
                           </DialogContent>
                         </Dialog>
                       ) : (
-                        // If no submission, go directly to editor
+                        // If no submission, go directly to PDF annotator
                         <Button 
                           className={eInkStyles.primaryButton}
                           onClick={() => {
-                            if (assignment.attachmentUrls && assignment.attachmentUrls.length > 0) {
-                              const objectPath = assignment.attachmentUrls[0].includes('/uploads/') 
-                                ? assignment.attachmentUrls[0].split('/uploads/').pop()
-                                : assignment.attachmentUrls[0].split('/').pop();
-                              window.open(`/objects/uploads/${objectPath}?edit=true`, '_blank');
-                            }
+                            setAnnotatingAssignment(assignment);
+                            setShowPDFAnnotator(true);
                           }}
                           disabled={!assignment.attachmentUrls || assignment.attachmentUrls.length === 0}
                         >
@@ -594,6 +593,29 @@ export function StudentPortal() {
       <div className="flex items-center justify-center h-64">
         <p className="text-gray-600">Access denied. Student role required.</p>
       </div>
+    );
+  }
+
+  // Show PDF Annotator when annotation mode is active
+  if (showPDFAnnotator && annotatingAssignment) {
+    return (
+      <PDFAnnotator
+        pdfUrl={annotatingAssignment.attachmentUrls![0]}
+        assignmentId={annotatingAssignment.id}
+        onSave={async (annotatedFileUrl: string) => {
+          // Submit the annotated file as the assignment
+          submitAssignmentMutation.mutate({
+            assignmentId: annotatingAssignment.id,
+            fileUrls: [annotatedFileUrl]
+          });
+          setShowPDFAnnotator(false);
+          setAnnotatingAssignment(null);
+        }}
+        onClose={() => {
+          setShowPDFAnnotator(false);
+          setAnnotatingAssignment(null);
+        }}
+      />
     );
   }
 
