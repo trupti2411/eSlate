@@ -100,20 +100,65 @@ export function PDFAnnotatorPage() {
     console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
   }, []);
 
-  // Simple coordinate conversion for canvas overlay
-  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
+  // Get PDF document coordinates (accounting for scroll)
+  const getPDFCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current || !pdfViewerRef.current) return { x: 0, y: 0 };
     
     const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
+    const iframe = pdfViewerRef.current;
+    const canvasRect = canvas.getBoundingClientRect();
     
+    // Get mouse position relative to canvas
+    const canvasX = e.clientX - canvasRect.left;
+    const canvasY = e.clientY - canvasRect.top;
+    
+    // Try to get scroll position from iframe content
+    let scrollX = 0;
+    let scrollY = 0;
+    
+    try {
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (iframeDoc) {
+        scrollX = iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || 0;
+        scrollY = iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || 0;
+      }
+    } catch (e) {
+      // Cross-origin, can't access iframe scroll - use estimate
+      console.log('Cannot access iframe scroll, using canvas coordinates');
+    }
+    
+    // Return coordinates relative to PDF document
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: canvasX + scrollX,
+      y: canvasY + scrollY
     };
   };
 
-  // Redraw all annotations
+  // Convert PDF document coordinates to current canvas coordinates
+  const pdfToCanvasCoordinates = (pdfX: number, pdfY: number) => {
+    if (!pdfViewerRef.current) return { x: pdfX, y: pdfY };
+    
+    let scrollX = 0;
+    let scrollY = 0;
+    
+    try {
+      const iframe = pdfViewerRef.current;
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+      if (iframeDoc) {
+        scrollX = iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || 0;
+        scrollY = iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || 0;
+      }
+    } catch (e) {
+      // Cross-origin, use coordinates as-is
+    }
+    
+    return {
+      x: pdfX - scrollX,
+      y: pdfY - scrollY
+    };
+  };
+
+  // Redraw all annotations (converting PDF coords to canvas coords)
   const redrawAnnotations = useCallback(() => {
     if (!canvasRef.current) return;
     
@@ -136,17 +181,19 @@ export function PDFAnnotatorPage() {
       if (annotation.type === 'stroke' && annotation.points) {
         ctx.beginPath();
         annotation.points.forEach((point, index) => {
+          const canvasCoords = pdfToCanvasCoordinates(point.x, point.y);
           if (index === 0) {
-            ctx.moveTo(point.x, point.y);
+            ctx.moveTo(canvasCoords.x, canvasCoords.y);
           } else {
-            ctx.lineTo(point.x, point.y);
+            ctx.lineTo(canvasCoords.x, canvasCoords.y);
           }
         });
         ctx.stroke();
       } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
+        const canvasCoords = pdfToCanvasCoordinates(annotation.x, annotation.y);
         ctx.fillStyle = annotation.style.color;
         ctx.font = '18px Arial';
-        ctx.fillText(annotation.text, annotation.x, annotation.y);
+        ctx.fillText(annotation.text, canvasCoords.x, canvasCoords.y);
       }
       
       ctx.restore();
@@ -163,14 +210,14 @@ export function PDFAnnotatorPage() {
     }
     
     setIsDrawing(true);
-    const coords = getCanvasCoordinates(e);
+    const coords = getPDFCoordinates(e);
     setCurrentStroke([coords]);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !activeTool) return;
     
-    const coords = getCanvasCoordinates(e);
+    const coords = getPDFCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
     
     // Draw current stroke in real-time
@@ -181,7 +228,7 @@ export function PDFAnnotatorPage() {
     // Redraw everything to show current stroke
     redrawAnnotations();
     
-    // Draw current stroke
+    // Draw current stroke (convert PDF coords to canvas coords)
     if (currentStroke.length > 0) {
       ctx.save();
       switch (activeTool) {
@@ -203,10 +250,11 @@ export function PDFAnnotatorPage() {
       
       ctx.beginPath();
       [...currentStroke, coords].forEach((point, index) => {
+        const canvasCoords = pdfToCanvasCoordinates(point.x, point.y);
         if (index === 0) {
-          ctx.moveTo(point.x, point.y);
+          ctx.moveTo(canvasCoords.x, canvasCoords.y);
         } else {
-          ctx.lineTo(point.x, point.y);
+          ctx.lineTo(canvasCoords.x, canvasCoords.y);
         }
       });
       ctx.stroke();
@@ -238,7 +286,7 @@ export function PDFAnnotatorPage() {
     const text = prompt('Enter text:');
     if (!text) return;
 
-    const coords = getCanvasCoordinates(e);
+    const coords = getPDFCoordinates(e);
     
     const newAnnotation = {
       type: 'text' as const,
@@ -465,6 +513,47 @@ export function PDFAnnotatorPage() {
   useEffect(() => {
     redrawAnnotations();
   }, [annotations, redrawAnnotations]);
+
+  // Listen for PDF scroll events to update annotation positions
+  useEffect(() => {
+    const iframe = pdfViewerRef.current;
+    if (!iframe) return;
+
+    const handleIframeLoad = () => {
+      try {
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+        if (iframeDoc) {
+          const handleScroll = () => {
+            // Redraw annotations when PDF scrolls
+            setTimeout(redrawAnnotations, 10);
+          };
+          
+          iframeDoc.addEventListener('scroll', handleScroll);
+          iframeDoc.addEventListener('wheel', handleScroll);
+          
+          return () => {
+            iframeDoc.removeEventListener('scroll', handleScroll);
+            iframeDoc.removeEventListener('wheel', handleScroll);
+          };
+        }
+      } catch (e) {
+        // Cross-origin, can't access iframe events
+        console.log('Cannot access iframe events due to cross-origin');
+      }
+    };
+
+    // Listen for iframe load
+    iframe.addEventListener('load', handleIframeLoad);
+    
+    // Try to set up listener if already loaded
+    if (iframe.contentDocument) {
+      handleIframeLoad();
+    }
+
+    return () => {
+      iframe.removeEventListener('load', handleIframeLoad);
+    };
+  }, [pdfLoaded, redrawAnnotations]);
 
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
