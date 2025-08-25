@@ -4,8 +4,26 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download, ZoomIn, ZoomOut, Home } from 'lucide-react';
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 type Tool = 'pen' | 'eraser' | 'text' | 'highlight';
+
+interface Annotation {
+  type: 'stroke' | 'text';
+  points?: Array<{x: number, y: number}>;
+  text?: string;
+  x?: number;
+  y?: number;
+  page: number;
+  style: {
+    color: string;
+    lineWidth: number;
+    globalCompositeOperation: string;
+  };
+}
 
 export function PDFAnnotatorPage() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
@@ -14,195 +32,141 @@ export function PDFAnnotatorPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
-  const [scale, setScale] = useState(1);
-  const [annotations, setAnnotations] = useState<Array<{
-    type: 'stroke' | 'text';
-    points?: Array<{x: number, y: number}>;
-    text?: string;
-    x?: number;
-    y?: number;
-    style: {
-      color: string;
-      lineWidth: number;
-      globalCompositeOperation: string;
-    };
-  }>>([]);
+  const [scale, setScale] = useState(1.2);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Array<{x: number, y: number}>>([]);
   
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const pdfContainerRef = useRef<HTMLDivElement>(null);
-  const pdfViewerRef = useRef<HTMLIFrameElement>(null);
+  const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
+  const annotationCanvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const pdfDocRef = useRef<any>(null);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get URL parameters and construct proper PDF URL
+  // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const rawPdfUrl = urlParams.get('pdf') || '';
   const assignmentId = urlParams.get('assignmentId') || '';
   
-  // Ensure PDF URL is properly constructed
-  const pdfUrl = rawPdfUrl.startsWith('/') ? rawPdfUrl : `/${rawPdfUrl}`;
-  
-  console.log('PDF Annotator initialized:', { pdfUrl, assignmentId });
+  const pdfUrl = rawPdfUrl.includes('http') ? rawPdfUrl : `https://storage.googleapis.com/${rawPdfUrl}`;
 
-  // Submit assignment mutation
-  const submitAssignmentMutation = useMutation({
-    mutationFn: async (fileUrl: string) => {
-      return apiRequest('/api/submissions', 'POST', {
-        assignmentId: assignmentId,
-        fileUrls: [fileUrl],
-        textResponse: "",
-        submittedAt: new Date().toISOString(),
-        status: 'submitted'
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+  // Load PDF using PDF.js
+  const loadPDF = useCallback(async () => {
+    if (!pdfUrl || !pdfCanvasRef.current) return;
+
+    try {
+      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      const pdf = await loadingTask.promise;
+      pdfDocRef.current = pdf;
+      setTotalPages(pdf.numPages);
+      setPdfLoaded(true);
+      renderPage(1);
+    } catch (error) {
+      console.error('Error loading PDF:', error);
       toast({
-        title: "Assignment Submitted Successfully",
-        description: "Your annotated assignment has been saved and submitted.",
-      });
-    },
-    onError: (error) => {
-      console.error('Submission error:', error);
-      toast({
-        title: "Submission Failed",
-        description: "Failed to submit your assignment. Please try again.",
+        title: "PDF Load Error",
+        description: "Failed to load the PDF document.",
         variant: "destructive",
       });
     }
-  });
+  }, [pdfUrl, toast]);
 
-  // Initialize canvas to match PDF viewer
-  const initializeCanvas = useCallback(() => {
-    if (!canvasRef.current || !pdfViewerRef.current) return;
+  // Render specific page
+  const renderPage = useCallback(async (pageNum: number) => {
+    if (!pdfDocRef.current || !pdfCanvasRef.current || !annotationCanvasRef.current) return;
 
-    const canvas = canvasRef.current;
-    const iframe = pdfViewerRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Set canvas to match iframe size
-    const rect = iframe.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
-    
-    // Configure context for high-quality drawing
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.globalAlpha = 1.0;
-    
-    // Load and redraw all annotations
-    loadSavedWork();
-    redrawAnnotations();
-    
-    console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
-  }, []);
-
-  // Get PDF document coordinates (accounting for scroll)
-  const getPDFCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !pdfViewerRef.current) return { x: 0, y: 0 };
-    
-    const canvas = canvasRef.current;
-    const iframe = pdfViewerRef.current;
-    const canvasRect = canvas.getBoundingClientRect();
-    
-    // Get mouse position relative to canvas
-    const canvasX = e.clientX - canvasRect.left;
-    const canvasY = e.clientY - canvasRect.top;
-    
-    // Try to get scroll position from iframe content
-    let scrollX = 0;
-    let scrollY = 0;
-    
     try {
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (iframeDoc) {
-        scrollX = iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || 0;
-        scrollY = iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || 0;
-      }
-    } catch (e) {
-      // Cross-origin, can't access iframe scroll - use estimate
-      console.log('Cannot access iframe scroll, using canvas coordinates');
+      const page = await pdfDocRef.current.getPage(pageNum);
+      const viewport = page.getViewport({ scale });
+      
+      const pdfCanvas = pdfCanvasRef.current;
+      const annotationCanvas = annotationCanvasRef.current;
+      
+      // Set canvas dimensions
+      pdfCanvas.width = viewport.width;
+      pdfCanvas.height = viewport.height;
+      annotationCanvas.width = viewport.width;
+      annotationCanvas.height = viewport.height;
+      
+      // Render PDF page
+      const pdfContext = pdfCanvas.getContext('2d')!;
+      const renderContext = {
+        canvasContext: pdfContext,
+        viewport: viewport
+      };
+      
+      await page.render(renderContext).promise;
+      
+      // Clear and redraw annotations for current page
+      const annotationContext = annotationCanvas.getContext('2d')!;
+      annotationContext.clearRect(0, 0, annotationCanvas.width, annotationCanvas.height);
+      redrawAnnotationsForPage(pageNum);
+      
+    } catch (error) {
+      console.error('Error rendering page:', error);
     }
-    
-    // Return coordinates relative to PDF document
-    return {
-      x: canvasX + scrollX,
-      y: canvasY + scrollY
-    };
-  };
+  }, [scale]);
 
-  // Convert PDF document coordinates to current canvas coordinates
-  const pdfToCanvasCoordinates = (pdfX: number, pdfY: number) => {
-    if (!pdfViewerRef.current) return { x: pdfX, y: pdfY };
+  // Redraw annotations for current page
+  const redrawAnnotationsForPage = useCallback((pageNum: number) => {
+    if (!annotationCanvasRef.current) return;
     
-    let scrollX = 0;
-    let scrollY = 0;
-    
-    try {
-      const iframe = pdfViewerRef.current;
-      const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-      if (iframeDoc) {
-        scrollX = iframeDoc.documentElement.scrollLeft || iframeDoc.body.scrollLeft || 0;
-        scrollY = iframeDoc.documentElement.scrollTop || iframeDoc.body.scrollTop || 0;
-      }
-    } catch (e) {
-      // Cross-origin, use coordinates as-is
-    }
-    
-    return {
-      x: pdfX - scrollX,
-      y: pdfY - scrollY
-    };
-  };
-
-  // Redraw all annotations (converting PDF coords to canvas coords)
-  const redrawAnnotations = useCallback(() => {
-    if (!canvasRef.current) return;
-    
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    const canvas = annotationCanvasRef.current;
+    const ctx = canvas.getContext('2d')!;
     
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw each annotation
-    annotations.forEach(annotation => {
-      ctx.save();
-      ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
-      ctx.strokeStyle = annotation.style.color;
-      ctx.lineWidth = annotation.style.lineWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      if (annotation.type === 'stroke' && annotation.points) {
-        ctx.beginPath();
-        annotation.points.forEach((point, index) => {
-          const canvasCoords = pdfToCanvasCoordinates(point.x, point.y);
-          if (index === 0) {
-            ctx.moveTo(canvasCoords.x, canvasCoords.y);
-          } else {
-            ctx.lineTo(canvasCoords.x, canvasCoords.y);
-          }
-        });
-        ctx.stroke();
-      } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
-        const canvasCoords = pdfToCanvasCoordinates(annotation.x, annotation.y);
-        ctx.fillStyle = annotation.style.color;
-        ctx.font = '18px Arial';
-        ctx.fillText(annotation.text, canvasCoords.x, canvasCoords.y);
-      }
-      
-      ctx.restore();
-    });
+    // Draw annotations for this page
+    annotations
+      .filter(annotation => annotation.page === pageNum)
+      .forEach(annotation => {
+        ctx.save();
+        ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
+        ctx.strokeStyle = annotation.style.color;
+        ctx.lineWidth = annotation.style.lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        
+        if (annotation.type === 'stroke' && annotation.points) {
+          ctx.beginPath();
+          annotation.points.forEach((point, index) => {
+            if (index === 0) {
+              ctx.moveTo(point.x, point.y);
+            } else {
+              ctx.lineTo(point.x, point.y);
+            }
+          });
+          ctx.stroke();
+        } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
+          ctx.fillStyle = annotation.style.color;
+          ctx.font = '18px Arial';
+          ctx.fillText(annotation.text, annotation.x, annotation.y);
+        }
+        
+        ctx.restore();
+      });
   }, [annotations]);
 
-  // Simple drawing functions
+  // Get coordinates relative to canvas
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!annotationCanvasRef.current) return { x: 0, y: 0 };
+    
+    const canvas = annotationCanvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    
+    return {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    };
+  };
+
+  // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!activeTool) return;
+    if (!activeTool || !isAnnotationMode) return;
     
     if (activeTool === 'text') {
       addTextAtPosition(e);
@@ -210,25 +174,25 @@ export function PDFAnnotatorPage() {
     }
     
     setIsDrawing(true);
-    const coords = getPDFCoordinates(e);
+    const coords = getCanvasCoordinates(e);
     setCurrentStroke([coords]);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !activeTool) return;
+    if (!isDrawing || !activeTool || !isAnnotationMode) return;
     
-    const coords = getPDFCoordinates(e);
+    const coords = getCanvasCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
     
     // Draw current stroke in real-time
-    const canvas = canvasRef.current;
+    const canvas = annotationCanvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
     
-    // Redraw everything to show current stroke
-    redrawAnnotations();
+    // Redraw page annotations
+    redrawAnnotationsForPage(currentPage);
     
-    // Draw current stroke (convert PDF coords to canvas coords)
+    // Draw current stroke
     if (currentStroke.length > 0) {
       ctx.save();
       switch (activeTool) {
@@ -250,11 +214,10 @@ export function PDFAnnotatorPage() {
       
       ctx.beginPath();
       [...currentStroke, coords].forEach((point, index) => {
-        const canvasCoords = pdfToCanvasCoordinates(point.x, point.y);
         if (index === 0) {
-          ctx.moveTo(canvasCoords.x, canvasCoords.y);
+          ctx.moveTo(point.x, point.y);
         } else {
-          ctx.lineTo(canvasCoords.x, canvasCoords.y);
+          ctx.lineTo(point.x, point.y);
         }
       });
       ctx.stroke();
@@ -266,9 +229,10 @@ export function PDFAnnotatorPage() {
     if (!isDrawing || currentStroke.length === 0 || !activeTool) return;
     
     // Save the completed stroke
-    const newAnnotation = {
-      type: 'stroke' as const,
+    const newAnnotation: Annotation = {
+      type: 'stroke',
       points: [...currentStroke],
+      page: currentPage,
       style: {
         color: activeTool === 'pen' ? '#000000' : 
                activeTool === 'highlight' ? 'rgba(255, 255, 0, 0.5)' : '#000000',
@@ -286,13 +250,14 @@ export function PDFAnnotatorPage() {
     const text = prompt('Enter text:');
     if (!text) return;
 
-    const coords = getPDFCoordinates(e);
+    const coords = getCanvasCoordinates(e);
     
-    const newAnnotation = {
-      type: 'text' as const,
+    const newAnnotation: Annotation = {
+      type: 'text',
       text,
       x: coords.x,
       y: coords.y,
+      page: currentPage,
       style: {
         color: '#000000',
         lineWidth: 0,
@@ -303,28 +268,63 @@ export function PDFAnnotatorPage() {
     setAnnotations(prev => [...prev, newAnnotation]);
   };
 
-  const clearCanvas = () => {
-    setAnnotations([]);
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // Navigation functions
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      const newPage = currentPage + 1;
+      setCurrentPage(newPage);
+      renderPage(newPage);
+    }
+  };
+
+  const prevPage = () => {
+    if (currentPage > 1) {
+      const newPage = currentPage - 1;
+      setCurrentPage(newPage);
+      renderPage(newPage);
+    }
+  };
+
+  // Tool and mode functions
+  const toggleMode = () => {
+    const newMode = !isAnnotationMode;
+    setIsAnnotationMode(newMode);
+    if (!newMode) {
+      setActiveTool(null);
+    } else {
+      setActiveTool('pen');
+    }
+  };
+
+  const handleToolChange = (tool: Tool) => {
+    if (!isAnnotationMode) {
+      setIsAnnotationMode(true);
+    }
+    setActiveTool(tool);
+  };
+
+  // Clear all annotations for current page
+  const clearCurrentPage = () => {
+    setAnnotations(prev => prev.filter(annotation => annotation.page !== currentPage));
   };
 
   // Save work to localStorage
   const saveWork = async () => {
-    if (isSaving || annotations.length === 0) return;
+    if (isSaving) return;
 
     setIsSaving(true);
     try {
-      // Save annotations data structure instead of image
       const saveKey = `pdf-annotation-data-${assignmentId}`;
-      localStorage.setItem(saveKey, JSON.stringify(annotations));
+      const saveData = {
+        annotations,
+        currentPage,
+        scale
+      };
+      localStorage.setItem(saveKey, JSON.stringify(saveData));
       
       toast({
         title: "Work Saved",
-        description: "Your annotations have been saved locally. You can continue working later.",
+        description: "Your annotations have been saved locally.",
       });
     } catch (error) {
       console.error('Save error:', error);
@@ -338,7 +338,7 @@ export function PDFAnnotatorPage() {
     }
   };
 
-  // Load saved work from localStorage
+  // Load saved work
   const loadSavedWork = () => {
     if (!assignmentId) return;
 
@@ -347,113 +347,103 @@ export function PDFAnnotatorPage() {
     
     if (savedData) {
       try {
-        const savedAnnotations = JSON.parse(savedData);
-        setAnnotations(savedAnnotations);
-        console.log('Loaded saved annotations:', savedAnnotations.length);
+        const { annotations: savedAnnotations, currentPage: savedPage, scale: savedScale } = JSON.parse(savedData);
+        setAnnotations(savedAnnotations || []);
+        if (savedPage) setCurrentPage(savedPage);
+        if (savedScale) setScale(savedScale);
       } catch (error) {
-        console.error('Failed to load saved annotations:', error);
+        console.error('Failed to load saved work:', error);
       }
     }
   };
 
-  const handleDownload = () => {
-    if (!canvasRef.current) return;
-    
-    const link = document.createElement('a');
-    link.download = `annotated-assignment-${assignmentId}.png`;
-    link.href = canvasRef.current.toDataURL('image/png');
-    link.click();
-  };
+  // Submit assignment mutation
+  const submitAssignmentMutation = useMutation({
+    mutationFn: async (submissionUrl: string) => {
+      return await apiRequest(`/api/submissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          assignmentId,
+          submissionUrl,
+          submissionText: 'PDF annotation completed',
+          status: 'submitted'
+        })
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Assignment Submitted",
+        description: "Your annotated assignment has been submitted successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error('Submission error:', error);
+      toast({
+        title: "Submission Failed", 
+        description: "There was an error submitting your assignment.",
+        variant: "destructive",
+      });
+    }
+  });
 
-  const zoomIn = () => setScale(prev => Math.min(prev * 1.2, 3));
-  const zoomOut = () => setScale(prev => Math.max(prev / 1.2, 0.5));
-
-  // Submit assignment (separate from save)
+  // Submit assignment
   const handleSubmit = async () => {
-    if (!canvasRef.current || isSubmitting) return;
-
+    if (isSubmitting) return;
     setIsSubmitting(true);
-    console.log('Starting submission process...');
-    
+
     try {
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
+      // Create a composite canvas with PDF and all annotations
+      const compositeCanvas = document.createElement('canvas');
+      const compositeCtx = compositeCanvas.getContext('2d')!;
       
-      // Check if canvas has any annotations
-      const imageData = ctx?.getImageData(0, 0, canvas.width, canvas.height);
-      let hasContent = false;
-      if (imageData) {
-        const data = imageData.data;
-        for (let i = 3; i < data.length; i += 4) {
-          if (data[i] !== 0) {
-            hasContent = true;
-            break;
-          }
+      // Set canvas size for all pages
+      if (pdfCanvasRef.current) {
+        compositeCanvas.width = pdfCanvasRef.current.width;
+        compositeCanvas.height = pdfCanvasRef.current.height * totalPages;
+      }
+      
+      // Render all pages with annotations
+      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+        await renderPage(pageNum);
+        
+        if (pdfCanvasRef.current && annotationCanvasRef.current) {
+          const yOffset = (pageNum - 1) * pdfCanvasRef.current.height;
+          
+          // Draw PDF page
+          compositeCtx.drawImage(pdfCanvasRef.current, 0, yOffset);
+          
+          // Draw annotations for this page
+          compositeCtx.drawImage(annotationCanvasRef.current, 0, yOffset);
         }
       }
-
-      if (!hasContent) {
-        toast({
-          title: "No Work to Submit",
-          description: "Please add some annotations before submitting your assignment.",
-          variant: "destructive",
+      
+      // Convert to blob and upload
+      compositeCanvas.toBlob(async (blob) => {
+        if (!blob) throw new Error('Failed to create image blob');
+        
+        const formData = new FormData();
+        formData.append('file', blob, 'annotated-assignment.png');
+        formData.append('path', 'uploads');
+        
+        const result = await apiRequest('/api/objects/upload', {
+          method: 'POST',
+          body: formData
         });
-        return;
-      }
-
-      // Convert canvas to blob
-      const blob = await new Promise<Blob>((resolve, reject) => {
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Failed to create blob'));
-        }, 'image/png', 1.0);
-      });
-
-      console.log('Canvas blob created for submission:', blob.size, 'bytes');
-
-      // Create FormData for upload
-      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const file = new File([blob], `submitted-assignment-${assignmentId}-${timestamp}.png`, { 
-        type: 'image/png' 
-      });
-
-      const formData = new FormData();
-      formData.append('file', file);
-
-      console.log('Uploading final submission:', file.name);
+        
+        const cleanUrl = result.uploadURL.replace(/\?.*$/, '');
+        await submitAssignmentMutation.mutateAsync(cleanUrl);
+        
+        // Clear saved work
+        const saveKey = `pdf-annotation-data-${assignmentId}`;
+        localStorage.removeItem(saveKey);
+      }, 'image/png');
       
-      const response = await fetch('/api/objects/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Upload failed: ${response.status} ${errorText}`);
-      }
-
-      const result = await response.json();
-      console.log('Upload successful:', result);
-      
-      if (!result.uploadURL) {
-        throw new Error('No upload URL received');
-      }
-
-      // Clean URL and submit assignment
-      const cleanUrl = result.uploadURL.replace(/\?.*$/, '');
-      console.log('Submitting assignment with URL:', cleanUrl);
-      
-      await submitAssignmentMutation.mutateAsync(cleanUrl);
-
-      // Clear saved work after successful submission
-      const saveKey = `pdf-annotation-data-${assignmentId}`;
-      localStorage.removeItem(saveKey);
-
     } catch (error) {
       console.error('Submission error:', error);
       toast({
         title: "Submission Failed",
-        description: `There was an error submitting your assignment: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        description: "There was an error submitting your assignment.",
         variant: "destructive",
       });
     } finally {
@@ -461,112 +451,32 @@ export function PDFAnnotatorPage() {
     }
   };
 
-  // Handle tool change
-  const handleToolChange = (tool: Tool) => {
-    if (!isAnnotationMode) {
-      // Switch to annotation mode and select tool
-      setIsAnnotationMode(true);
-      setActiveTool(tool);
-    } else {
-      // In annotation mode, just switch tools
-      setActiveTool(tool);
-    }
-  };
-
-  const toggleMode = () => {
-    const newMode = !isAnnotationMode;
-    setIsAnnotationMode(newMode);
-    if (!newMode) {
-      setActiveTool(null);
-    } else {
-      setActiveTool('pen'); // Default to pen when entering annotation mode
-    }
-  };
-
-  // Sync canvas with PDF on load and resize
+  // Initialize PDF when component mounts
   useEffect(() => {
-    if (pdfLoaded) {
-      const timer = setTimeout(initializeCanvas, 100);
-      return () => clearTimeout(timer);
-    }
-  }, [pdfLoaded, initializeCanvas]);
+    loadSavedWork();
+    loadPDF();
+  }, [loadPDF]);
 
-  // Re-initialize canvas when scale changes
+  // Re-render page when scale changes
   useEffect(() => {
-    if (pdfLoaded) {
-      const timer = setTimeout(initializeCanvas, 100);
-      return () => clearTimeout(timer);
+    if (pdfLoaded && pdfDocRef.current) {
+      renderPage(currentPage);
     }
-  }, [scale, pdfLoaded, initializeCanvas]);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setTimeout(initializeCanvas, 100);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [initializeCanvas]);
+  }, [scale, currentPage, pdfLoaded, renderPage]);
 
   // Redraw annotations when they change
   useEffect(() => {
-    redrawAnnotations();
-  }, [annotations, redrawAnnotations]);
-
-  // Listen for PDF scroll events to update annotation positions
-  useEffect(() => {
-    const iframe = pdfViewerRef.current;
-    if (!iframe) return;
-
-    const handleIframeLoad = () => {
-      try {
-        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-        if (iframeDoc) {
-          const handleScroll = () => {
-            // Redraw annotations when PDF scrolls
-            setTimeout(redrawAnnotations, 10);
-          };
-          
-          iframeDoc.addEventListener('scroll', handleScroll);
-          iframeDoc.addEventListener('wheel', handleScroll);
-          
-          return () => {
-            iframeDoc.removeEventListener('scroll', handleScroll);
-            iframeDoc.removeEventListener('wheel', handleScroll);
-          };
-        }
-      } catch (e) {
-        // Cross-origin, can't access iframe events
-        console.log('Cannot access iframe events due to cross-origin');
-      }
-    };
-
-    // Listen for iframe load
-    iframe.addEventListener('load', handleIframeLoad);
-    
-    // Try to set up listener if already loaded
-    if (iframe.contentDocument) {
-      handleIframeLoad();
+    if (pdfLoaded) {
+      redrawAnnotationsForPage(currentPage);
     }
-
-    return () => {
-      iframe.removeEventListener('load', handleIframeLoad);
-    };
-  }, [pdfLoaded, redrawAnnotations]);
+  }, [annotations, currentPage, pdfLoaded, redrawAnnotationsForPage]);
 
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
       {/* Header */}
-      <div className="bg-white border-b p-4 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-bold">PDF Annotation</h1>
-          <div className="text-sm text-gray-600">
-            Assignment ID: {assignmentId}
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-2">
+      <div className="bg-white border-b p-4 flex justify-between items-center">
+        <h1 className="text-xl font-semibold">PDF Annotation - Assignment {assignmentId}</h1>
+        <div className="flex gap-2">
           <Button
             onClick={saveWork}
             disabled={isSaving}
@@ -584,19 +494,9 @@ export function PDFAnnotatorPage() {
             <Send className="h-4 w-4 mr-2" />
             {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
           </Button>
-          <Button
-            onClick={() => window.close()}
-            variant="outline"
-          >
+          <Button onClick={() => window.close()} variant="outline">
             <X className="h-4 w-4 mr-2" />
             Close
-          </Button>
-          <Button
-            onClick={() => window.open('/student', '_blank')}
-            variant="outline"
-          >
-            <Home className="h-4 w-4 mr-2" />
-            Back to Portal
           </Button>
         </div>
       </div>
@@ -605,7 +505,6 @@ export function PDFAnnotatorPage() {
         {/* Toolbar */}
         <div className="w-64 bg-white border-r p-4 overflow-y-auto">
           <div className="space-y-6">
-
             {/* Mode Toggle */}
             <div>
               <Button
@@ -621,6 +520,20 @@ export function PDFAnnotatorPage() {
               </Button>
             </div>
 
+            {/* Page Navigation */}
+            <div>
+              <h3 className="font-medium mb-3">Navigation</h3>
+              <div className="flex items-center justify-between mb-2">
+                <Button onClick={prevPage} disabled={currentPage <= 1} size="sm" variant="outline">
+                  ←
+                </Button>
+                <span className="text-sm">Page {currentPage} of {totalPages}</span>
+                <Button onClick={nextPage} disabled={currentPage >= totalPages} size="sm" variant="outline">
+                  →
+                </Button>
+              </div>
+            </div>
+
             {/* Drawing Tools - Only show when in annotation mode */}
             {isAnnotationMode && (
               <div>
@@ -629,34 +542,34 @@ export function PDFAnnotatorPage() {
                   <Button
                     onClick={() => handleToolChange('pen')}
                     variant={activeTool === 'pen' ? 'default' : 'outline'}
-                    className={`w-full justify-start text-black ${activeTool === 'pen' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                    className={`w-full justify-start ${activeTool === 'pen' ? 'bg-blue-600 text-white' : ''}`}
                   >
                     <Pen className="h-4 w-4 mr-2" />
-                    <span className="font-medium">Pen</span>
+                    Pen
                   </Button>
                   <Button
                     onClick={() => handleToolChange('highlight')}
                     variant={activeTool === 'highlight' ? 'default' : 'outline'}
-                    className={`w-full justify-start text-black ${activeTool === 'highlight' ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                    className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-yellow-400 text-black' : ''}`}
                   >
                     <Highlighter className="h-4 w-4 mr-2" />
-                    <span className="font-medium">Highlight</span>
+                    Highlight
                   </Button>
                   <Button
                     onClick={() => handleToolChange('eraser')}
                     variant={activeTool === 'eraser' ? 'default' : 'outline'}
-                    className={`w-full justify-start text-black ${activeTool === 'eraser' ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                    className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-red-600 text-white' : ''}`}
                   >
                     <Eraser className="h-4 w-4 mr-2" />
-                    <span className="font-medium">Eraser</span>
+                    Eraser
                   </Button>
                   <Button
                     onClick={() => handleToolChange('text')}
                     variant={activeTool === 'text' ? 'default' : 'outline'}
-                    className={`w-full justify-start text-black ${activeTool === 'text' ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                    className={`w-full justify-start ${activeTool === 'text' ? 'bg-green-600 text-white' : ''}`}
                   >
                     <Type className="h-4 w-4 mr-2" />
-                    <span className="font-medium">Add Text</span>
+                    Add Text
                   </Button>
                 </div>
               </div>
@@ -666,11 +579,11 @@ export function PDFAnnotatorPage() {
             <div>
               <h3 className="font-medium mb-3">Zoom</h3>
               <div className="flex items-center gap-2 mb-2">
-                <Button onClick={zoomOut} size="sm" variant="outline">
+                <Button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} size="sm" variant="outline">
                   <ZoomOut className="h-4 w-4" />
                 </Button>
                 <span className="flex-1 text-center text-sm">{Math.round(scale * 100)}%</span>
-                <Button onClick={zoomIn} size="sm" variant="outline">
+                <Button onClick={() => setScale(s => Math.min(3, s + 0.2))} size="sm" variant="outline">
                   <ZoomIn className="h-4 w-4" />
                 </Button>
               </div>
@@ -680,13 +593,9 @@ export function PDFAnnotatorPage() {
             <div>
               <h3 className="font-medium mb-3">Actions</h3>
               <div className="space-y-2">
-                <Button onClick={clearCanvas} className="w-full justify-start" variant="outline">
+                <Button onClick={clearCurrentPage} className="w-full justify-start" variant="outline">
                   <RotateCcw className="h-4 w-4 mr-2" />
-                  Clear All
-                </Button>
-                <Button onClick={handleDownload} className="w-full justify-start" variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download PNG
+                  Clear Page
                 </Button>
               </div>
             </div>
@@ -694,36 +603,29 @@ export function PDFAnnotatorPage() {
         </div>
 
         {/* PDF Viewer */}
-        <div className="flex-1 relative bg-gray-200">
-          <iframe
-            ref={pdfViewerRef}
-            src={pdfUrl}
-            className="w-full h-full border-0 bg-white"
-            style={{ 
-              width: '100%',
-              height: '100%'
-            }}
-            onLoad={() => {
-              setPdfLoaded(true);
-              setTimeout(initializeCanvas, 300);
-            }}
-            title="PDF Document"
-          />
-          
-          {/* Single canvas overlay */}
-          <canvas
-            ref={canvasRef}
-            className="absolute top-0 left-0 w-full h-full"
-            style={{
-              cursor: isAnnotationMode ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
-              pointerEvents: isAnnotationMode ? 'auto' : 'none',
-              zIndex: isAnnotationMode ? 10 : 5
-            }}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-          />
+        <div className="flex-1 relative bg-gray-200 overflow-auto" ref={containerRef}>
+          <div className="relative inline-block">
+            {/* PDF Canvas */}
+            <canvas
+              ref={pdfCanvasRef}
+              className="block bg-white shadow-lg"
+            />
+            
+            {/* Annotation Canvas Overlay */}
+            <canvas
+              ref={annotationCanvasRef}
+              className="absolute top-0 left-0"
+              style={{
+                pointerEvents: isAnnotationMode ? 'auto' : 'none',
+                cursor: isAnnotationMode && activeTool ? 
+                  (activeTool === 'text' ? 'text' : 'crosshair') : 'default'
+              }}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+            />
+          </div>
         </div>
       </div>
 
@@ -731,11 +633,11 @@ export function PDFAnnotatorPage() {
       <div className="bg-white border-t p-2 text-sm text-gray-600 flex justify-between items-center">
         <div>
           Mode: {isAnnotationMode ? `Annotating (${activeTool?.toUpperCase()})` : 'Viewing'} | 
-          PDF Status: {pdfLoaded ? 'Loaded' : 'Loading...'}
+          PDF Status: {pdfLoaded ? `${currentPage}/${totalPages} pages` : 'Loading...'}
         </div>
         <div>
           {isAnnotationMode 
-            ? 'Draw on the PDF with your selected tool. Switch to View Mode to scroll freely.' 
+            ? 'Draw on the PDF with your selected tool. Use page navigation to move between pages.' 
             : 'Click "VIEW MODE" button to switch to Annotation Mode for drawing.'
           }
         </div>
