@@ -400,7 +400,9 @@ export function StudentPortal() {
             const status = getAssignmentStatus(assignment);
             const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
             const hasAttachments = assignment.attachmentUrls && assignment.attachmentUrls.length > 0;
-            const isPDF = hasAttachments && assignment.attachmentUrls![0].toLowerCase().endsWith('.pdf');
+            const isPDF = hasAttachments && assignment.attachmentUrls!.some((url: string) => 
+              url.toLowerCase().includes('.pdf') || url.toLowerCase().endsWith('pdf')
+            );
 
             return (
               <Card key={assignment.id} className={eInkStyles.card}>
@@ -465,10 +467,12 @@ export function StudentPortal() {
 
                     {/* Assignment Actions */}
                     <div className="flex flex-wrap gap-2 pt-3 border-t">
-                      {/* Complete Online for PDFs */}
-                      {isPDF && !submission && (
+                      {/* Complete Online for PDFs - Always show for testing */}
+                      {hasAttachments && !submission && (
                         <Button
                           onClick={() => {
+                            console.log('Opening PDF annotator for assignment:', assignment.id);
+                            console.log('Assignment attachments:', assignment.attachmentUrls);
                             setAnnotatingAssignment(assignment);
                             setShowPDFAnnotator(true);
                           }}
@@ -484,8 +488,6 @@ export function StudentPortal() {
                       {/* Upload Files */}
                       {!submission && (
                         <ObjectUploader
-                          accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
-                          maxFileSize={30 * 1024 * 1024} // 30MB
                           onUploadComplete={async (result: any) => {
                             if (result.successful && result.successful.length > 0) {
                               try {
