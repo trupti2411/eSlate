@@ -19,7 +19,8 @@ import {
   Download,
   Search,
   Filter,
-  GraduationCap
+  GraduationCap,
+  Paperclip
 } from "lucide-react";
 import { format } from "date-fns";
 import { type Submission } from "@shared/schema";
@@ -273,10 +274,69 @@ export default function SubmittedHomework() {
                                 <h3 className="font-semibold mb-3">Student Response</h3>
                                 <div className="bg-gray-50 p-4 rounded border min-h-[200px]">
                                   <p className="whitespace-pre-wrap text-gray-800 leading-relaxed">
-                                    {selectedSubmission.content || "No content provided"}
+                                    {selectedSubmission.content || "No text response provided"}
                                   </p>
                                 </div>
                               </div>
+
+                              {/* Uploaded Files */}
+                              {selectedSubmission.fileUrls && selectedSubmission.fileUrls.length > 0 && (
+                                <div className={`${eInkStyles.card} p-4`}>
+                                  <h3 className="font-semibold mb-3 flex items-center">
+                                    <Paperclip className="h-4 w-4 mr-2" />
+                                    Submitted Files ({selectedSubmission.fileUrls.length})
+                                  </h3>
+                                  <div className="space-y-2">
+                                    {selectedSubmission.fileUrls.map((fileUrl, index) => {
+                                      const filename = fileUrl.split('/').pop() || `file-${index + 1}`;
+                                      return (
+                                        <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded bg-gray-50">
+                                          <div className="flex items-center">
+                                            <FileText className="h-4 w-4 mr-2 text-blue-600" />
+                                            <span className="font-medium text-sm">{filename}</span>
+                                          </div>
+                                          <div className="flex gap-2">
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                const objectPath = fileUrl.includes('/uploads/') 
+                                                  ? fileUrl.split('/uploads/').pop()
+                                                  : fileUrl.split('/').pop();
+                                                window.open(`/objects/uploads/${objectPath}`, '_blank');
+                                              }}
+                                              className="text-xs"
+                                            >
+                                              <Eye className="h-3 w-3 mr-1" />
+                                              View
+                                            </Button>
+                                            <Button
+                                              size="sm"
+                                              variant="outline"
+                                              onClick={() => {
+                                                const objectPath = fileUrl.includes('/uploads/') 
+                                                  ? fileUrl.split('/uploads/').pop()
+                                                  : fileUrl.split('/').pop();
+                                                const link = document.createElement('a');
+                                                link.href = `/objects/uploads/${objectPath}`;
+                                                link.download = filename;
+                                                link.target = '_blank';
+                                                document.body.appendChild(link);
+                                                link.click();
+                                                document.body.removeChild(link);
+                                              }}
+                                              className="text-xs"
+                                            >
+                                              <Download className="h-3 w-3 mr-1" />
+                                              Download
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
                         </DialogContent>
