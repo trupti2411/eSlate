@@ -9,6 +9,7 @@ type Tool = 'pen' | 'eraser' | 'text' | 'highlight';
 
 export function PDFAnnotatorPage() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
+  const [isAnnotationMode, setIsAnnotationMode] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -414,7 +415,24 @@ export function PDFAnnotatorPage() {
 
   // Handle tool change
   const handleToolChange = (tool: Tool) => {
-    setActiveTool(tool);
+    if (!isAnnotationMode) {
+      // Switch to annotation mode and select tool
+      setIsAnnotationMode(true);
+      setActiveTool(tool);
+    } else {
+      // In annotation mode, just switch tools
+      setActiveTool(tool);
+    }
+  };
+
+  const toggleMode = () => {
+    const newMode = !isAnnotationMode;
+    setIsAnnotationMode(newMode);
+    if (!newMode) {
+      setActiveTool(null);
+    } else {
+      setActiveTool('pen'); // Default to pen when entering annotation mode
+    }
   };
 
   // Sync canvas with PDF on load and resize
@@ -499,44 +517,61 @@ export function PDFAnnotatorPage() {
         <div className="w-64 bg-white border-r p-4 overflow-y-auto">
           <div className="space-y-6">
 
-            {/* Drawing Tools */}
+            {/* Mode Toggle */}
             <div>
-              <h3 className="font-medium mb-3">Drawing Tools</h3>
-              <div className="space-y-2">
-                <Button
-                  onClick={() => handleToolChange('pen')}
-                  variant={activeTool === 'pen' ? 'default' : 'outline'}
-                  className={`w-full justify-start text-black ${activeTool === 'pen' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
-                >
-                  <Pen className="h-4 w-4 mr-2" />
-                  <span className="font-medium">Pen</span>
-                </Button>
-                <Button
-                  onClick={() => handleToolChange('highlight')}
-                  variant={activeTool === 'highlight' ? 'default' : 'outline'}
-                  className={`w-full justify-start text-black ${activeTool === 'highlight' ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
-                >
-                  <Highlighter className="h-4 w-4 mr-2" />
-                  <span className="font-medium">Highlight</span>
-                </Button>
-                <Button
-                  onClick={() => handleToolChange('eraser')}
-                  variant={activeTool === 'eraser' ? 'default' : 'outline'}
-                  className={`w-full justify-start text-black ${activeTool === 'eraser' ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
-                >
-                  <Eraser className="h-4 w-4 mr-2" />
-                  <span className="font-medium">Eraser</span>
-                </Button>
-                <Button
-                  onClick={() => handleToolChange('text')}
-                  variant={activeTool === 'text' ? 'default' : 'outline'}
-                  className={`w-full justify-start text-black ${activeTool === 'text' ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
-                >
-                  <Type className="h-4 w-4 mr-2" />
-                  <span className="font-medium">Add Text</span>
-                </Button>
-              </div>
+              <Button
+                onClick={toggleMode}
+                variant={isAnnotationMode ? 'default' : 'outline'}
+                className={`w-full justify-center mb-6 text-sm font-medium ${
+                  isAnnotationMode 
+                    ? 'bg-blue-600 text-white border-blue-600' 
+                    : 'bg-white border-gray-300 hover:bg-gray-50 text-black'
+                }`}
+              >
+                {isAnnotationMode ? '✏️ ANNOTATION MODE' : '👀 VIEW MODE (Click to Annotate)'}
+              </Button>
             </div>
+
+            {/* Drawing Tools - Only show when in annotation mode */}
+            {isAnnotationMode && (
+              <div>
+                <h3 className="font-medium mb-3">Drawing Tools</h3>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => handleToolChange('pen')}
+                    variant={activeTool === 'pen' ? 'default' : 'outline'}
+                    className={`w-full justify-start text-black ${activeTool === 'pen' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    <Pen className="h-4 w-4 mr-2" />
+                    <span className="font-medium">Pen</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleToolChange('highlight')}
+                    variant={activeTool === 'highlight' ? 'default' : 'outline'}
+                    className={`w-full justify-start text-black ${activeTool === 'highlight' ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    <Highlighter className="h-4 w-4 mr-2" />
+                    <span className="font-medium">Highlight</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleToolChange('eraser')}
+                    variant={activeTool === 'eraser' ? 'default' : 'outline'}
+                    className={`w-full justify-start text-black ${activeTool === 'eraser' ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    <Eraser className="h-4 w-4 mr-2" />
+                    <span className="font-medium">Eraser</span>
+                  </Button>
+                  <Button
+                    onClick={() => handleToolChange('text')}
+                    variant={activeTool === 'text' ? 'default' : 'outline'}
+                    className={`w-full justify-start text-black ${activeTool === 'text' ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
+                  >
+                    <Type className="h-4 w-4 mr-2" />
+                    <span className="font-medium">Add Text</span>
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Zoom Controls */}
             <div>
@@ -591,9 +626,9 @@ export function PDFAnnotatorPage() {
             ref={canvasRef}
             className="absolute top-0 left-0 w-full h-full"
             style={{
-              cursor: activeTool ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
-              pointerEvents: activeTool ? 'auto' : 'none',
-              zIndex: activeTool ? 10 : 5
+              cursor: isAnnotationMode ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
+              pointerEvents: isAnnotationMode ? 'auto' : 'none',
+              zIndex: isAnnotationMode ? 10 : 5
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
@@ -606,11 +641,14 @@ export function PDFAnnotatorPage() {
       {/* Status Bar */}
       <div className="bg-white border-t p-2 text-sm text-gray-600 flex justify-between items-center">
         <div>
-          Current Tool: {activeTool ? activeTool.charAt(0).toUpperCase() + activeTool.slice(1) : 'None'} | 
+          Mode: {isAnnotationMode ? `Annotating (${activeTool?.toUpperCase()})` : 'Viewing'} | 
           PDF Status: {pdfLoaded ? 'Loaded' : 'Loading...'}
         </div>
         <div>
-          Tip: Select a drawing tool to annotate, scroll naturally to navigate the PDF
+          {isAnnotationMode 
+            ? 'Draw on the PDF with your selected tool. Switch to View Mode to scroll freely.' 
+            : 'Click "VIEW MODE" button to switch to Annotation Mode for drawing.'
+          }
         </div>
       </div>
     </div>
