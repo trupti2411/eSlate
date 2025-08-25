@@ -226,22 +226,56 @@ export function AssignmentCompletionArea({
                 </div>
               )}
 
-              <Button
-                onClick={() => {
-                  // Open the editor directly without intermediate dialog
-                  if (attachmentUrls.length > 0) {
-                    const objectPath = attachmentUrls[0].includes('/uploads/') 
-                      ? attachmentUrls[0].split('/uploads/').pop()
-                      : attachmentUrls[0].split('/').pop();
-                    window.open(`/objects/uploads/${objectPath}?edit=true`, '_blank');
-                  }
-                }}
-                className={`${eInkStyles.primaryButton} w-full`}
-                disabled={submission?.status === 'submitted' || attachmentUrls.length === 0}
-              >
-                <PenTool className="h-4 w-4 mr-2" />
-                Start Online Completion
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    // Open the editor directly without intermediate dialog
+                    if (attachmentUrls.length > 0) {
+                      const objectPath = attachmentUrls[0].includes('/uploads/') 
+                        ? attachmentUrls[0].split('/uploads/').pop()
+                        : attachmentUrls[0].split('/').pop();
+                      window.open(`/objects/uploads/${objectPath}?edit=true`, '_blank');
+                    }
+                  }}
+                  className={`${eInkStyles.primaryButton} flex-1`}
+                  disabled={submission?.status === 'submitted' || attachmentUrls.length === 0}
+                >
+                  <PenTool className="h-4 w-4 mr-2" />
+                  Complete Online
+                </Button>
+                
+                <Button
+                  onClick={() => {
+                    // Download all assignment files
+                    attachmentUrls.forEach((url, index) => {
+                      const metadata = fileMetadata?.[index];
+                      const filename = getDisplayFilename(url, metadata, index);
+                      const objectPath = url.includes('/uploads/') 
+                        ? url.split('/uploads/').pop()
+                        : url.split('/').pop();
+                      
+                      const link = document.createElement('a');
+                      link.href = `/objects/uploads/${objectPath}`;
+                      link.download = filename;
+                      link.target = '_blank';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      
+                      // Add small delay between downloads to prevent browser blocking
+                      if (index < attachmentUrls.length - 1) {
+                        setTimeout(() => {}, 100);
+                      }
+                    });
+                  }}
+                  className={`${eInkStyles.button} flex-shrink-0`}
+                  disabled={submission?.status === 'submitted' || attachmentUrls.length === 0}
+                  data-testid="button-download-assignment"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download Assignment
+                </Button>
+              </div>
             </div>
 
             {/* Option 2: Complete Offline */}
