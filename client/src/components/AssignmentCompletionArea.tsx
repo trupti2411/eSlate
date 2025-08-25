@@ -17,6 +17,83 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 
+// Component to display submitted files with original filenames
+function SubmittedFilesDisplay({ fileUrls, eInkStyles }: { fileUrls: string[]; eInkStyles: any }) {
+  const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(fileUrls);
+
+  return (
+    <div className="mt-4">
+      <Label className="text-sm font-medium mb-2 block">Previously Uploaded Files ({fileUrls.length}):</Label>
+      {isLoadingMetadata ? (
+        <div className="text-center py-4">
+          <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-xs text-gray-600 mt-2">Loading file information...</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {fileUrls.map((url, index) => {
+            const metadata = fileMetadata?.[index];
+            const displayFilename = getDisplayFilename(url, metadata, index);
+            const fileExtension = displayFilename.split('.').pop()?.toLowerCase();
+            
+            return (
+              <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded bg-gray-50">
+                <div className="flex items-center">
+                  <FileText className="h-4 w-4 mr-2 text-blue-600" />
+                  <div className="flex flex-col">
+                    <span className="text-sm font-medium">{displayFilename}</span>
+                    {fileExtension && (
+                      <span className="text-xs text-gray-500">
+                        {fileExtension.toUpperCase()} File
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const objectPath = url.includes('/uploads/') 
+                        ? url.split('/uploads/').pop()
+                        : url.split('/').pop();
+                      window.open(`/objects/uploads/${objectPath}`, '_blank');
+                    }}
+                    className="text-xs"
+                  >
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const objectPath = url.includes('/uploads/') 
+                        ? url.split('/uploads/').pop()
+                        : url.split('/').pop();
+                      const link = document.createElement('a');
+                      link.href = `/objects/uploads/${objectPath}`;
+                      link.download = displayFilename;
+                      link.target = '_blank';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="text-xs"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface AssignmentCompletionAreaProps {
   assignment: Assignment;
   submission?: Submission | null;
@@ -409,28 +486,7 @@ export function AssignmentCompletionArea({
 
               {/* Show existing submission files if any */}
               {submission?.fileUrls && submission.fileUrls.length > 0 && (
-                <div className="mt-4">
-                  <Label className="text-sm font-medium mb-2 block">Previously Uploaded Files:</Label>
-                  <div className="space-y-2">
-                    {submission.fileUrls.map((url, index) => (
-                      <div key={index} className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2" />
-                          <span className="text-sm">File {index + 1}</span>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => window.open(url, '_blank')}
-                          className="text-xs"
-                        >
-                          <Eye className="h-3 w-3 mr-1" />
-                          View
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                <SubmittedFilesDisplay fileUrls={submission.fileUrls} eInkStyles={eInkStyles} />
               )}
             </div>
           </div>
