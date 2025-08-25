@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { type Assignment, type Submission } from "@shared/schema";
+import { PDFAnnotator } from "./PDFAnnotator";
 import { 
   FileText, 
   Download, 
@@ -16,6 +17,9 @@ import {
   Monitor
 } from "lucide-react";
 import { format } from "date-fns";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 // Component to display submitted files with original filenames
 function SubmittedFilesDisplay({ fileUrls, eInkStyles }: { fileUrls: string[]; eInkStyles: any }) {
@@ -106,10 +110,44 @@ export function AssignmentCompletionArea({
   onSubmissionUpdate 
 }: AssignmentCompletionAreaProps) {
   const [activeTab, setActiveTab] = useState("assignment");
+  const [isPDFAnnotatorOpen, setIsPDFAnnotatorOpen] = useState(false);
+  const [selectedPDFUrl, setSelectedPDFUrl] = useState<string>("");
+  
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch metadata for assignment files
   const attachmentUrls = assignment.attachmentUrls || [];
   const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(attachmentUrls);
+
+  // Submit assignment mutation
+  const submitAssignmentMutation = useMutation({
+    mutationFn: async (fileUrl: string) => {
+      return apiRequest('/api/submissions', 'POST', {
+        assignmentId: assignment.id,
+        fileUrls: [fileUrl],
+        textResponse: "",
+        submittedAt: new Date().toISOString(),
+        status: 'submitted'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+      onSubmissionUpdate();
+      toast({
+        title: "Assignment Submitted",
+        description: "Your annotated assignment has been submitted successfully.",
+      });
+    },
+    onError: (error) => {
+      console.error('Submission error:', error);
+      toast({
+        title: "Submission Failed",
+        description: "Failed to submit your assignment. Please try again.",
+        variant: "destructive",
+      });
+    }
+  });
 
 
 
@@ -307,12 +345,16 @@ export function AssignmentCompletionArea({
               <div className="flex gap-2">
                 <Button
                   onClick={() => {
-                    // Open the editor directly without intermediate dialog
                     if (attachmentUrls.length > 0) {
-                      const objectPath = attachmentUrls[0].includes('/uploads/') 
-                        ? attachmentUrls[0].split('/uploads/').pop()
-                        : attachmentUrls[0].split('/').pop();
-                      window.open(`/objects/uploads/${objectPath}?edit=true`, '_blank');
+                      // Convert URL to accessible format for PDFAnnotator
+                      const url = attachmentUrls[0];
+                      const objectPath = url.includes('/uploads/') 
+                        ? url.split('/uploads/').pop()
+                        : url.split('/').pop();
+                      const pdfUrl = `/objects/uploads/${objectPath}`;
+                      
+                      setSelectedPDFUrl(pdfUrl);
+                      setIsPDFAnnotatorOpen(true);
                     }
                   }}
                   className={`${eInkStyles.primaryButton} flex-1`}
@@ -520,6 +562,28 @@ export function AssignmentCompletionArea({
           </div>
         </TabsContent>
       </Tabs>
+
+      {/* PDF Annotator Modal */}
+      {isPDFAnnotatorOpen && selectedPDFUrl && (
+        <PDFAnnotator
+          pdfUrl={selectedPDFUrl}
+          assignmentId={assignment.id}
+          onSave={async (annotatedFileUrl: string) => {
+            try {
+              await submitAssignmentMutation.mutateAsync(annotatedFileUrl);
+              setIsPDFAnnotatorOpen(false);
+              setSelectedPDFUrl("");
+            } catch (error) {
+              // Error is handled in the mutation
+              console.error('Save failed:', error);
+            }
+          }}
+          onClose={() => {
+            setIsPDFAnnotatorOpen(false);
+            setSelectedPDFUrl("");
+          }}
+        />
+      )}
     </div>
   );
 }
