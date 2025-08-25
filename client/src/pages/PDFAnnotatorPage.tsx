@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { Save, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download, ZoomIn, ZoomOut, Home } from 'lucide-react';
+import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download, ZoomIn, ZoomOut, Home } from 'lucide-react';
 
 type Tool = 'pen' | 'eraser' | 'text' | 'highlight';
 
@@ -11,8 +11,10 @@ export function PDFAnnotatorPage() {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
   const [scale, setScale] = useState(1);
+  const [annotations, setAnnotations] = useState<any[]>([]);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -59,7 +61,7 @@ export function PDFAnnotatorPage() {
     }
   });
 
-  // Initialize canvas with proper sizing to match PDF exactly
+  // Initialize canvas with proper sizing and load saved work
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current || !pdfViewerRef.current) return;
 
@@ -68,24 +70,26 @@ export function PDFAnnotatorPage() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas dimensions to match iframe exactly
-    const rect = iframe.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = rect.height;
+    // Set canvas to cover the entire PDF area (larger than viewport)
+    canvas.width = 1200; // Fixed width for PDF pages
+    canvas.height = 1600; // Fixed height for PDF pages
     
-    // Ensure canvas overlays perfectly on iframe
-    canvas.style.width = rect.width + 'px';
-    canvas.style.height = rect.height + 'px';
+    // Style canvas to overlay properly
+    canvas.style.width = '100%';
+    canvas.style.height = '100%';
     
     // Configure context for high-quality drawing
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalAlpha = 1.0;
     
-    console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
+    // Load saved annotations
+    loadSavedWork();
+    
+    console.log('Canvas initialized with fixed dimensions for PDF sync');
   }, []);
 
-  // Get coordinate relative to PDF content - fixed for proper synchronization
+  // Get coordinate relative to PDF content - properly synchronized
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !pdfContainerRef.current) return { x: 0, y: 0 };
     
@@ -93,15 +97,15 @@ export function PDFAnnotatorPage() {
     const container = pdfContainerRef.current;
     const rect = canvas.getBoundingClientRect();
     
-    // Get mouse position relative to canvas viewport
+    // Get mouse position relative to canvas
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    // Convert to canvas coordinate space and account for container scroll
-    return {
-      x: (x + container.scrollLeft) * (canvas.width / rect.width),
-      y: (y + container.scrollTop) * (canvas.height / rect.height)
-    };
+    // Convert to actual canvas coordinates (accounting for CSS scaling)
+    const canvasX = (x / rect.width) * canvas.width;
+    const canvasY = (y / rect.height) * canvas.height;
+    
+    return { x: canvasX, y: canvasY };
   };
 
   // Drawing functions with proper coordinate handling
@@ -182,6 +186,55 @@ export function PDFAnnotatorPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
+  // Save work to localStorage
+  const saveWork = async () => {
+    if (!canvasRef.current || isSaving) return;
+
+    setIsSaving(true);
+    try {
+      const canvas = canvasRef.current;
+      const dataURL = canvas.toDataURL('image/png');
+      
+      // Save to localStorage with assignment ID
+      const saveKey = `pdf-annotation-${assignmentId}`;
+      localStorage.setItem(saveKey, dataURL);
+      
+      toast({
+        title: "Work Saved",
+        description: "Your annotations have been saved locally. You can continue working later.",
+      });
+    } catch (error) {
+      console.error('Save error:', error);
+      toast({
+        title: "Save Failed",
+        description: "Failed to save your work locally.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Load saved work from localStorage
+  const loadSavedWork = () => {
+    if (!canvasRef.current || !assignmentId) return;
+
+    const saveKey = `pdf-annotation-${assignmentId}`;
+    const savedData = localStorage.getItem(saveKey);
+    
+    if (savedData) {
+      const img = new Image();
+      img.onload = () => {
+        const ctx = canvasRef.current?.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          console.log('Loaded saved annotations');
+        }
+      };
+      img.src = savedData;
+    }
+  };
+
   const handleDownload = () => {
     if (!canvasRef.current) return;
     
@@ -194,12 +247,12 @@ export function PDFAnnotatorPage() {
   const zoomIn = () => setScale(prev => Math.min(prev * 1.2, 3));
   const zoomOut = () => setScale(prev => Math.max(prev / 1.2, 0.5));
 
-  // Save annotated work with proper error handling
-  const handleSave = async () => {
-    if (!canvasRef.current || isSaving) return;
+  // Submit assignment (separate from save)
+  const handleSubmit = async () => {
+    if (!canvasRef.current || isSubmitting) return;
 
-    setIsSaving(true);
-    console.log('Starting save process...');
+    setIsSubmitting(true);
+    console.log('Starting submission process...');
     
     try {
       const canvas = canvasRef.current;
@@ -220,8 +273,8 @@ export function PDFAnnotatorPage() {
 
       if (!hasContent) {
         toast({
-          title: "No Annotations Found",
-          description: "Please add some annotations before saving your work.",
+          title: "No Work to Submit",
+          description: "Please add some annotations before submitting your assignment.",
           variant: "destructive",
         });
         return;
@@ -235,18 +288,18 @@ export function PDFAnnotatorPage() {
         }, 'image/png', 1.0);
       });
 
-      console.log('Canvas blob created:', blob.size, 'bytes');
+      console.log('Canvas blob created for submission:', blob.size, 'bytes');
 
       // Create FormData for upload
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const file = new File([blob], `annotated-assignment-${assignmentId}-${timestamp}.png`, { 
+      const file = new File([blob], `submitted-assignment-${assignmentId}-${timestamp}.png`, { 
         type: 'image/png' 
       });
 
       const formData = new FormData();
       formData.append('file', file);
 
-      console.log('Uploading file:', file.name);
+      console.log('Uploading final submission:', file.name);
       
       const response = await fetch('/api/objects/upload', {
         method: 'POST',
@@ -271,15 +324,19 @@ export function PDFAnnotatorPage() {
       
       await submitAssignmentMutation.mutateAsync(cleanUrl);
 
+      // Clear saved work after successful submission
+      const saveKey = `pdf-annotation-${assignmentId}`;
+      localStorage.removeItem(saveKey);
+
     } catch (error) {
-      console.error('Save error:', error);
+      console.error('Submission error:', error);
       toast({
-        title: "Save Failed",
-        description: `There was an error saving your work: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        title: "Submission Failed",
+        description: `There was an error submitting your assignment: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive",
       });
     } finally {
-      setIsSaving(false);
+      setIsSubmitting(false);
     }
   };
 
@@ -331,12 +388,21 @@ export function PDFAnnotatorPage() {
         
         <div className="flex items-center gap-2">
           <Button
-            onClick={handleSave}
+            onClick={saveWork}
             disabled={isSaving}
-            className="bg-green-600 hover:bg-green-700 text-white"
+            variant="outline"
+            className="border-blue-600 text-blue-600 hover:bg-blue-50"
           >
             <Save className="h-4 w-4 mr-2" />
-            {isSaving ? 'Saving...' : 'Save & Submit'}
+            {isSaving ? 'Saving...' : 'Save Work'}
+          </Button>
+          <Button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="bg-green-600 hover:bg-green-700 text-white"
+          >
+            <Send className="h-4 w-4 mr-2" />
+            {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
           </Button>
           <Button
             onClick={() => window.close()}
@@ -474,7 +540,8 @@ export function PDFAnnotatorPage() {
                   pointerEvents: activeTool ? 'auto' : 'none',
                   zIndex: activeTool ? 10 : 1,
                   width: '100%',
-                  height: '100%'
+                  height: '100%',
+                  imageRendering: 'pixelated'
                 }}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
