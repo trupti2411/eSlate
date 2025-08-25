@@ -21,10 +21,15 @@ export function PDFAnnotatorPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Get URL parameters
+  // Get URL parameters and construct proper PDF URL
   const urlParams = new URLSearchParams(window.location.search);
-  const pdfUrl = urlParams.get('pdf') || '';
+  const rawPdfUrl = urlParams.get('pdf') || '';
   const assignmentId = urlParams.get('assignmentId') || '';
+  
+  // Ensure PDF URL is properly constructed
+  const pdfUrl = rawPdfUrl.startsWith('/') ? rawPdfUrl : `/${rawPdfUrl}`;
+  
+  console.log('PDF Annotator initialized:', { pdfUrl, assignmentId });
 
   // Submit assignment mutation
   const submitAssignmentMutation = useMutation({
@@ -54,31 +59,33 @@ export function PDFAnnotatorPage() {
     }
   });
 
-  // Initialize canvas with proper sizing and scrolling sync
+  // Initialize canvas with proper sizing to match PDF exactly
   const initializeCanvas = useCallback(() => {
-    if (!canvasRef.current || !pdfContainerRef.current) return;
+    if (!canvasRef.current || !pdfViewerRef.current) return;
 
     const canvas = canvasRef.current;
-    const container = pdfContainerRef.current;
+    const iframe = pdfViewerRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to match the PDF container
-    const rect = container.getBoundingClientRect();
-    canvas.width = container.scrollWidth;
-    canvas.height = container.scrollHeight;
+    // Set canvas dimensions to match iframe exactly
+    const rect = iframe.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
     
-    // Position canvas to overlay perfectly on PDF
-    canvas.style.width = container.scrollWidth + 'px';
-    canvas.style.height = container.scrollHeight + 'px';
+    // Ensure canvas overlays perfectly on iframe
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
     
     // Configure context for high-quality drawing
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalAlpha = 1.0;
+    
+    console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
   }, []);
 
-  // Get coordinate relative to PDF content accounting for scroll
+  // Get coordinate relative to PDF content - fixed for proper synchronization
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !pdfContainerRef.current) return { x: 0, y: 0 };
     
@@ -86,17 +93,14 @@ export function PDFAnnotatorPage() {
     const container = pdfContainerRef.current;
     const rect = canvas.getBoundingClientRect();
     
-    // Get mouse position relative to canvas
-    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+    // Get mouse position relative to canvas viewport
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    // Account for container scroll position
-    const scrollX = container.scrollLeft;
-    const scrollY = container.scrollTop;
-    
+    // Convert to canvas coordinate space and account for container scroll
     return {
-      x: x + scrollX,
-      y: y + scrollY
+      x: (x + container.scrollLeft) * (canvas.width / rect.width),
+      y: (y + container.scrollTop) * (canvas.height / rect.height)
     };
   };
 
@@ -360,9 +364,11 @@ export function PDFAnnotatorPage() {
               <h3 className="font-medium mb-3">Mode</h3>
               <Button
                 onClick={() => setActiveTool(null)}
-                className={`w-full justify-start ${activeTool === null ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+                variant={activeTool === null ? 'default' : 'outline'}
+                className={`w-full justify-start text-black ${activeTool === null ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
               >
-                📄 Navigate PDF
+                <span className="mr-2">📄</span>
+                <span className="font-medium">Navigate PDF</span>
               </Button>
             </div>
 
@@ -372,31 +378,35 @@ export function PDFAnnotatorPage() {
               <div className="space-y-2">
                 <Button
                   onClick={() => handleToolChange('pen')}
-                  className={`w-full justify-start ${activeTool === 'pen' ? 'bg-blue-600 text-white' : 'bg-gray-100'}`}
+                  variant={activeTool === 'pen' ? 'default' : 'outline'}
+                  className={`w-full justify-start text-black ${activeTool === 'pen' ? 'bg-blue-600 text-white border-blue-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
                 >
                   <Pen className="h-4 w-4 mr-2" />
-                  Pen
+                  <span className="font-medium">Pen</span>
                 </Button>
                 <Button
                   onClick={() => handleToolChange('highlight')}
-                  className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-yellow-400 text-black' : 'bg-gray-100'}`}
+                  variant={activeTool === 'highlight' ? 'default' : 'outline'}
+                  className={`w-full justify-start text-black ${activeTool === 'highlight' ? 'bg-yellow-400 text-black border-yellow-400' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
                 >
                   <Highlighter className="h-4 w-4 mr-2" />
-                  Highlight
+                  <span className="font-medium">Highlight</span>
                 </Button>
                 <Button
                   onClick={() => handleToolChange('eraser')}
-                  className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-red-600 text-white' : 'bg-gray-100'}`}
+                  variant={activeTool === 'eraser' ? 'default' : 'outline'}
+                  className={`w-full justify-start text-black ${activeTool === 'eraser' ? 'bg-red-600 text-white border-red-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
                 >
                   <Eraser className="h-4 w-4 mr-2" />
-                  Eraser
+                  <span className="font-medium">Eraser</span>
                 </Button>
                 <Button
                   onClick={() => handleToolChange('text')}
-                  className={`w-full justify-start ${activeTool === 'text' ? 'bg-green-600 text-white' : 'bg-gray-100'}`}
+                  variant={activeTool === 'text' ? 'default' : 'outline'}
+                  className={`w-full justify-start text-black ${activeTool === 'text' ? 'bg-green-600 text-white border-green-600' : 'bg-white border-gray-300 hover:bg-gray-50'}`}
                 >
                   <Type className="h-4 w-4 mr-2" />
-                  Add Text
+                  <span className="font-medium">Add Text</span>
                 </Button>
               </div>
             </div>
@@ -433,38 +443,45 @@ export function PDFAnnotatorPage() {
         </div>
 
         {/* PDF Viewer */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative bg-gray-200">
           <div 
             ref={pdfContainerRef}
-            className="relative w-full h-full overflow-auto bg-gray-50"
-            style={{ transform: `scale(${scale})`, transformOrigin: '0 0' }}
+            className="relative w-full h-full overflow-auto"
           >
-            <iframe
-              ref={pdfViewerRef}
-              src={pdfUrl}
-              className="w-full h-full border-0 block"
-              style={{ minHeight: '100vh' }}
-              onLoad={() => {
-                setPdfLoaded(true);
-                setTimeout(initializeCanvas, 200);
-              }}
-            />
-            
-            <canvas
-              ref={canvasRef}
-              className="absolute top-0 left-0 pointer-events-auto"
-              style={{
-                cursor: activeTool === 'text' ? 'text' : 
-                       activeTool === 'eraser' ? 'grab' : 
-                       activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                pointerEvents: activeTool ? 'auto' : 'none',
-                zIndex: activeTool ? 10 : 1
-              }}
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-            />
+            <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: '0 0' }}>
+              <iframe
+                ref={pdfViewerRef}
+                src={pdfUrl}
+                className="w-full border-0 block bg-white"
+                style={{ 
+                  height: '100vh',
+                  minHeight: '800px'
+                }}
+                onLoad={() => {
+                  setPdfLoaded(true);
+                  setTimeout(initializeCanvas, 300);
+                }}
+                title="PDF Document"
+              />
+              
+              <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 pointer-events-auto"
+                style={{
+                  cursor: activeTool === 'text' ? 'text' : 
+                         activeTool === 'eraser' ? 'crosshair' : 
+                         activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
+                  pointerEvents: activeTool ? 'auto' : 'none',
+                  zIndex: activeTool ? 10 : 1,
+                  width: '100%',
+                  height: '100%'
+                }}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
+            </div>
           </div>
         </div>
       </div>
