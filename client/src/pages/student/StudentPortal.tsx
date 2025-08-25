@@ -16,7 +16,7 @@ import { useFileMetadata } from '@/hooks/useFileMetadata';
 import { PDFAnnotator } from '@/components/PDFAnnotator';
 
 function UploadedFilesList({ fileUrls, className }: { fileUrls: string[], className?: string }) {
-  const { data: fileMetadata, isLoading, error } = useFileMetadata(fileUrls);
+  const { data: fileMetadata, isLoading, error } = useFileMetadata(fileUrls[0] || '');
 
   if (isLoading) {
     return (
@@ -74,7 +74,7 @@ function UploadedFilesList({ fileUrls, className }: { fileUrls: string[], classN
       <h4 className="font-medium text-sm">Uploaded Files:</h4>
       <div className="space-y-1">
         {fileUrls.map((url, index) => {
-          const metadata = fileMetadata[url];
+          const metadata = fileMetadata as any;
           const fileName = metadata?.originalFileName || `File ${index + 1}`;
           
           return (
@@ -125,7 +125,7 @@ export function StudentPortal() {
     enabled: !!user && user.role === 'student'
   });
 
-  const studentDbId = studentProfile?.id || '';
+  const studentDbId = (studentProfile as any)?.id || '';
 
   // Query for student terms
   const { data: studentTerms = [], isLoading: isLoadingTerms } = useQuery({
@@ -422,10 +422,10 @@ export function StudentPortal() {
                         <span className="font-medium">Due:</span> {format(new Date(assignment.submissionDate), 'MMM dd, yyyy h:mm a')}
                       </div>
                       <div>
-                        <span className="font-medium">Type:</span> {assignment.submissionType}
+                        <span className="font-medium">Type:</span> File Upload
                       </div>
                       <div>
-                        <span className="font-medium">Max Score:</span> {assignment.maxScore || 'Not specified'}
+                        <span className="font-medium">Points:</span> Not specified
                       </div>
                     </div>
 
@@ -484,10 +484,9 @@ export function StudentPortal() {
                       {/* Upload Files */}
                       {!submission && (
                         <ObjectUploader
-                          multiple={true}
                           accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg"
                           maxFileSize={30 * 1024 * 1024} // 30MB
-                          onUploadComplete={async (result) => {
+                          onUploadComplete={async (result: any) => {
                             if (result.successful && result.successful.length > 0) {
                               try {
                                 // Set original filename metadata for each uploaded file
@@ -515,7 +514,7 @@ export function StudentPortal() {
                                 });
                                 
                                 // Get existing file URLs from the current submission
-                                const existingFileUrls = submission?.fileUrls || [];
+                                const existingFileUrls: string[] = [];
                                 
                                 // Merge existing and new files
                                 const allFileUrls = [...existingFileUrls, ...newFileUrls];
