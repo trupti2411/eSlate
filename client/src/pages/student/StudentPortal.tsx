@@ -395,6 +395,39 @@ export function StudentPortal() {
                             {submission ? 'View & Edit' : 'Complete Online'}
                           </Button>
                         </DialogTrigger>
+                        
+                        {/* Download Assignment Button */}
+                        {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
+                          <Button 
+                            className={eInkStyles.button}
+                            onClick={() => {
+                              // Download all assignment files
+                              assignment.attachmentUrls!.forEach((url, index) => {
+                                const filename = url.split('/').pop() || `assignment-file-${index + 1}`;
+                                const objectPath = url.includes('/uploads/') 
+                                  ? url.split('/uploads/').pop()
+                                  : url.split('/').pop();
+                                
+                                const link = document.createElement('a');
+                                link.href = `/objects/uploads/${objectPath}`;
+                                link.download = filename;
+                                link.target = '_blank';
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                                
+                                // Add small delay between downloads
+                                if (index < assignment.attachmentUrls!.length - 1) {
+                                  setTimeout(() => {}, 100);
+                                }
+                              });
+                            }}
+                            data-testid="button-download-assignment"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download Assignment
+                          </Button>
+                        )}
                         <DialogContent className="max-w-4xl max-h-[80vh] bg-white border-2 border-black">
                           <DialogHeader>
                             <DialogTitle className="text-xl">{assignment.title}</DialogTitle>
