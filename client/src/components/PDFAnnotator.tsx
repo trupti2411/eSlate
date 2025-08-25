@@ -1,6 +1,4 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
-import { PDFDocument } from 'pdf-lib';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -21,9 +19,6 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 
-// Configure PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-
 interface PDFAnnotatorProps {
   pdfUrl: string;
   assignmentId: string;
@@ -34,14 +29,14 @@ interface PDFAnnotatorProps {
 type Tool = 'pen' | 'eraser' | 'text' | 'highlight' | 'circle' | 'rectangle' | 'line';
 
 export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnotatorProps) {
-  const [numPages, setNumPages] = useState<number>(0);
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.2);
+  const [scale, setScale] = useState<number>(1.0);
   const [activeTool, setActiveTool] = useState<Tool>('pen');
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [pdfLoaded, setPdfLoaded] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const pdfViewerRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
@@ -53,12 +48,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     toolbar: "bg-white border-2 border-black p-4 space-x-2",
   };
 
-  // Initialize canvas when PDF loads
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
-    setTimeout(initializeCanvas, 500);
-  };
-
+  // Initialize canvas
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current) return;
 
@@ -66,7 +56,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
+    // Set canvas size to match PDF viewer
     canvas.width = 800 * scale;
     canvas.height = 1100 * scale;
     
@@ -75,11 +65,17 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 3;
+    
+    // Make canvas transparent
+    ctx.globalAlpha = 1.0;
   }, [scale]);
 
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (activeTool === 'text') return; // Text handled separately
+    if (activeTool === 'text') {
+      addTextAtPosition(e);
+      return;
+    }
     
     setIsDrawing(true);
     const canvas = canvasRef.current;
@@ -87,8 +83,8 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     if (!canvas || !ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -98,16 +94,16 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
       case 'pen':
         ctx.globalCompositeOperation = 'source-over';
         ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 3 * scale;
         break;
       case 'highlight':
         ctx.globalCompositeOperation = 'multiply';
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.3)';
-        ctx.lineWidth = 20;
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+        ctx.lineWidth = 20 * scale;
         break;
       case 'eraser':
         ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = 20;
+        ctx.lineWidth = 20 * scale;
         break;
     }
   };
@@ -120,8 +116,8 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     if (!canvas || !ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
     ctx.lineTo(x, y);
     ctx.stroke();
@@ -131,31 +127,38 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     setIsDrawing(false);
   };
 
-  // Touch support for mobile/tablet
+  // Touch support for mobile/tablet devices
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const touch = e.touches[0];
-    const mouseEvent = new MouseEvent("mousedown", {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const fakeEvent = {
       clientX: touch.clientX,
       clientY: touch.clientY
-    });
-    canvasRef.current?.dispatchEvent(mouseEvent);
+    } as React.MouseEvent<HTMLCanvasElement>;
+    
+    startDrawing(fakeEvent);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
     const touch = e.touches[0];
-    const mouseEvent = new MouseEvent("mousemove", {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const fakeEvent = {
       clientX: touch.clientX,
       clientY: touch.clientY
-    });
-    canvasRef.current?.dispatchEvent(mouseEvent);
+    } as React.MouseEvent<HTMLCanvasElement>;
+    
+    draw(fakeEvent);
   };
 
   const handleTouchEnd = (e: React.TouchEvent<HTMLCanvasElement>) => {
     e.preventDefault();
-    const mouseEvent = new MouseEvent("mouseup", {});
-    canvasRef.current?.dispatchEvent(mouseEvent);
+    stopDrawing();
   };
 
   // Tool handlers
@@ -163,7 +166,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     setActiveTool(tool);
   };
 
-  const addText = () => {
+  const addTextAtPosition = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const text = prompt("Enter text:");
     if (!text || !canvasRef.current) return;
     
@@ -171,10 +174,14 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    const rect = canvas.getBoundingClientRect();
+    const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
     ctx.globalCompositeOperation = 'source-over';
-    ctx.font = '16px Arial';
+    ctx.font = `${16 * scale}px Arial`;
     ctx.fillStyle = '#000000';
-    ctx.fillText(text, 100, 100);
+    ctx.fillText(text, x, y);
   };
 
   const addShape = (shape: 'circle' | 'rectangle' | 'line') => {
@@ -184,21 +191,25 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2 * scale;
+    ctx.fillStyle = 'transparent';
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
 
     switch (shape) {
       case 'circle':
         ctx.beginPath();
-        ctx.arc(150, 150, 30, 0, 2 * Math.PI);
+        ctx.arc(centerX, centerY, 50 * scale, 0, 2 * Math.PI);
         ctx.stroke();
         break;
       case 'rectangle':
-        ctx.strokeRect(100, 100, 100, 60);
+        ctx.strokeRect(centerX - 75 * scale, centerY - 40 * scale, 150 * scale, 80 * scale);
         break;
       case 'line':
         ctx.beginPath();
-        ctx.moveTo(100, 100);
-        ctx.lineTo(200, 100);
+        ctx.moveTo(centerX - 75 * scale, centerY);
+        ctx.lineTo(centerX + 75 * scale, centerY);
         ctx.stroke();
         break;
     }
@@ -212,7 +223,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
-  // Save annotated PDF
+  // Save annotated work
   const handleSave = async () => {
     if (!canvasRef.current || isSaving) return;
 
@@ -231,6 +242,9 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
       const uploadResult = await fetch(uploadResponse.uploadURL, {
         method: 'PUT',
         body: blob,
+        headers: {
+          'Content-Type': 'image/png'
+        }
       });
 
       if (uploadResult.ok) {
@@ -239,14 +253,19 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
           ? fileUrl.split('/uploads/')[1] 
           : fileUrl.split('/').pop();
         
-        // Set metadata
-        await apiRequest('/api/objects/metadata', 'POST', {
-          objectPath,
-          metadata: {
-            originalFilename: `annotated-assignment-${assignmentId}.png`,
-            annotated: true
-          }
-        });
+        // Set metadata for the annotated file
+        try {
+          await apiRequest('/api/objects/metadata', 'POST', {
+            objectPath,
+            metadata: {
+              originalFilename: `annotated-assignment-${assignmentId}.png`,
+              annotated: true,
+              assignmentId: assignmentId
+            }
+          });
+        } catch (metadataError) {
+          console.warn('Failed to set metadata, but upload succeeded:', metadataError);
+        }
         
         onSave(fileUrl);
         toast({
@@ -278,10 +297,23 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
   };
 
   // Zoom controls
-  const zoomIn = () => setScale(prev => Math.min(prev + 0.2, 3));
-  const zoomOut = () => setScale(prev => Math.max(prev - 0.2, 0.5));
+  const zoomIn = () => {
+    setScale(prev => {
+      const newScale = Math.min(prev + 0.2, 3);
+      setTimeout(initializeCanvas, 100);
+      return newScale;
+    });
+  };
 
-  // Initialize canvas on scale change
+  const zoomOut = () => {
+    setScale(prev => {
+      const newScale = Math.max(prev - 0.2, 0.5);
+      setTimeout(initializeCanvas, 100);
+      return newScale;
+    });
+  };
+
+  // Initialize canvas
   useEffect(() => {
     initializeCanvas();
   }, [initializeCanvas]);
@@ -397,12 +429,13 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
               <div className="space-y-2">
                 <h4 className="font-medium text-sm">Text</h4>
                 <Button
-                  onClick={addText}
-                  className={eInkStyles.button}
+                  onClick={() => handleToolChange('text')}
+                  className={activeTool === 'text' ? eInkStyles.activeButton : eInkStyles.button}
                 >
                   <Type className="h-4 w-4 mr-2" />
                   Add Text
                 </Button>
+                <p className="text-xs text-gray-600">Click on canvas to add text</p>
               </div>
 
               <Separator />
@@ -433,7 +466,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
               {/* Zoom Controls */}
               <div className="space-y-2">
                 <h4 className="font-medium text-sm">Zoom</h4>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <Button
                     onClick={zoomOut}
                     className={eInkStyles.button}
@@ -441,7 +474,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
                   >
                     <ZoomOut className="h-4 w-4" />
                   </Button>
-                  <span className="flex items-center px-2 text-sm">
+                  <span className="flex items-center px-2 text-sm min-w-[60px] text-center">
                     {Math.round(scale * 100)}%
                   </span>
                   <Button
@@ -459,28 +492,29 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
           {/* PDF and Canvas Container */}
           <Card className={`${eInkStyles.card} col-span-12 md:col-span-9`}>
             <div className="p-4">
-              <div className="relative" ref={containerRef}>
-                {/* PDF Document */}
-                <Document
-                  file={pdfUrl}
-                  onLoadSuccess={onDocumentLoadSuccess}
-                  className="relative"
-                >
-                  <Page
-                    pageNumber={currentPage}
-                    scale={scale}
-                    className="shadow-lg"
-                  />
-                </Document>
+              <div className="relative bg-white border rounded" ref={containerRef}>
+                {/* PDF Iframe */}
+                <iframe
+                  ref={pdfViewerRef}
+                  src={`${pdfUrl}#view=FitH`}
+                  className="w-full h-[800px] border-0"
+                  style={{
+                    transform: `scale(${scale})`,
+                    transformOrigin: 'top left',
+                    width: `${100 / scale}%`,
+                    height: `${800 / scale}px`,
+                  }}
+                  onLoad={() => setPdfLoaded(true)}
+                />
 
                 {/* Annotation Canvas Overlay */}
                 <canvas
                   ref={canvasRef}
-                  className="absolute top-0 left-0 border-2 border-dashed border-gray-300 opacity-90 cursor-crosshair"
+                  className="absolute top-0 left-0 opacity-90 pointer-events-auto"
                   style={{
-                    width: `${800 * scale}px`,
-                    height: `${1100 * scale}px`,
-                    pointerEvents: 'all',
+                    width: '100%',
+                    height: '800px',
+                    cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : 'crosshair',
                   }}
                   onMouseDown={startDrawing}
                   onMouseMove={draw}
@@ -492,28 +526,17 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
                 />
               </div>
 
-              {/* Page Navigation */}
-              {numPages > 1 && (
-                <div className="flex items-center justify-center gap-4 mt-4">
-                  <Button
-                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                    disabled={currentPage <= 1}
-                    className={eInkStyles.button}
-                  >
-                    Previous
-                  </Button>
-                  <span className="text-sm">
-                    Page {currentPage} of {numPages}
-                  </span>
-                  <Button
-                    onClick={() => setCurrentPage(prev => Math.min(numPages, prev + 1))}
-                    disabled={currentPage >= numPages}
-                    className={eInkStyles.button}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
+              {/* Instructions */}
+              <div className="mt-4 p-3 bg-gray-50 border rounded text-sm">
+                <h4 className="font-medium mb-2">How to use:</h4>
+                <ul className="space-y-1 text-gray-700">
+                  <li>• Select a tool from the toolbar on the left</li>
+                  <li>• Draw directly on the document with your mouse, stylus, or finger</li>
+                  <li>• Use the Text tool to click and add typed text anywhere</li>
+                  <li>• Use Zoom controls to get closer for detailed work</li>
+                  <li>• Click "Save Work" when finished to submit your annotated assignment</li>
+                </ul>
+              </div>
             </div>
           </Card>
         </div>
