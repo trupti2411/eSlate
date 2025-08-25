@@ -30,7 +30,7 @@ type Tool = 'pen' | 'eraser' | 'text' | 'highlight' | 'circle' | 'rectangle' | '
 
 export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnotatorProps) {
   const [scale, setScale] = useState<number>(1.0);
-  const [activeTool, setActiveTool] = useState<Tool>('pen');
+  const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
@@ -365,6 +365,20 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
             <div className="p-4 space-y-4">
               <h3 className="font-semibold text-lg">Tools</h3>
               
+              {/* Navigation Mode */}
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm">Mode</h4>
+                <Button
+                  onClick={() => setActiveTool(null)}
+                  className={activeTool === null ? eInkStyles.activeButton : eInkStyles.button}
+                >
+                  <span className="h-4 w-4 mr-2">📄</span>
+                  Navigate PDF
+                </Button>
+              </div>
+
+              <Separator />
+
               {/* Drawing Tools */}
               <div className="space-y-2">
                 <h4 className="font-medium text-sm">Drawing</h4>
@@ -510,11 +524,13 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
                 {/* Annotation Canvas Overlay */}
                 <canvas
                   ref={canvasRef}
-                  className="absolute top-0 left-0 opacity-90 pointer-events-auto"
+                  className="absolute top-0 left-0 opacity-90"
                   style={{
                     width: '100%',
                     height: '800px',
-                    cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : 'crosshair',
+                    cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
+                    pointerEvents: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 'auto' : 'none',
+                    zIndex: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 10 : 1,
                   }}
                   onMouseDown={startDrawing}
                   onMouseMove={draw}
