@@ -476,7 +476,7 @@ export function StudentPortal() {
                     {/* Assignment Actions */}
                     <div className="flex flex-wrap gap-2 pt-3 border-t">
                       {/* Complete Online for PDFs - Always show for testing */}
-                      {hasAttachments && !submission && (
+                      {hasAttachments && (
                         <Button
                           onClick={() => {
                             console.log('Opening PDF annotator for assignment:', assignment.id);
@@ -487,9 +487,10 @@ export function StudentPortal() {
                           className={eInkStyles.primaryButton}
                           size="sm"
                           data-testid={`button-complete-online-${assignment.id}`}
+                          disabled={!!submission}
                         >
                           <Edit className="h-4 w-4 mr-2" />
-                          Complete Online
+                          {submission ? 'View Submission' : 'Complete Online'}
                         </Button>
                       )}
 
