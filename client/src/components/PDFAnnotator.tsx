@@ -56,17 +56,18 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size to match PDF viewer
-    canvas.width = 800 * scale;
-    canvas.height = 1100 * scale;
+    // Set canvas size to match container
+    canvas.width = 800;
+    canvas.height = 800;
     
     // Configure context for high-quality drawing
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     
-    // Make canvas transparent
+    // Clear canvas and set transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.globalAlpha = 1.0;
   }, [scale]);
 
@@ -506,40 +507,47 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
           {/* PDF and Canvas Container */}
           <Card className={`${eInkStyles.card} col-span-12 md:col-span-9`}>
             <div className="p-4">
-              <div className="relative bg-white border rounded" ref={containerRef}>
-                {/* PDF Iframe */}
-                <iframe
-                  ref={pdfViewerRef}
-                  src={`${pdfUrl}#view=FitH`}
-                  className="w-full h-[800px] border-0"
+              <div className="relative bg-white border rounded overflow-hidden" ref={containerRef}>
+                {/* Container that moves together */}
+                <div 
+                  className="relative"
                   style={{
                     transform: `scale(${scale})`,
                     transformOrigin: 'top left',
                     width: `${100 / scale}%`,
                     height: `${800 / scale}px`,
                   }}
-                  onLoad={() => setPdfLoaded(true)}
-                />
+                >
+                  {/* PDF Iframe */}
+                  <iframe
+                    ref={pdfViewerRef}
+                    src={`${pdfUrl}#view=FitH`}
+                    className="w-full h-[800px] border-0 block"
+                    onLoad={() => setPdfLoaded(true)}
+                  />
 
-                {/* Annotation Canvas Overlay */}
-                <canvas
-                  ref={canvasRef}
-                  className="absolute top-0 left-0 opacity-90"
-                  style={{
-                    width: '100%',
-                    height: '800px',
-                    cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                    pointerEvents: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 'auto' : 'none',
-                    zIndex: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 10 : 1,
-                  }}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                  onTouchStart={handleTouchStart}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                />
+                  {/* Annotation Canvas Overlay - positioned relative to PDF */}
+                  <canvas
+                    ref={canvasRef}
+                    className="absolute top-0 left-0 opacity-90"
+                    width={800}
+                    height={800}
+                    style={{
+                      width: '100%',
+                      height: '800px',
+                      cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
+                      pointerEvents: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 'auto' : 'none',
+                      zIndex: activeTool === 'pen' || activeTool === 'highlight' || activeTool === 'text' || activeTool === 'eraser' ? 10 : 1,
+                    }}
+                    onMouseDown={startDrawing}
+                    onMouseMove={draw}
+                    onMouseUp={stopDrawing}
+                    onMouseLeave={stopDrawing}
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                  />
+                </div>
               </div>
 
               {/* Instructions */}
