@@ -73,17 +73,17 @@ export function PDFAnnotatorPage() {
     }
   });
 
-  // Initialize fixed canvas overlay
+  // Initialize canvas to match PDF viewer
   const initializeCanvas = useCallback(() => {
-    if (!canvasRef.current || !pdfContainerRef.current) return;
+    if (!canvasRef.current || !pdfViewerRef.current) return;
 
     const canvas = canvasRef.current;
-    const container = pdfContainerRef.current;
+    const iframe = pdfViewerRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas to match container viewport (not scroll area)
-    const rect = container.getBoundingClientRect();
+    // Set canvas to match iframe size
+    const rect = iframe.getBoundingClientRect();
     canvas.width = rect.width;
     canvas.height = rect.height;
     
@@ -96,56 +96,25 @@ export function PDFAnnotatorPage() {
     loadSavedWork();
     redrawAnnotations();
     
-    console.log('Canvas initialized as fixed overlay:', { width: canvas.width, height: canvas.height });
+    console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
   }, []);
 
-  // Check if mouse is over scrollbar area
-  const isOverScrollbar = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!pdfContainerRef.current) return false;
+  // Simple coordinate conversion for canvas overlay
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!canvasRef.current) return { x: 0, y: 0 };
     
-    const container = pdfContainerRef.current;
-    const rect = container.getBoundingClientRect();
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
     
-    // Check if cursor is near right edge (vertical scrollbar area)
-    const isNearRightEdge = e.clientX > rect.right - 20;
-    // Check if cursor is near bottom edge (horizontal scrollbar area)  
-    const isNearBottomEdge = e.clientY > rect.bottom - 20;
-    
-    return isNearRightEdge || isNearBottomEdge;
-  };
-
-  // Get viewport coordinates and convert to absolute PDF coordinates
-  const getAbsoluteCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current || !pdfContainerRef.current) return { x: 0, y: 0 };
-    
-    const container = pdfContainerRef.current;
-    const containerRect = container.getBoundingClientRect();
-    
-    // Get mouse position relative to the PDF container (not canvas)
-    const x = e.clientX - containerRect.left;
-    const y = e.clientY - containerRect.top;
-    
-    // Add scroll offset to get absolute position in PDF document
     return {
-      x: x + container.scrollLeft,
-      y: y + container.scrollTop
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
     };
   };
 
-  // Convert absolute PDF coordinates to current viewport coordinates
-  const absoluteToViewport = (absoluteX: number, absoluteY: number) => {
-    if (!pdfContainerRef.current) return { x: 0, y: 0 };
-    
-    const container = pdfContainerRef.current;
-    return {
-      x: absoluteX - container.scrollLeft,
-      y: absoluteY - container.scrollTop
-    };
-  };
-
-  // Redraw all annotations on the current viewport
+  // Redraw all annotations
   const redrawAnnotations = useCallback(() => {
-    if (!canvasRef.current || !pdfContainerRef.current) return;
+    if (!canvasRef.current) return;
     
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -166,29 +135,26 @@ export function PDFAnnotatorPage() {
       if (annotation.type === 'stroke' && annotation.points) {
         ctx.beginPath();
         annotation.points.forEach((point, index) => {
-          const viewportCoords = absoluteToViewport(point.x, point.y);
           if (index === 0) {
-            ctx.moveTo(viewportCoords.x, viewportCoords.y);
+            ctx.moveTo(point.x, point.y);
           } else {
-            ctx.lineTo(viewportCoords.x, viewportCoords.y);
+            ctx.lineTo(point.x, point.y);
           }
         });
         ctx.stroke();
       } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
-        const viewportCoords = absoluteToViewport(annotation.x, annotation.y);
         ctx.fillStyle = annotation.style.color;
         ctx.font = '18px Arial';
-        ctx.fillText(annotation.text, viewportCoords.x, viewportCoords.y);
+        ctx.fillText(annotation.text, annotation.x, annotation.y);
       }
       
       ctx.restore();
     });
   }, [annotations]);
 
-  // Drawing functions with absolute coordinate storage
+  // Simple drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Don't draw if over scrollbar or no tool selected
-    if (!activeTool || isOverScrollbar(e)) return;
+    if (!activeTool) return;
     
     if (activeTool === 'text') {
       addTextAtPosition(e);
@@ -196,14 +162,14 @@ export function PDFAnnotatorPage() {
     }
     
     setIsDrawing(true);
-    const coords = getAbsoluteCoordinates(e);
+    const coords = getCanvasCoordinates(e);
     setCurrentStroke([coords]);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !activeTool || isOverScrollbar(e)) return;
+    if (!isDrawing || !activeTool) return;
     
-    const coords = getAbsoluteCoordinates(e);
+    const coords = getCanvasCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
     
     // Draw current stroke in real-time
@@ -236,11 +202,10 @@ export function PDFAnnotatorPage() {
       
       ctx.beginPath();
       [...currentStroke, coords].forEach((point, index) => {
-        const viewportCoords = absoluteToViewport(point.x, point.y);
         if (index === 0) {
-          ctx.moveTo(viewportCoords.x, viewportCoords.y);
+          ctx.moveTo(point.x, point.y);
         } else {
-          ctx.lineTo(viewportCoords.x, viewportCoords.y);
+          ctx.lineTo(point.x, point.y);
         }
       });
       ctx.stroke();
@@ -269,13 +234,10 @@ export function PDFAnnotatorPage() {
   };
 
   const addTextAtPosition = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Don't add text if over scrollbar
-    if (isOverScrollbar(e)) return;
-    
     const text = prompt('Enter text:');
     if (!text) return;
 
-    const coords = getAbsoluteCoordinates(e);
+    const coords = getCanvasCoordinates(e);
     
     const newAnnotation = {
       type: 'text' as const,
@@ -481,21 +443,7 @@ export function PDFAnnotatorPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, [initializeCanvas]);
 
-  // Redraw annotations when scrolling to keep them synchronized
-  useEffect(() => {
-    const container = pdfContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      // Redraw annotations at their correct positions relative to current viewport
-      redrawAnnotations();
-    };
-
-    container.addEventListener('scroll', handleScroll, { passive: true });
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [redrawAnnotations]);
-
-  // Redraw annotations when annotations change
+  // Redraw annotations when they change
   useEffect(() => {
     redrawAnnotations();
   }, [annotations, redrawAnnotations]);
@@ -623,71 +571,45 @@ export function PDFAnnotatorPage() {
 
         {/* PDF Viewer */}
         <div className="flex-1 relative bg-gray-200">
-          <div 
-            ref={pdfContainerRef}
-            className="relative w-full h-full overflow-auto"
-            style={{ transform: `scale(${scale})`, transformOrigin: '0 0' }}
-          >
-            <iframe
-              ref={pdfViewerRef}
-              src={pdfUrl}
-              className="w-full border-0 block bg-white"
-              style={{ 
-                height: '100vh',
-                minHeight: '800px',
-                width: '100%'
-              }}
-              onLoad={() => {
-                setPdfLoaded(true);
-                setTimeout(initializeCanvas, 500);
-              }}
-              title="PDF Document"
-            />
-            
+          <iframe
+            ref={pdfViewerRef}
+            src={pdfUrl}
+            className="w-full h-full border-0 bg-white"
+            style={{ 
+              width: '100%',
+              height: '100%'
+            }}
+            onLoad={() => {
+              setPdfLoaded(true);
+              setTimeout(initializeCanvas, 300);
+            }}
+            title="PDF Document"
+          />
+          
+          {/* Canvas overlay for annotations - only active when tool selected */}
+          {activeTool && (
             <canvas
               ref={canvasRef}
-              className="absolute top-0 left-0 w-full h-full"
+              className="absolute top-0 left-0 w-full h-full pointer-events-auto"
               style={{
-                cursor: activeTool === 'text' ? 'text' : 
-                       activeTool === 'eraser' ? 'crosshair' : 
-                       activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                pointerEvents: 'none',
-                zIndex: 2
+                cursor: activeTool === 'text' ? 'text' : 'crosshair',
+                zIndex: 10
               }}
               onMouseDown={startDrawing}
               onMouseMove={draw}
               onMouseUp={stopDrawing}
               onMouseLeave={stopDrawing}
             />
-            
-            {/* Invisible overlay for drawing events only */}
-            <div
-              className="absolute top-0 left-0 w-full h-full"
-              style={{
-                pointerEvents: activeTool ? 'auto' : 'none',
-                zIndex: 3,
-                cursor: activeTool === 'text' ? 'text' : 
-                       activeTool === 'eraser' ? 'crosshair' : 
-                       activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default'
-              }}
-              onMouseDown={(e) => {
-                const canvasEvent = {
-                  ...e,
-                  currentTarget: canvasRef.current
-                } as any;
-                startDrawing(canvasEvent);
-              }}
-              onMouseMove={(e) => {
-                const canvasEvent = {
-                  ...e,
-                  currentTarget: canvasRef.current
-                } as any;
-                draw(canvasEvent);
-              }}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-            />
-          </div>
+          )}
+          
+          {/* Canvas for displaying saved annotations - always visible */}
+          <canvas
+            ref={canvasRef}
+            className="absolute top-0 left-0 w-full h-full pointer-events-none"
+            style={{
+              zIndex: 5
+            }}
+          />
         </div>
       </div>
 
