@@ -253,6 +253,17 @@ export function AssignmentCompletionArea({
               )}
             </div>
           )}
+
+          {/* Student's Submitted Files */}
+          {submission?.fileUrls && submission.fileUrls.length > 0 && (
+            <div className={`${eInkStyles.card} p-4`}>
+              <h3 className="font-semibold mb-3 flex items-center">
+                <FileText className="h-4 w-4 mr-2 text-green-600" />
+                Your Submitted Files ({submission.fileUrls.length})
+              </h3>
+              <SubmittedFilesDisplay fileUrls={submission.fileUrls} eInkStyles={eInkStyles} />
+            </div>
+          )}
         </TabsContent>
 
         <TabsContent value="completion" className="space-y-6">
