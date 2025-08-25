@@ -20,6 +20,8 @@ import {
   AlertCircle, 
   Eye, 
   Download,
+  Upload,
+  Send,
   GraduationCap,
   Users,
   PlayCircle,
@@ -30,6 +32,9 @@ import {
 import { format, isAfter, parseISO, isPast } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { AssignmentCompletionArea } from "@/components/AssignmentCompletionArea";
+import { ObjectUploader } from "@/components/ObjectUploader";
+import { useMutation } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 
 export function StudentPortal() {
   const { user } = useAuth();
@@ -46,6 +51,34 @@ export function StudentPortal() {
   });
 
   const studentId = studentProfile?.id;
+
+  // Submission mutation for uploading completed assignments
+  const submitAssignmentMutation = useMutation({
+    mutationFn: async ({ assignmentId, fileUrls }: { assignmentId: string; fileUrls: string[] }) => {
+      return await apiRequest('/api/submissions', 'POST', {
+        assignmentId,
+        fileUrls,
+        content: '',
+        isDraft: false,
+        status: 'submitted'
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Assignment submitted successfully!",
+        description: "Your completed assignment has been uploaded and submitted.",
+      });
+      queryClient.invalidateQueries({ queryKey: ['/api/students', studentId, 'assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/students', studentId, 'submissions'] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Submission failed",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
 
   // Get student's terms (active and non-active)
   const { data: studentTerms = [], isLoading: isLoadingTerms } = useQuery<AcademicTerm[]>({
@@ -427,6 +460,38 @@ export function StudentPortal() {
                             <Download className="h-4 w-4 mr-2" />
                             Download Assignment
                           </Button>
+                        )}
+
+                        {/* Upload Completed Assignment Button */}
+                        {assignment.attachmentUrls && assignment.attachmentUrls.length > 0 && (
+                          <ObjectUploader
+                            maxNumberOfFiles={5}
+                            maxFileSize={31457280} // 30MB
+                            onGetUploadParameters={async () => {
+                              const response = await apiRequest('/api/objects/upload', 'POST');
+                              return {
+                                method: 'PUT' as const,
+                                url: response.uploadUrl,
+                              };
+                            }}
+                            onComplete={(result) => {
+                              const fileUrls = result.successful.map(file => {
+                                const url = (file.response as any)?.body?.url || file.uploadURL;
+                                return url.replace(/\?.*$/, ''); // Remove query parameters
+                              });
+                              
+                              if (fileUrls.length > 0) {
+                                submitAssignmentMutation.mutate({
+                                  assignmentId: assignment.id,
+                                  fileUrls: fileUrls
+                                });
+                              }
+                            }}
+                            buttonClassName={eInkStyles.button}
+                          >
+                            <Upload className="h-4 w-4 mr-2" />
+                            Upload Completed Assignment
+                          </ObjectUploader>
                         )}
                         <DialogContent className="max-w-4xl max-h-[80vh] bg-white border-2 border-black">
                           <DialogHeader>
