@@ -232,7 +232,15 @@ export function StudentPortal() {
   if (showPDFAnnotator && annotatingAssignment) {
     return (
       <PDFAnnotator
-        pdfUrl={annotatingAssignment.attachmentUrls![0]}
+        pdfUrl={(() => {
+          const url = annotatingAssignment.attachmentUrls![0];
+          // Convert storage URL to accessible format
+          if (url.includes('/uploads/')) {
+            const objectPath = url.split('/uploads/').pop()?.split('?')[0];
+            return `/objects/uploads/${objectPath}`;
+          }
+          return url;
+        })()}
         assignmentId={annotatingAssignment.id}
         onSave={async (annotatedFileUrl: string) => {
           // Submit the annotated file as the assignment
