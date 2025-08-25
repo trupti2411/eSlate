@@ -471,7 +471,7 @@ export function StudentPortal() {
                               const response = await apiRequest('/api/objects/upload', 'POST');
                               return {
                                 method: 'PUT' as const,
-                                url: response.uploadUrl,
+                                url: response.uploadURL,
                               };
                             }}
                             onComplete={(result) => {
