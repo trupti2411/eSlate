@@ -14,7 +14,19 @@ export function PDFAnnotatorPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
   const [scale, setScale] = useState(1);
-  const [annotations, setAnnotations] = useState<any[]>([]);
+  const [annotations, setAnnotations] = useState<Array<{
+    type: 'stroke' | 'text';
+    points?: Array<{x: number, y: number}>;
+    text?: string;
+    x?: number;
+    y?: number;
+    style: {
+      color: string;
+      lineWidth: number;
+      globalCompositeOperation: string;
+    };
+  }>>([]);
+  const [currentStroke, setCurrentStroke] = useState<Array<{x: number, y: number}>>([]);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfContainerRef = useRef<HTMLDivElement>(null);
@@ -61,7 +73,7 @@ export function PDFAnnotatorPage() {
     }
   });
 
-  // Initialize canvas to perfectly match PDF iframe
+  // Initialize fixed canvas overlay
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current || !pdfContainerRef.current) return;
 
@@ -70,58 +82,96 @@ export function PDFAnnotatorPage() {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Make canvas exactly match the container's scroll area
-    canvas.width = container.scrollWidth;
-    canvas.height = container.scrollHeight;
-    
-    // Position canvas to cover the entire scrollable area
-    canvas.style.width = container.scrollWidth + 'px';
-    canvas.style.height = container.scrollHeight + 'px';
-    canvas.style.position = 'absolute';
-    canvas.style.top = '0px';
-    canvas.style.left = '0px';
+    // Set canvas to match container viewport (not scroll area)
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width;
+    canvas.height = rect.height;
     
     // Configure context for high-quality drawing
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalAlpha = 1.0;
     
-    // Load saved annotations
+    // Load and redraw all annotations
     loadSavedWork();
+    redrawAnnotations();
     
-    console.log('Canvas initialized to match PDF scroll area:', { 
-      width: canvas.width, 
-      height: canvas.height,
-      scrollWidth: container.scrollWidth,
-      scrollHeight: container.scrollHeight
-    });
+    console.log('Canvas initialized as fixed overlay:', { width: canvas.width, height: canvas.height });
   }, []);
 
-  // Get absolute coordinates that stay fixed relative to PDF content
-  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Get viewport coordinates and convert to absolute PDF coordinates
+  const getAbsoluteCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !pdfContainerRef.current) return { x: 0, y: 0 };
     
     const canvas = canvasRef.current;
     const container = pdfContainerRef.current;
     const rect = canvas.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
     
-    // Get mouse position relative to the container
-    const x = e.clientX - containerRect.left;
-    const y = e.clientY - containerRect.top;
+    // Get mouse position relative to canvas
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
     
-    // Add the current scroll position to get absolute position in the PDF
-    const absoluteX = x + container.scrollLeft;
-    const absoluteY = y + container.scrollTop;
-    
-    // Scale to canvas coordinates
-    const canvasX = (absoluteX / container.scrollWidth) * canvas.width;
-    const canvasY = (absoluteY / container.scrollHeight) * canvas.height;
-    
-    return { x: canvasX, y: canvasY };
+    // Add scroll offset to get absolute position in PDF document
+    return {
+      x: x + container.scrollLeft,
+      y: y + container.scrollTop
+    };
   };
 
-  // Drawing functions with proper coordinate handling
+  // Convert absolute PDF coordinates to current viewport coordinates
+  const absoluteToViewport = (absoluteX: number, absoluteY: number) => {
+    if (!pdfContainerRef.current) return { x: 0, y: 0 };
+    
+    const container = pdfContainerRef.current;
+    return {
+      x: absoluteX - container.scrollLeft,
+      y: absoluteY - container.scrollTop
+    };
+  };
+
+  // Redraw all annotations on the current viewport
+  const redrawAnnotations = useCallback(() => {
+    if (!canvasRef.current || !pdfContainerRef.current) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw each annotation
+    annotations.forEach(annotation => {
+      ctx.save();
+      ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
+      ctx.strokeStyle = annotation.style.color;
+      ctx.lineWidth = annotation.style.lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      if (annotation.type === 'stroke' && annotation.points) {
+        ctx.beginPath();
+        annotation.points.forEach((point, index) => {
+          const viewportCoords = absoluteToViewport(point.x, point.y);
+          if (index === 0) {
+            ctx.moveTo(viewportCoords.x, viewportCoords.y);
+          } else {
+            ctx.lineTo(viewportCoords.x, viewportCoords.y);
+          }
+        });
+        ctx.stroke();
+      } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
+        const viewportCoords = absoluteToViewport(annotation.x, annotation.y);
+        ctx.fillStyle = annotation.style.color;
+        ctx.font = '18px Arial';
+        ctx.fillText(annotation.text, viewportCoords.x, viewportCoords.y);
+      }
+      
+      ctx.restore();
+    });
+  }, [annotations]);
+
+  // Drawing functions with absolute coordinate storage
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (activeTool === 'text') {
       addTextAtPosition(e);
@@ -129,47 +179,75 @@ export function PDFAnnotatorPage() {
     }
     
     setIsDrawing(true);
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-
-    const coords = getCanvasCoordinates(e);
-
-    ctx.beginPath();
-    ctx.moveTo(coords.x, coords.y);
-    
-    // Configure brush for current tool
-    switch (activeTool) {
-      case 'pen':
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 3 / scale; // Adjust line width for zoom
-        break;
-      case 'highlight':
-        ctx.globalCompositeOperation = 'multiply';
-        ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-        ctx.lineWidth = 20 / scale;
-        break;
-      case 'eraser':
-        ctx.globalCompositeOperation = 'destination-out';
-        ctx.lineWidth = 20 / scale;
-        break;
-    }
+    const coords = getAbsoluteCoordinates(e);
+    setCurrentStroke([coords]);
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
+    if (!isDrawing || !activeTool) return;
     
+    const coords = getAbsoluteCoordinates(e);
+    setCurrentStroke(prev => [...prev, coords]);
+    
+    // Draw current stroke in real-time
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
-
-    const coords = getCanvasCoordinates(e);
-    ctx.lineTo(coords.x, coords.y);
-    ctx.stroke();
+    
+    // Redraw everything to show current stroke
+    redrawAnnotations();
+    
+    // Draw current stroke
+    if (currentStroke.length > 0) {
+      ctx.save();
+      switch (activeTool) {
+        case 'pen':
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 3;
+          break;
+        case 'highlight':
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+          ctx.lineWidth = 20;
+          break;
+        case 'eraser':
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.lineWidth = 20;
+          break;
+      }
+      
+      ctx.beginPath();
+      [...currentStroke, coords].forEach((point, index) => {
+        const viewportCoords = absoluteToViewport(point.x, point.y);
+        if (index === 0) {
+          ctx.moveTo(viewportCoords.x, viewportCoords.y);
+        } else {
+          ctx.lineTo(viewportCoords.x, viewportCoords.y);
+        }
+      });
+      ctx.stroke();
+      ctx.restore();
+    }
   };
 
   const stopDrawing = () => {
+    if (!isDrawing || currentStroke.length === 0 || !activeTool) return;
+    
+    // Save the completed stroke
+    const newAnnotation = {
+      type: 'stroke' as const,
+      points: [...currentStroke],
+      style: {
+        color: activeTool === 'pen' ? '#000000' : 
+               activeTool === 'highlight' ? 'rgba(255, 255, 0, 0.5)' : '#000000',
+        lineWidth: activeTool === 'pen' ? 3 : 20,
+        globalCompositeOperation: activeTool === 'eraser' ? 'destination-out' : 'source-over'
+      }
+    };
+    
+    setAnnotations(prev => [...prev, newAnnotation]);
+    setCurrentStroke([]);
     setIsDrawing(false);
   };
 
@@ -177,21 +255,25 @@ export function PDFAnnotatorPage() {
     const text = prompt('Enter text:');
     if (!text) return;
 
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const coords = getCanvasCoordinates(e);
-
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.font = `${18 / scale}px Arial`; // Adjust font size for zoom
-    ctx.fillStyle = '#000000';
-    ctx.fillText(text, coords.x, coords.y);
+    const coords = getAbsoluteCoordinates(e);
+    
+    const newAnnotation = {
+      type: 'text' as const,
+      text,
+      x: coords.x,
+      y: coords.y,
+      style: {
+        color: '#000000',
+        lineWidth: 0,
+        globalCompositeOperation: 'source-over'
+      }
+    };
+    
+    setAnnotations(prev => [...prev, newAnnotation]);
   };
 
   const clearCanvas = () => {
+    setAnnotations([]);
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
@@ -201,16 +283,13 @@ export function PDFAnnotatorPage() {
 
   // Save work to localStorage
   const saveWork = async () => {
-    if (!canvasRef.current || isSaving) return;
+    if (isSaving || annotations.length === 0) return;
 
     setIsSaving(true);
     try {
-      const canvas = canvasRef.current;
-      const dataURL = canvas.toDataURL('image/png');
-      
-      // Save to localStorage with assignment ID
-      const saveKey = `pdf-annotation-${assignmentId}`;
-      localStorage.setItem(saveKey, dataURL);
+      // Save annotations data structure instead of image
+      const saveKey = `pdf-annotation-data-${assignmentId}`;
+      localStorage.setItem(saveKey, JSON.stringify(annotations));
       
       toast({
         title: "Work Saved",
@@ -230,21 +309,19 @@ export function PDFAnnotatorPage() {
 
   // Load saved work from localStorage
   const loadSavedWork = () => {
-    if (!canvasRef.current || !assignmentId) return;
+    if (!assignmentId) return;
 
-    const saveKey = `pdf-annotation-${assignmentId}`;
+    const saveKey = `pdf-annotation-data-${assignmentId}`;
     const savedData = localStorage.getItem(saveKey);
     
     if (savedData) {
-      const img = new Image();
-      img.onload = () => {
-        const ctx = canvasRef.current?.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(img, 0, 0);
-          console.log('Loaded saved annotations');
-        }
-      };
-      img.src = savedData;
+      try {
+        const savedAnnotations = JSON.parse(savedData);
+        setAnnotations(savedAnnotations);
+        console.log('Loaded saved annotations:', savedAnnotations.length);
+      } catch (error) {
+        console.error('Failed to load saved annotations:', error);
+      }
     }
   };
 
@@ -338,7 +415,7 @@ export function PDFAnnotatorPage() {
       await submitAssignmentMutation.mutateAsync(cleanUrl);
 
       // Clear saved work after successful submission
-      const saveKey = `pdf-annotation-${assignmentId}`;
+      const saveKey = `pdf-annotation-data-${assignmentId}`;
       localStorage.removeItem(saveKey);
 
     } catch (error) {
@@ -384,20 +461,24 @@ export function PDFAnnotatorPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, [initializeCanvas]);
 
-  // Handle container scroll - canvas should stay perfectly aligned
+  // Redraw annotations when scrolling to keep them synchronized
   useEffect(() => {
     const container = pdfContainerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
-      // Canvas position is absolute within the container, so it scrolls with the content
-      // This ensures annotations stay locked to their PDF positions
-      console.log('PDF scrolled:', { scrollLeft: container.scrollLeft, scrollTop: container.scrollTop });
+      // Redraw annotations at their correct positions relative to current viewport
+      redrawAnnotations();
     };
 
     container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [redrawAnnotations]);
+
+  // Redraw annotations when annotations change
+  useEffect(() => {
+    redrawAnnotations();
+  }, [annotations, redrawAnnotations]);
 
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
@@ -557,11 +638,8 @@ export function PDFAnnotatorPage() {
             
             <canvas
               ref={canvasRef}
-              className="pointer-events-auto"
+              className="pointer-events-auto absolute top-0 left-0 w-full h-full"
               style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
                 cursor: activeTool === 'text' ? 'text' : 
                        activeTool === 'eraser' ? 'crosshair' : 
                        activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
