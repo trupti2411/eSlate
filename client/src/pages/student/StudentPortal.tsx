@@ -31,10 +31,64 @@ import {
 } from "lucide-react";
 import { format, isAfter, parseISO, isPast } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { AssignmentCompletionArea } from "@/components/AssignmentCompletionArea";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+
+// Component to display submitted files with original filenames in submission area
+function SubmittedFilesInSubmission({ fileUrls }: { fileUrls: string[] }) {
+  const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(fileUrls);
+
+  return (
+    <div className="mt-3">
+      <div className="text-xs text-gray-600 mb-2">Uploaded Files ({fileUrls.length}):</div>
+      {isLoadingMetadata ? (
+        <div className="text-center py-2">
+          <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {fileUrls.map((url, index) => {
+            const metadata = fileMetadata?.[index];
+            const displayFilename = getDisplayFilename(url, metadata, index);
+            const fileExtension = displayFilename.split('.').pop()?.toLowerCase();
+            
+            return (
+              <div key={index} className="flex items-center justify-between p-2 bg-white border rounded text-xs">
+                <div className="flex items-center">
+                  <FileText className="h-3 w-3 mr-2 text-blue-600" />
+                  <div>
+                    <span className="font-medium">{displayFilename}</span>
+                    {fileExtension && (
+                      <span className="text-gray-500 ml-1">({fileExtension.toUpperCase()})</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const objectPath = url.includes('/uploads/') 
+                        ? url.split('/uploads/').pop()
+                        : url.split('/').pop();
+                      window.open(`/objects/uploads/${objectPath}`, '_blank');
+                    }}
+                    className="h-6 px-2 text-xs"
+                  >
+                    View
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function StudentPortal() {
   const { user } = useAuth();
@@ -407,10 +461,13 @@ export function StudentPortal() {
                         <div className="bg-gray-50 p-3 rounded border text-sm">
                           <div className="flex justify-between mb-2">
                             <span>Submitted: {format(new Date(submission.submittedAt!), 'MMM dd, yyyy HH:mm')}</span>
-
                           </div>
                           {submission.content && (
-                            <p className="text-gray-700">{submission.content}</p>
+                            <p className="text-gray-700 mb-3">{submission.content}</p>
+                          )}
+                          {/* Display uploaded files */}
+                          {submission.fileUrls && submission.fileUrls.length > 0 && (
+                            <SubmittedFilesInSubmission fileUrls={submission.fileUrls} />
                           )}
                         </div>
                       </div>
