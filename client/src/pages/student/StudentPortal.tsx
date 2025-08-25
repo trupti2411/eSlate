@@ -495,14 +495,20 @@ export function StudentPortal() {
                                   // Wait for all metadata to be set
                                   await Promise.allSettled(metadataPromises);
                                   
-                                  const fileUrls = result.successful.map((file: any) => {
+                                  const newFileUrls = result.successful.map((file: any) => {
                                     const url = file.uploadURL as string;
                                     return url.replace(/\?.*$/, ''); // Remove query parameters
                                   });
                                   
+                                  // Get existing file URLs from the current submission
+                                  const existingFileUrls = submission?.fileUrls || [];
+                                  
+                                  // Merge existing and new files
+                                  const allFileUrls = [...existingFileUrls, ...newFileUrls];
+                                  
                                   submitAssignmentMutation.mutate({
                                     assignmentId: assignment.id,
-                                    fileUrls: fileUrls
+                                    fileUrls: allFileUrls
                                   });
                                 } catch (error) {
                                   console.error('Error processing upload:', error);
