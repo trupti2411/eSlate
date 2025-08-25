@@ -101,6 +101,41 @@ export function StudentPortal() {
   const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
   const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
 
+  if (!user || user.role !== 'student') {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-600">Access denied. Student role required.</p>
+      </div>
+    );
+  }
+
+  // Show PDF Annotator when annotation mode is active
+  if (showPDFAnnotator && annotatingAssignment) {
+    return (
+      <PDFAnnotator
+        pdfUrl={annotatingAssignment.attachmentUrls![0]}
+        assignmentId={annotatingAssignment.id}
+        onSave={async (annotatedFileUrl: string) => {
+          // Submit the annotated file as the assignment
+          try {
+            submitAssignmentMutation.mutate({
+              assignmentId: annotatingAssignment.id,
+              fileUrls: [annotatedFileUrl]
+            });
+            setShowPDFAnnotator(false);
+            setAnnotatingAssignment(null);
+          } catch (error) {
+            console.error('Error submitting annotated assignment:', error);
+          }
+        }}
+        onClose={() => {
+          setShowPDFAnnotator(false);
+          setAnnotatingAssignment(null);
+        }}
+      />
+    );
+  }
+
   // E-ink optimized styles
   const eInkStyles = {
     card: "bg-white border-2 border-black rounded-none",
@@ -587,37 +622,6 @@ export function StudentPortal() {
       )}
     </div>
   );
-
-  if (!user || user.role !== 'student') {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <p className="text-gray-600">Access denied. Student role required.</p>
-      </div>
-    );
-  }
-
-  // Show PDF Annotator when annotation mode is active
-  if (showPDFAnnotator && annotatingAssignment) {
-    return (
-      <PDFAnnotator
-        pdfUrl={annotatingAssignment.attachmentUrls![0]}
-        assignmentId={annotatingAssignment.id}
-        onSave={async (annotatedFileUrl: string) => {
-          // Submit the annotated file as the assignment
-          submitAssignmentMutation.mutate({
-            assignmentId: annotatingAssignment.id,
-            fileUrls: [annotatedFileUrl]
-          });
-          setShowPDFAnnotator(false);
-          setAnnotatingAssignment(null);
-        }}
-        onClose={() => {
-          setShowPDFAnnotator(false);
-          setAnnotatingAssignment(null);
-        }}
-      />
-    );
-  }
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">
