@@ -61,22 +61,25 @@ export function PDFAnnotatorPage() {
     }
   });
 
-  // Initialize canvas with proper sizing and load saved work
+  // Initialize canvas to perfectly match PDF iframe
   const initializeCanvas = useCallback(() => {
-    if (!canvasRef.current || !pdfViewerRef.current) return;
+    if (!canvasRef.current || !pdfContainerRef.current) return;
 
     const canvas = canvasRef.current;
-    const iframe = pdfViewerRef.current;
+    const container = pdfContainerRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas to cover the entire PDF area (larger than viewport)
-    canvas.width = 1200; // Fixed width for PDF pages
-    canvas.height = 1600; // Fixed height for PDF pages
+    // Make canvas exactly match the container's scroll area
+    canvas.width = container.scrollWidth;
+    canvas.height = container.scrollHeight;
     
-    // Style canvas to overlay properly
-    canvas.style.width = '100%';
-    canvas.style.height = '100%';
+    // Position canvas to cover the entire scrollable area
+    canvas.style.width = container.scrollWidth + 'px';
+    canvas.style.height = container.scrollHeight + 'px';
+    canvas.style.position = 'absolute';
+    canvas.style.top = '0px';
+    canvas.style.left = '0px';
     
     // Configure context for high-quality drawing
     ctx.lineCap = 'round';
@@ -86,24 +89,34 @@ export function PDFAnnotatorPage() {
     // Load saved annotations
     loadSavedWork();
     
-    console.log('Canvas initialized with fixed dimensions for PDF sync');
+    console.log('Canvas initialized to match PDF scroll area:', { 
+      width: canvas.width, 
+      height: canvas.height,
+      scrollWidth: container.scrollWidth,
+      scrollHeight: container.scrollHeight
+    });
   }, []);
 
-  // Get coordinate relative to PDF content - properly synchronized
+  // Get absolute coordinates that stay fixed relative to PDF content
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current || !pdfContainerRef.current) return { x: 0, y: 0 };
     
     const canvas = canvasRef.current;
     const container = pdfContainerRef.current;
     const rect = canvas.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
     
-    // Get mouse position relative to canvas
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    // Get mouse position relative to the container
+    const x = e.clientX - containerRect.left;
+    const y = e.clientY - containerRect.top;
     
-    // Convert to actual canvas coordinates (accounting for CSS scaling)
-    const canvasX = (x / rect.width) * canvas.width;
-    const canvasY = (y / rect.height) * canvas.height;
+    // Add the current scroll position to get absolute position in the PDF
+    const absoluteX = x + container.scrollLeft;
+    const absoluteY = y + container.scrollTop;
+    
+    // Scale to canvas coordinates
+    const canvasX = (absoluteX / container.scrollWidth) * canvas.width;
+    const canvasY = (absoluteY / container.scrollHeight) * canvas.height;
     
     return { x: canvasX, y: canvasY };
   };
@@ -348,9 +361,18 @@ export function PDFAnnotatorPage() {
   // Sync canvas with PDF on load and resize
   useEffect(() => {
     if (pdfLoaded) {
-      setTimeout(initializeCanvas, 100);
+      const timer = setTimeout(initializeCanvas, 100);
+      return () => clearTimeout(timer);
     }
-  }, [pdfLoaded, initializeCanvas, scale]);
+  }, [pdfLoaded, initializeCanvas]);
+
+  // Re-initialize canvas when scale changes
+  useEffect(() => {
+    if (pdfLoaded) {
+      const timer = setTimeout(initializeCanvas, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [scale, pdfLoaded, initializeCanvas]);
 
   // Handle window resize
   useEffect(() => {
@@ -362,16 +384,18 @@ export function PDFAnnotatorPage() {
     return () => window.removeEventListener('resize', handleResize);
   }, [initializeCanvas]);
 
-  // Sync canvas on PDF container scroll
+  // Handle container scroll - canvas should stay perfectly aligned
   useEffect(() => {
     const container = pdfContainerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
-      // Canvas stays in sync automatically due to positioning
+      // Canvas position is absolute within the container, so it scrolls with the content
+      // This ensures annotations stay locked to their PDF positions
+      console.log('PDF scrolled:', { scrollLeft: container.scrollLeft, scrollTop: container.scrollTop });
     };
 
-    container.addEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -513,42 +537,42 @@ export function PDFAnnotatorPage() {
           <div 
             ref={pdfContainerRef}
             className="relative w-full h-full overflow-auto"
+            style={{ transform: `scale(${scale})`, transformOrigin: '0 0' }}
           >
-            <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: '0 0' }}>
-              <iframe
-                ref={pdfViewerRef}
-                src={pdfUrl}
-                className="w-full border-0 block bg-white"
-                style={{ 
-                  height: '100vh',
-                  minHeight: '800px'
-                }}
-                onLoad={() => {
-                  setPdfLoaded(true);
-                  setTimeout(initializeCanvas, 300);
-                }}
-                title="PDF Document"
-              />
-              
-              <canvas
-                ref={canvasRef}
-                className="absolute top-0 left-0 pointer-events-auto"
-                style={{
-                  cursor: activeTool === 'text' ? 'text' : 
-                         activeTool === 'eraser' ? 'crosshair' : 
-                         activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                  pointerEvents: activeTool ? 'auto' : 'none',
-                  zIndex: activeTool ? 10 : 1,
-                  width: '100%',
-                  height: '100%',
-                  imageRendering: 'pixelated'
-                }}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-              />
-            </div>
+            <iframe
+              ref={pdfViewerRef}
+              src={pdfUrl}
+              className="w-full border-0 block bg-white"
+              style={{ 
+                height: '100vh',
+                minHeight: '800px',
+                width: '100%'
+              }}
+              onLoad={() => {
+                setPdfLoaded(true);
+                setTimeout(initializeCanvas, 500);
+              }}
+              title="PDF Document"
+            />
+            
+            <canvas
+              ref={canvasRef}
+              className="pointer-events-auto"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                cursor: activeTool === 'text' ? 'text' : 
+                       activeTool === 'eraser' ? 'crosshair' : 
+                       activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
+                pointerEvents: activeTool ? 'auto' : 'none',
+                zIndex: activeTool ? 10 : 1
+              }}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+            />
           </div>
         </div>
       </div>
