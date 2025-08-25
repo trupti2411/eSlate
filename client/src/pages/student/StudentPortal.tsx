@@ -137,13 +137,7 @@ export function StudentPortal() {
     );
   }
 
-  // E-ink optimized styles
-  const eInkStyles = {
-    card: "bg-white border-2 border-black rounded-none",
-    button: "bg-white border-2 border-black text-black hover:bg-gray-100 rounded-none",
-    primaryButton: "bg-black text-white border-2 border-black hover:bg-gray-800 rounded-none",
-    badge: "bg-white border border-black text-black rounded-none"
-  };
+
 
   const studentId = user?.id ? `student-${user.id}` : '';
 
@@ -212,6 +206,8 @@ export function StudentPortal() {
     }
   });
 
+
+
   const getAssignmentStatus = (assignment: Assignment) => {
     const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
     if (submission) {
@@ -237,6 +233,14 @@ export function StudentPortal() {
       'needs_revision': 'bg-orange-100 text-orange-800 border-orange-300'
     };
     return colors[status as keyof typeof colors] || colors.pending;
+  };
+
+  // E-ink optimized styles
+  const eInkStyles = {
+    card: "bg-white border-2 border-black rounded-none",
+    button: "bg-white border-2 border-black text-black hover:bg-gray-100 rounded-none",
+    primaryButton: "bg-black text-white border-2 border-black hover:bg-gray-800 rounded-none",
+    badge: "bg-white border border-black text-black rounded-none"
   };
 
   const renderDashboard = () => (
