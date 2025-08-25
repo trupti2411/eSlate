@@ -586,29 +586,19 @@ export function PDFAnnotatorPage() {
             title="PDF Document"
           />
           
-          {/* Canvas overlay for annotations - only active when tool selected */}
-          {activeTool && (
-            <canvas
-              ref={canvasRef}
-              className="absolute top-0 left-0 w-full h-full pointer-events-auto"
-              style={{
-                cursor: activeTool === 'text' ? 'text' : 'crosshair',
-                zIndex: 10
-              }}
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-            />
-          )}
-          
-          {/* Canvas for displaying saved annotations - always visible */}
+          {/* Single canvas overlay */}
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0 w-full h-full pointer-events-none"
+            className="absolute top-0 left-0 w-full h-full"
             style={{
-              zIndex: 5
+              cursor: activeTool ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
+              pointerEvents: activeTool ? 'auto' : 'none',
+              zIndex: activeTool ? 10 : 5
             }}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={stopDrawing}
+            onMouseLeave={stopDrawing}
           />
         </div>
       </div>
