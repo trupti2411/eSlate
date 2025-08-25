@@ -1876,7 +1876,7 @@ Good luck with your assignment!"
       const { assignmentId } = req.params;
       
       // Get assignment to find the PDF URL
-      const assignment = await storage.getAssignmentById(assignmentId);
+      const assignment = await storage.getAssignment(assignmentId);
       if (!assignment) {
         return res.status(404).json({ error: 'Assignment not found' });
       }
