@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { type Submission } from "@shared/schema";
+import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 
 interface SubmissionWithDetails extends Submission {
   student: {
@@ -40,6 +41,89 @@ interface SubmissionWithDetails extends Submission {
     description: string;
     submissionDate: string;
   };
+}
+
+// Component to display submitted files with original filenames
+function SubmittedFilesSection({ submission, eInkStyles }: { submission: SubmissionWithDetails; eInkStyles: any }) {
+  const fileUrls = submission.fileUrls || [];
+  const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(fileUrls);
+
+  if (!fileUrls.length) return null;
+
+  return (
+    <div className={`${eInkStyles.card} p-4`}>
+      <h3 className="font-semibold mb-3 flex items-center">
+        <Paperclip className="h-4 w-4 mr-2" />
+        Submitted Files ({fileUrls.length})
+      </h3>
+      {isLoadingMetadata ? (
+        <div className="text-center py-4">
+          <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <p className="text-sm text-gray-600 mt-2">Loading file information...</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {fileUrls.map((fileUrl, index) => {
+            const metadata = fileMetadata?.[index];
+            const displayFilename = getDisplayFilename(fileUrl, metadata, index);
+            const fileExtension = displayFilename.split('.').pop()?.toLowerCase();
+            
+            return (
+              <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded bg-gray-50">
+                <div className="flex items-center">
+                  <FileText className="h-4 w-4 mr-2 text-blue-600" />
+                  <div className="flex flex-col">
+                    <span className="font-medium text-sm">{displayFilename}</span>
+                    {fileExtension && (
+                      <span className="text-xs text-gray-500">
+                        {fileExtension.toUpperCase()} File
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const objectPath = fileUrl.includes('/uploads/') 
+                        ? fileUrl.split('/uploads/').pop()
+                        : fileUrl.split('/').pop();
+                      window.open(`/objects/uploads/${objectPath}`, '_blank');
+                    }}
+                    className="text-xs"
+                  >
+                    <Eye className="h-3 w-3 mr-1" />
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      const objectPath = fileUrl.includes('/uploads/') 
+                        ? fileUrl.split('/uploads/').pop()
+                        : fileUrl.split('/').pop();
+                      const link = document.createElement('a');
+                      link.href = `/objects/uploads/${objectPath}`;
+                      link.download = displayFilename; // Use original filename for download
+                      link.target = '_blank';
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                    }}
+                    className="text-xs"
+                  >
+                    <Download className="h-3 w-3 mr-1" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function SubmittedHomework() {
@@ -221,7 +305,7 @@ export default function SubmittedHomework() {
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          <span>Submitted {submission.submittedAt ? format(new Date(submission.submittedAt), 'MMM dd, yyyy HH:mm') : format(new Date(submission.createdAt), 'MMM dd, yyyy HH:mm')}</span>
+                          <span>Submitted {submission.submittedAt ? format(new Date(submission.submittedAt), 'MMM dd, yyyy HH:mm') : (submission.createdAt ? format(new Date(submission.createdAt), 'MMM dd, yyyy HH:mm') : 'Unknown date')}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <BookOpen className="h-4 w-4" />
@@ -280,63 +364,7 @@ export default function SubmittedHomework() {
                               </div>
 
                               {/* Uploaded Files */}
-                              {selectedSubmission.fileUrls && selectedSubmission.fileUrls.length > 0 && (
-                                <div className={`${eInkStyles.card} p-4`}>
-                                  <h3 className="font-semibold mb-3 flex items-center">
-                                    <Paperclip className="h-4 w-4 mr-2" />
-                                    Submitted Files ({selectedSubmission.fileUrls.length})
-                                  </h3>
-                                  <div className="space-y-2">
-                                    {selectedSubmission.fileUrls.map((fileUrl, index) => {
-                                      const filename = fileUrl.split('/').pop() || `file-${index + 1}`;
-                                      return (
-                                        <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded bg-gray-50">
-                                          <div className="flex items-center">
-                                            <FileText className="h-4 w-4 mr-2 text-blue-600" />
-                                            <span className="font-medium text-sm">{filename}</span>
-                                          </div>
-                                          <div className="flex gap-2">
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => {
-                                                const objectPath = fileUrl.includes('/uploads/') 
-                                                  ? fileUrl.split('/uploads/').pop()
-                                                  : fileUrl.split('/').pop();
-                                                window.open(`/objects/uploads/${objectPath}`, '_blank');
-                                              }}
-                                              className="text-xs"
-                                            >
-                                              <Eye className="h-3 w-3 mr-1" />
-                                              View
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() => {
-                                                const objectPath = fileUrl.includes('/uploads/') 
-                                                  ? fileUrl.split('/uploads/').pop()
-                                                  : fileUrl.split('/').pop();
-                                                const link = document.createElement('a');
-                                                link.href = `/objects/uploads/${objectPath}`;
-                                                link.download = filename;
-                                                link.target = '_blank';
-                                                document.body.appendChild(link);
-                                                link.click();
-                                                document.body.removeChild(link);
-                                              }}
-                                              className="text-xs"
-                                            >
-                                              <Download className="h-3 w-3 mr-1" />
-                                              Download
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
+                              {selectedSubmission.fileUrls && selectedSubmission.fileUrls.length > 0 && <SubmittedFilesSection submission={selectedSubmission} eInkStyles={eInkStyles} />}
                             </div>
                           )}
                         </DialogContent>

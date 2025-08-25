@@ -474,17 +474,44 @@ export function StudentPortal() {
                                 url: response.uploadURL,
                               };
                             }}
-                            onComplete={(result) => {
+                            onComplete={async (result) => {
                               if (result.successful && result.successful.length > 0) {
-                                const fileUrls = result.successful.map(file => {
-                                  const url = file.uploadURL as string;
-                                  return url.replace(/\?.*$/, ''); // Remove query parameters
-                                });
-                                
-                                submitAssignmentMutation.mutate({
-                                  assignmentId: assignment.id,
-                                  fileUrls: fileUrls
-                                });
+                                try {
+                                  // Set metadata for each uploaded file
+                                  const metadataPromises = result.successful.map(async (file: any) => {
+                                    const uploadURL = file.uploadURL as string;
+                                    const originalFileName = file.name || file.fileName || `file-${Date.now()}`;
+                                    
+                                    try {
+                                      await apiRequest('/api/objects/metadata', 'POST', {
+                                        uploadURL: uploadURL,
+                                        originalFileName: originalFileName
+                                      });
+                                    } catch (error) {
+                                      console.warn('Failed to set metadata for file:', originalFileName, error);
+                                    }
+                                  });
+                                  
+                                  // Wait for all metadata to be set
+                                  await Promise.allSettled(metadataPromises);
+                                  
+                                  const fileUrls = result.successful.map((file: any) => {
+                                    const url = file.uploadURL as string;
+                                    return url.replace(/\?.*$/, ''); // Remove query parameters
+                                  });
+                                  
+                                  submitAssignmentMutation.mutate({
+                                    assignmentId: assignment.id,
+                                    fileUrls: fileUrls
+                                  });
+                                } catch (error) {
+                                  console.error('Error processing upload:', error);
+                                  toast({
+                                    title: "Upload processing failed", 
+                                    description: "Files uploaded but failed to process. Please contact support.",
+                                    variant: "destructive",
+                                  });
+                                }
                               } else {
                                 toast({
                                   title: "Upload failed", 
