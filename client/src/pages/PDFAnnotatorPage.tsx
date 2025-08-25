@@ -46,11 +46,16 @@ export function PDFAnnotatorPage() {
   const rawPdfUrl = urlParams.get('pdf') || '';
   const assignmentId = urlParams.get('assignmentId') || '';
   
-  const pdfUrl = rawPdfUrl.includes('http') ? rawPdfUrl : `https://storage.googleapis.com/${rawPdfUrl}`;
+  // Construct proper Google Cloud Storage URL
+  const pdfUrl = rawPdfUrl.includes('http') 
+    ? rawPdfUrl 
+    : `https://storage.googleapis.com/replit-objstore-792cd13a-ccaf-496a-97b4-c254b4221184/${rawPdfUrl.replace(/^\/+/, '')}`;
 
   // Load PDF in iframe
   const loadPDF = useCallback(() => {
     if (!pdfUrl) return;
+    
+    console.log('Loading PDF:', pdfUrl);
     setPdfLoaded(true);
     setTotalPages(1); // Simplified for iframe approach
     setCurrentPage(1);
