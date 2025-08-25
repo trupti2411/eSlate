@@ -475,15 +475,23 @@ export function StudentPortal() {
                               };
                             }}
                             onComplete={(result) => {
-                              const fileUrls = result.successful.map(file => {
-                                const url = (file.response as any)?.body?.url || file.uploadURL;
-                                return url.replace(/\?.*$/, ''); // Remove query parameters
-                              });
-                              
-                              if (fileUrls.length > 0) {
+                              if (result.successful && result.successful.length > 0) {
+                                const fileUrls = result.successful.map(file => {
+                                  const url = file.uploadURL as string;
+                                  return url.replace(/\?.*$/, ''); // Remove query parameters
+                                });
+                                
                                 submitAssignmentMutation.mutate({
                                   assignmentId: assignment.id,
                                   fileUrls: fileUrls
+                                });
+                              } else {
+                                toast({
+                                  title: "Upload failed", 
+                                  description: result.failed && result.failed.length > 0 
+                                    ? `Failed to upload ${result.failed.length} file(s). Please try again.`
+                                    : "No files were uploaded successfully. Please try again.",
+                                  variant: "destructive",
                                 });
                               }
                             }}
