@@ -479,10 +479,16 @@ export function StudentPortal() {
                       {hasAttachments && (
                         <Button
                           onClick={() => {
-                            console.log('Opening PDF annotator for assignment:', assignment.id);
-                            console.log('Assignment attachments:', assignment.attachmentUrls);
-                            setAnnotatingAssignment(assignment);
-                            setShowPDFAnnotator(true);
+                            if (assignment.attachmentUrls && assignment.attachmentUrls.length > 0) {
+                              const url = assignment.attachmentUrls[0];
+                              const objectPath = url.includes('/uploads/') 
+                                ? url.split('/uploads/').pop()?.split('?')[0]
+                                : url.split('/').pop()?.split('?')[0];
+                              
+                              // Open PDF annotator in new tab with assignment context
+                              const annotatorUrl = `/pdf-annotator?pdf=${encodeURIComponent(`/objects/uploads/${objectPath}`)}&assignmentId=${assignment.id}`;
+                              window.open(annotatorUrl, '_blank');
+                            }
                           }}
                           className={eInkStyles.primaryButton}
                           size="sm"
