@@ -46,9 +46,9 @@ export default function GoogleDocsViewer() {
   const publicDocumentUrl = assignmentId ? `/api/public-doc/${assignmentId}` : '';
   const fallbackUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
   
-  // Google Docs Viewer URL
+  // Google Docs Viewer URL with enhanced parameters for full document loading
   const googleDocsViewerUrl = publicDocumentUrl ? 
-    `https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + publicDocumentUrl)}&embedded=true` : '';
+    `https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + publicDocumentUrl)}&embedded=true&chrome=false&dov=1` : '';
 
   // Load document with Google Docs Viewer
   const loadDocument = useCallback(async () => {
@@ -158,8 +158,8 @@ export default function GoogleDocsViewer() {
       const container = containerRef.current;
       
       const rect = container.getBoundingClientRect();
-      // Make canvas large enough to cover scrollable content
-      const canvasHeight = Math.max(rect.height, 3000); // Even larger for multi-page documents
+      // Make canvas large enough to cover scrollable content - much larger for full documents
+      const canvasHeight = Math.max(rect.height, 5000); // Much larger for full multi-page documents
       canvas.width = rect.width;
       canvas.height = canvasHeight;
       canvas.style.width = `${rect.width}px`;
@@ -594,6 +594,19 @@ export default function GoogleDocsViewer() {
             Download Original
           </Button>
           <Button 
+            onClick={() => {
+              if (iframeRef.current) {
+                // Force reload with timestamp to bypass cache and load full document
+                iframeRef.current.src = googleDocsViewerUrl + `&t=${Date.now()}`;
+              }
+            }}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Full Reload
+          </Button>
+          <Button 
             onClick={saveWork} 
             disabled={isSaving}
             variant="outline"
@@ -708,13 +721,14 @@ export default function GoogleDocsViewer() {
             title="Google Docs Viewer"
             onLoad={handleIframeLoad}
             onError={handleIframeError}
+            allow="fullscreen"
             style={{
               position: 'absolute',
               top: 0,
               left: 0,
               width: '100%',
               height: '100%',
-              minHeight: '200vh' // Make iframe taller to enable scrolling
+              minHeight: '500vh' // Much larger height to ensure full document loads
             }}
           />
           
@@ -757,7 +771,7 @@ export default function GoogleDocsViewer() {
               zIndex: 15,
               backgroundColor: 'transparent',
               pointerEvents: viewerReady && !isDrawing ? 'auto' : 'none',
-              height: '3000px', // Match larger canvas height for page navigation
+              height: '5000px', // Match larger canvas height for full document navigation
               minHeight: '100%'
             }}
             onMouseDown={(e) => {
