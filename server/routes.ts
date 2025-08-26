@@ -1870,6 +1870,127 @@ Good luck with your assignment!"
     }
   });
 
+  // Document converter - converts Word docs to HTML/images for viewing
+  app.get('/api/convert-doc/:assignmentId', async (req, res) => {
+    try {
+      const { assignmentId } = req.params;
+      
+      // Get assignment to find the document URL
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ error: 'Assignment not found' });
+      }
+      
+      // Get the first attachment URL
+      const documentUrl = assignment.attachmentUrls?.[0];
+      if (!documentUrl) {
+        return res.status(404).json({ error: 'No document attachment found' });
+      }
+      
+      // Extract object path from Google Cloud Storage URL
+      const match = documentUrl.match(/googleapis\.com\/([^\/]+)\/(.+)$/);
+      if (!match) {
+        return res.status(400).json({ error: 'Invalid document URL format' });
+      }
+      
+      const bucketName = match[1];
+      const objectName = match[2];
+      
+      console.log(`Converting document: gs://${bucketName}/${objectName}`);
+      
+      try {
+        // Get the file from Google Cloud Storage
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectName);
+        
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          return res.status(404).json({ error: 'Document file not found in storage' });
+        }
+        
+        // Get file metadata to determine type
+        const [metadata] = await file.getMetadata();
+        const contentType = metadata.contentType || 'application/octet-stream';
+        
+        if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+            contentType.includes('application/msword')) {
+          
+          // For Word documents, convert to HTML
+          const mammoth = require('mammoth');
+          
+          // Download the file to a buffer
+          const [fileBuffer] = await file.download();
+          
+          // Convert Word document to HTML
+          const result = await mammoth.convertToHtml({ buffer: fileBuffer });
+          const html = result.value;
+          
+          // Return HTML wrapped in a complete page
+          const fullHtml = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8">
+              <title>Document Viewer</title>
+              <style>
+                body { 
+                  font-family: Arial, sans-serif; 
+                  line-height: 1.6; 
+                  max-width: 800px; 
+                  margin: 0 auto; 
+                  padding: 20px;
+                  background: white;
+                  color: black;
+                }
+                p { margin-bottom: 1em; }
+                h1, h2, h3 { color: #333; margin-top: 1.5em; }
+              </style>
+            </head>
+            <body>
+              ${html}
+            </body>
+            </html>
+          `;
+          
+          res.set({
+            'Content-Type': 'text/html',
+            'Cache-Control': 'public, max-age=3600',
+          });
+          
+          return res.send(fullHtml);
+          
+        } else {
+          // For other document types, just proxy the file
+          res.set({
+            'Content-Type': contentType,
+            'Content-Length': metadata.size?.toString() || '0',
+            'Content-Disposition': 'inline',
+            'Cache-Control': 'public, max-age=3600',
+          });
+          
+          const stream = file.createReadStream();
+          stream.pipe(res);
+          
+          stream.on('error', (error) => {
+            console.error('Error streaming document:', error);
+            if (!res.headersSent) {
+              res.status(500).json({ error: 'Error streaming document file' });
+            }
+          });
+        }
+        
+      } catch (storageError: any) {
+        console.error('Google Cloud Storage error:', storageError);
+        return res.status(500).json({ error: 'Failed to access document file' });
+      }
+      
+    } catch (error) {
+      console.error('Document conversion error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // Public document proxy for Google Docs Viewer (no authentication required)
   app.get('/api/public-doc/:assignmentId', async (req, res) => {
     try {
