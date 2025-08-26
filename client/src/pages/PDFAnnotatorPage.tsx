@@ -54,22 +54,35 @@ export function PDFAnnotatorPage() {
     setPdfLoaded(true);
   }, [pdfUrl]);
 
-  // Update canvas size to match PDF viewer
+  // Update canvas size to match PDF viewer exactly
   const updateCanvasSize = useCallback(() => {
     if (!annotationCanvasRef.current || !pdfViewerRef.current || !containerRef.current) return;
     
     const canvas = annotationCanvasRef.current;
+    const iframe = pdfViewerRef.current;
     const container = containerRef.current;
     
-    // Set canvas to cover the entire scrollable area
-    const rect = container.getBoundingClientRect();
-    canvas.width = rect.width;
-    canvas.height = container.scrollHeight; // Full scrollable height
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${container.scrollHeight}px`;
+    // Get the iframe's actual content dimensions including scale
+    const iframeRect = iframe.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
     
-    console.log('Canvas resized:', { width: canvas.width, height: canvas.height });
-  }, []);
+    // Set canvas to match the scaled iframe dimensions exactly
+    canvas.width = iframeRect.width;
+    canvas.height = iframeRect.height;
+    canvas.style.width = `${iframeRect.width}px`;
+    canvas.style.height = `${iframeRect.height}px`;
+    
+    // Position canvas to overlay the iframe exactly
+    canvas.style.left = `${iframeRect.left - containerRect.left}px`;
+    canvas.style.top = `${iframeRect.top - containerRect.top}px`;
+    
+    console.log('Canvas synchronized with iframe:', { 
+      width: canvas.width, 
+      height: canvas.height,
+      left: canvas.style.left,
+      top: canvas.style.top
+    });
+  }, [scale]);
 
   // Track scroll position for coordinate adjustment
   const updateScrollOffset = useCallback(() => {
@@ -80,7 +93,10 @@ export function PDFAnnotatorPage() {
       x: container.scrollLeft,
       y: container.scrollTop
     });
-  }, []);
+    
+    // Update canvas position to stay aligned with iframe
+    updateCanvasSize();
+  }, [updateCanvasSize]);
 
   // Redraw all annotations
   const redrawAnnotations = useCallback(() => {
@@ -122,17 +138,16 @@ export function PDFAnnotatorPage() {
     });
   }, [annotations]);
 
-  // Get coordinates relative to canvas with scroll compensation
+  // Get coordinates relative to canvas - no scroll compensation needed since canvas follows iframe
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!annotationCanvasRef.current || !containerRef.current) return { x: 0, y: 0 };
+    if (!annotationCanvasRef.current) return { x: 0, y: 0 };
     
     const canvas = annotationCanvasRef.current;
-    const container = containerRef.current;
     const rect = canvas.getBoundingClientRect();
     
     return {
-      x: e.clientX - rect.left + container.scrollLeft,
-      y: e.clientY - rect.top + container.scrollTop
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
     };
   };
 
@@ -388,18 +403,13 @@ export function PDFAnnotatorPage() {
     redrawAnnotations();
   }, [annotations, redrawAnnotations]);
 
-  // Handle container scroll - update scroll offset
+  // Handle container scroll - keep canvas aligned with iframe
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const handleScroll = () => {
       updateScrollOffset();
-      // Update canvas position to follow scroll
-      if (annotationCanvasRef.current) {
-        const canvas = annotationCanvasRef.current;
-        canvas.style.transform = `translate(${-container.scrollLeft}px, ${-container.scrollTop}px)`;
-      }
     };
 
     container.addEventListener('scroll', handleScroll);
@@ -533,16 +543,21 @@ export function PDFAnnotatorPage() {
               height: `${100 / scale}%`,
               width: `${100 / scale}%`
             }}
+            onLoad={() => {
+              // Ensure canvas is properly positioned after PDF loads
+              setTimeout(updateCanvasSize, 200);
+            }}
           />
           
-          {/* Annotation Canvas Overlay - Smart Interaction */}
+          {/* Annotation Canvas Overlay - Perfectly Aligned */}
           <canvas
             ref={annotationCanvasRef}
-            className="absolute top-0 left-0"
+            className="absolute"
             style={{
               cursor: isDrawing ? 'none' : (activeTool === 'text' ? 'text' : 'crosshair'),
               zIndex: 10,
-              pointerEvents: 'auto'
+              pointerEvents: 'auto',
+              position: 'absolute'
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
