@@ -29,6 +29,7 @@ export default function GoogleDocsViewer() {
   const [documentType, setDocumentType] = useState('Document');
   const [viewerReady, setViewerReady] = useState(false);
   const [loadAttempts, setLoadAttempts] = useState(0);
+  const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -127,14 +128,38 @@ export default function GoogleDocsViewer() {
       const container = containerRef.current;
       
       const rect = container.getBoundingClientRect();
+      // Make canvas large enough to cover scrollable content
       canvas.width = rect.width;
-      canvas.height = rect.height;
+      canvas.height = Math.max(rect.height, 2000); // Larger canvas for scrolling
       canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${rect.height}px`;
+      canvas.style.height = `${Math.max(rect.height, 2000)}px`;
       
-      console.log('Canvas overlay initialized for Google Docs Viewer:', rect.width, 'x', rect.height);
+      console.log('Canvas overlay initialized for Google Docs Viewer:', rect.width, 'x', Math.max(rect.height, 2000));
     }
   }, []);
+
+  // Handle container scroll
+  const handleScroll = useCallback(() => {
+    if (containerRef.current) {
+      const scrollTop = containerRef.current.scrollTop;
+      const scrollLeft = containerRef.current.scrollLeft;
+      setScrollOffset({ x: scrollLeft, y: scrollTop });
+      
+      // Update canvas position to follow scroll
+      if (canvasRef.current) {
+        canvasRef.current.style.transform = `translate(${-scrollLeft}px, ${-scrollTop}px)`;
+      }
+    }
+  }, []);
+
+  // Set up scroll listener
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll, { passive: true });
+      return () => container.removeEventListener('scroll', handleScroll);
+    }
+  }, [handleScroll]);
 
   // Handle iframe load
   const handleIframeLoad = useCallback(() => {
@@ -305,16 +330,16 @@ export default function GoogleDocsViewer() {
     setAnnotations(prev => [...prev, newAnnotation]);
   };
 
-  // Get coordinates relative to canvas
+  // Get coordinates relative to canvas, accounting for scroll
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
+    if (!canvasRef.current || !containerRef.current) return { x: 0, y: 0 };
     
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
+    const container = containerRef.current;
+    const containerRect = container.getBoundingClientRect();
     
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: e.clientX - containerRect.left + container.scrollLeft,
+      y: e.clientY - containerRect.top + container.scrollTop
     };
   };
 
@@ -589,6 +614,7 @@ export default function GoogleDocsViewer() {
                 <p><strong>Annotations:</strong> {annotations.length}</p>
                 <p><strong>Viewer:</strong> Google Docs</p>
                 <p><strong>Status:</strong> {viewerReady ? 'Ready' : 'Loading...'}</p>
+                <p><strong>Scroll:</strong> {scrollOffset.x}, {scrollOffset.y}</p>
                 <p><strong>Attempts:</strong> {loadAttempts + 1}</p>
               </div>
             </div>
@@ -629,12 +655,16 @@ export default function GoogleDocsViewer() {
           {/* Annotation canvas overlay */}
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0"
+            className="absolute"
             style={{
               cursor: isDrawing || activeTool !== 'text' ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
               zIndex: 20,
               backgroundColor: 'transparent',
-              pointerEvents: isDrawing ? 'auto' : 'none' // Only capture events when drawing
+              pointerEvents: isDrawing ? 'auto' : 'none', // Only capture events when drawing
+              top: 0,
+              left: 0,
+              transform: `translate(${-scrollOffset.x}px, ${-scrollOffset.y}px)`,
+              transformOrigin: 'top left'
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
