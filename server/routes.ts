@@ -1870,6 +1870,82 @@ Good luck with your assignment!"
     }
   });
 
+  // Public document proxy for Google Docs Viewer (no authentication required)
+  app.get('/api/public-doc/:assignmentId', async (req, res) => {
+    try {
+      const { assignmentId } = req.params;
+      
+      // Get assignment to find the document URL
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ error: 'Assignment not found' });
+      }
+      
+      // Get the first attachment URL
+      const documentUrl = assignment.attachmentUrls?.[0];
+      if (!documentUrl) {
+        return res.status(404).json({ error: 'No document attachment found' });
+      }
+      
+      // Extract object path from Google Cloud Storage URL
+      const match = documentUrl.match(/googleapis\.com\/([^\/]+)\/(.+)$/);
+      if (!match) {
+        return res.status(400).json({ error: 'Invalid document URL format' });
+      }
+      
+      const bucketName = match[1];
+      const objectName = match[2];
+      
+      console.log(`Serving public document: gs://${bucketName}/${objectName}`);
+      
+      try {
+        // Get the file from Google Cloud Storage
+        const bucket = objectStorageClient.bucket(bucketName);
+        const file = bucket.file(objectName);
+        
+        // Check if file exists
+        const [exists] = await file.exists();
+        if (!exists) {
+          return res.status(404).json({ error: 'Document file not found in storage' });
+        }
+        
+        // Get file metadata
+        const [metadata] = await file.getMetadata();
+        const contentType = metadata.contentType || 'application/octet-stream';
+        
+        // Set appropriate headers for public access
+        res.set({
+          'Content-Type': contentType,
+          'Content-Length': metadata.size?.toString() || '0',
+          'Content-Disposition': 'inline',
+          'Cache-Control': 'public, max-age=3600',
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET',
+          'Access-Control-Allow-Headers': 'Content-Type',
+        });
+        
+        // Stream the file to the response
+        const stream = file.createReadStream();
+        stream.pipe(res);
+        
+        stream.on('error', (error) => {
+          console.error('Error streaming public document:', error);
+          if (!res.headersSent) {
+            res.status(500).json({ error: 'Error streaming document file' });
+          }
+        });
+        
+      } catch (storageError: any) {
+        console.error('Google Cloud Storage error:', storageError);
+        return res.status(500).json({ error: 'Failed to access document file' });
+      }
+      
+    } catch (error) {
+      console.error('Public document proxy error:', error);
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   // PDF Proxy endpoint for serving protected PDFs with authentication
   app.get('/api/pdf-proxy/:assignmentId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
     try {

@@ -28,6 +28,8 @@ export default function GoogleDocsAnnotatorPage() {
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Array<{x: number, y: number}>>([]);
   const [documentType, setDocumentType] = useState('Document');
+  const [useGoogleViewer, setUseGoogleViewer] = useState(true);
+  const [viewerError, setViewerError] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -39,10 +41,14 @@ export default function GoogleDocsAnnotatorPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const assignmentId = urlParams.get('assignmentId') || '';
   
-  // Create Google Docs Viewer URL
+  // Create URLs for both approaches
   const documentUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
-  const googleDocsViewerUrl = documentUrl ? 
-    `https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + documentUrl)}&embedded=true` : '';
+  const publicDocumentUrl = assignmentId ? `/api/public-doc/${assignmentId}` : '';
+  const googleDocsViewerUrl = publicDocumentUrl ? 
+    `https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + publicDocumentUrl)}&embedded=true` : '';
+  
+  // Fallback URL for direct iframe viewing
+  const fallbackUrl = documentUrl;
 
   // Load document with Google Docs Viewer
   const loadDocument = useCallback(async () => {
@@ -114,11 +120,24 @@ export default function GoogleDocsAnnotatorPage() {
 
   // Handle iframe load
   const handleIframeLoad = useCallback(() => {
-    console.log('Google Docs Viewer iframe loaded');
+    console.log('Document viewer iframe loaded');
+    setViewerError(false);
     setTimeout(() => {
       initializeCanvas();
     }, 1000);
   }, [initializeCanvas]);
+
+  // Handle iframe error
+  const handleIframeError = useCallback(() => {
+    console.log('Google Docs Viewer failed, switching to direct view');
+    setViewerError(true);
+    setUseGoogleViewer(false);
+    
+    toast({
+      title: "Viewer Switched",
+      description: "Switched to direct document view for better compatibility.",
+    });
+  }, [toast]);
 
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -481,7 +500,10 @@ export default function GoogleDocsAnnotatorPage() {
               <div className="text-sm text-gray-600 space-y-1">
                 <p><strong>Type:</strong> {documentType}</p>
                 <p><strong>Annotations:</strong> {annotations.length}</p>
-                <p><strong>Viewer:</strong> Google Docs</p>
+                <p><strong>Viewer:</strong> {useGoogleViewer && !viewerError ? 'Google Docs' : 'Direct'}</p>
+                {viewerError && (
+                  <p className="text-yellow-600"><strong>Status:</strong> Fallback mode</p>
+                )}
               </div>
             </div>
           </div>
@@ -489,21 +511,50 @@ export default function GoogleDocsAnnotatorPage() {
 
         {/* Document Viewer */}
         <div className="flex-1 relative" ref={containerRef}>
-          {/* Google Docs Viewer iframe */}
-          <iframe
-            ref={iframeRef}
-            src={googleDocsViewerUrl}
-            className="w-full h-full border-0"
-            title="Document Viewer"
-            onLoad={handleIframeLoad}
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%'
-            }}
-          />
+          {useGoogleViewer && !viewerError ? (
+            // Google Docs Viewer iframe
+            <>
+              <iframe
+                ref={iframeRef}
+                src={googleDocsViewerUrl}
+                className="w-full h-full border-0"
+                title="Document Viewer"
+                onLoad={handleIframeLoad}
+                onError={handleIframeError}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  height: '100%'
+                }}
+              />
+              
+              {/* Show loading message while Google Docs Viewer loads */}
+              <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-5">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-gray-600">Loading with Google Docs Viewer...</p>
+                </div>
+              </div>
+            </>
+          ) : (
+            // Fallback direct iframe viewer
+            <iframe
+              ref={iframeRef}
+              src={fallbackUrl}
+              className="w-full h-full border-0 bg-white"
+              title="Document Viewer"
+              onLoad={handleIframeLoad}
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                height: '100%'
+              }}
+            />
+          )}
           
           {/* Annotation canvas overlay */}
           <canvas
@@ -511,7 +562,7 @@ export default function GoogleDocsAnnotatorPage() {
             className="absolute top-0 left-0 pointer-events-auto"
             style={{
               cursor: activeTool === 'text' ? 'text' : 'crosshair',
-              zIndex: 10
+              zIndex: 20
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
