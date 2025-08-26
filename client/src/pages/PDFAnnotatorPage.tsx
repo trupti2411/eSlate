@@ -1,7 +1,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
@@ -30,14 +30,14 @@ export function PDFAnnotatorPage() {
   const [scale, setScale] = useState(1.0);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Array<{x: number, y: number}>>([]);
-  const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
+  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(0);
   
-  const pdfViewerRef = useRef<HTMLIFrameElement>(null);
-  const annotationCanvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -46,115 +46,133 @@ export function PDFAnnotatorPage() {
   // Use server proxy endpoint to serve authenticated PDFs
   const pdfUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
 
-  // Load PDF in iframe
-  const loadPDF = useCallback(() => {
+  // Load PDF using PDF.js
+  const loadPDF = useCallback(async () => {
     if (!pdfUrl) return;
     
-    console.log('Loading PDF:', pdfUrl);
-    setPdfLoaded(true);
+    try {
+      console.log('Loading PDF with PDF.js:', pdfUrl);
+      
+      // Import PDF.js dynamically
+      const pdfjsLib = await import('pdfjs-dist');
+      
+      // Set worker path
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.js';
+      
+      // Load PDF document
+      const loadingTask = pdfjsLib.getDocument(pdfUrl);
+      const pdf = await loadingTask.promise;
+      
+      setPdfDoc(pdf);
+      setTotalPages(pdf.numPages);
+      setPdfLoaded(true);
+      
+      console.log(`PDF loaded successfully. Pages: ${pdf.numPages}`);
+      
+      // Render first page
+      await renderPage(pdf, 1);
+      
+    } catch (error) {
+      console.error('Error loading PDF:', error);
+      toast({
+        title: "PDF Loading Failed",
+        description: "Could not load the PDF document.",
+        variant: "destructive",
+      });
+    }
   }, [pdfUrl]);
 
-  // Update canvas size to match PDF viewer exactly
-  const updateCanvasSize = useCallback(() => {
-    if (!annotationCanvasRef.current || !pdfViewerRef.current || !containerRef.current) return;
+  // Render PDF page
+  const renderPage = useCallback(async (pdf: any, pageNum: number) => {
+    if (!pdf || !canvasRef.current) return;
     
-    const canvas = annotationCanvasRef.current;
-    const iframe = pdfViewerRef.current;
-    const container = containerRef.current;
-    
-    // Get the iframe's actual content dimensions including scale
-    const iframeRect = iframe.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    
-    // Set canvas to match the scaled iframe dimensions exactly
-    canvas.width = iframeRect.width;
-    canvas.height = iframeRect.height;
-    canvas.style.width = `${iframeRect.width}px`;
-    canvas.style.height = `${iframeRect.height}px`;
-    
-    // Position canvas to overlay the iframe exactly
-    canvas.style.left = `${iframeRect.left - containerRect.left}px`;
-    canvas.style.top = `${iframeRect.top - containerRect.top}px`;
-    
-    console.log('Canvas synchronized with iframe:', { 
-      width: canvas.width, 
-      height: canvas.height,
-      left: canvas.style.left,
-      top: canvas.style.top
-    });
-  }, [scale]);
+    try {
+      const page = await pdf.getPage(pageNum);
+      const canvas = canvasRef.current;
+      const context = canvas.getContext('2d');
+      
+      if (!context) return;
+      
+      // Calculate viewport
+      const viewport = page.getViewport({ scale });
+      
+      // Set canvas dimensions
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
+      
+      // Clear canvas
+      context.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // Render PDF page
+      const renderContext = {
+        canvasContext: context,
+        viewport: viewport,
+      };
+      
+      await page.render(renderContext).promise;
+      
+      // Draw annotations on top
+      drawAnnotations(context);
+      
+      console.log(`Page ${pageNum} rendered at scale ${scale}`);
+      
+    } catch (error) {
+      console.error('Error rendering page:', error);
+    }
+  }, [scale, annotations]);
 
-  // Track scroll position for coordinate adjustment
-  const updateScrollOffset = useCallback(() => {
-    if (!containerRef.current) return;
-    
-    const container = containerRef.current;
-    setScrollOffset({
-      x: container.scrollLeft,
-      y: container.scrollTop
-    });
-    
-    // Update canvas position to stay aligned with iframe
-    updateCanvasSize();
-  }, [updateCanvasSize]);
-
-  // Redraw all annotations
-  const redrawAnnotations = useCallback(() => {
-    if (!annotationCanvasRef.current) return;
-    
-    const canvas = annotationCanvasRef.current;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    // Clear canvas
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw each annotation with scroll compensation
-    annotations.forEach(annotation => {
+  // Draw all annotations on canvas
+  const drawAnnotations = useCallback((ctx: CanvasRenderingContext2D) => {
+    // Draw each annotation
+    annotations.filter(annotation => annotation.page === currentPage).forEach(annotation => {
       ctx.save();
       ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
       ctx.strokeStyle = annotation.style.color;
-      ctx.lineWidth = annotation.style.lineWidth;
+      ctx.lineWidth = annotation.style.lineWidth * scale; // Scale line width
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
       if (annotation.type === 'stroke' && annotation.points) {
         ctx.beginPath();
         annotation.points.forEach((point, index) => {
+          const scaledX = point.x * scale;
+          const scaledY = point.y * scale;
           if (index === 0) {
-            ctx.moveTo(point.x, point.y);
+            ctx.moveTo(scaledX, scaledY);
           } else {
-            ctx.lineTo(point.x, point.y);
+            ctx.lineTo(scaledX, scaledY);
           }
         });
         ctx.stroke();
       } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
         ctx.fillStyle = annotation.style.color;
-        ctx.font = '18px Arial';
-        ctx.fillText(annotation.text, annotation.x, annotation.y);
+        ctx.font = `${18 * scale}px Arial`;
+        ctx.fillText(annotation.text, annotation.x * scale, annotation.y * scale);
       }
       
       ctx.restore();
     });
-  }, [annotations]);
+  }, [annotations, currentPage, scale]);
 
-  // Get coordinates relative to canvas - no scroll compensation needed since canvas follows iframe
+  // Get coordinates relative to PDF content (unscaled)
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!annotationCanvasRef.current) return { x: 0, y: 0 };
+    if (!canvasRef.current) return { x: 0, y: 0 };
     
-    const canvas = annotationCanvasRef.current;
+    const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     
+    // Get coordinates relative to canvas and convert to PDF coordinate space (unscaled)
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: (e.clientX - rect.left) / scale,
+      y: (e.clientY - rect.top) / scale
     };
   };
 
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Only start drawing if user actually intends to draw (mouse button held down for drawing tools)
-    if (e.buttons !== 1) return; // Only left mouse button
+    if (e.buttons !== 1) return;
     
     if (activeTool === 'text') {
       addTextAtPosition(e);
@@ -165,7 +183,6 @@ export function PDFAnnotatorPage() {
     const coords = getCanvasCoordinates(e);
     setCurrentStroke([coords]);
     
-    // Prevent default only when actively drawing
     e.preventDefault();
     e.stopPropagation();
   };
@@ -176,62 +193,65 @@ export function PDFAnnotatorPage() {
     const coords = getCanvasCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
     
-    // Draw current stroke in real-time
-    const canvas = annotationCanvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
-    
-    // Redraw all annotations
-    redrawAnnotations();
-    
-    // Draw current stroke
-    if (currentStroke.length > 0) {
-      ctx.save();
-      switch (activeTool) {
-        case 'pen':
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = 3;
-          break;
-        case 'highlight':
-          ctx.globalCompositeOperation = 'multiply';
-          ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-          ctx.lineWidth = 20;
-          break;
-        case 'eraser':
-          ctx.globalCompositeOperation = 'destination-out';
-          ctx.lineWidth = 20;
-          break;
-      }
+    // Redraw page with current stroke
+    if (pdfDoc) {
+      renderPage(pdfDoc, currentPage);
       
-      ctx.beginPath();
-      [...currentStroke, coords].forEach((point, index) => {
-        if (index === 0) {
-          ctx.moveTo(point.x, point.y);
-        } else {
-          ctx.lineTo(point.x, point.y);
+      // Draw current stroke in real-time
+      const canvas = canvasRef.current;
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return;
+      
+      if (currentStroke.length > 0) {
+        ctx.save();
+        switch (activeTool) {
+          case 'pen':
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 3 * scale;
+            break;
+          case 'highlight':
+            ctx.globalCompositeOperation = 'multiply';
+            ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+            ctx.lineWidth = 20 * scale;
+            break;
+          case 'eraser':
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.lineWidth = 20 * scale;
+            break;
         }
-      });
-      ctx.stroke();
-      ctx.restore();
+        
+        ctx.beginPath();
+        [...currentStroke, coords].forEach((point, index) => {
+          const scaledX = point.x * scale;
+          const scaledY = point.y * scale;
+          if (index === 0) {
+            ctx.moveTo(scaledX, scaledY);
+          } else {
+            ctx.lineTo(scaledX, scaledY);
+          }
+        });
+        ctx.stroke();
+        ctx.restore();
+      }
     }
     
     e.preventDefault();
     e.stopPropagation();
   };
 
-  const stopDrawing = (e?: React.MouseEvent<HTMLCanvasElement>) => {
+  const stopDrawing = () => {
     if (!isDrawing || currentStroke.length === 0) return;
     
-    // Save the completed stroke
+    // Save the completed stroke in PDF coordinate space (unscaled)
     const newAnnotation: Annotation = {
       type: 'stroke',
       points: [...currentStroke],
-      page: 1,
+      page: currentPage,
       style: {
         color: activeTool === 'pen' ? '#000000' : 
                activeTool === 'highlight' ? 'rgba(255, 255, 0, 0.5)' : '#000000',
-        lineWidth: activeTool === 'pen' ? 3 : 20,
+        lineWidth: activeTool === 'pen' ? 3 : 20, // Store unscaled line width
         globalCompositeOperation: activeTool === 'eraser' ? 'destination-out' : 'source-over'
       }
     };
@@ -250,9 +270,9 @@ export function PDFAnnotatorPage() {
     const newAnnotation: Annotation = {
       type: 'text',
       text,
-      x: coords.x,
+      x: coords.x, // Store in PDF coordinate space
       y: coords.y,
-      page: 1,
+      page: currentPage,
       style: {
         color: '#000000',
         lineWidth: 0,
@@ -266,6 +286,17 @@ export function PDFAnnotatorPage() {
   // Clear all annotations
   const clearCanvas = () => {
     setAnnotations([]);
+    if (pdfDoc) {
+      renderPage(pdfDoc, currentPage);
+    }
+  };
+
+  // Change scale and re-render
+  const changeScale = (newScale: number) => {
+    setScale(newScale);
+    if (pdfDoc) {
+      renderPage(pdfDoc, currentPage);
+    }
   };
 
   // Save work to localStorage
@@ -277,7 +308,8 @@ export function PDFAnnotatorPage() {
       const saveKey = `pdf-annotation-data-${assignmentId}`;
       const saveData = {
         annotations,
-        scale
+        scale,
+        currentPage
       };
       localStorage.setItem(saveKey, JSON.stringify(saveData));
       
@@ -306,9 +338,10 @@ export function PDFAnnotatorPage() {
     
     if (savedData) {
       try {
-        const { annotations: savedAnnotations, scale: savedScale } = JSON.parse(savedData);
+        const { annotations: savedAnnotations, scale: savedScale, currentPage: savedPage } = JSON.parse(savedData);
         setAnnotations(savedAnnotations || []);
         if (savedScale) setScale(savedScale);
+        if (savedPage) setCurrentPage(savedPage);
       } catch (error) {
         console.error('Failed to load saved work:', error);
       }
@@ -347,11 +380,9 @@ export function PDFAnnotatorPage() {
     setIsSubmitting(true);
 
     try {
-      // Create canvas with current annotations for submission
-      const canvas = annotationCanvasRef.current;
+      const canvas = canvasRef.current;
       if (!canvas) throw new Error('No canvas available');
       
-      // Convert to blob and upload
       canvas.toBlob(async (blob) => {
         if (!blob) throw new Error('Failed to create image blob');
         
@@ -387,47 +418,19 @@ export function PDFAnnotatorPage() {
     loadPDF();
   }, [loadPDF]);
 
-  // Update canvas when PDF loads or container size changes
+  // Re-render when scale changes
   useEffect(() => {
-    if (pdfLoaded) {
-      const timer = setTimeout(() => {
-        updateCanvasSize();
-        updateScrollOffset();
-      }, 500); // Give PDF time to render
-      return () => clearTimeout(timer);
+    if (pdfDoc && pdfLoaded) {
+      renderPage(pdfDoc, currentPage);
     }
-  }, [pdfLoaded, updateCanvasSize, updateScrollOffset]);
+  }, [scale, currentPage, pdfDoc, pdfLoaded, renderPage]);
 
-  // Redraw annotations when they change
+  // Re-render when annotations change
   useEffect(() => {
-    redrawAnnotations();
-  }, [annotations, redrawAnnotations]);
-
-  // Handle container scroll - keep canvas aligned with iframe
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      updateScrollOffset();
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [updateScrollOffset]);
-
-  // Handle window resize
-  useEffect(() => {
-    const handleResize = () => {
-      setTimeout(() => {
-        updateCanvasSize();
-        updateScrollOffset();
-      }, 100);
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [updateCanvasSize, updateScrollOffset]);
+    if (pdfDoc && pdfLoaded) {
+      renderPage(pdfDoc, currentPage);
+    }
+  }, [annotations, pdfDoc, pdfLoaded, currentPage, renderPage]);
 
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
@@ -506,11 +509,11 @@ export function PDFAnnotatorPage() {
             <div>
               <h3 className="font-medium mb-3">Zoom</h3>
               <div className="flex items-center gap-2 mb-2">
-                <Button onClick={() => setScale(s => Math.max(0.5, s - 0.2))} size="sm" variant="outline">
+                <Button onClick={() => changeScale(Math.max(0.5, scale - 0.2))} size="sm" variant="outline">
                   <ZoomOut className="h-4 w-4" />
                 </Button>
                 <span className="flex-1 text-center text-sm">{Math.round(scale * 100)}%</span>
-                <Button onClick={() => setScale(s => Math.min(3, s + 0.2))} size="sm" variant="outline">
+                <Button onClick={() => changeScale(Math.min(3, scale + 0.2))} size="sm" variant="outline">
                   <ZoomIn className="h-4 w-4" />
                 </Button>
               </div>
@@ -529,60 +532,33 @@ export function PDFAnnotatorPage() {
           </div>
         </div>
 
-        {/* PDF Viewer with Natural Scrolling and Annotation */}
+        {/* PDF Viewer */}
         <div className="flex-1 relative bg-gray-200 overflow-auto" ref={containerRef}>
-          {/* PDF iframe */}
-          <iframe
-            ref={pdfViewerRef}
-            src={pdfUrl}
-            className="w-full min-h-full bg-white block"
-            title="PDF Document"
-            style={{
-              transform: `scale(${scale})`,
-              transformOrigin: 'top left',
-              height: `${100 / scale}%`,
-              width: `${100 / scale}%`
-            }}
-            onLoad={() => {
-              // Ensure canvas is properly positioned after PDF loads
-              setTimeout(updateCanvasSize, 200);
-            }}
-          />
-          
-          {/* Annotation Canvas Overlay - Perfectly Aligned */}
-          <canvas
-            ref={annotationCanvasRef}
-            className="absolute"
-            style={{
-              cursor: isDrawing ? 'none' : (activeTool === 'text' ? 'text' : 'crosshair'),
-              zIndex: 10,
-              pointerEvents: 'auto',
-              position: 'absolute'
-            }}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-            onWheel={(e) => {
-              // Allow wheel events to pass through for scrolling
-              e.currentTarget.style.pointerEvents = 'none';
-              setTimeout(() => {
-                if (e.currentTarget) {
-                  e.currentTarget.style.pointerEvents = 'auto';
-                }
-              }, 100);
-            }}
-          />
+          <div className="flex justify-center items-start p-4">
+            <canvas
+              ref={canvasRef}
+              className="border border-gray-300 bg-white shadow-lg"
+              style={{
+                cursor: activeTool === 'text' ? 'text' : 'crosshair',
+                maxWidth: '100%',
+                maxHeight: '100%'
+              }}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={stopDrawing}
+              onMouseLeave={stopDrawing}
+            />
+          </div>
         </div>
       </div>
 
       {/* Status Bar */}
       <div className="bg-white border-t p-2 text-sm text-gray-600 flex justify-between items-center">
         <div>
-          Tool: {activeTool?.toUpperCase()} | PDF Status: {pdfLoaded ? 'Loaded' : 'Loading...'}
+          Tool: {activeTool?.toUpperCase()} | Page: {currentPage}/{totalPages} | PDF Status: {pdfLoaded ? 'Loaded' : 'Loading...'}
         </div>
         <div className="text-green-600 font-medium">
-          ✓ Natural scrolling enabled with simultaneous annotation capability
+          ✓ PDF.js direct rendering - annotations locked to content
         </div>
       </div>
     </div>
