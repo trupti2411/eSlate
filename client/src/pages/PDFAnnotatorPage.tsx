@@ -138,6 +138,9 @@ export function PDFAnnotatorPage() {
 
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Only start drawing if user actually intends to draw (mouse button held down for drawing tools)
+    if (e.buttons !== 1) return; // Only left mouse button
+    
     if (activeTool === 'text') {
       addTextAtPosition(e);
       return;
@@ -147,12 +150,13 @@ export function PDFAnnotatorPage() {
     const coords = getCanvasCoordinates(e);
     setCurrentStroke([coords]);
     
-    // Prevent default to stop scrolling during drawing
+    // Prevent default only when actively drawing
     e.preventDefault();
+    e.stopPropagation();
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
+    if (!isDrawing || e.buttons !== 1) return;
     
     const coords = getCanvasCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
@@ -198,9 +202,10 @@ export function PDFAnnotatorPage() {
     }
     
     e.preventDefault();
+    e.stopPropagation();
   };
 
-  const stopDrawing = () => {
+  const stopDrawing = (e?: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing || currentStroke.length === 0) return;
     
     // Save the completed stroke
@@ -530,18 +535,28 @@ export function PDFAnnotatorPage() {
             }}
           />
           
-          {/* Annotation Canvas Overlay - Always Active */}
+          {/* Annotation Canvas Overlay - Smart Interaction */}
           <canvas
             ref={annotationCanvasRef}
-            className="absolute top-0 left-0 pointer-events-auto"
+            className="absolute top-0 left-0"
             style={{
-              cursor: activeTool === 'text' ? 'text' : 'crosshair',
-              zIndex: 10
+              cursor: isDrawing ? 'none' : (activeTool === 'text' ? 'text' : 'crosshair'),
+              zIndex: 10,
+              pointerEvents: 'auto'
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
+            onWheel={(e) => {
+              // Allow wheel events to pass through for scrolling
+              e.currentTarget.style.pointerEvents = 'none';
+              setTimeout(() => {
+                if (e.currentTarget) {
+                  e.currentTarget.style.pointerEvents = 'auto';
+                }
+              }, 100);
+            }}
           />
         </div>
       </div>
