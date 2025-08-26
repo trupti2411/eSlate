@@ -38,8 +38,14 @@ export default function DocumentAnnotatorPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const assignmentId = urlParams.get('assignmentId') || '';
   
-  // Use direct document URL
+  // Use direct document URL and public URL for different approaches
   const documentUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
+  const publicDocumentUrl = assignmentId ? `/api/public-doc/${assignmentId}` : '';
+  
+  // For Word docs, we'll use Google Docs Viewer with public URL
+  // For PDFs, we'll use direct viewing
+  const [isWordDocument, setIsWordDocument] = useState(false);
+  const [actualDocumentUrl, setActualDocumentUrl] = useState(documentUrl);
 
   // Load document directly in iframe
   const loadDocument = useCallback(async () => {
@@ -48,28 +54,38 @@ export default function DocumentAnnotatorPage() {
     try {
       console.log('Loading document directly:', documentUrl);
       
-      // Detect document type
+      // Detect document type and set appropriate URL
       try {
         const response = await fetch(documentUrl, { method: 'HEAD' });
         const contentType = response.headers.get('content-type') || '';
         
         if (contentType.includes('application/pdf')) {
           setDocumentType('PDF');
-        } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+          setIsWordDocument(false);
+          setActualDocumentUrl(documentUrl); // Use direct PDF viewing
+        } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+                   contentType.includes('application/msword')) {
           setDocumentType('Word Document');
-        } else if (contentType.includes('application/msword')) {
-          setDocumentType('Word Document');
+          setIsWordDocument(true);
+          // Use Google Docs Viewer for Word documents
+          setActualDocumentUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + publicDocumentUrl)}&embedded=true`);
         } else if (contentType.includes('application/vnd.ms-excel') || 
                    contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
           setDocumentType('Excel Spreadsheet');
+          setIsWordDocument(true);
+          setActualDocumentUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + publicDocumentUrl)}&embedded=true`);
         } else if (contentType.includes('application/vnd.ms-powerpoint') ||
                    contentType.includes('application/vnd.openxmlformats-officedocument.presentationml.presentation')) {
           setDocumentType('PowerPoint Presentation');
+          setIsWordDocument(true);
+          setActualDocumentUrl(`https://docs.google.com/viewer?url=${encodeURIComponent(window.location.origin + publicDocumentUrl)}&embedded=true`);
         }
         
         console.log('Document type detected:', documentType, 'Content-Type:', contentType);
+        console.log('Using URL:', actualDocumentUrl);
       } catch (detectionError) {
         console.log('Document type detection failed, using default');
+        setActualDocumentUrl(documentUrl);
       }
       
       setDocLoaded(true);
@@ -395,7 +411,7 @@ export default function DocumentAnnotatorPage() {
           </Button>
           <Button 
             onClick={submitAssignment}
-            disabled={isSubmitting || annotations.length === 0}
+            disabled={isSubmitting || (annotations.length === 0 && !isWordDocument)}
             className="flex items-center gap-2 bg-green-600 hover:bg-green-700"
           >
             <Send className="h-4 w-4" />
@@ -422,6 +438,7 @@ export default function DocumentAnnotatorPage() {
                   variant={activeTool === 'pen' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => setActiveTool('pen')}
+                  disabled={isWordDocument}
                 >
                   <Pen className="h-4 w-4 mr-2" />
                   Pen
@@ -430,6 +447,7 @@ export default function DocumentAnnotatorPage() {
                   variant={activeTool === 'highlight' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => setActiveTool('highlight')}
+                  disabled={isWordDocument}
                 >
                   <Highlighter className="h-4 w-4 mr-2" />
                   Highlight
@@ -438,6 +456,7 @@ export default function DocumentAnnotatorPage() {
                   variant={activeTool === 'eraser' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => setActiveTool('eraser')}
+                  disabled={isWordDocument}
                 >
                   <Eraser className="h-4 w-4 mr-2" />
                   Eraser
@@ -446,6 +465,7 @@ export default function DocumentAnnotatorPage() {
                   variant={activeTool === 'text' ? 'default' : 'outline'}
                   className="w-full justify-start"
                   onClick={() => setActiveTool('text')}
+                  disabled={isWordDocument}
                 >
                   <Type className="h-4 w-4 mr-2" />
                   Add Text
@@ -461,6 +481,7 @@ export default function DocumentAnnotatorPage() {
                   variant="outline"
                   className="w-full justify-start"
                   onClick={clearAnnotations}
+                  disabled={isWordDocument}
                 >
                   <RotateCcw className="h-4 w-4 mr-2" />
                   Clear All
@@ -474,8 +495,8 @@ export default function DocumentAnnotatorPage() {
               <div className="text-sm text-gray-600 space-y-1">
                 <p><strong>Type:</strong> {documentType}</p>
                 <p><strong>Annotations:</strong> {annotations.length}</p>
-                <p><strong>Viewer:</strong> Direct</p>
-                <p><strong>Status:</strong> Ready</p>
+                <p><strong>Viewer:</strong> {isWordDocument ? 'Google Docs' : 'Direct PDF'}</p>
+                <p><strong>Status:</strong> {isWordDocument ? 'View Only' : 'Ready'}</p>
               </div>
             </div>
           </div>
@@ -483,10 +504,10 @@ export default function DocumentAnnotatorPage() {
 
         {/* Document Viewer */}
         <div className="flex-1 relative" ref={containerRef}>
-          {/* Direct document iframe */}
+          {/* Document iframe */}
           <iframe
             ref={iframeRef}
-            src={documentUrl}
+            src={actualDocumentUrl}
             className="w-full h-full border-0 bg-white"
             title="Document Viewer"
             onLoad={handleIframeLoad}
@@ -495,18 +516,20 @@ export default function DocumentAnnotatorPage() {
               top: 0,
               left: 0,
               width: '100%',
-              height: '100%'
+              height: '100%',
+              pointerEvents: isWordDocument ? 'auto' : 'none' // Allow scrolling for Word docs, disable for PDFs to allow annotation
             }}
           />
           
           {/* Annotation canvas overlay */}
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0 pointer-events-auto"
+            className="absolute top-0 left-0"
             style={{
               cursor: activeTool === 'text' ? 'text' : 'crosshair',
               zIndex: 10,
-              backgroundColor: 'transparent'
+              backgroundColor: 'transparent',
+              pointerEvents: isWordDocument ? 'none' : 'auto' // Disable for Word docs (Google Viewer needs interaction), enable for PDFs
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
@@ -514,6 +537,15 @@ export default function DocumentAnnotatorPage() {
             onMouseLeave={stopDrawing}
             onClick={addTextAnnotation}
           />
+          
+          {isWordDocument && (
+            <div className="absolute top-4 right-4 bg-yellow-100 border border-yellow-300 rounded p-2 text-sm z-20">
+              <p className="text-yellow-800">
+                <strong>Word Document:</strong> This document is displayed using Google Docs Viewer.
+                Annotation is not available for Word documents - please download to annotate offline.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -524,8 +556,8 @@ export default function DocumentAnnotatorPage() {
           <span>Annotations: {annotations.length}</span>
         </div>
         <div className="flex items-center gap-4">
-          <span>{documentType} loaded with direct viewer</span>
-          <span>Status: Ready for annotation</span>
+          <span>{documentType} loaded with {isWordDocument ? 'Google Docs Viewer' : 'direct PDF viewer'}</span>
+          <span>Status: {isWordDocument ? 'View only (Word docs need offline annotation)' : 'Ready for annotation'}</span>
         </div>
       </div>
     </div>
