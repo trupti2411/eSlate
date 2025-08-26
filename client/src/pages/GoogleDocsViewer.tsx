@@ -182,7 +182,7 @@ export default function GoogleDocsViewer() {
   }, [googleDocsViewerUrl, loadDocument]);
 
   // Drawing functions
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
     if (activeTool === 'text' || !viewerReady) return;
     if (e.buttons !== 1) return;
     
@@ -190,11 +190,16 @@ export default function GoogleDocsViewer() {
     const coords = getCanvasCoordinates(e);
     setCurrentStroke([coords]);
     
+    // Enable canvas pointer events while drawing
+    if (canvasRef.current) {
+      canvasRef.current.style.pointerEvents = 'auto';
+    }
+    
     e.preventDefault();
     e.stopPropagation();
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const draw = (e: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
     if (!isDrawing || activeTool === 'text' || !viewerReady) return;
     
     const coords = getCanvasCoordinates(e);
@@ -249,7 +254,10 @@ export default function GoogleDocsViewer() {
   };
 
   const stopDrawing = () => {
-    if (!isDrawing || currentStroke.length === 0) return;
+    if (!isDrawing || currentStroke.length === 0) {
+      setIsDrawing(false);
+      return;
+    }
     
     // Save the completed stroke
     const newAnnotation: Annotation = {
@@ -266,10 +274,15 @@ export default function GoogleDocsViewer() {
     setAnnotations(prev => [...prev, newAnnotation]);
     setCurrentStroke([]);
     setIsDrawing(false);
+    
+    // Disable canvas pointer events after drawing
+    if (canvasRef.current) {
+      canvasRef.current.style.pointerEvents = 'none';
+    }
   };
 
   // Add text annotation
-  const addTextAnnotation = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const addTextAnnotation = (e: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
     if (activeTool !== 'text' || !viewerReady) return;
     
     const text = prompt('Enter text:');
@@ -293,7 +306,7 @@ export default function GoogleDocsViewer() {
   };
 
   // Get coordinates relative to canvas
-  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement | HTMLDivElement>) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     
     const canvas = canvasRef.current;
@@ -583,7 +596,7 @@ export default function GoogleDocsViewer() {
         </div>
 
         {/* Document Viewer */}
-        <div className="flex-1 relative" ref={containerRef}>
+        <div className="flex-1 relative overflow-auto" ref={containerRef}>
           {/* Google Docs Viewer iframe */}
           <iframe
             ref={iframeRef}
@@ -597,7 +610,8 @@ export default function GoogleDocsViewer() {
               top: 0,
               left: 0,
               width: '100%',
-              height: '100%'
+              height: '100%',
+              minHeight: '200vh' // Make iframe taller to enable scrolling
             }}
           />
           
@@ -615,17 +629,85 @@ export default function GoogleDocsViewer() {
           {/* Annotation canvas overlay */}
           <canvas
             ref={canvasRef}
-            className="absolute top-0 left-0 pointer-events-auto"
+            className="absolute top-0 left-0"
             style={{
-              cursor: activeTool === 'text' ? 'text' : 'crosshair',
+              cursor: isDrawing || activeTool !== 'text' ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
               zIndex: 20,
-              backgroundColor: 'transparent'
+              backgroundColor: 'transparent',
+              pointerEvents: isDrawing ? 'auto' : 'none' // Only capture events when drawing
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
             onMouseUp={stopDrawing}
             onMouseLeave={stopDrawing}
             onClick={addTextAnnotation}
+          />
+          
+          {/* Annotation activation overlay - captures initial click to start drawing */}
+          <div
+            className="absolute top-0 left-0 w-full h-full"
+            style={{
+              zIndex: 15,
+              backgroundColor: 'transparent',
+              pointerEvents: viewerReady && !isDrawing ? 'auto' : 'none'
+            }}
+            onMouseDown={(e) => {
+              // Pass the event to canvas for drawing
+              if (canvasRef.current) {
+                const canvas = canvasRef.current;
+                const rect = canvas.getBoundingClientRect();
+                const syntheticEvent = {
+                  ...e,
+                  currentTarget: canvas,
+                  target: canvas,
+                  clientX: e.clientX,
+                  clientY: e.clientY,
+                  preventDefault: () => e.preventDefault(),
+                  stopPropagation: () => e.stopPropagation(),
+                  buttons: e.buttons
+                } as any;
+                
+                startDrawing(syntheticEvent);
+              }
+            }}
+            onMouseMove={(e) => {
+              if (isDrawing && canvasRef.current) {
+                const canvas = canvasRef.current;
+                const syntheticEvent = {
+                  ...e,
+                  currentTarget: canvas,
+                  target: canvas,
+                  clientX: e.clientX,
+                  clientY: e.clientY,
+                  preventDefault: () => e.preventDefault(),
+                  stopPropagation: () => e.stopPropagation(),
+                  buttons: e.buttons
+                } as any;
+                
+                draw(syntheticEvent);
+              }
+            }}
+            onMouseUp={() => {
+              if (isDrawing) {
+                stopDrawing();
+              }
+            }}
+            onClick={(e) => {
+              if (activeTool === 'text' && canvasRef.current) {
+                const canvas = canvasRef.current;
+                const syntheticEvent = {
+                  ...e,
+                  currentTarget: canvas,
+                  target: canvas,
+                  clientX: e.clientX,
+                  clientY: e.clientY,
+                  preventDefault: () => e.preventDefault(),
+                  stopPropagation: () => e.stopPropagation()
+                } as any;
+                
+                addTextAnnotation(syntheticEvent);
+              }
+            }}
           />
         </div>
       </div>
