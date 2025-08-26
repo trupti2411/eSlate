@@ -46,7 +46,7 @@ export function PDFAnnotatorPage() {
   // Use server proxy endpoint to serve authenticated PDFs
   const pdfUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
 
-  // Load PDF using PDF.js
+  // Load PDF using PDF.js with fallback
   const loadPDF = useCallback(async () => {
     if (!pdfUrl) return;
     
@@ -56,8 +56,19 @@ export function PDFAnnotatorPage() {
       // Import PDF.js dynamically
       const pdfjsLib = await import('pdfjs-dist');
       
-      // Set worker path
-      pdfjsLib.GlobalWorkerOptions.workerSrc = '/node_modules/pdfjs-dist/build/pdf.worker.min.js';
+      // Try different worker setup approaches
+      try {
+        // First try with CDN worker
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      } catch {
+        try {
+          // Fallback to legacy worker setup
+          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+        } catch {
+          // Final fallback - disable worker
+          pdfjsLib.GlobalWorkerOptions.workerSrc = null;
+        }
+      }
       
       // Load PDF document
       const loadingTask = pdfjsLib.getDocument(pdfUrl);
@@ -73,11 +84,16 @@ export function PDFAnnotatorPage() {
       await renderPage(pdf, 1);
       
     } catch (error) {
-      console.error('Error loading PDF:', error);
+      console.error('Error loading PDF with PDF.js:', error);
+      console.log('Falling back to iframe method...');
+      
+      // Fallback to iframe approach
+      setPdfLoaded(true);
+      setTotalPages(1);
+      
       toast({
-        title: "PDF Loading Failed",
-        description: "Could not load the PDF document.",
-        variant: "destructive",
+        title: "PDF Loaded",
+        description: "PDF loaded using fallback method. Basic annotation available.",
       });
     }
   }, [pdfUrl]);
@@ -534,21 +550,65 @@ export function PDFAnnotatorPage() {
 
         {/* PDF Viewer */}
         <div className="flex-1 relative bg-gray-200 overflow-auto" ref={containerRef}>
-          <div className="flex justify-center items-start p-4">
-            <canvas
-              ref={canvasRef}
-              className="border border-gray-300 bg-white shadow-lg"
-              style={{
-                cursor: activeTool === 'text' ? 'text' : 'crosshair',
-                maxWidth: '100%',
-                maxHeight: '100%'
-              }}
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={stopDrawing}
-              onMouseLeave={stopDrawing}
-            />
-          </div>
+          {pdfDoc ? (
+            // PDF.js direct rendering
+            <div className="flex justify-center items-start p-4">
+              <canvas
+                ref={canvasRef}
+                className="border border-gray-300 bg-white shadow-lg"
+                style={{
+                  cursor: activeTool === 'text' ? 'text' : 'crosshair',
+                  maxWidth: '100%',
+                  maxHeight: '100%'
+                }}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
+            </div>
+          ) : (
+            // Fallback iframe with simple annotation overlay
+            <>
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full bg-white"
+                title="PDF Document"
+                style={{
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left'
+                }}
+                onLoad={() => {
+                  if (!pdfDoc) {
+                    setTimeout(() => {
+                      // Initialize simple canvas overlay for iframe fallback
+                      if (canvasRef.current && containerRef.current) {
+                        const canvas = canvasRef.current;
+                        const container = containerRef.current;
+                        const rect = container.getBoundingClientRect();
+                        canvas.width = rect.width;
+                        canvas.height = rect.height;
+                        canvas.style.width = `${rect.width}px`;
+                        canvas.style.height = `${rect.height}px`;
+                      }
+                    }, 200);
+                  }
+                }}
+              />
+              <canvas
+                ref={canvasRef}
+                className="absolute top-0 left-0 pointer-events-auto"
+                style={{
+                  cursor: activeTool === 'text' ? 'text' : 'crosshair',
+                  zIndex: 10
+                }}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
+            </>
+          )}
         </div>
       </div>
 
