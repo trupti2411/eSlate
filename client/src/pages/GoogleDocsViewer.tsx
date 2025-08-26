@@ -121,6 +121,36 @@ export default function GoogleDocsViewer() {
     }
   }, [publicDocumentUrl, googleDocsViewerUrl, documentType, viewerReady, toast]);
 
+  // Draw all annotations on canvas
+  const drawAnnotations = useCallback((ctx: CanvasRenderingContext2D) => {
+    annotations.forEach(annotation => {
+      ctx.save();
+      ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
+      ctx.strokeStyle = annotation.style.color;
+      ctx.lineWidth = annotation.style.lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      if (annotation.type === 'stroke' && annotation.points) {
+        ctx.beginPath();
+        annotation.points.forEach((point, index) => {
+          if (index === 0) {
+            ctx.moveTo(point.x, point.y);
+          } else {
+            ctx.lineTo(point.x, point.y);
+          }
+        });
+        ctx.stroke();
+      } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
+        ctx.fillStyle = annotation.style.color;
+        ctx.font = '18px Arial';
+        ctx.fillText(annotation.text, annotation.x, annotation.y);
+      }
+      
+      ctx.restore();
+    });
+  }, [annotations]);
+
   // Initialize canvas overlay
   const initializeCanvas = useCallback(() => {
     if (canvasRef.current && containerRef.current) {
@@ -389,36 +419,6 @@ export default function GoogleDocsViewer() {
       y: e.clientY - containerRect.top + container.scrollTop
     };
   };
-
-  // Draw all annotations on canvas
-  const drawAnnotations = useCallback((ctx: CanvasRenderingContext2D) => {
-    annotations.forEach(annotation => {
-      ctx.save();
-      ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
-      ctx.strokeStyle = annotation.style.color;
-      ctx.lineWidth = annotation.style.lineWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      if (annotation.type === 'stroke' && annotation.points) {
-        ctx.beginPath();
-        annotation.points.forEach((point, index) => {
-          if (index === 0) {
-            ctx.moveTo(point.x, point.y);
-          } else {
-            ctx.lineTo(point.x, point.y);
-          }
-        });
-        ctx.stroke();
-      } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
-        ctx.fillStyle = annotation.style.color;
-        ctx.font = '18px Arial';
-        ctx.fillText(annotation.text, annotation.x, annotation.y);
-      }
-      
-      ctx.restore();
-    });
-  }, [annotations]);
 
   // Save work
   const saveWork = async () => {
