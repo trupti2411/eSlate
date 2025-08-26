@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 
 import { storage } from "./storage";
-import { setupCustomAuth, isAuthenticated, type AuthenticatedRequest } from "./customAuth";
+import { setupCustomAuth, isAuthenticated } from "./customAuth";
 import {
   insertMessageSchema,
   insertProgressSchema,
@@ -121,7 +121,7 @@ trailer<</Size 5/Root 1 0 R>>
   // Company Portal - Assignment Management (Company Admin & Tutor access)
   
   // Get assignments by company
-  app.get('/api/companies/:companyId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/companies/:companyId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const companyId = req.params.companyId;
@@ -150,7 +150,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Get assignments by class
-  app.get('/api/classes/:classId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/classes/:classId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const classId = req.params.classId;
       const assignments = await storage.getAssignmentsByClass(classId);
@@ -164,7 +164,7 @@ trailer<</Size 5/Root 1 0 R>>
   // ===== STUDENT PORTAL ROUTES =====
   
   // Get student's terms
-  app.get('/api/students/:studentId/terms', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/terms', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const { studentId } = req.params;
@@ -186,7 +186,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Get student's classes
-  app.get('/api/students/:studentId/classes', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/classes', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const { studentId } = req.params;
@@ -208,7 +208,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Get student's assignments
-  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const { studentId } = req.params;
@@ -230,7 +230,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Get student's submissions
-  app.get('/api/students/:studentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const { studentId } = req.params;
@@ -252,7 +252,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Create assignment
-  app.post('/api/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       console.log("Assignment creation request received:", {
@@ -291,7 +291,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Update assignment
-  app.patch('/api/assignments/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.patch('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const assignmentId = req.params.id;
@@ -329,7 +329,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Delete assignment
-  app.delete('/api/assignments/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.delete('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const assignmentId = req.params.id;
@@ -360,7 +360,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // File upload for assignments
-  app.post('/api/assignments/:id/upload', isAuthenticated, upload.array('files', 10), async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/assignments/:id/upload', isAuthenticated, upload.array('files', 10), async (req: any, res: any) => {
     try {
       const user = req.user!;
       const assignmentId = req.params.id;
@@ -414,7 +414,7 @@ trailer<</Size 5/Root 1 0 R>>
   // Student Portal - Assignment Viewing and Submission
   
   // Get student's assignments
-  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const studentId = req.params.studentId;
@@ -446,7 +446,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Create or update submission (unified endpoint)
-  app.post('/api/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       
@@ -490,7 +490,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Legacy create submission endpoint
-  app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const assignmentId = req.params.assignmentId;
@@ -520,7 +520,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Update submission
-  app.patch('/api/submissions/:id', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.patch('/api/submissions/:id', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const submissionId = req.params.id;
@@ -556,7 +556,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Get submissions for assignment (for tutors/admins)
-  app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const assignmentId = req.params.assignmentId;
@@ -575,7 +575,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Assignment file serving route
-  app.get('/api/assignments/:assignmentId/files/:filename', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/assignments/:assignmentId/files/:filename', isAuthenticated, async (req: any, res: any) => {
     try {
       const { assignmentId, filename } = req.params;
       const user = req.user!;
@@ -711,7 +711,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Company students route
-  app.get('/api/company/students', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/company/students', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       let students: any[] = [];
@@ -731,7 +731,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Student Portal API Routes
-  app.get('/api/students/:studentId/terms', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/terms', isAuthenticated, async (req: any, res: any) => {
     try {
       const { studentId } = req.params;
       const terms = await storage.getStudentTerms(studentId);
@@ -742,7 +742,7 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
-  app.get('/api/students/:studentId/classes', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/classes', isAuthenticated, async (req: any, res: any) => {
     try {
       const { studentId } = req.params;
       const classes = await storage.getStudentClasses(studentId);
@@ -753,7 +753,7 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
-  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
       const { studentId } = req.params;
       const assignments = await storage.getStudentAssignments(studentId);
@@ -764,7 +764,7 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
-  app.get('/api/students/:studentId/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/students/:studentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const { studentId } = req.params;
       const submissions = await storage.getStudentSubmissions(studentId);
@@ -776,7 +776,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Get student profile from user ID
-  app.get('/api/auth/student-profile', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/auth/student-profile', isAuthenticated, async (req: any, res: any) => {
     try {
       const userId = req.user?.id;
       if (!userId) {
@@ -798,7 +798,7 @@ trailer<</Size 5/Root 1 0 R>>
 
 
   // Get all submissions for company review
-  app.get('/api/company/submissions', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/company/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       
@@ -822,7 +822,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Simple file upload route
-  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
     try {
       if (!req.file) {
         return res.status(400).json({ error: "No file uploaded" });
@@ -1546,7 +1546,7 @@ trailer<</Size 5/Root 1 0 R>>
 
 
   // Object storage upload endpoint
-  app.post('/api/objects/upload', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/objects/upload', isAuthenticated, async (req: any, res: any) => {
     try {
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL();
@@ -1558,7 +1558,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Set metadata for uploaded object
-  app.post('/api/objects/metadata', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.post('/api/objects/metadata', isAuthenticated, async (req: any, res: any) => {
     try {
       const { uploadURL, originalFileName } = req.body;
       
@@ -1577,7 +1577,7 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Serve uploaded objects (for file viewing)
-  app.get('/objects/:objectPath(*)', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/objects/:objectPath(*)', isAuthenticated, async (req: any, res: any) => {
     const objectStorageService = new ObjectStorageService();
     const isEditMode = req.query.edit === 'true';
     
@@ -1830,7 +1830,7 @@ Good luck with your assignment!"
   });
 
   // Get object metadata including original filename
-  app.get('/api/objects/:objectPath(*)/metadata', isAuthenticated, async (req: AuthenticatedRequest, res: any) => {
+  app.get('/api/objects/:objectPath(*)/metadata', isAuthenticated, async (req: any, res: any) => {
     try {
       const objectPath = `/objects/${req.params.objectPath}`;
       console.log("Getting metadata for object path:", objectPath);
@@ -2068,7 +2068,7 @@ Good luck with your assignment!"
   });
 
   // PDF Proxy endpoint for serving protected PDFs with authentication
-  app.get('/api/pdf-proxy/:assignmentId', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/pdf-proxy/:assignmentId', isAuthenticated, async (req: any, res) => {
     try {
       const { assignmentId } = req.params;
       

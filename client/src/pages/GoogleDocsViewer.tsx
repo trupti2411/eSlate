@@ -424,18 +424,45 @@ export default function GoogleDocsViewer() {
   const saveWork = async () => {
     setIsSaving(true);
     try {
+      // Save locally first
       localStorage.setItem(`annotations_${assignmentId}`, JSON.stringify(annotations));
       
-      toast({
-        title: "Work Saved",
-        description: "Your annotations have been saved locally.",
+      // Also save to database as draft
+      const annotationsData = JSON.stringify(annotations);
+      
+      const response = await fetch('/api/submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignmentId: assignmentId,
+          digitalContent: annotationsData,
+          content: `Work in progress with ${annotations.length} annotations`,
+          status: 'draft',
+          isDraft: true,
+          inputMethod: 'pen',
+          deviceType: 'e-ink'
+        }),
       });
+
+      if (response.ok) {
+        toast({
+          title: "Work Saved",
+          description: "Your annotations have been saved both locally and to the server.",
+        });
+      } else {
+        // Even if server save fails, local save succeeded
+        toast({
+          title: "Work Saved Locally",
+          description: "Saved locally. Server sync will retry on submit.",
+        });
+      }
     } catch (error) {
       console.error('Error saving work:', error);
       toast({
-        title: "Save Failed",
-        description: "Could not save your work. Please try again.",
-        variant: "destructive",
+        title: "Work Saved Locally",
+        description: "Saved locally. Server sync will retry on submit.",
       });
     } finally {
       setIsSaving(false);
@@ -446,8 +473,32 @@ export default function GoogleDocsViewer() {
   const submitAssignment = async () => {
     setIsSubmitting(true);
     try {
-      // TODO: Implement actual submission logic
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Save annotations as digital content
+      const annotationsData = JSON.stringify(annotations);
+      
+      // Submit to database via API
+      const response = await fetch('/api/submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          assignmentId: assignmentId,
+          digitalContent: annotationsData,
+          content: `Assignment completed with ${annotations.length} annotations`,
+          status: 'submitted',
+          isDraft: false,
+          inputMethod: 'pen', // E-ink stylus input
+          deviceType: 'e-ink' // E-ink device
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to submit: ${response.statusText}`);
+      }
+
+      const submission = await response.json();
+      console.log('Assignment submitted successfully:', submission);
       
       toast({
         title: "Assignment Submitted",
