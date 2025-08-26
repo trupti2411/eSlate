@@ -129,14 +129,22 @@ export default function GoogleDocsViewer() {
       
       const rect = container.getBoundingClientRect();
       // Make canvas large enough to cover scrollable content
+      const canvasHeight = Math.max(rect.height, 3000); // Even larger for multi-page documents
       canvas.width = rect.width;
-      canvas.height = Math.max(rect.height, 2000); // Larger canvas for scrolling
+      canvas.height = canvasHeight;
       canvas.style.width = `${rect.width}px`;
-      canvas.style.height = `${Math.max(rect.height, 2000)}px`;
+      canvas.style.height = `${canvasHeight}px`;
       
-      console.log('Canvas overlay initialized for Google Docs Viewer:', rect.width, 'x', Math.max(rect.height, 2000));
+      // Redraw existing annotations on the new canvas
+      const ctx = canvas.getContext('2d');
+      if (ctx && annotations.length > 0) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        drawAnnotations(ctx);
+      }
+      
+      console.log('Canvas overlay initialized/updated for Google Docs Viewer:', rect.width, 'x', canvasHeight);
     }
-  }, []);
+  }, [annotations, drawAnnotations]);
 
   // Handle container scroll
   const handleScroll = useCallback(() => {
@@ -170,8 +178,10 @@ export default function GoogleDocsViewer() {
       clearTimeout(loadTimeoutRef.current);
     }
     
+    // Initialize canvas and set up iframe monitoring
     setTimeout(() => {
       initializeCanvas();
+      setupIframeMonitoring();
     }, 2000); // Give Google Docs Viewer more time to fully render
     
     toast({
@@ -179,6 +189,43 @@ export default function GoogleDocsViewer() {
       description: "Google Docs Viewer loaded successfully. Annotation tools are active.",
     });
   }, [initializeCanvas, documentType, toast]);
+
+  // Monitor iframe for page changes and content updates
+  const setupIframeMonitoring = useCallback(() => {
+    if (!iframeRef.current) return;
+    
+    try {
+      const iframe = iframeRef.current;
+      
+      // Listen for iframe content changes (page navigation)
+      const checkForChanges = () => {
+        try {
+          // Re-initialize canvas when content might have changed
+          setTimeout(() => {
+            initializeCanvas();
+          }, 1000);
+        } catch (error) {
+          console.log('Cross-origin iframe access - expected');
+        }
+      };
+      
+      // Set up periodic monitoring for page changes
+      const monitorInterval = setInterval(() => {
+        checkForChanges();
+      }, 3000); // Check every 3 seconds for changes
+      
+      // Listen for any iframe events that might indicate content changes
+      iframe.addEventListener('load', checkForChanges);
+      
+      // Cleanup function
+      return () => {
+        clearInterval(monitorInterval);
+        iframe.removeEventListener('load', checkForChanges);
+      };
+    } catch (error) {
+      console.log('Could not set up iframe monitoring:', error);
+    }
+  }, [initializeCanvas]);
 
   // Handle iframe error
   const handleIframeError = useCallback(() => {
@@ -468,7 +515,7 @@ export default function GoogleDocsViewer() {
     }
   }, [annotations, drawAnnotations]);
 
-  // Handle window resize
+  // Handle window resize and page changes
   useEffect(() => {
     const handleResize = () => {
       setTimeout(() => {
@@ -477,8 +524,37 @@ export default function GoogleDocsViewer() {
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    
+    // Also listen for potential page navigation events
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Common page navigation keys
+      if (e.key === 'PageDown' || e.key === 'PageUp' || e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        setTimeout(() => {
+          initializeCanvas();
+        }, 1000);
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, [initializeCanvas]);
+
+  // Monitor for content changes and reinitialize canvas
+  useEffect(() => {
+    if (viewerReady) {
+      const monitorChanges = setInterval(() => {
+        // Periodically reinitialize canvas to ensure it stays aligned
+        // This helps with page navigation and dynamic content changes
+        initializeCanvas();
+      }, 5000); // Every 5 seconds
+      
+      return () => clearInterval(monitorChanges);
+    }
+  }, [viewerReady, initializeCanvas]);
 
   if (!docLoaded) {
     return (
@@ -615,6 +691,7 @@ export default function GoogleDocsViewer() {
                 <p><strong>Viewer:</strong> Google Docs</p>
                 <p><strong>Status:</strong> {viewerReady ? 'Ready' : 'Loading...'}</p>
                 <p><strong>Scroll:</strong> {scrollOffset.x}, {scrollOffset.y}</p>
+                <p><strong>Canvas:</strong> {canvasRef.current ? `${canvasRef.current.width}x${canvasRef.current.height}` : 'Not ready'}</p>
                 <p><strong>Attempts:</strong> {loadAttempts + 1}</p>
               </div>
             </div>
@@ -675,11 +752,13 @@ export default function GoogleDocsViewer() {
           
           {/* Annotation activation overlay - captures initial click to start drawing */}
           <div
-            className="absolute top-0 left-0 w-full h-full"
+            className="absolute top-0 left-0 w-full"
             style={{
               zIndex: 15,
               backgroundColor: 'transparent',
-              pointerEvents: viewerReady && !isDrawing ? 'auto' : 'none'
+              pointerEvents: viewerReady && !isDrawing ? 'auto' : 'none',
+              height: '3000px', // Match larger canvas height for page navigation
+              minHeight: '100%'
             }}
             onMouseDown={(e) => {
               // Pass the event to canvas for drawing
