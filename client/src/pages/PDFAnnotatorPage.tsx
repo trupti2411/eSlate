@@ -51,49 +51,76 @@ export function PDFAnnotatorPage() {
     if (!pdfUrl) return;
     
     try {
-      console.log('Loading PDF with PDF.js:', pdfUrl);
+      console.log('Loading document:', pdfUrl);
       
-      // Import PDF.js dynamically
-      const pdfjsLib = await import('pdfjs-dist');
+      // First, check if this is actually a PDF by trying to fetch headers
+      const response = await fetch(pdfUrl, { method: 'HEAD' });
+      const contentType = response.headers.get('content-type') || '';
       
-      // Try different worker setup approaches
-      try {
-        // First try with CDN worker
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      } catch {
+      console.log('Content type:', contentType);
+      
+      // Check if it's a PDF file
+      if (contentType.includes('application/pdf')) {
+        // Try PDF.js for actual PDF files
         try {
-          // Fallback to legacy worker setup
-          pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-        } catch {
-          // Final fallback - disable worker
-          pdfjsLib.GlobalWorkerOptions.workerSrc = null;
+          const pdfjsLib = await import('pdfjs-dist');
+          
+          // Try different worker setup approaches
+          try {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+          } catch {
+            try {
+              pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+            } catch {
+              pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+            }
+          }
+          
+          const loadingTask = pdfjsLib.getDocument(pdfUrl);
+          const pdf = await loadingTask.promise;
+          
+          setPdfDoc(pdf);
+          setTotalPages(pdf.numPages);
+          setPdfLoaded(true);
+          
+          console.log(`PDF loaded successfully. Pages: ${pdf.numPages}`);
+          await renderPage(pdf, 1);
+          return;
+        } catch (pdfError) {
+          console.error('PDF.js failed:', pdfError);
         }
       }
       
-      // Load PDF document
-      const loadingTask = pdfjsLib.getDocument(pdfUrl);
-      const pdf = await loadingTask.promise;
+      // For non-PDF files (Word docs, etc.), show error message
+      if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+          contentType.includes('application/msword') ||
+          contentType.includes('application/vnd.ms-excel') ||
+          contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+        
+        toast({
+          title: "Unsupported File Type",
+          description: "This annotation system only works with PDF files. Word documents and Excel files are not supported.",
+          variant: "destructive",
+        });
+        return;
+      }
       
-      setPdfDoc(pdf);
-      setTotalPages(pdf.numPages);
-      setPdfLoaded(true);
-      
-      console.log(`PDF loaded successfully. Pages: ${pdf.numPages}`);
-      
-      // Render first page
-      await renderPage(pdf, 1);
-      
-    } catch (error) {
-      console.error('Error loading PDF with PDF.js:', error);
-      console.log('Falling back to iframe method...');
-      
-      // Fallback to iframe approach
+      // Final fallback - try iframe method for unknown types
+      console.log('Using iframe fallback...');
       setPdfLoaded(true);
       setTotalPages(1);
       
       toast({
-        title: "PDF Loaded",
-        description: "PDF loaded using fallback method. Basic annotation available.",
+        title: "Document Loaded",
+        description: "Document loaded using fallback method. Limited annotation available.",
+      });
+      
+    } catch (error) {
+      console.error('Error loading document:', error);
+      toast({
+        title: "Loading Failed",
+        description: "Could not load the document. Please ensure it's a valid PDF file.",
+        variant: "destructive",
       });
     }
   }, [pdfUrl]);
