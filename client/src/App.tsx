@@ -21,7 +21,7 @@ import CompanyAcademicManagement from "@/pages/admin/CompanyAcademicManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
 import { StudentAssignments } from "@/pages/assignments/StudentAssignments";
 import { StudentPortal } from "@/pages/student/StudentPortal";
-import GoogleDocsAnnotatorPage from "@/pages/GoogleDocsAnnotatorPage";
+import DocumentAnnotatorPage from "@/pages/DocumentAnnotatorPage";
 import SubmittedHomework from "@/pages/company/SubmittedHomework";
 
 import NotFound from "@/pages/not-found";
@@ -75,7 +75,7 @@ function Router() {
           <Route path="/assignments" component={StudentAssignments} />
           <Route path="/student/assignments" component={StudentAssignments} />
           <Route path="/student/portal" component={StudentPortal} />
-          <Route path="/pdf-annotator" component={GoogleDocsAnnotatorPage} />
+          <Route path="/pdf-annotator" component={DocumentAnnotatorPage} />
         </>
       )}
       <Route component={NotFound} />
