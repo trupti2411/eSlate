@@ -43,6 +43,7 @@ export default function UniversalDocumentAnnotator() {
   // Use converted document URL for better compatibility
   const documentUrl = assignmentId ? `/api/convert-doc/${assignmentId}` : '';
   const fallbackUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
+  const [actualUrl, setActualUrl] = useState('');
 
   // Load document with conversion
   const loadDocument = useCallback(async () => {
@@ -51,49 +52,81 @@ export default function UniversalDocumentAnnotator() {
     try {
       console.log('Loading document with conversion:', documentUrl);
       
-      // Try converted document first
+      // First, check what type of document we have using the fallback URL
       try {
-        const response = await fetch(documentUrl, { method: 'HEAD' });
-        if (response.ok) {
-          setDocumentType('Document (Converted)');
-          setDocLoaded(true);
+        const response = await fetch(fallbackUrl, { method: 'HEAD' });
+        const contentType = response.headers.get('content-type') || '';
+        
+        console.log('Document content type:', contentType);
+        
+        if (contentType.includes('application/pdf')) {
+          // For PDFs, use the direct PDF proxy
+          setDocumentType('PDF');
+          setActualUrl(fallbackUrl);
+        } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+                   contentType.includes('application/msword')) {
+          // For Word documents, try conversion
+          setDocumentType('Word Document');
           
-          toast({
-            title: "Document Loaded",
-            description: "Document converted and ready for annotation.",
-          });
-          return;
+          try {
+            const convertResponse = await fetch(documentUrl, { method: 'HEAD' });
+            if (convertResponse.ok) {
+              console.log('Using converted Word document');
+              setActualUrl(documentUrl);
+            } else {
+              console.log('Conversion failed, using direct URL');
+              setActualUrl(fallbackUrl);
+            }
+          } catch (convError) {
+            console.log('Conversion error, using direct URL:', convError);
+            setActualUrl(fallbackUrl);
+          }
+        } else {
+          // For other document types, try conversion first, then fallback
+          setDocumentType('Document');
+          
+          try {
+            const convertResponse = await fetch(documentUrl, { method: 'HEAD' });
+            if (convertResponse.ok) {
+              setActualUrl(documentUrl);
+            } else {
+              setActualUrl(fallbackUrl);
+            }
+          } catch (convError) {
+            setActualUrl(fallbackUrl);
+          }
         }
-      } catch (conversionError) {
-        console.log('Conversion failed, trying fallback...');
-      }
-      
-      // Fallback to original document
-      const response = await fetch(fallbackUrl, { method: 'HEAD' });
-      const contentType = response.headers.get('content-type') || '';
-      
-      if (contentType.includes('application/pdf')) {
-        setDocumentType('PDF');
-      } else {
+        
+        setDocLoaded(true);
+        
+        toast({
+          title: `${documentType} Ready`,
+          description: "Document loaded and ready for annotation.",
+        });
+        
+      } catch (error) {
+        console.error('Error checking document type:', error);
+        
+        // Last resort - try both URLs
+        setActualUrl(fallbackUrl);
         setDocumentType('Document');
+        setDocLoaded(true);
+        
+        toast({
+          title: "Document Loaded",
+          description: "Document loaded with fallback method.",
+        });
       }
-      
-      setDocLoaded(true);
-      
-      toast({
-        title: `${documentType} Loaded`,
-        description: "Document ready for annotation.",
-      });
       
     } catch (error) {
       console.error('Error loading document:', error);
       toast({
         title: "Loading Failed",
-        description: "Could not load the document.",
+        description: "Could not load the document. Please try refreshing.",
         variant: "destructive",
       });
     }
-  }, [documentUrl, fallbackUrl, documentType, toast]);
+  }, [documentUrl, fallbackUrl, toast]);
 
   // Initialize canvas overlay
   const initializeCanvas = useCallback(() => {
@@ -515,6 +548,7 @@ export default function UniversalDocumentAnnotator() {
                 <p><strong>Type:</strong> {documentType}</p>
                 <p><strong>Annotations:</strong> {annotations.length}</p>
                 <p><strong>Status:</strong> {isScrolling ? 'Scrolling...' : 'Ready'}</p>
+                <p><strong>URL:</strong> {actualUrl ? 'Loaded' : 'Loading...'}</p>
               </div>
             </div>
           </div>
@@ -523,16 +557,33 @@ export default function UniversalDocumentAnnotator() {
         {/* Document Viewer */}
         <div className="flex-1 relative overflow-auto" ref={containerRef}>
           {/* Document iframe */}
-          <iframe
-            ref={iframeRef}
-            src={documentUrl}
-            className="w-full min-h-full border-0 bg-white"
-            title="Document Viewer"
-            onLoad={handleIframeLoad}
-            style={{
-              minHeight: '100vh'
-            }}
-          />
+          {actualUrl ? (
+            <iframe
+              ref={iframeRef}
+              src={actualUrl}
+              className="w-full min-h-full border-0 bg-white"
+              title="Document Viewer"
+              onLoad={handleIframeLoad}
+              onError={(e) => {
+                console.error('Iframe loading error:', e);
+                toast({
+                  title: "Display Error",
+                  description: "Document failed to display. Try downloading the original.",
+                  variant: "destructive",
+                });
+              }}
+              style={{
+                minHeight: '100vh'
+              }}
+            />
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600">Preparing document...</p>
+              </div>
+            </div>
+          )}
           
           {/* Annotation canvas overlay */}
           <canvas
@@ -561,7 +612,8 @@ export default function UniversalDocumentAnnotator() {
         </div>
         <div className="flex items-center gap-4">
           <span>{documentType} loaded with universal viewer</span>
-          <span>Status: Ready for annotation</span>
+          <span>URL: {actualUrl || 'Loading...'}</span>
+          <span>Status: {actualUrl ? 'Ready for annotation' : 'Loading...'}</span>
         </div>
       </div>
     </div>
