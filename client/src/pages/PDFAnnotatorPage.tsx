@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
-import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download, ZoomIn, ZoomOut, Home } from 'lucide-react';
+import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, ZoomIn, ZoomOut } from 'lucide-react';
 
 type Tool = 'pen' | 'eraser' | 'text' | 'highlight';
 
@@ -22,17 +22,15 @@ interface Annotation {
 }
 
 export function PDFAnnotatorPage() {
-  const [activeTool, setActiveTool] = useState<Tool | null>(null);
-  const [isAnnotationMode, setIsAnnotationMode] = useState(false);
+  const [activeTool, setActiveTool] = useState<Tool>('pen');
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
-  const [scale, setScale] = useState(1.2);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(0);
+  const [scale, setScale] = useState(1.0);
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [currentStroke, setCurrentStroke] = useState<Array<{x: number, y: number}>>([]);
+  const [scrollOffset, setScrollOffset] = useState({ x: 0, y: 0 });
   
   const pdfViewerRef = useRef<HTMLIFrameElement>(null);
   const annotationCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -43,7 +41,6 @@ export function PDFAnnotatorPage() {
 
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
-  const rawPdfUrl = urlParams.get('pdf') || '';
   const assignmentId = urlParams.get('assignmentId') || '';
   
   // Use server proxy endpoint to serve authenticated PDFs
@@ -55,25 +52,34 @@ export function PDFAnnotatorPage() {
     
     console.log('Loading PDF:', pdfUrl);
     setPdfLoaded(true);
-    setTotalPages(1); // Simplified for iframe approach
-    setCurrentPage(1);
   }, [pdfUrl]);
 
-  // Initialize canvas overlay
-  const initializeCanvas = useCallback(() => {
-    if (!annotationCanvasRef.current || !containerRef.current) return;
+  // Update canvas size to match PDF viewer
+  const updateCanvasSize = useCallback(() => {
+    if (!annotationCanvasRef.current || !pdfViewerRef.current || !containerRef.current) return;
     
     const canvas = annotationCanvasRef.current;
     const container = containerRef.current;
     
-    // Match canvas size to container
+    // Set canvas to cover the entire scrollable area
     const rect = container.getBoundingClientRect();
     canvas.width = rect.width;
-    canvas.height = rect.height;
+    canvas.height = container.scrollHeight; // Full scrollable height
     canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
+    canvas.style.height = `${container.scrollHeight}px`;
     
-    console.log('Canvas initialized:', { width: canvas.width, height: canvas.height });
+    console.log('Canvas resized:', { width: canvas.width, height: canvas.height });
+  }, []);
+
+  // Track scroll position for coordinate adjustment
+  const updateScrollOffset = useCallback(() => {
+    if (!containerRef.current) return;
+    
+    const container = containerRef.current;
+    setScrollOffset({
+      x: container.scrollLeft,
+      y: container.scrollTop
+    });
   }, []);
 
   // Redraw all annotations
@@ -87,7 +93,7 @@ export function PDFAnnotatorPage() {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw each annotation
+    // Draw each annotation with scroll compensation
     annotations.forEach(annotation => {
       ctx.save();
       ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
@@ -116,23 +122,22 @@ export function PDFAnnotatorPage() {
     });
   }, [annotations]);
 
-  // Get coordinates relative to canvas
+  // Get coordinates relative to canvas with scroll compensation
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!annotationCanvasRef.current) return { x: 0, y: 0 };
+    if (!annotationCanvasRef.current || !containerRef.current) return { x: 0, y: 0 };
     
     const canvas = annotationCanvasRef.current;
+    const container = containerRef.current;
     const rect = canvas.getBoundingClientRect();
     
     return {
-      x: e.clientX - rect.left,
-      y: e.clientY - rect.top
+      x: e.clientX - rect.left + container.scrollLeft,
+      y: e.clientY - rect.top + container.scrollTop
     };
   };
 
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!activeTool || !isAnnotationMode) return;
-    
     if (activeTool === 'text') {
       addTextAtPosition(e);
       return;
@@ -141,10 +146,13 @@ export function PDFAnnotatorPage() {
     setIsDrawing(true);
     const coords = getCanvasCoordinates(e);
     setCurrentStroke([coords]);
+    
+    // Prevent default to stop scrolling during drawing
+    e.preventDefault();
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !activeTool || !isAnnotationMode) return;
+    if (!isDrawing) return;
     
     const coords = getCanvasCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
@@ -154,7 +162,7 @@ export function PDFAnnotatorPage() {
     const ctx = canvas?.getContext('2d');
     if (!canvas || !ctx) return;
     
-    // Redraw annotations
+    // Redraw all annotations
     redrawAnnotations();
     
     // Draw current stroke
@@ -188,16 +196,18 @@ export function PDFAnnotatorPage() {
       ctx.stroke();
       ctx.restore();
     }
+    
+    e.preventDefault();
   };
 
   const stopDrawing = () => {
-    if (!isDrawing || currentStroke.length === 0 || !activeTool) return;
+    if (!isDrawing || currentStroke.length === 0) return;
     
     // Save the completed stroke
     const newAnnotation: Annotation = {
       type: 'stroke',
       points: [...currentStroke],
-      page: currentPage,
+      page: 1,
       style: {
         color: activeTool === 'pen' ? '#000000' : 
                activeTool === 'highlight' ? 'rgba(255, 255, 0, 0.5)' : '#000000',
@@ -222,7 +232,7 @@ export function PDFAnnotatorPage() {
       text,
       x: coords.x,
       y: coords.y,
-      page: currentPage,
+      page: 1,
       style: {
         color: '#000000',
         lineWidth: 0,
@@ -231,24 +241,6 @@ export function PDFAnnotatorPage() {
     };
     
     setAnnotations(prev => [...prev, newAnnotation]);
-  };
-
-  // Tool and mode functions
-  const toggleMode = () => {
-    const newMode = !isAnnotationMode;
-    setIsAnnotationMode(newMode);
-    if (!newMode) {
-      setActiveTool(null);
-    } else {
-      setActiveTool('pen');
-    }
-  };
-
-  const handleToolChange = (tool: Tool) => {
-    if (!isAnnotationMode) {
-      setIsAnnotationMode(true);
-    }
-    setActiveTool(tool);
   };
 
   // Clear all annotations
@@ -265,7 +257,6 @@ export function PDFAnnotatorPage() {
       const saveKey = `pdf-annotation-data-${assignmentId}`;
       const saveData = {
         annotations,
-        currentPage,
         scale
       };
       localStorage.setItem(saveKey, JSON.stringify(saveData));
@@ -295,9 +286,8 @@ export function PDFAnnotatorPage() {
     
     if (savedData) {
       try {
-        const { annotations: savedAnnotations, currentPage: savedPage, scale: savedScale } = JSON.parse(savedData);
+        const { annotations: savedAnnotations, scale: savedScale } = JSON.parse(savedData);
         setAnnotations(savedAnnotations || []);
-        if (savedPage) setCurrentPage(savedPage);
         if (savedScale) setScale(savedScale);
       } catch (error) {
         console.error('Failed to load saved work:', error);
@@ -377,28 +367,52 @@ export function PDFAnnotatorPage() {
     loadPDF();
   }, [loadPDF]);
 
-  // Initialize canvas when PDF loads
+  // Update canvas when PDF loads or container size changes
   useEffect(() => {
     if (pdfLoaded) {
-      const timer = setTimeout(initializeCanvas, 100);
+      const timer = setTimeout(() => {
+        updateCanvasSize();
+        updateScrollOffset();
+      }, 500); // Give PDF time to render
       return () => clearTimeout(timer);
     }
-  }, [pdfLoaded, initializeCanvas]);
+  }, [pdfLoaded, updateCanvasSize, updateScrollOffset]);
 
   // Redraw annotations when they change
   useEffect(() => {
     redrawAnnotations();
   }, [annotations, redrawAnnotations]);
 
+  // Handle container scroll - update scroll offset
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      updateScrollOffset();
+      // Update canvas position to follow scroll
+      if (annotationCanvasRef.current) {
+        const canvas = annotationCanvasRef.current;
+        canvas.style.transform = `translate(${-container.scrollLeft}px, ${-container.scrollTop}px)`;
+      }
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [updateScrollOffset]);
+
   // Handle window resize
   useEffect(() => {
     const handleResize = () => {
-      setTimeout(initializeCanvas, 100);
+      setTimeout(() => {
+        updateCanvasSize();
+        updateScrollOffset();
+      }, 100);
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [initializeCanvas]);
+  }, [updateCanvasSize, updateScrollOffset]);
 
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
@@ -434,61 +448,44 @@ export function PDFAnnotatorPage() {
         {/* Toolbar */}
         <div className="w-64 bg-white border-r p-4 overflow-y-auto">
           <div className="space-y-6">
-            {/* Mode Toggle */}
+            {/* Drawing Tools */}
             <div>
-              <Button
-                onClick={toggleMode}
-                variant={isAnnotationMode ? 'default' : 'outline'}
-                className={`w-full justify-center mb-6 text-sm font-medium ${
-                  isAnnotationMode 
-                    ? 'bg-blue-600 text-white border-blue-600' 
-                    : 'bg-white border-gray-300 hover:bg-gray-50 text-black'
-                }`}
-              >
-                {isAnnotationMode ? '✏️ ANNOTATION MODE' : '👀 VIEW MODE (Click to Annotate)'}
-              </Button>
-            </div>
-
-            {/* Drawing Tools - Only show when in annotation mode */}
-            {isAnnotationMode && (
-              <div>
-                <h3 className="font-medium mb-3">Drawing Tools</h3>
-                <div className="space-y-2">
-                  <Button
-                    onClick={() => handleToolChange('pen')}
-                    variant={activeTool === 'pen' ? 'default' : 'outline'}
-                    className={`w-full justify-start ${activeTool === 'pen' ? 'bg-blue-600 text-white' : ''}`}
-                  >
-                    <Pen className="h-4 w-4 mr-2" />
-                    Pen
-                  </Button>
-                  <Button
-                    onClick={() => handleToolChange('highlight')}
-                    variant={activeTool === 'highlight' ? 'default' : 'outline'}
-                    className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-yellow-400 text-black' : ''}`}
-                  >
-                    <Highlighter className="h-4 w-4 mr-2" />
-                    Highlight
-                  </Button>
-                  <Button
-                    onClick={() => handleToolChange('eraser')}
-                    variant={activeTool === 'eraser' ? 'default' : 'outline'}
-                    className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-red-600 text-white' : ''}`}
-                  >
-                    <Eraser className="h-4 w-4 mr-2" />
-                    Eraser
-                  </Button>
-                  <Button
-                    onClick={() => handleToolChange('text')}
-                    variant={activeTool === 'text' ? 'default' : 'outline'}
-                    className={`w-full justify-start ${activeTool === 'text' ? 'bg-green-600 text-white' : ''}`}
-                  >
-                    <Type className="h-4 w-4 mr-2" />
-                    Add Text
-                  </Button>
-                </div>
+              <h3 className="font-medium mb-3">Drawing Tools</h3>
+              <div className="space-y-2">
+                <Button
+                  onClick={() => setActiveTool('pen')}
+                  variant={activeTool === 'pen' ? 'default' : 'outline'}
+                  className={`w-full justify-start ${activeTool === 'pen' ? 'bg-blue-600 text-white' : ''}`}
+                >
+                  <Pen className="h-4 w-4 mr-2" />
+                  Pen
+                </Button>
+                <Button
+                  onClick={() => setActiveTool('highlight')}
+                  variant={activeTool === 'highlight' ? 'default' : 'outline'}
+                  className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-yellow-400 text-black' : ''}`}
+                >
+                  <Highlighter className="h-4 w-4 mr-2" />
+                  Highlight
+                </Button>
+                <Button
+                  onClick={() => setActiveTool('eraser')}
+                  variant={activeTool === 'eraser' ? 'default' : 'outline'}
+                  className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-red-600 text-white' : ''}`}
+                >
+                  <Eraser className="h-4 w-4 mr-2" />
+                  Eraser
+                </Button>
+                <Button
+                  onClick={() => setActiveTool('text')}
+                  variant={activeTool === 'text' ? 'default' : 'outline'}
+                  className={`w-full justify-start ${activeTool === 'text' ? 'bg-green-600 text-white' : ''}`}
+                >
+                  <Type className="h-4 w-4 mr-2" />
+                  Add Text
+                </Button>
               </div>
-            )}
+            </div>
 
             {/* Zoom Controls */}
             <div>
@@ -517,29 +514,29 @@ export function PDFAnnotatorPage() {
           </div>
         </div>
 
-        {/* PDF Viewer */}
+        {/* PDF Viewer with Natural Scrolling and Annotation */}
         <div className="flex-1 relative bg-gray-200 overflow-auto" ref={containerRef}>
           {/* PDF iframe */}
           <iframe
             ref={pdfViewerRef}
             src={pdfUrl}
-            className="w-full h-full bg-white"
+            className="w-full min-h-full bg-white block"
             title="PDF Document"
             style={{
               transform: `scale(${scale})`,
-              transformOrigin: 'top left'
+              transformOrigin: 'top left',
+              height: `${100 / scale}%`,
+              width: `${100 / scale}%`
             }}
           />
           
-          {/* Annotation Canvas Overlay */}
+          {/* Annotation Canvas Overlay - Always Active */}
           <canvas
             ref={annotationCanvasRef}
-            className="absolute top-0 left-0"
+            className="absolute top-0 left-0 pointer-events-auto"
             style={{
-              pointerEvents: isAnnotationMode ? 'auto' : 'none',
-              cursor: isAnnotationMode && activeTool ? 
-                (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
-              zIndex: isAnnotationMode ? 10 : 5
+              cursor: activeTool === 'text' ? 'text' : 'crosshair',
+              zIndex: 10
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
@@ -552,14 +549,10 @@ export function PDFAnnotatorPage() {
       {/* Status Bar */}
       <div className="bg-white border-t p-2 text-sm text-gray-600 flex justify-between items-center">
         <div>
-          Mode: {isAnnotationMode ? `Annotating (${activeTool?.toUpperCase()})` : 'Viewing'} | 
-          PDF Status: {pdfLoaded ? 'Loaded' : 'Loading...'}
+          Tool: {activeTool?.toUpperCase()} | PDF Status: {pdfLoaded ? 'Loaded' : 'Loading...'}
         </div>
-        <div>
-          {isAnnotationMode 
-            ? 'Draw on the PDF with your selected tool. Switch to View Mode to scroll freely.' 
-            : 'Click "VIEW MODE" button to switch to Annotation Mode for drawing.'
-          }
+        <div className="text-green-600 font-medium">
+          ✓ Natural scrolling enabled with simultaneous annotation capability
         </div>
       </div>
     </div>
