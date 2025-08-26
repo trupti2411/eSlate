@@ -146,44 +146,72 @@ export function PDFAnnotatorPage() {
       ctx.save();
       ctx.globalCompositeOperation = annotation.style.globalCompositeOperation as GlobalCompositeOperation;
       ctx.strokeStyle = annotation.style.color;
-      ctx.lineWidth = annotation.style.lineWidth * scale; // Scale line width
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
       if (annotation.type === 'stroke' && annotation.points) {
         ctx.beginPath();
-        annotation.points.forEach((point, index) => {
-          const scaledX = point.x * scale;
-          const scaledY = point.y * scale;
-          if (index === 0) {
-            ctx.moveTo(scaledX, scaledY);
-          } else {
-            ctx.lineTo(scaledX, scaledY);
-          }
-        });
+        
+        if (pdfDoc) {
+          // For PDF.js rendering, apply scale
+          ctx.lineWidth = annotation.style.lineWidth * scale;
+          annotation.points.forEach((point, index) => {
+            const scaledX = point.x * scale;
+            const scaledY = point.y * scale;
+            if (index === 0) {
+              ctx.moveTo(scaledX, scaledY);
+            } else {
+              ctx.lineTo(scaledX, scaledY);
+            }
+          });
+        } else {
+          // For iframe fallback, use direct coordinates
+          ctx.lineWidth = annotation.style.lineWidth;
+          annotation.points.forEach((point, index) => {
+            if (index === 0) {
+              ctx.moveTo(point.x, point.y);
+            } else {
+              ctx.lineTo(point.x, point.y);
+            }
+          });
+        }
         ctx.stroke();
       } else if (annotation.type === 'text' && annotation.text && annotation.x !== undefined && annotation.y !== undefined) {
         ctx.fillStyle = annotation.style.color;
-        ctx.font = `${18 * scale}px Arial`;
-        ctx.fillText(annotation.text, annotation.x * scale, annotation.y * scale);
+        
+        if (pdfDoc) {
+          ctx.font = `${18 * scale}px Arial`;
+          ctx.fillText(annotation.text, annotation.x * scale, annotation.y * scale);
+        } else {
+          ctx.font = '18px Arial';
+          ctx.fillText(annotation.text, annotation.x, annotation.y);
+        }
       }
       
       ctx.restore();
     });
-  }, [annotations, currentPage, scale]);
+  }, [annotations, currentPage, scale, pdfDoc]);
 
-  // Get coordinates relative to PDF content (unscaled)
+  // Get coordinates relative to canvas
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!canvasRef.current) return { x: 0, y: 0 };
     
     const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     
-    // Get coordinates relative to canvas and convert to PDF coordinate space (unscaled)
-    return {
-      x: (e.clientX - rect.left) / scale,
-      y: (e.clientY - rect.top) / scale
-    };
+    // For PDF.js rendering, convert to PDF coordinate space
+    if (pdfDoc) {
+      return {
+        x: (e.clientX - rect.left) / scale,
+        y: (e.clientY - rect.top) / scale
+      };
+    } else {
+      // For iframe fallback, use direct canvas coordinates
+      return {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top
+      };
+    }
   };
 
   // Drawing functions
@@ -209,36 +237,46 @@ export function PDFAnnotatorPage() {
     const coords = getCanvasCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
     
-    // Redraw page with current stroke
+    // Draw current stroke in real-time
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx) return;
+    
+    // For PDF.js, re-render page first
     if (pdfDoc) {
       renderPage(pdfDoc, currentPage);
+    } else {
+      // For iframe fallback, just redraw annotations
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      drawAnnotations(ctx);
+    }
+    
+    // Draw current stroke
+    if (currentStroke.length > 0) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       
-      // Draw current stroke in real-time
-      const canvas = canvasRef.current;
-      const ctx = canvas?.getContext('2d');
-      if (!canvas || !ctx) return;
+      switch (activeTool) {
+        case 'pen':
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = pdfDoc ? 3 * scale : 3;
+          break;
+        case 'highlight':
+          ctx.globalCompositeOperation = 'multiply';
+          ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+          ctx.lineWidth = pdfDoc ? 20 * scale : 20;
+          break;
+        case 'eraser':
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.lineWidth = pdfDoc ? 20 * scale : 20;
+          break;
+      }
       
-      if (currentStroke.length > 0) {
-        ctx.save();
-        switch (activeTool) {
-          case 'pen':
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.strokeStyle = '#000000';
-            ctx.lineWidth = 3 * scale;
-            break;
-          case 'highlight':
-            ctx.globalCompositeOperation = 'multiply';
-            ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-            ctx.lineWidth = 20 * scale;
-            break;
-          case 'eraser':
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.lineWidth = 20 * scale;
-            break;
-        }
-        
-        ctx.beginPath();
-        [...currentStroke, coords].forEach((point, index) => {
+      ctx.beginPath();
+      [...currentStroke, coords].forEach((point, index) => {
+        if (pdfDoc) {
           const scaledX = point.x * scale;
           const scaledY = point.y * scale;
           if (index === 0) {
@@ -246,10 +284,16 @@ export function PDFAnnotatorPage() {
           } else {
             ctx.lineTo(scaledX, scaledY);
           }
-        });
-        ctx.stroke();
-        ctx.restore();
-      }
+        } else {
+          if (index === 0) {
+            ctx.moveTo(point.x, point.y);
+          } else {
+            ctx.lineTo(point.x, point.y);
+          }
+        }
+      });
+      ctx.stroke();
+      ctx.restore();
     }
     
     e.preventDefault();
@@ -259,7 +303,7 @@ export function PDFAnnotatorPage() {
   const stopDrawing = () => {
     if (!isDrawing || currentStroke.length === 0) return;
     
-    // Save the completed stroke in PDF coordinate space (unscaled)
+    // Save the completed stroke
     const newAnnotation: Annotation = {
       type: 'stroke',
       points: [...currentStroke],
@@ -267,7 +311,7 @@ export function PDFAnnotatorPage() {
       style: {
         color: activeTool === 'pen' ? '#000000' : 
                activeTool === 'highlight' ? 'rgba(255, 255, 0, 0.5)' : '#000000',
-        lineWidth: activeTool === 'pen' ? 3 : 20, // Store unscaled line width
+        lineWidth: activeTool === 'pen' ? 3 : 20,
         globalCompositeOperation: activeTool === 'eraser' ? 'destination-out' : 'source-over'
       }
     };
@@ -286,7 +330,7 @@ export function PDFAnnotatorPage() {
     const newAnnotation: Annotation = {
       type: 'text',
       text,
-      x: coords.x, // Store in PDF coordinate space
+      x: coords.x,
       y: coords.y,
       page: currentPage,
       style: {
