@@ -85,7 +85,7 @@ export class ObjectStorageService {
       // Set appropriate headers
       res.set({
         "Content-Type": metadata.contentType || "application/octet-stream",
-        "Content-Length": metadata.size,
+        "Content-Length": metadata.size?.toString() || '0',
         "Content-Disposition": `inline; filename="${fileName}"`,
         "Cache-Control": `public, max-age=${cacheTtlSec}`,
         "Accept-Ranges": "bytes",
