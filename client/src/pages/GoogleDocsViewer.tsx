@@ -433,7 +433,9 @@ export default function GoogleDocsViewer() {
     setIsSaving(true);
     try {
       // Save locally first
-      localStorage.setItem(`annotations_${assignmentId}`, JSON.stringify(annotations));
+      // Create unique storage key using both assignment ID and document path/index
+      const documentKey = objectPath || `doc_${docIndex}`;
+      localStorage.setItem(`annotations_${assignmentId}_${documentKey}`, JSON.stringify(annotations));
       
       // Also save to database as draft
       const annotationsData = JSON.stringify(annotations);
@@ -553,7 +555,9 @@ export default function GoogleDocsViewer() {
 
   // Load saved annotations
   useEffect(() => {
-    const savedAnnotations = localStorage.getItem(`annotations_${assignmentId}`);
+    // Create unique storage key using both assignment ID and document path/index
+    const documentKey = objectPath || `doc_${docIndex}`;
+    const savedAnnotations = localStorage.getItem(`annotations_${assignmentId}_${documentKey}`);
     if (savedAnnotations) {
       try {
         setAnnotations(JSON.parse(savedAnnotations));
@@ -561,7 +565,7 @@ export default function GoogleDocsViewer() {
         console.error('Error loading saved annotations:', error);
       }
     }
-  }, [assignmentId]);
+  }, [assignmentId, objectPath, docIndex]);
 
   // Redraw canvas when annotations change
   useEffect(() => {
