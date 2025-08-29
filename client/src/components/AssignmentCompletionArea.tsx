@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { type Assignment, type Submission } from "@shared/schema";
 import { PDFAnnotator } from "./PDFAnnotator";
+import { ObjectUploader } from "./ObjectUploader";
 import { 
   FileText, 
   Download, 
@@ -113,6 +114,7 @@ export function AssignmentCompletionArea({
   const [activeTab, setActiveTab] = useState("assignment");
   const [isPDFAnnotatorOpen, setIsPDFAnnotatorOpen] = useState(false);
   const [selectedPDFUrl, setSelectedPDFUrl] = useState<string>("");
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -121,7 +123,34 @@ export function AssignmentCompletionArea({
   const attachmentUrls = assignment.attachmentUrls || [];
   const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(attachmentUrls);
 
-  // Submit assignment mutation
+  // Upload functions
+  const getUploadParameters = async () => {
+    const response = await apiRequest("/api/objects/upload", "POST");
+    return {
+      method: "PUT" as const,
+      url: response.uploadUrl,
+    };
+  };
+
+  const handleUploadComplete = (result: any) => {
+    if (result.successful && result.successful.length > 0) {
+      const newFileUrls = result.successful.map((file: any) => {
+        // Extract object key from upload URL
+        const urlParts = file.uploadURL.split('/');
+        const objectKey = urlParts[urlParts.length - 1].split('?')[0];
+        return `/objects/uploads/${objectKey}`;
+      });
+      
+      setUploadedFiles(prev => [...prev, ...newFileUrls]);
+      
+      toast({
+        title: "Files uploaded successfully",
+        description: `${result.successful.length} file(s) uploaded`,
+      });
+    }
+  };
+
+  // Submit assignment mutation (for PDF annotations)
   const submitAssignmentMutation = useMutation({
     mutationFn: async (fileUrl: string) => {
       return apiRequest('/api/submissions', 'POST', {
@@ -153,6 +182,40 @@ export function AssignmentCompletionArea({
 
 
 
+
+  // Submit offline uploaded files
+  const submitOfflineUploadMutation = useMutation({
+    mutationFn: async () => {
+      if (uploadedFiles.length === 0) {
+        throw new Error("No files uploaded");
+      }
+      
+      return apiRequest('/api/submissions', 'POST', {
+        assignmentId: assignment.id,
+        fileUrls: uploadedFiles,
+        textResponse: "",
+        submittedAt: new Date().toISOString(),
+        status: 'submitted'
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+      onSubmissionUpdate();
+      setUploadedFiles([]); // Clear uploaded files
+      toast({
+        title: "Assignment Submitted",
+        description: "Your assignment has been submitted successfully."
+      });
+    },
+    onError: (error) => {
+      console.error('Error submitting assignment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to submit assignment. Please try again.",
+        variant: "destructive"
+      });
+    }
+  });
 
   const eInkStyles = {
     card: "bg-white border-2 border-black rounded shadow-sm",
@@ -474,31 +537,50 @@ export function AssignmentCompletionArea({
                 Select the completed assignment file(s) from your device
               </p>
               
-              {/* File Upload Input */}
+              {/* File Upload with ObjectUploader */}
               <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 mb-4">
-                <input
-                  type="file"
-                  multiple
-                  accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                  className="hidden"
-                  id="assignment-upload"
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files || []);
-                    // Handle file upload logic here
-                    console.log("Files selected:", files);
-                  }}
-                />
-                <label
-                  htmlFor="assignment-upload"
-                  className="cursor-pointer inline-flex items-center px-6 py-3 border-2 border-black bg-white text-black hover:bg-gray-100 font-medium rounded"
+                <ObjectUploader
+                  maxNumberOfFiles={5}
+                  maxFileSize={31457280} // 30MB
+                  onGetUploadParameters={getUploadParameters}
+                  onComplete={handleUploadComplete}
+                  buttonClassName="inline-flex items-center px-6 py-3 border-2 border-black bg-white text-black hover:bg-gray-100 font-medium rounded"
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   Choose Files
-                </label>
+                </ObjectUploader>
                 <p className="text-xs text-gray-500 mt-2">
                   Supported formats: PDF, DOC, DOCX, PNG, JPG (Max 30MB per file)
                 </p>
               </div>
+
+              {/* Show uploaded files */}
+              {uploadedFiles.length > 0 && (
+                <div className="mt-4">
+                  <Label className="text-sm font-medium mb-2 block">Uploaded Files ({uploadedFiles.length}):</Label>
+                  <div className="space-y-2">
+                    {uploadedFiles.map((url, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border border-gray-200 rounded bg-green-50">
+                        <div className="flex items-center">
+                          <FileText className="h-4 w-4 mr-2 text-green-600" />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">File {index + 1} uploaded</span>
+                            <span className="text-xs text-gray-500">Ready for submission</span>
+                          </div>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setUploadedFiles(prev => prev.filter((_, i) => i !== index))}
+                          className="text-xs text-red-600 hover:bg-red-50"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Show existing submission files if any */}
               {submission?.fileUrls && submission.fileUrls.length > 0 && (
@@ -522,15 +604,16 @@ export function AssignmentCompletionArea({
           <div className="flex justify-end">
             <Button
               type="button"
-              onClick={() => {
-                // Placeholder for submission logic
-                console.log("Submit assignment - offline upload");
-              }}
-              disabled={submission?.status === 'submitted'}
+              onClick={() => submitOfflineUploadMutation.mutate()}
+              disabled={submission?.status === 'submitted' || uploadedFiles.length === 0 || submitOfflineUploadMutation.isPending}
               className={`${eInkStyles.primaryButton} px-6`}
             >
               <Send className="h-4 w-4 mr-2" />
-              {submission?.status === 'submitted' ? 'Submitted' : 'Submit Assignment'}
+              {submitOfflineUploadMutation.isPending 
+                ? 'Submitting...' 
+                : submission?.status === 'submitted' 
+                  ? 'Submitted' 
+                  : 'Submit Assignment'}
             </Button>
           </div>
         </TabsContent>
