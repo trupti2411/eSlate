@@ -126,9 +126,10 @@ export function AssignmentCompletionArea({
   // Upload functions
   const getUploadParameters = async () => {
     const response = await apiRequest("/api/objects/upload", "POST");
+    console.log("Upload response:", response); // Debug log
     return {
       method: "PUT" as const,
-      url: response.uploadUrl,
+      url: response.uploadURL, // Note: it's uploadURL not uploadUrl
     };
   };
 
