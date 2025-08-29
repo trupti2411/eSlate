@@ -1,3 +1,4 @@
+import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -26,29 +27,46 @@ function getObjectPathFromUrl(url: string): string {
 }
 
 export function useFileMetadata(fileUrl: string) {
-  const objectPath = getObjectPathFromUrl(fileUrl);
+  const objectPath = React.useMemo(() => {
+    if (!fileUrl) return '';
+    return getObjectPathFromUrl(fileUrl);
+  }, [fileUrl]);
   
   return useQuery<FileMetadata>({
-    queryKey: ['/api/objects/metadata', objectPath],
+    queryKey: ['/api/objects/metadata', objectPath, fileUrl],
     queryFn: async () => {
-      if (!objectPath) {
+      if (!objectPath || !fileUrl) {
         throw new Error("Invalid file URL");
       }
       return apiRequest(`/api${objectPath}/metadata`, 'GET');
     },
-    enabled: !!objectPath,
+    enabled: !!objectPath && !!fileUrl,
     staleTime: 5 * 60 * 1000, // 5 minutes
     retry: 1,
   });
 }
 
 export function useMultipleFileMetadata(fileUrls: string[]) {
-  const queries = fileUrls.map(url => useFileMetadata(url));
+  // Create stable array with empty strings to maintain hook call order
+  const stableUrls = React.useMemo(() => {
+    const maxLength = Math.max(fileUrls.length, 10); // Support up to 10 files
+    const paddedUrls = [...fileUrls];
+    while (paddedUrls.length < maxLength) {
+      paddedUrls.push(''); // Add empty strings for unused slots
+    }
+    return paddedUrls.slice(0, maxLength);
+  }, [fileUrls]);
+
+  // Always call the same number of hooks
+  const queries = stableUrls.map(url => useFileMetadata(url));
+  
+  // Filter out results for empty URLs
+  const validQueries = queries.slice(0, fileUrls.length);
   
   return {
-    data: queries.map(q => q.data),
-    isLoading: queries.some(q => q.isLoading),
-    errors: queries.map(q => q.error).filter(Boolean),
+    data: validQueries.map(q => q.data),
+    isLoading: validQueries.some(q => q.isLoading),
+    errors: validQueries.map(q => q.error).filter(Boolean),
   };
 }
 
