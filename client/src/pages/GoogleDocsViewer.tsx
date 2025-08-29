@@ -41,9 +41,14 @@ export default function GoogleDocsViewer() {
   // Get URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const assignmentId = urlParams.get('assignmentId') || '';
+  const objectPath = urlParams.get('objectPath') || '';
+  const docIndex = urlParams.get('docIndex') || '0';
+  const filename = urlParams.get('filename') || '';
   
-  // Use public document URL for Google Docs Viewer
-  const publicDocumentUrl = assignmentId ? `/api/public-doc/${assignmentId}` : '';
+  // Use specific document URL based on objectPath if provided, otherwise fall back to assignment-based URL
+  const publicDocumentUrl = objectPath ? 
+    `/objects/uploads/${objectPath}` : 
+    (assignmentId ? `/api/public-doc/${assignmentId}` : '');
   const fallbackUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
   
   // Google Docs Viewer URL with enhanced parameters for full document loading
@@ -69,14 +74,17 @@ export default function GoogleDocsViewer() {
         const contentType = response.headers.get('content-type') || '';
         console.log('Document content type:', contentType);
         
-        if (contentType.includes('application/pdf')) {
+        // Detect document type from content type or filename
+        const fileExt = filename.toLowerCase().split('.').pop();
+        if (contentType.includes('application/pdf') || fileExt === 'pdf') {
           setDocumentType('PDF');
-        } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document')) {
+        } else if (contentType.includes('application/vnd.openxmlformats-officedocument.wordprocessingml.document') || fileExt === 'docx') {
           setDocumentType('Word Document');
-        } else if (contentType.includes('application/msword')) {
+        } else if (contentType.includes('application/msword') || fileExt === 'doc') {
           setDocumentType('Word Document');
         } else if (contentType.includes('application/vnd.ms-excel') || 
-                   contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')) {
+                   contentType.includes('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') ||
+                   fileExt === 'xls' || fileExt === 'xlsx') {
           setDocumentType('Excel Spreadsheet');
         } else if (contentType.includes('application/vnd.ms-powerpoint') ||
                    contentType.includes('application/vnd.openxmlformats-officedocument.presentationml.presentation')) {
