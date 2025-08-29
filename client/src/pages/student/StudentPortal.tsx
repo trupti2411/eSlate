@@ -14,6 +14,7 @@ import { format, isPast } from 'date-fns';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { useFileMetadata } from '@/hooks/useFileMetadata';
 import { PDFAnnotator } from '@/components/PDFAnnotator';
+import { AssignmentCompletionArea } from '@/components/AssignmentCompletionArea';
 
 function UploadedFilesList({ fileUrls, className }: { fileUrls: string[], className?: string }) {
   const { data: fileMetadata, isLoading, error } = useFileMetadata(fileUrls[0] || '');
@@ -403,170 +404,16 @@ export function StudentPortal() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {typedAssignments.map((assignment: Assignment) => {
-            const status = getAssignmentStatus(assignment);
             const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
-            const hasAttachments = assignment.attachmentUrls && assignment.attachmentUrls.length > 0;
-            const isPDF = hasAttachments && assignment.attachmentUrls!.some((url: string) => 
-              url.toLowerCase().includes('.pdf') || url.toLowerCase().endsWith('pdf')
-            );
 
             return (
-              <Card key={assignment.id} className={eInkStyles.card}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <CardTitle className="text-lg">{assignment.title}</CardTitle>
-                      <CardDescription>{assignment.description}</CardDescription>
-                    </div>
-                    <Badge className={`${getStatusColor(status)} ${eInkStyles.badge}`}>
-                      {status}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="text-sm space-y-1">
-                      <div>
-                        <span className="font-medium">Due:</span> {format(new Date(assignment.submissionDate), 'MMM dd, yyyy h:mm a')}
-                      </div>
-                      <div>
-                        <span className="font-medium">Type:</span> File Upload
-                      </div>
-                      <div>
-                        <span className="font-medium">Points:</span> Not specified
-                      </div>
-                    </div>
-
-                    {/* Assignment Materials */}
-                    {hasAttachments && (
-                      <div className="space-y-2">
-                        <h4 className="font-medium text-sm">Assignment Materials:</h4>
-                        <div className="space-y-1">
-                          {assignment.attachmentUrls!.map((url: string, index: number) => (
-                            <Button
-                              key={index}
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                const objectPath = url.includes('/uploads/') 
-                                  ? url.split('/uploads/').pop()
-                                  : url.split('/').pop();
-                                window.open(`/objects/uploads/${objectPath}`, '_blank');
-                              }}
-                              className={`${eInkStyles.button} w-full justify-start text-xs`}
-                            >
-                              <Download className="h-3 w-3 mr-2" />
-                              View Assignment Material {index + 1}
-                            </Button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Show uploaded files if submission exists */}
-                    {submission && submission.fileUrls && submission.fileUrls.length > 0 && (
-                      <UploadedFilesList 
-                        fileUrls={submission.fileUrls} 
-                        className="border-t pt-3"
-                      />
-                    )}
-
-                    {/* Assignment Actions */}
-                    <div className="flex flex-wrap gap-2 pt-3 border-t">
-                      {/* Complete Online for PDFs - Always show for testing */}
-                      {hasAttachments && (
-                        <Button
-                          onClick={() => {
-                            if (assignment.attachmentUrls && assignment.attachmentUrls.length > 0) {
-                              const url = assignment.attachmentUrls[0];
-                              const objectPath = url.includes('/uploads/') 
-                                ? url.split('/uploads/').pop()?.split('?')[0]
-                                : url.split('/').pop()?.split('?')[0];
-                              
-                              // Open PDF annotator in new tab with assignment context
-                              const annotatorUrl = `/pdf-annotator?pdf=${encodeURIComponent(`/objects/uploads/${objectPath}`)}&assignmentId=${assignment.id}`;
-                              window.open(annotatorUrl, '_blank');
-                            }
-                          }}
-                          className={eInkStyles.primaryButton}
-                          size="sm"
-                          data-testid={`button-complete-online-${assignment.id}`}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          {submission ? 'View Submission' : 'Complete Online'}
-                        </Button>
-                      )}
-
-                      {/* Upload Files */}
-                      {!submission && (
-                        <ObjectUploader
-                          onUploadComplete={async (result: any) => {
-                            if (result.successful && result.successful.length > 0) {
-                              try {
-                                // Set original filename metadata for each uploaded file
-                                const metadataPromises = result.successful.map(async (file: any) => {
-                                  const originalFileName = file.originalName || file.name || 'Unknown file';
-                                  const objectPath = file.uploadURL.includes('/uploads/') 
-                                    ? file.uploadURL.split('/uploads/').pop().split('?')[0]
-                                    : file.uploadURL.split('/').pop().split('?')[0];
-                                  
-                                  try {
-                                    await apiRequest(`/api/objects/uploads/${objectPath}/metadata`, 'POST', {
-                                      originalFileName
-                                    });
-                                  } catch (error) {
-                                    console.warn('Failed to set metadata for file:', originalFileName, error);
-                                  }
-                                });
-                                
-                                // Wait for all metadata to be set
-                                await Promise.allSettled(metadataPromises);
-                                
-                                const newFileUrls = result.successful.map((file: any) => {
-                                  const url = file.uploadURL as string;
-                                  return url.replace(/\?.*$/, ''); // Remove query parameters
-                                });
-                                
-                                // Get existing file URLs from the current submission
-                                const existingFileUrls: string[] = [];
-                                
-                                // Merge existing and new files
-                                const allFileUrls = [...existingFileUrls, ...newFileUrls];
-                                
-                                submitAssignmentMutation.mutate({
-                                  assignmentId: assignment.id,
-                                  fileUrls: allFileUrls
-                                });
-                              } catch (error) {
-                                console.error('Error processing upload:', error);
-                                toast({
-                                  title: "Upload processing failed", 
-                                  description: "Files uploaded but failed to process. Please contact support.",
-                                  variant: "destructive",
-                                });
-                              }
-                            } else {
-                              toast({
-                                title: "Upload failed", 
-                                description: result.failed && result.failed.length > 0 
-                                  ? `Failed to upload ${result.failed.length} file(s). Please try again.`
-                                  : "No files were uploaded successfully. Please try again.",
-                                variant: "destructive",
-                              });
-                            }
-                          }}
-                          buttonClassName={eInkStyles.button}
-                        >
-                          <Upload className="h-4 w-4 mr-2" />
-                          Upload Completed Assignment
-                        </ObjectUploader>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AssignmentCompletionArea
+                key={assignment.id}
+                assignment={assignment}
+                submission={submission}
+              />
             );
           })}
         </div>
