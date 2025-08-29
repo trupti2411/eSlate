@@ -434,57 +434,45 @@ export function StudentPortal() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {Object.entries(groupedAssignments).map(([yearId, yearGroup]: [string, any]) => (
-              <div key={yearId} className="border-2 border-black rounded-lg p-6 space-y-6">
-                <h3 className="text-xl font-bold text-black border-b-2 border-black pb-2">
-                  📚 {getYearName(yearId)}
-                </h3>
-                
-                {Object.entries(yearGroup).map(([termId, termGroup]: [string, any]) => (
-                  <div key={termId} className="ml-4 space-y-4">
-                    <h4 className="text-lg font-semibold text-gray-800">
-                      📅 {getTermName(termId)}
-                    </h4>
-                    
-                    {Object.entries(termGroup).map(([subject, subjectGroup]: [string, any]) => (
-                      <div key={subject} className="ml-4 space-y-3">
-                        <h5 className="text-base font-medium text-gray-700 border-l-4 border-black pl-3">
-                          📖 {subject}
-                        </h5>
-                        
-                        {Object.entries(subjectGroup).map(([week, weekAssignments]: [string, any]) => (
-                          <div key={week} className="ml-6 space-y-3">
-                            <h6 className="text-sm font-medium text-gray-600">
-                              📝 Week {week}
-                            </h6>
-                            
-                            <div className="space-y-4">
-                              {weekAssignments.map((assignment: Assignment) => {
-                                const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
+              Object.entries(yearGroup).map(([termId, termGroup]: [string, any]) => (
+                Object.entries(termGroup).map(([subject, subjectGroup]: [string, any]) => (
+                  Object.entries(subjectGroup).map(([week, weekAssignments]: [string, any]) => (
+                    weekAssignments.map((assignment: Assignment) => {
+                      const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
 
-                                return (
-                                  <AssignmentCompletionArea
-                                    key={assignment.id}
-                                    assignment={assignment}
-                                    submission={submission}
-                                    onSubmissionUpdate={() => {
-                                      // Refetch submissions when updated
-                                      queryClient.invalidateQueries({
-                                        queryKey: [`/api/students/student-${user?.id}/submissions`]
-                                      });
-                                    }}
-                                  />
-                                );
-                              })}
-                            </div>
+                      return (
+                        <div key={assignment.id} className="space-y-2">
+                          {/* Assignment organization badges */}
+                          <div className="flex items-center gap-2 mb-3">
+                            <Badge className="bg-black text-white text-xs">
+                              {getYearName(yearId)} - {getTermName(termId)}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {subject}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              Week {week}
+                            </Badge>
                           </div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                ))}
-              </div>
+                          
+                          <AssignmentCompletionArea
+                            assignment={assignment}
+                            submission={submission}
+                            onSubmissionUpdate={() => {
+                              // Refetch submissions when updated
+                              queryClient.invalidateQueries({
+                                queryKey: [`/api/students/student-${user?.id}/submissions`]
+                              });
+                            }}
+                          />
+                        </div>
+                      );
+                    })
+                  ))
+                ))
+              ))
             ))}
           </div>
         )}

@@ -19,6 +19,7 @@ import { ObjectUploader } from "@/components/ObjectUploader";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import Layout from "@/components/Layout";
 
 const assignmentFormSchema = insertAssignmentSchema.extend({
   submissionDate: z.string(),
@@ -137,81 +138,68 @@ function AssignmentHierarchy({
   };
 
   return (
-    <div className="space-y-6">
-      {Object.entries(groupedAssignments).map(([yearId, yearGroup]) => (
-        <div key={yearId} className="border rounded-lg p-4 space-y-4">
-          <h2 className="text-xl font-semibold text-primary">
-            📚 {getYearName(yearId)}
-          </h2>
-          
-          {Object.entries(yearGroup).map(([termId, termGroup]) => (
-            <div key={termId} className="ml-4 space-y-3">
-              <h3 className="text-lg font-medium text-secondary-foreground">
-                📅 {getTermName(termId)}
-              </h3>
-              
-              {Object.entries(termGroup).map(([subject, subjectGroup]) => (
-                <div key={subject} className="ml-4 space-y-2">
-                  <h4 className="text-base font-medium text-muted-foreground">
-                    📖 {subject}
-                  </h4>
-                  
-                  {Object.entries(subjectGroup).map(([week, weekAssignments]) => (
-                    <div key={week} className="ml-4 space-y-2">
-                      <h5 className="text-sm font-medium text-muted-foreground">
-                        📝 Week {week}
-                      </h5>
-                      
-                      <div className="grid gap-3">
-                        {weekAssignments.map((assignment: Assignment) => (
-                          <Card key={assignment.id} className="hover:shadow-md transition-shadow">
-                            <CardHeader className="pb-2">
-                              <div className="flex items-start justify-between">
-                                <div className="space-y-1">
-                                  <CardTitle className="text-base">{assignment.title}</CardTitle>
-                                  <CardDescription className="text-sm">{assignment.description}</CardDescription>
-                                </div>
-                                <div className="flex space-x-1">
-                                  <Button variant="outline" size="sm" onClick={() => onEdit(assignment)}>
-                                    <Edit className="w-3 h-3" />
-                                  </Button>
-                                  <Button variant="outline" size="sm" onClick={() => onDelete(assignment)}>
-                                    <Trash2 className="w-3 h-3" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </CardHeader>
-                            <CardContent className="pt-2">
-                              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                                <div className="flex items-center space-x-2">
-                                  <Calendar className="w-3 h-3" />
-                                  <span>
-                                    Due: {assignment.submissionDate ? format(new Date(assignment.submissionDate), "MMM d, yyyy") : "No due date"}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Users className="w-3 h-3" />
-                                  <span>Class Assignment</span>
-                                </div>
-                              </div>
-                              {assignment.instructions && (
-                                <div className="mt-2 p-2 bg-muted rounded text-xs">
-                                  <p className="text-muted-foreground">Instructions:</p>
-                                  <p>{assignment.instructions}</p>
-                                </div>
-                              )}
-                            </CardContent>
-                          </Card>
-                        ))}
+    <div className="space-y-4">
+      <div className="grid gap-4">
+        {Object.entries(groupedAssignments).map(([yearId, yearGroup]) => (
+          Object.entries(yearGroup).map(([termId, termGroup]) => (
+            Object.entries(termGroup).map(([subject, subjectGroup]) => (
+              Object.entries(subjectGroup).map(([week, weekAssignments]) => (
+                weekAssignments.map((assignment: Assignment) => (
+                  <Card key={assignment.id} className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="space-y-2">
+                          <CardTitle className="text-xl">{assignment.title}</CardTitle>
+                          <CardDescription className="text-sm">{assignment.description}</CardDescription>
+                          <div className="flex items-center gap-4 text-sm">
+                            <Badge variant="secondary" className="text-xs">
+                              {getYearName(yearId)} - {getTermName(termId)}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              {subject}
+                            </Badge>
+                            <Badge variant="outline" className="text-xs">
+                              Week {week}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => onEdit(assignment)}>
+                            <Edit className="w-4 h-4" />
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => onDelete(assignment)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      ))}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
+                        <div className="flex items-center space-x-2">
+                          <Calendar className="w-4 h-4 text-muted-foreground" />
+                          <span>
+                            Due: {assignment.submissionDate ? format(new Date(assignment.submissionDate), "MMM d, yyyy") : "No due date"}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <span>Class Assignment</span>
+                        </div>
+                      </div>
+                      {assignment.instructions && (
+                        <div className="mt-4 p-3 bg-muted rounded-md">
+                          <p className="text-sm text-muted-foreground">Instructions:</p>
+                          <p className="text-sm">{assignment.instructions}</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                ))
+              ))
+            ))
+          ))
+        ))}
+      </div>
     </div>
   );
 }
@@ -451,12 +439,13 @@ export function AssignmentManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Assignment Management</h1>
-          <p className="text-muted-foreground">Create and manage assignments for your classes</p>
-        </div>
+    <Layout>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Assignment Management</h1>
+            <p className="text-muted-foreground">Create and manage assignments for your classes</p>
+          </div>
         <Dialog open={isCreateDialogOpen || !!editingAssignment} onOpenChange={(open) => {
           if (!open) {
             setIsCreateDialogOpen(false);
@@ -830,6 +819,7 @@ export function AssignmentManagement() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </Layout>
   );
 }
