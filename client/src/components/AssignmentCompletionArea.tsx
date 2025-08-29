@@ -115,9 +115,27 @@ export function AssignmentCompletionArea({
   const [isPDFAnnotatorOpen, setIsPDFAnnotatorOpen] = useState(false);
   const [selectedPDFUrl, setSelectedPDFUrl] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [selectedDocumentUrl, setSelectedDocumentUrl] = useState<string>("");
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Fetch all submissions for this assignment to check per-document completion
+  const { data: allSubmissions = [] } = useQuery<Submission[]>({
+    queryKey: ['/api/assignments', assignment.id, 'submissions'],
+  });
+
+  // Helper function to check if a specific document is completed
+  const isDocumentCompleted = (documentUrl: string) => {
+    return allSubmissions.some(sub => 
+      sub.documentUrl === documentUrl && sub.status === 'submitted'
+    );
+  };
+
+  // Get submission for a specific document
+  const getDocumentSubmission = (documentUrl: string) => {
+    return allSubmissions.find(sub => sub.documentUrl === documentUrl);
+  };
 
   // Fetch metadata for assignment files
   const attachmentUrls = assignment.attachmentUrls || [];
@@ -153,9 +171,10 @@ export function AssignmentCompletionArea({
 
   // Submit assignment mutation (for PDF annotations)
   const submitAssignmentMutation = useMutation({
-    mutationFn: async (fileUrl: string) => {
+    mutationFn: async ({ fileUrl, documentUrl }: { fileUrl: string; documentUrl: string }) => {
       return apiRequest('/api/submissions', 'POST', {
         assignmentId: assignment.id,
+        documentUrl: documentUrl,
         fileUrls: [fileUrl],
         textResponse: "",
         submittedAt: new Date().toISOString(),
@@ -186,13 +205,14 @@ export function AssignmentCompletionArea({
 
   // Submit offline uploaded files
   const submitOfflineUploadMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (documentUrl?: string) => {
       if (uploadedFiles.length === 0) {
         throw new Error("No files uploaded");
       }
       
       return apiRequest('/api/submissions', 'POST', {
         assignmentId: assignment.id,
+        documentUrl: documentUrl || null, // For general assignment submission without specific document
         fileUrls: uploadedFiles,
         textResponse: "",
         submittedAt: new Date().toISOString(),
@@ -384,7 +404,7 @@ export function AssignmentCompletionArea({
                       </div>
                     </div>
                     <Badge className={eInkStyles.badge}>
-                      {submission?.status === 'submitted' ? 'Submitted' : 'Pending'}
+                      {isDocumentCompleted(url) ? 'Submitted' : 'Pending'}
                     </Badge>
                   </div>
                   
@@ -428,7 +448,7 @@ export function AssignmentCompletionArea({
                             window.open(viewerUrl, '_blank');
                           }}
                           className="bg-blue-600 hover:bg-blue-700 text-white flex-1 text-xs"
-                          disabled={submission?.status === 'submitted'}
+                          disabled={isDocumentCompleted(url)}
                         >
                           <PenTool className="h-3 w-3 mr-1" />
                           Complete
@@ -469,9 +489,12 @@ export function AssignmentCompletionArea({
                         </Button>
                         
                         <Button
-                          onClick={() => setActiveTab("offline-upload")}
+                          onClick={() => {
+                            setSelectedDocumentUrl(url);
+                            setActiveTab("offline-upload");
+                          }}
                           className="bg-green-600 hover:bg-green-700 text-white flex-1 text-xs"
-                          disabled={submission?.status === 'submitted'}
+                          disabled={isDocumentCompleted(url)}
                         >
                           <Upload className="h-3 w-3 mr-1" />
                           Upload
@@ -605,8 +628,8 @@ export function AssignmentCompletionArea({
           <div className="flex justify-end">
             <Button
               type="button"
-              onClick={() => submitOfflineUploadMutation.mutate()}
-              disabled={submission?.status === 'submitted' || uploadedFiles.length === 0 || submitOfflineUploadMutation.isPending}
+              onClick={() => submitOfflineUploadMutation.mutate(selectedDocumentUrl)}
+              disabled={uploadedFiles.length === 0 || submitOfflineUploadMutation.isPending || (selectedDocumentUrl && isDocumentCompleted(selectedDocumentUrl))}
               className={`${eInkStyles.primaryButton} px-6`}
             >
               <Send className="h-4 w-4 mr-2" />
@@ -627,7 +650,10 @@ export function AssignmentCompletionArea({
           assignmentId={assignment.id}
           onSave={async (annotatedFileUrl: string) => {
             try {
-              await submitAssignmentMutation.mutateAsync(annotatedFileUrl);
+              await submitAssignmentMutation.mutateAsync({ 
+                fileUrl: annotatedFileUrl, 
+                documentUrl: selectedPDFUrl 
+              });
               setIsPDFAnnotatorOpen(false);
               setSelectedPDFUrl("");
             } catch (error) {

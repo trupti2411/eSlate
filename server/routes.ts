@@ -555,13 +555,25 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
-  // Get submissions for assignment (for tutors/admins)
+  // Get submissions for assignment (for tutors/admins and students for their own submissions)
   app.get('/api/assignments/:assignmentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
       const assignmentId = req.params.assignmentId;
       
-      // Verify user has access to this assignment
+      // Allow students to access their own submissions for an assignment
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        // Return only this student's submissions for the assignment
+        const submissions = await storage.getSubmissionsByAssignmentAndStudent(assignmentId, student.id);
+        return res.json(submissions);
+      }
+      
+      // For company_admin and tutor, return all submissions
       if (!['company_admin', 'tutor'].includes(user.role)) {
         return res.status(403).json({ message: "Access denied" });
       }

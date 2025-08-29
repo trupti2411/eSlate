@@ -142,6 +142,7 @@ export const submissions = pgTable("submissions", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   assignmentId: varchar("assignment_id").notNull().references(() => assignments.id),
   studentId: varchar("student_id").notNull().references(() => students.id),
+  documentUrl: varchar("document_url"), // Which specific document this submission is for (for multi-document assignments)
   content: text("content"), // Text response for pen/touchscreen input
   digitalContent: text("digital_content"), // Digitized handwriting content
   fileUrls: text("file_urls").array().default([]), // Multiple uploaded files

@@ -172,6 +172,7 @@ export interface IStorage {
   getSubmission(id: string): Promise<Submission | undefined>;
   getSubmissionsByAssignment(assignmentId: string): Promise<Submission[]>;
   getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
+  getSubmissionsByAssignmentAndStudent(assignmentId: string, studentId: string): Promise<Submission[]>;
   getCompanySubmissions(companyId: string): Promise<any[]>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
   deleteSubmission(id: string): Promise<void>;
@@ -1065,6 +1066,12 @@ export class DatabaseStorage implements IStorage {
   async getSubmissionsByStudent(studentId: string): Promise<Submission[]> {
     return await db.select().from(submissions)
       .where(eq(submissions.studentId, studentId))
+      .orderBy(desc(submissions.createdAt));
+  }
+
+  async getSubmissionsByAssignmentAndStudent(assignmentId: string, studentId: string): Promise<Submission[]> {
+    return await db.select().from(submissions)
+      .where(and(eq(submissions.assignmentId, assignmentId), eq(submissions.studentId, studentId)))
       .orderBy(desc(submissions.createdAt));
   }
 
