@@ -413,6 +413,12 @@ export function StudentPortal() {
                 key={assignment.id}
                 assignment={assignment}
                 submission={submission}
+                onSubmissionUpdate={() => {
+                  // Refetch submissions when updated
+                  queryClient.invalidateQueries({
+                    queryKey: [`/api/students/student-${user?.id}/submissions`]
+                  });
+                }}
               />
             );
           })}

@@ -76,6 +76,7 @@ function Router() {
           <Route path="/student/assignments" component={StudentAssignments} />
           <Route path="/student/portal" component={StudentPortal} />
           <Route path="/pdf-annotator" component={GoogleDocsViewer} />
+          <Route path="/google-docs-viewer" component={GoogleDocsViewer} />
         </>
       )}
       <Route component={NotFound} />

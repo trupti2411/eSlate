@@ -354,14 +354,14 @@ export function AssignmentCompletionArea({
                         
                         <Button
                           onClick={() => {
-                            // Convert URL to accessible format for annotation
+                            // Convert URL to accessible format for Google Docs Viewer
                             const objectPath = url.includes('/uploads/') 
                               ? url.split('/uploads/').pop()
                               : url.split('/').pop();
-                            const pdfUrl = `/objects/uploads/${objectPath}`;
                             
-                            setSelectedPDFUrl(pdfUrl);
-                            setIsPDFAnnotatorOpen(true);
+                            // Navigate to full-screen Google Docs Viewer
+                            const viewerUrl = `/google-docs-viewer?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}`;
+                            window.location.href = viewerUrl;
                           }}
                           className="bg-blue-600 hover:bg-blue-700 text-white flex-1 text-xs"
                           disabled={submission?.status === 'submitted'}
