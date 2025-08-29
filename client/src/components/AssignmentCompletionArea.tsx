@@ -39,7 +39,7 @@ function SubmittedFilesDisplay({ fileUrls, eInkStyles }: { fileUrls: string[]; e
       ) : (
         <div className="grid gap-2">
           {fileUrls.map((fileUrl, index) => {
-            const filename = getDisplayFilename(fileUrl, fileMetadata);
+            const filename = getDisplayFilename(fileUrl, fileMetadata?.[index]);
             const fileExtension = filename.split('.').pop()?.toLowerCase();
             
             return (
@@ -299,7 +299,7 @@ export function AssignmentCompletionArea({
             </p>
             
             {attachmentUrls.map((url, index) => {
-              const filename = getDisplayFilename(url, fileMetadata);
+              const filename = getDisplayFilename(url, fileMetadata?.[index]);
               const fileExtension = filename.split('.').pop()?.toLowerCase();
               const isCompleted = isDocumentCompleted(url);
               
@@ -376,15 +376,24 @@ export function AssignmentCompletionArea({
           <div className="mt-6 p-4 border-2 border-dashed border-gray-300 rounded-lg">
             <h4 className="font-medium mb-3">Upload Your Completed Work</h4>
             <ObjectUploader
-              accept={assignment.allowedFileTypes ? 
-                assignment.allowedFileTypes.map(type => `.${type}`).join(',') : 
-                '.pdf,.doc,.docx,.xls,.xlsx,.png,.jpeg'
-              }
               maxFileSize={assignment.maxFileSize || 30 * 1024 * 1024}
-              maxFiles={5}
-              getUploadParameters={getUploadParameters}
-              onUploadComplete={handleUploadComplete}
-            />
+              maxNumberOfFiles={5}
+              onGetUploadParameters={getUploadParameters}
+              onComplete={handleUploadComplete}
+            >
+              <div className="text-center p-6 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors">
+                <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                <p className="text-sm text-gray-600">
+                  Click to upload or drag and drop your completed assignment files
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {assignment.allowedFileTypes ? 
+                    `Supported: ${assignment.allowedFileTypes.join(', ')}` : 
+                    'Supported: PDF, DOC, DOCX, XLS, XLSX, PNG, JPEG'
+                  }
+                </p>
+              </div>
+            </ObjectUploader>
 
             {uploadedFiles.length > 0 && (
               <div className="mt-4">
