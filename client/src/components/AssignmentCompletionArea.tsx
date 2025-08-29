@@ -183,6 +183,7 @@ export function AssignmentCompletionArea({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/assignments', assignment.id, 'submissions'] });
       onSubmissionUpdate();
       toast({
         title: "Assignment Submitted",
@@ -221,6 +222,7 @@ export function AssignmentCompletionArea({
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/students'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/assignments', assignment.id, 'submissions'] });
       onSubmissionUpdate();
       setUploadedFiles([]); // Clear uploaded files
       toast({
@@ -629,7 +631,7 @@ export function AssignmentCompletionArea({
             <Button
               type="button"
               onClick={() => submitOfflineUploadMutation.mutate(selectedDocumentUrl)}
-              disabled={uploadedFiles.length === 0 || submitOfflineUploadMutation.isPending || (selectedDocumentUrl && isDocumentCompleted(selectedDocumentUrl))}
+              disabled={uploadedFiles.length === 0 || submitOfflineUploadMutation.isPending || Boolean(selectedDocumentUrl && isDocumentCompleted(selectedDocumentUrl))}
               className={`${eInkStyles.primaryButton} px-6`}
             >
               <Send className="h-4 w-4 mr-2" />
