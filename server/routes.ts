@@ -469,9 +469,12 @@ trailer<</Size 5/Root 1 0 R>>
       
       const validatedData = insertSubmissionSchema.parse(submissionData);
       
-      // Check if submission already exists
+      // Check if submission already exists for this specific document
       const existingSubmissions = await storage.getStudentSubmissions(student.id);
-      const existingSubmission = existingSubmissions.find(s => s.assignmentId === req.body.assignmentId);
+      const existingSubmission = existingSubmissions.find(s => 
+        s.assignmentId === req.body.assignmentId && 
+        s.documentUrl === req.body.documentUrl
+      );
       
       let submission;
       if (existingSubmission) {
