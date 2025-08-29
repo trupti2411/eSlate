@@ -1576,6 +1576,42 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Public document route for Google Docs Viewer (no authentication required)
+  app.get('/api/public-objects/:objectPath(*)', async (req: any, res: any) => {
+    const objectStorageService = new ObjectStorageService();
+    
+    try {
+      const objectPath = `/objects/${req.params.objectPath}`;
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      
+      // Get metadata to get original filename
+      const [metadata] = await objectFile.getMetadata();
+      const originalFileName = metadata.metadata?.originalName || 'assignment-file';
+      
+      // Serve the file directly with proper headers for Google Docs Viewer
+      res.set({
+        "Content-Type": metadata.contentType || "application/octet-stream",
+        "Content-Length": metadata.size?.toString() || '0',
+        "Content-Disposition": `inline; filename="${originalFileName}"`,
+        "Cache-Control": "public, max-age=3600",
+        "Accept-Ranges": "bytes",
+        "Access-Control-Allow-Origin": "*", // Allow Google Docs Viewer to access
+        "Access-Control-Allow-Methods": "GET, HEAD, OPTIONS",
+        "Access-Control-Allow-Headers": "Range, Content-Range"
+      });
+
+      // Download the entire file to buffer first
+      const [fileContents] = await objectFile.download();
+      res.end(fileContents);
+    } catch (error) {
+      console.error("Error accessing public object:", error);
+      if (error instanceof ObjectNotFoundError) {
+        return res.sendStatus(404);
+      }
+      return res.sendStatus(500);
+    }
+  });
+
   // Serve uploaded objects (for file viewing)
   app.get('/objects/:objectPath(*)', isAuthenticated, async (req: any, res: any) => {
     const objectStorageService = new ObjectStorageService();

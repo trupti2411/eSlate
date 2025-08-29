@@ -359,9 +359,9 @@ export function AssignmentCompletionArea({
                               ? url.split('/uploads/').pop()
                               : url.split('/').pop();
                             
-                            // Navigate to full-screen Google Docs Viewer with specific document index
+                            // Open full-screen Google Docs Viewer with specific document index in new tab
                             const viewerUrl = `/google-docs-viewer?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`;
-                            window.location.href = viewerUrl;
+                            window.open(viewerUrl, '_blank');
                           }}
                           className="bg-blue-600 hover:bg-blue-700 text-white flex-1 text-xs"
                           disabled={submission?.status === 'submitted'}

@@ -47,7 +47,7 @@ export default function GoogleDocsViewer() {
   
   // Use specific document URL based on objectPath if provided, otherwise fall back to assignment-based URL
   const publicDocumentUrl = objectPath ? 
-    `/objects/uploads/${objectPath}` : 
+    `/api/public-objects/uploads/${objectPath}` : 
     (assignmentId ? `/api/public-doc/${assignmentId}` : '');
   const fallbackUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
   
