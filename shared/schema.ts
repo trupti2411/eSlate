@@ -121,8 +121,13 @@ export const assignments = pgTable("assignments", {
   companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   classId: varchar("class_id").references(() => classes.id), // Assign to entire class
-  subject: varchar("subject"), // Optional subject/topic field
-
+  
+  // Academic organization fields
+  academicYearId: varchar("academic_year_id").references(() => academicYears.id),
+  termId: varchar("term_id").references(() => academicTerms.id),
+  subject: varchar("subject").notNull(), // Required subject field
+  week: integer("week"), // Week number (1-52 or term-specific)
+  
   attachmentUrls: text("attachment_urls").array().default([]), // Files uploaded by admin/tutor
   allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg']), // Specified file types
   maxFileSize: integer("max_file_size").default(31457280), // 30MB in bytes
@@ -275,6 +280,14 @@ export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
   class: one(classes, {
     fields: [assignments.classId],
     references: [classes.id],
+  }),
+  academicYear: one(academicYears, {
+    fields: [assignments.academicYearId],
+    references: [academicYears.id],
+  }),
+  term: one(academicTerms, {
+    fields: [assignments.termId],
+    references: [academicTerms.id],
   }),
   submissions: many(submissions),
   progress: many(progress),
@@ -474,6 +487,7 @@ export const academicYearsRelations = relations(academicYears, ({ one, many }) =
     references: [tutoringCompanies.id],
   }),
   terms: many(academicTerms),
+  assignments: many(assignments),
 }));
 
 export const academicTermsRelations = relations(academicTerms, ({ one, many }) => ({
@@ -486,6 +500,7 @@ export const academicTermsRelations = relations(academicTerms, ({ one, many }) =
     references: [tutoringCompanies.id],
   }),
   classes: many(classes),
+  assignments: many(assignments),
 }));
 
 export const classesRelations = relations(classes, ({ one, many }) => ({

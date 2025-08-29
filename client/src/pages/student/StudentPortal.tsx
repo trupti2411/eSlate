@@ -389,43 +389,108 @@ export function StudentPortal() {
     </div>
   );
 
-  const renderAssignments = () => (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold text-black">Assignments</h2>
-      {isLoadingAssignments ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
-        </div>
-      ) : typedAssignments.length === 0 ? (
-        <Card className={eInkStyles.card}>
-          <CardContent className="text-center py-8">
-            <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
-            <p className="text-gray-600">No assignments found</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
-          {typedAssignments.map((assignment: Assignment) => {
-            const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
+  const renderAssignments = () => {
+    // Group assignments by year, term, subject, and week for hierarchical display
+    const groupedAssignments = typedAssignments.reduce((acc: any, assignment: any) => {
+      const year = assignment.academicYearId || 'Unassigned Year';
+      const term = assignment.termId || 'Unassigned Term';
+      const subject = assignment.subject || 'No Subject';
+      const week = assignment.week?.toString() || 'No Week';
 
-            return (
-              <AssignmentCompletionArea
-                key={assignment.id}
-                assignment={assignment}
-                submission={submission}
-                onSubmissionUpdate={() => {
-                  // Refetch submissions when updated
-                  queryClient.invalidateQueries({
-                    queryKey: [`/api/students/student-${user?.id}/submissions`]
-                  });
-                }}
-              />
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
+      if (!acc[year]) acc[year] = {};
+      if (!acc[year][term]) acc[year][term] = {};
+      if (!acc[year][term][subject]) acc[year][term][subject] = {};
+      if (!acc[year][term][subject][week]) acc[year][term][subject][week] = [];
+
+      acc[year][term][subject][week].push(assignment);
+      return acc;
+    }, {});
+
+    const getYearName = (yearId: string) => {
+      if (yearId === 'Unassigned Year') return 'Unassigned Year';
+      // For now, just use the year ID directly since we don't have access to academic years in student portal
+      return yearId;
+    };
+
+    const getTermName = (termId: string) => {
+      if (termId === 'Unassigned Term') return 'Unassigned Term';
+      // Find the term name from the loaded terms
+      const term = typedStudentTerms.find((t: AcademicTerm) => t.id === termId);
+      return term?.name || termId;
+    };
+
+    return (
+      <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-black">Assignments</h2>
+        {isLoadingAssignments ? (
+          <div className="flex items-center justify-center h-32">
+            <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        ) : typedAssignments.length === 0 ? (
+          <Card className={eInkStyles.card}>
+            <CardContent className="text-center py-8">
+              <FileText className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <p className="text-gray-600">No assignments found</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-8">
+            {Object.entries(groupedAssignments).map(([yearId, yearGroup]: [string, any]) => (
+              <div key={yearId} className="border-2 border-black rounded-lg p-6 space-y-6">
+                <h3 className="text-xl font-bold text-black border-b-2 border-black pb-2">
+                  📚 {getYearName(yearId)}
+                </h3>
+                
+                {Object.entries(yearGroup).map(([termId, termGroup]: [string, any]) => (
+                  <div key={termId} className="ml-4 space-y-4">
+                    <h4 className="text-lg font-semibold text-gray-800">
+                      📅 {getTermName(termId)}
+                    </h4>
+                    
+                    {Object.entries(termGroup).map(([subject, subjectGroup]: [string, any]) => (
+                      <div key={subject} className="ml-4 space-y-3">
+                        <h5 className="text-base font-medium text-gray-700 border-l-4 border-black pl-3">
+                          📖 {subject}
+                        </h5>
+                        
+                        {Object.entries(subjectGroup).map(([week, weekAssignments]: [string, any]) => (
+                          <div key={week} className="ml-6 space-y-3">
+                            <h6 className="text-sm font-medium text-gray-600">
+                              📝 Week {week}
+                            </h6>
+                            
+                            <div className="space-y-4">
+                              {weekAssignments.map((assignment: Assignment) => {
+                                const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
+
+                                return (
+                                  <AssignmentCompletionArea
+                                    key={assignment.id}
+                                    assignment={assignment}
+                                    submission={submission}
+                                    onSubmissionUpdate={() => {
+                                      // Refetch submissions when updated
+                                      queryClient.invalidateQueries({
+                                        queryKey: [`/api/students/student-${user?.id}/submissions`]
+                                      });
+                                    }}
+                                  />
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="max-w-7xl mx-auto p-6 space-y-6">

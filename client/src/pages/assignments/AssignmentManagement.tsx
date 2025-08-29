@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,9 @@ import { useToast } from "@/hooks/use-toast";
 
 const assignmentFormSchema = insertAssignmentSchema.extend({
   submissionDate: z.string(),
+  academicYearId: z.string().optional(),
+  termId: z.string().optional(),
+  week: z.number().optional(),
 }).omit({
   companyId: true,
   createdBy: true,
@@ -86,6 +89,133 @@ function UploadedFilesList({
   );
 }
 
+// Component to display assignments organized by academic hierarchy
+function AssignmentHierarchy({ 
+  assignments, 
+  academicYears, 
+  academicTerms, 
+  onEdit, 
+  onDelete 
+}: {
+  assignments: Assignment[];
+  academicYears: any[];
+  academicTerms: any[];
+  onEdit: (assignment: Assignment) => void;
+  onDelete: (assignment: Assignment) => void;
+}) {
+  // Group assignments by academic year, term, subject, and week
+  const groupedAssignments = React.useMemo(() => {
+    const groups: { [key: string]: { [key: string]: { [key: string]: { [key: string]: Assignment[] } } } } = {};
+
+    assignments.forEach((assignment: any) => {
+      const year = assignment.academicYearId || 'Unassigned';
+      const term = assignment.termId || 'Unassigned';
+      const subject = assignment.subject || 'No Subject';
+      const week = assignment.week?.toString() || 'No Week';
+
+      if (!groups[year]) groups[year] = {};
+      if (!groups[year][term]) groups[year][term] = {};
+      if (!groups[year][term][subject]) groups[year][term][subject] = {};
+      if (!groups[year][term][subject][week]) groups[year][term][subject][week] = [];
+
+      groups[year][term][subject][week].push(assignment);
+    });
+
+    return groups;
+  }, [assignments]);
+
+  const getYearName = (yearId: string) => {
+    if (yearId === 'Unassigned') return 'Unassigned Year';
+    const year = academicYears.find(y => y.id === yearId);
+    return year?.name || yearId;
+  };
+
+  const getTermName = (termId: string) => {
+    if (termId === 'Unassigned') return 'Unassigned Term';
+    const term = academicTerms.find(t => t.id === termId);
+    return term?.name || termId;
+  };
+
+  return (
+    <div className="space-y-6">
+      {Object.entries(groupedAssignments).map(([yearId, yearGroup]) => (
+        <div key={yearId} className="border rounded-lg p-4 space-y-4">
+          <h2 className="text-xl font-semibold text-primary">
+            📚 {getYearName(yearId)}
+          </h2>
+          
+          {Object.entries(yearGroup).map(([termId, termGroup]) => (
+            <div key={termId} className="ml-4 space-y-3">
+              <h3 className="text-lg font-medium text-secondary-foreground">
+                📅 {getTermName(termId)}
+              </h3>
+              
+              {Object.entries(termGroup).map(([subject, subjectGroup]) => (
+                <div key={subject} className="ml-4 space-y-2">
+                  <h4 className="text-base font-medium text-muted-foreground">
+                    📖 {subject}
+                  </h4>
+                  
+                  {Object.entries(subjectGroup).map(([week, weekAssignments]) => (
+                    <div key={week} className="ml-4 space-y-2">
+                      <h5 className="text-sm font-medium text-muted-foreground">
+                        📝 Week {week}
+                      </h5>
+                      
+                      <div className="grid gap-3">
+                        {weekAssignments.map((assignment: Assignment) => (
+                          <Card key={assignment.id} className="hover:shadow-md transition-shadow">
+                            <CardHeader className="pb-2">
+                              <div className="flex items-start justify-between">
+                                <div className="space-y-1">
+                                  <CardTitle className="text-base">{assignment.title}</CardTitle>
+                                  <CardDescription className="text-sm">{assignment.description}</CardDescription>
+                                </div>
+                                <div className="flex space-x-1">
+                                  <Button variant="outline" size="sm" onClick={() => onEdit(assignment)}>
+                                    <Edit className="w-3 h-3" />
+                                  </Button>
+                                  <Button variant="outline" size="sm" onClick={() => onDelete(assignment)}>
+                                    <Trash2 className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </CardHeader>
+                            <CardContent className="pt-2">
+                              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                <div className="flex items-center space-x-2">
+                                  <Calendar className="w-3 h-3" />
+                                  <span>
+                                    Due: {assignment.submissionDate ? format(new Date(assignment.submissionDate), "MMM d, yyyy") : "No due date"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <Users className="w-3 h-3" />
+                                  <span>Class Assignment</span>
+                                </div>
+                              </div>
+                              {assignment.instructions && (
+                                <div className="mt-2 p-2 bg-muted rounded text-xs">
+                                  <p className="text-muted-foreground">Instructions:</p>
+                                  <p>{assignment.instructions}</p>
+                                </div>
+                              )}
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function AssignmentManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -108,6 +238,17 @@ export function AssignmentManagement() {
   // Fetch classes for assignment creation
   const { data: classes = [] } = useQuery<Class[]>({
     queryKey: ['/api/companies', companyId, 'classes'],
+    enabled: !!companyId,
+  });
+
+  // Fetch academic years and terms for the new organization structure
+  const { data: academicYears = [] } = useQuery<any[]>({
+    queryKey: ['/api/companies', companyId, 'academic-years'],
+    enabled: !!companyId,
+  });
+
+  const { data: academicTerms = [] } = useQuery<any[]>({
+    queryKey: ['/api/companies', companyId, 'academic-terms'],
     enabled: !!companyId,
   });
 
@@ -205,7 +346,9 @@ export function AssignmentManagement() {
       instructions: "",
       submissionDate: "",
       subject: "",
-
+      academicYearId: "",
+      termId: "",
+      week: undefined,
       classId: "",
       attachmentUrls: [],
       allowedFileTypes: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg'],
@@ -250,6 +393,9 @@ export function AssignmentManagement() {
       description: assignment.description || '',
       instructions: assignment.instructions || '',
       subject: assignment.subject || '',
+      academicYearId: (assignment as any).academicYearId || '',
+      termId: (assignment as any).termId || '',
+      week: (assignment as any).week || undefined,
       classId: assignment.classId,
       submissionDate: assignment.submissionDate 
         ? new Date(assignment.submissionDate).toISOString().slice(0, 16) 
@@ -357,7 +503,7 @@ export function AssignmentManagement() {
                   name="subject"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel htmlFor="assignment-subject">Subject/Topic</FormLabel>
+                      <FormLabel htmlFor="assignment-subject">Subject/Topic *</FormLabel>
                       <FormControl>
                         <Input 
                           id="assignment-subject"
@@ -370,6 +516,80 @@ export function AssignmentManagement() {
                     </FormItem>
                   )}
                 />
+
+                {/* Academic Organization Fields */}
+                <div className="grid grid-cols-3 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="academicYearId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="assignment-academic-year">Academic Year</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger id="assignment-academic-year">
+                              <SelectValue placeholder="Select year" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {academicYears.map((year: any) => (
+                              <SelectItem key={year.id} value={year.id}>
+                                {year.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="termId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="assignment-term">Term</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ""}>
+                          <FormControl>
+                            <SelectTrigger id="assignment-term">
+                              <SelectValue placeholder="Select term" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {academicTerms.map((term: any) => (
+                              <SelectItem key={term.id} value={term.id}>
+                                {term.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="week"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel htmlFor="assignment-week">Week</FormLabel>
+                        <FormControl>
+                          <Input 
+                            id="assignment-week"
+                            type="number"
+                            placeholder="e.g., 1, 2, 3" 
+                            {...field} 
+                            value={field.value?.toString() || ""} 
+                            onChange={(e) => field.onChange(e.target.value ? parseInt(e.target.value) : undefined)}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
                 {preSelectedClass ? (
                   <FormItem>
@@ -574,54 +794,13 @@ export function AssignmentManagement() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
-          {assignments.map((assignment: Assignment) => (
-            <Card key={assignment.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-xl">{assignment.title}</CardTitle>
-                    <CardDescription>{assignment.description}</CardDescription>
-                  </div>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm" onClick={() => handleEdit(assignment)}>
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDelete(assignment)}>
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span>
-                      Due: {assignment.submissionDate ? format(new Date(assignment.submissionDate), "MMM d, yyyy") : "No due date"}
-                    </span>
-                  </div>
-                  {assignment.subject && (
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary">{assignment.subject}</Badge>
-                    </div>
-                  )}
-
-                  <div className="flex items-center space-x-2">
-                    <Users className="w-4 h-4 text-muted-foreground" />
-                    <span>Class Assignment</span>
-                  </div>
-                </div>
-                {assignment.instructions && (
-                  <div className="mt-4 p-3 bg-muted rounded-md">
-                    <p className="text-sm text-muted-foreground">Instructions:</p>
-                    <p className="text-sm">{assignment.instructions}</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <AssignmentHierarchy 
+          assignments={assignments}
+          academicYears={academicYears}
+          academicTerms={academicTerms}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+        />
       )}
 
       {/* Delete Confirmation Dialog */}
