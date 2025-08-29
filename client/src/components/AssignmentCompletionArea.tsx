@@ -14,7 +14,8 @@ import {
   BookOpen, 
   Calendar,
   PenTool,
-  Monitor
+  Monitor,
+  Upload
 } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -295,132 +296,93 @@ export function AssignmentCompletionArea({
         </TabsContent>
 
         <TabsContent value="completion" className="space-y-6">
-          {/* Assignment Completion Options */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Option 1: Complete Online */}
-            <div className={`${eInkStyles.card} p-6`}>
-              <div className="text-center mb-4">
-                <Monitor className="h-12 w-12 mx-auto mb-3 text-blue-600" />
-                <h3 className="text-lg font-semibold mb-2">Complete Online</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  View and complete the assignment directly in your browser with stylus/pen input
-                </p>
-              </div>
+          {/* Individual Document Completion Options */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold text-center mb-6">Complete Each Document Individually</h3>
+            
+            {attachmentUrls.map((url, index) => {
+              const metadata = fileMetadata?.[index];
+              const filename = getDisplayFilename(url, metadata, index);
+              const fileExtension = filename.split('.').pop()?.toLowerCase();
               
-              {/* Show assignment files for online completion */}
-              {attachmentUrls.length > 0 && (
-                <div className="space-y-2 mb-4">
-                  <Label className="text-sm font-medium">Assignment Files:</Label>
-                  {attachmentUrls.map((url, index) => {
-                    const metadata = fileMetadata?.[index];
-                    const filename = getDisplayFilename(url, metadata, index);
-                    return (
-                      <div key={index} className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2" />
-                          <span className="text-sm">{filename}</span>
-                        </div>
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              const objectPath = url.includes('/uploads/') 
-                                ? url.split('/uploads/').pop()
-                                : url.split('/').pop();
-                              window.open(`/objects/uploads/${objectPath}`, '_blank');
-                            }}
-                            className="text-xs"
-                          >
-                            <Eye className="h-3 w-3 mr-1" />
-                            View
-                          </Button>
-                        </div>
+              return (
+                <div key={index} className={`${eInkStyles.card} p-6`}>
+                  {/* Document Header */}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                      <FileText className="h-6 w-6 mr-3 text-blue-600" />
+                      <div>
+                        <h4 className="text-lg font-semibold">{filename}</h4>
+                        <span className="text-sm text-gray-500">
+                          Document {index + 1} of {attachmentUrls.length}
+                          {fileExtension && ` (${fileExtension.toUpperCase()})`}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    if (attachmentUrls.length > 0) {
-                      // Convert URL to accessible format for PDFAnnotator
-                      const url = attachmentUrls[0];
-                      const objectPath = url.includes('/uploads/') 
-                        ? url.split('/uploads/').pop()
-                        : url.split('/').pop();
-                      const pdfUrl = `/objects/uploads/${objectPath}`;
+                    </div>
+                    <Badge className={eInkStyles.badge}>
+                      {submission?.status === 'submitted' ? 'Submitted' : 'Pending'}
+                    </Badge>
+                  </div>
+                  
+                  {/* Document Completion Options */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Complete Online Option */}
+                    <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                      <div className="text-center mb-3">
+                        <Monitor className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+                        <h5 className="font-semibold text-blue-800">Complete Online</h5>
+                        <p className="text-xs text-blue-600 mb-3">
+                          Annotate with stylus/pen directly in browser
+                        </p>
+                      </div>
                       
-                      setSelectedPDFUrl(pdfUrl);
-                      setIsPDFAnnotatorOpen(true);
-                    }
-                  }}
-                  className={`${eInkStyles.primaryButton} flex-1`}
-                  disabled={submission?.status === 'submitted' || attachmentUrls.length === 0}
-                >
-                  <PenTool className="h-4 w-4 mr-2" />
-                  Complete Online
-                </Button>
-                
-                <Button
-                  onClick={() => {
-                    // Download all assignment files
-                    attachmentUrls.forEach((url, index) => {
-                      const metadata = fileMetadata?.[index];
-                      const filename = getDisplayFilename(url, metadata, index);
-                      const objectPath = url.includes('/uploads/') 
-                        ? url.split('/uploads/').pop()
-                        : url.split('/').pop();
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const objectPath = url.includes('/uploads/') 
+                              ? url.split('/uploads/').pop()
+                              : url.split('/').pop();
+                            window.open(`/objects/uploads/${objectPath}`, '_blank');
+                          }}
+                          className="flex-1 text-xs"
+                        >
+                          <Eye className="h-3 w-3 mr-1" />
+                          View
+                        </Button>
+                        
+                        <Button
+                          onClick={() => {
+                            // Convert URL to accessible format for annotation
+                            const objectPath = url.includes('/uploads/') 
+                              ? url.split('/uploads/').pop()
+                              : url.split('/').pop();
+                            const pdfUrl = `/objects/uploads/${objectPath}`;
+                            
+                            setSelectedPDFUrl(pdfUrl);
+                            setIsPDFAnnotatorOpen(true);
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white flex-1 text-xs"
+                          disabled={submission?.status === 'submitted'}
+                        >
+                          <PenTool className="h-3 w-3 mr-1" />
+                          Complete
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Upload Completed Work Option */}
+                    <div className="border border-green-200 bg-green-50 rounded-lg p-4">
+                      <div className="text-center mb-3">
+                        <Upload className="h-8 w-8 mx-auto mb-2 text-green-600" />
+                        <h5 className="font-semibold text-green-800">Upload Completed</h5>
+                        <p className="text-xs text-green-600 mb-3">
+                          Download, complete offline, then upload
+                        </p>
+                      </div>
                       
-                      const link = document.createElement('a');
-                      link.href = `/objects/uploads/${objectPath}`;
-                      link.download = filename;
-                      link.target = '_blank';
-                      document.body.appendChild(link);
-                      link.click();
-                      document.body.removeChild(link);
-                      
-                      // Add small delay between downloads to prevent browser blocking
-                      if (index < attachmentUrls.length - 1) {
-                        setTimeout(() => {}, 100);
-                      }
-                    });
-                  }}
-                  className={`${eInkStyles.button} flex-shrink-0`}
-                  disabled={submission?.status === 'submitted' || attachmentUrls.length === 0}
-                  data-testid="button-download-assignment"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Assignment
-                </Button>
-              </div>
-            </div>
-
-            {/* Option 2: Complete Offline */}
-            <div className={`${eInkStyles.card} p-6`}>
-              <div className="text-center mb-4">
-                <Download className="h-12 w-12 mx-auto mb-3 text-green-600" />
-                <h3 className="text-lg font-semibold mb-2">Complete Offline</h3>
-                <p className="text-sm text-gray-600 mb-4">
-                  Download assignment files, complete externally, then upload your completed work
-                </p>
-              </div>
-
-              {/* Download assignment files */}
-              {attachmentUrls.length > 0 && (
-                <div className="space-y-2 mb-4">
-                  <Label className="text-sm font-medium">Download Files:</Label>
-                  {attachmentUrls.map((url, index) => {
-                    const metadata = fileMetadata?.[index];
-                    const filename = getDisplayFilename(url, metadata, index);
-                    return (
-                      <div key={index} className="flex items-center justify-between p-2 border rounded">
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 mr-2" />
-                          <span className="text-sm">{filename}</span>
-                        </div>
+                      <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
@@ -436,42 +398,53 @@ export function AssignmentCompletionArea({
                             link.click();
                             document.body.removeChild(link);
                           }}
-                          className="text-xs"
+                          className="flex-1 text-xs"
                         >
                           <Download className="h-3 w-3 mr-1" />
                           Download
                         </Button>
+                        
+                        <Button
+                          onClick={() => setActiveTab("offline-upload")}
+                          className="bg-green-600 hover:bg-green-700 text-white flex-1 text-xs"
+                          disabled={submission?.status === 'submitted'}
+                        >
+                          <Upload className="h-3 w-3 mr-1" />
+                          Upload
+                        </Button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  </div>
                 </div>
-              )}
-
-              <Button
-                onClick={() => setActiveTab("offline-upload")}
-                className={`${eInkStyles.button} w-full`}
-                disabled={submission?.status === 'submitted'}
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                Upload Completed Work
-              </Button>
-            </div>
-          </div>
-
-          {/* Submission Status */}
-          {submission?.status === 'submitted' && (
-            <div className={`${eInkStyles.card} p-4 bg-green-50 border-green-200`}>
-              <div className="flex items-center text-green-800">
-                <Send className="h-4 w-4 mr-2" />
-                <span className="font-medium">Assignment Successfully Submitted</span>
-              </div>
-              {submission.submittedAt && (
-                <p className="text-sm text-green-600 mt-1">
-                  Submitted on {format(new Date(submission.submittedAt), 'MMM dd, yyyy HH:mm')}
+              );
+            })}
+            
+            {/* No documents message */}
+            {attachmentUrls.length === 0 && (
+              <div className={`${eInkStyles.card} p-8 text-center`}>
+                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <h4 className="text-lg font-semibold text-gray-600 mb-2">No Assignment Materials</h4>
+                <p className="text-sm text-gray-500">
+                  This assignment has no attached documents to complete.
                 </p>
-              )}
-            </div>
-          )}
+              </div>
+            )}
+
+            {/* Submission Status */}
+            {submission?.status === 'submitted' && (
+              <div className={`${eInkStyles.card} p-4 bg-green-50 border-green-200`}>
+                <div className="flex items-center text-green-800">
+                  <Send className="h-4 w-4 mr-2" />
+                  <span className="font-medium">Assignment Successfully Submitted</span>
+                </div>
+                {submission.submittedAt && (
+                  <p className="text-sm text-green-600 mt-1">
+                    Submitted on {format(new Date(submission.submittedAt), 'MMM dd, yyyy HH:mm')}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
         </TabsContent>
 
 
