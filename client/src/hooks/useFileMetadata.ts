@@ -15,11 +15,18 @@ function getObjectPathFromUrl(url: string): string {
       const pathPart = url.split('/uploads/').pop();
       return `/objects/uploads/${pathPart}`;
     }
-    // Handle other URL formats if needed
-    const urlObj = new URL(url);
-    const pathParts = urlObj.pathname.split('/');
-    const objectPath = pathParts.slice(2).join('/'); // Skip bucket name
-    return `/objects/${objectPath}`;
+    // Handle Google Cloud Storage URLs
+    if (url.includes('storage.googleapis.com')) {
+      const urlObj = new URL(url);
+      const pathParts = urlObj.pathname.split('/').filter(Boolean); // Remove empty strings
+      // pathParts[0] is bucket name, rest is the object path
+      if (pathParts.length > 1) {
+        const objectPath = pathParts.slice(1).join('/');
+        return `/objects/${objectPath}`;
+      }
+    }
+    // Fallback for other URL formats
+    return '';
   } catch (error) {
     console.warn("Failed to parse object path from URL:", url, error);
     return '';
