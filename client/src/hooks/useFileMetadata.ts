@@ -11,19 +11,13 @@ interface FileMetadata {
 // Extract object path from upload URL for metadata lookup
 function getObjectPathFromUrl(url: string): string {
   try {
+    // All URLs have /uploads/ in them, so extract everything after that
     if (url.includes('/uploads/')) {
-      const pathPart = url.split('/uploads/').pop();
-      return `/objects/uploads/${pathPart}`;
-    }
-    // Handle Google Cloud Storage URLs
-    if (url.includes('storage.googleapis.com')) {
-      const urlObj = new URL(url);
-      const pathParts = urlObj.pathname.split('/').filter(Boolean); // Remove empty strings
-      // pathParts[0] is bucket name, rest is the object path
-      if (pathParts.length > 1) {
-        const objectPath = pathParts.slice(1).join('/');
-        return `/objects/${objectPath}`;
-      }
+      const uploadsIndex = url.indexOf('/uploads/');
+      const objectId = url.substring(uploadsIndex + '/uploads/'.length);
+      // Remove any query strings
+      const cleanId = objectId.split('?')[0];
+      return `/objects/uploads/${cleanId}`;
     }
     // Fallback for other URL formats
     return '';
