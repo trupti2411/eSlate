@@ -1094,6 +1094,74 @@ trailer<</Size 5/Root 1 0 R>>
   });
 
   // Administrative routes
+  
+  // Admin stats endpoint for dashboard
+  app.get('/api/admin/stats', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Get all users and calculate stats
+      const users = await storage.getAllUsers();
+      const activeUsers = users.filter(u => u.isActive && !u.isDeleted);
+      
+      // Count users by role
+      const students = activeUsers.filter(u => u.role === 'student').length;
+      const tutors = activeUsers.filter(u => u.role === 'tutor').length;
+      const parents = activeUsers.filter(u => u.role === 'parent').length;
+      const companyAdmins = activeUsers.filter(u => u.role === 'company_admin').length;
+      const admins = activeUsers.filter(u => u.role === 'admin').length;
+      
+      // Get companies
+      const companies = await storage.getAllCompanies();
+      const activeCompanies = companies.filter(c => c.isActive).length;
+      
+      // Get all assignments count
+      let totalAssignments = 0;
+      let totalSubmissions = 0;
+      let submittedCount = 0;
+      
+      try {
+        for (const company of companies) {
+          const assignments = await storage.getAssignmentsByCompany(company.id);
+          totalAssignments += assignments.length;
+          
+          for (const assignment of assignments) {
+            const submissions = await storage.getSubmissionsByAssignment(assignment.id);
+            totalSubmissions += submissions.length;
+            submittedCount += submissions.filter(s => s.status === 'submitted').length;
+          }
+        }
+      } catch (e) {
+        console.log('Error fetching assignment stats:', e);
+      }
+      
+      const completionRate = totalSubmissions > 0 
+        ? Math.round((submittedCount / totalSubmissions) * 100) 
+        : 0;
+
+      res.json({
+        totalUsers: activeUsers.length,
+        students,
+        tutors,
+        parents,
+        companyAdmins,
+        admins,
+        totalCompanies: activeCompanies,
+        totalAssignments,
+        totalSubmissions,
+        completionRate,
+        systemStatus: 'Good'
+      });
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ message: "Failed to fetch stats" });
+    }
+  });
+  
   app.get('/api/admin/users', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
