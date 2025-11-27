@@ -440,6 +440,8 @@ export function AssignmentCompletionArea({
         <PDFAnnotator
           pdfUrl={selectedPDFUrl}
           assignmentId={assignment.id}
+          documentUrl={selectedPDFUrl}
+          isSubmitted={isDocumentCompleted(selectedPDFUrl)}
           onSave={async (annotatedFileUrl: string) => {
             try {
               await submitAssignmentMutation.mutateAsync({ 

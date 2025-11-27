@@ -1,22 +1,26 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Save, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download } from 'lucide-react';
+import { Save, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download, Send } from 'lucide-react';
 
 interface PDFAnnotatorProps {
   pdfUrl: string;
   assignmentId: string;
   onSave: (annotatedFileUrl: string) => Promise<void>;
   onClose: () => void;
+  isSubmitted?: boolean;
+  documentUrl?: string;
 }
 
 type Tool = 'pen' | 'eraser' | 'text' | 'highlight';
 
-export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnotatorProps) {
+export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitted = false, documentUrl }: PDFAnnotatorProps) {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
+  const [hasAnnotations, setHasAnnotations] = useState(false);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfViewerRef = useRef<HTMLIFrameElement>(null);
@@ -94,6 +98,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
 
     ctx.lineTo(x, y);
     ctx.stroke();
+    setHasAnnotations(true);
   };
 
   const stopDrawing = () => {
@@ -137,10 +142,12 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
     link.click();
   };
 
-  // Save annotated work
-  const handleSave = async () => {
-    if (!canvasRef.current || isSaving) return;
+  // Save and Submit annotated work
+  const handleSaveAndSubmit = async (submitAfterSave: boolean = false) => {
+    if (!canvasRef.current || isSaving || isSubmitting) return;
 
+    const isSubmittingNow = isSaving ? false : submitAfterSave;
+    if (isSubmittingNow) setIsSubmitting(true);
     setIsSaving(true);
     console.log('Starting save process...');
     
@@ -168,6 +175,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
           variant: "destructive",
         });
         setIsSaving(false);
+        if (isSubmittingNow) setIsSubmitting(false);
         return;
       }
 
@@ -217,9 +225,17 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
       await onSave(cleanUrl);
 
       toast({
-        title: "Assignment saved successfully",
-        description: "Your annotated assignment has been saved.",
+        title: submitAfterSave ? "Assignment Submitted" : "Assignment Saved",
+        description: submitAfterSave 
+          ? "Your annotated assignment has been submitted successfully." 
+          : "Your annotated assignment has been saved. Click Submit when ready.",
       });
+
+      if (submitAfterSave) {
+        setTimeout(() => {
+          onClose();
+        }, 1500);
+      }
     } catch (error) {
       console.error('Save error:', error);
       toast({
@@ -229,6 +245,7 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
       });
     } finally {
       setIsSaving(false);
+      if (isSubmittingNow) setIsSubmitting(false);
     }
   };
 
@@ -261,14 +278,29 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose }: PDFAnnot
           <h2 className="text-xl font-bold">PDF Annotation</h2>
           <div className="flex gap-2">
             <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="bg-black text-white hover:bg-gray-800"
+              onClick={() => handleSaveAndSubmit(false)}
+              disabled={isSaving || isSubmitting || isSubmitted}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              data-testid="button-save-work"
             >
               <Save className="h-4 w-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save Work'}
             </Button>
-            <Button onClick={onClose} variant="outline">
+            <Button
+              onClick={() => handleSaveAndSubmit(true)}
+              disabled={isSaving || isSubmitting || isSubmitted}
+              className="bg-green-600 hover:bg-green-700 text-white"
+              data-testid="button-submit-assignment"
+            >
+              <Send className="h-4 w-4 mr-2" />
+              {isSubmitting || isSaving ? 'Submitting...' : 'Submit Assignment'}
+            </Button>
+            <Button 
+              onClick={onClose} 
+              variant="outline"
+              disabled={isSaving || isSubmitting}
+              data-testid="button-close-annotator"
+            >
               <X className="h-4 w-4 mr-2" />
               Close
             </Button>
