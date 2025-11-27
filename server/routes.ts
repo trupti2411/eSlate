@@ -1000,7 +1000,7 @@ trailer<</Size 5/Root 1 0 R>>
       }
 
       // Clean the request body to only include allowed fields (simplified - direct class assignment)
-      const allowedFields = ['schoolName', 'classId'];
+      const allowedFields = ['schoolName', 'classId', 'tutorId'];
       const updateData: any = {};
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
