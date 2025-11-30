@@ -88,8 +88,12 @@ export function AssignmentCompletionArea({
   const queryClient = useQueryClient();
 
   // Fetch all submissions for this assignment to check per-document completion
+  // Disable while annotator is open to prevent re-renders that clear annotations
   const { data: allSubmissions = [] } = useQuery<Submission[]>({
     queryKey: ['/api/assignments', assignment.id, 'submissions'],
+    staleTime: 30 * 1000, // Keep data fresh for 30 seconds to prevent constant refetches during annotation
+    gcTime: 5 * 60 * 1000, // Cache for 5 minutes
+    enabled: !isPDFAnnotatorOpen, // Disable query while annotator is open to prevent re-renders
   });
 
   // Helper function to check if a specific document is completed
