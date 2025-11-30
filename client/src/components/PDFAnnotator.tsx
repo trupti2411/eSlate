@@ -14,7 +14,7 @@ interface PDFAnnotatorProps {
 
 type Tool = 'pen' | 'eraser' | 'text' | 'highlight';
 
-export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitted = false, documentUrl }: PDFAnnotatorProps) {
+function PDFAnnotatorComponent({ pdfUrl, assignmentId, onSave, onClose, isSubmitted = false, documentUrl }: PDFAnnotatorProps) {
   const [activeTool, setActiveTool] = useState<Tool | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -25,10 +25,11 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const pdfViewerRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const canvasImageRef = useRef<ImageData | null>(null); // Store canvas drawing state
   
   const { toast } = useToast();
 
-  // Initialize canvas
+  // Initialize canvas and restore previous drawing if it exists
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current || !containerRef.current) return;
 
@@ -45,6 +46,16 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.globalAlpha = 1.0;
+    
+    // Restore previous annotations if they exist
+    if (canvasImageRef.current) {
+      try {
+        ctx.putImageData(canvasImageRef.current, 0, 0);
+      } catch (e) {
+        // Canvas size might have changed, can't restore
+        canvasImageRef.current = null;
+      }
+    }
   }, []);
 
   // Drawing functions
@@ -85,6 +96,20 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     }
   };
 
+  const saveCanvasState = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    
+    try {
+      // Save current canvas drawing state
+      canvasImageRef.current = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    } catch (e) {
+      // Silently fail if we can't save state
+    }
+  }, []);
+
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDrawing) return;
     
@@ -99,6 +124,9 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     ctx.lineTo(x, y);
     ctx.stroke();
     setHasAnnotations(true);
+    
+    // Save canvas state after each draw
+    saveCanvasState();
   };
 
   const stopDrawing = () => {
@@ -260,15 +288,19 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     initializeCanvas();
   }, [initializeCanvas]);
 
-  // Handle window resize
+  // Handle window resize - but preserve annotations
   useEffect(() => {
     const handleResize = () => {
-      setTimeout(initializeCanvas, 100);
+      // Save canvas before resize
+      saveCanvasState();
+      setTimeout(() => {
+        initializeCanvas();
+      }, 100);
     };
 
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
-  }, [initializeCanvas]);
+  }, [initializeCanvas, saveCanvasState]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -429,3 +461,6 @@ export function PDFAnnotator({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     </div>
   );
 }
+
+// Wrap in React.memo to prevent unnecessary re-renders that clear the canvas
+export const PDFAnnotator = React.memo(PDFAnnotatorComponent);
