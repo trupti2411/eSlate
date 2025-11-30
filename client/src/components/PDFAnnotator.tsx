@@ -136,15 +136,15 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     });
   }, []);
 
-  // Initialize canvas
+  // Initialize canvas with viewport dimensions
   const initializeCanvas = useCallback(() => {
-    if (!canvasRef.current || !containerRef.current) return;
+    if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    const container = containerRef.current;
     
-    canvas.width = container.clientWidth;
-    canvas.height = container.clientHeight;
+    // Use window dimensions for fixed canvas
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
     
     // Redraw all existing strokes
     redrawCanvas();
@@ -492,12 +492,16 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
               
               <canvas
                 ref={canvasRef}
-                className="absolute top-0 left-0"
+                className="fixed"
                 style={{
+                  top: 0,
+                  left: 0,
                   cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
                   pointerEvents: activeTool ? 'auto' : 'none',
-                  zIndex: activeTool ? 10 : 1,
-                  touchAction: activeTool ? 'none' : 'auto'
+                  zIndex: activeTool ? 9999 : 1,
+                  touchAction: activeTool ? 'none' : 'auto',
+                  width: '100vw',
+                  height: '100vh'
                 }}
                 onMouseDown={startDrawing}
                 onMouseMove={draw}
