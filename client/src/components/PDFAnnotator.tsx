@@ -61,7 +61,24 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     strokeStore.set(storeKey, { strokes, texts });
   }, [strokes, texts, storeKey]);
 
-  // Redraw all strokes and texts on canvas
+  // Use refs to avoid dependency chasing
+  const strokesRef = useRef(strokes);
+  const textsRef = useRef(texts);
+  const currentStrokeRef = useRef(currentStroke);
+
+  useEffect(() => {
+    strokesRef.current = strokes;
+  }, [strokes]);
+
+  useEffect(() => {
+    textsRef.current = texts;
+  }, [texts]);
+
+  useEffect(() => {
+    currentStrokeRef.current = currentStroke;
+  }, [currentStroke]);
+
+  // Redraw all strokes and texts on canvas - STABLE FUNCTION
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -71,8 +88,13 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Get latest strokes from ref
+    const currentStrokes = strokesRef.current;
+    const currentTexts = textsRef.current;
+    const currentDrawingStroke = currentStrokeRef.current;
+
     // Redraw all strokes
-    strokes.forEach(stroke => {
+    currentStrokes.forEach(stroke => {
       if (stroke.points.length < 2) return;
       
       ctx.beginPath();
@@ -90,17 +112,17 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     });
 
     // Draw current stroke being drawn
-    if (currentStroke && currentStroke.points.length >= 2) {
+    if (currentDrawingStroke && currentDrawingStroke.points.length >= 2) {
       ctx.beginPath();
-      ctx.globalCompositeOperation = currentStroke.compositeOperation;
-      ctx.strokeStyle = currentStroke.color;
-      ctx.lineWidth = currentStroke.lineWidth;
+      ctx.globalCompositeOperation = currentDrawingStroke.compositeOperation;
+      ctx.strokeStyle = currentDrawingStroke.color;
+      ctx.lineWidth = currentDrawingStroke.lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       
-      ctx.moveTo(currentStroke.points[0].x, currentStroke.points[0].y);
-      for (let i = 1; i < currentStroke.points.length; i++) {
-        ctx.lineTo(currentStroke.points[i].x, currentStroke.points[i].y);
+      ctx.moveTo(currentDrawingStroke.points[0].x, currentDrawingStroke.points[0].y);
+      for (let i = 1; i < currentDrawingStroke.points.length; i++) {
+        ctx.lineTo(currentDrawingStroke.points[i].x, currentDrawingStroke.points[i].y);
       }
       ctx.stroke();
     }
@@ -109,10 +131,10 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     ctx.globalCompositeOperation = 'source-over';
     ctx.font = '18px Arial';
     ctx.fillStyle = '#000000';
-    texts.forEach(textAnnotation => {
+    currentTexts.forEach(textAnnotation => {
       ctx.fillText(textAnnotation.text, textAnnotation.x, textAnnotation.y);
     });
-  }, [strokes, texts, currentStroke]);
+  }, []);
 
   // Initialize canvas
   const initializeCanvas = useCallback(() => {
@@ -128,10 +150,10 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // Redraw when strokes change
+  // Redraw when strokes, texts, or current stroke change
   useEffect(() => {
     redrawCanvas();
-  }, [redrawCanvas]);
+  }, [strokes, texts, currentStroke, redrawCanvas]);
 
   const getToolSettings = (tool: Tool): Pick<Stroke, 'color' | 'lineWidth' | 'compositeOperation'> => {
     switch (tool) {
