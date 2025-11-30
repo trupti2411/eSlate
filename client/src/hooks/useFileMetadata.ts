@@ -64,9 +64,21 @@ export function useMultipleFileMetadata(fileUrls: string[]) {
   // Filter out results for empty URLs
   const validQueries = queries.slice(0, fileUrls.length);
   
+  // Determine overall loading state - only while we have actual valid queries
+  const hasAnyQueries = validQueries.length > 0;
+  const isLoading = hasAnyQueries && validQueries.some(q => q.isLoading);
+  
   return {
-    data: validQueries.map(q => q.data),
-    isLoading: validQueries.some(q => q.isLoading),
+    data: validQueries.map((q, idx) => {
+      // If query failed, return fallback object with filename from URL
+      if (q.error && !q.data) {
+        const fileUrl = fileUrls[idx];
+        const filename = fileUrl.split('/').pop()?.split('?')[0] || `File ${idx + 1}`;
+        return { originalName: filename, contentType: 'unknown', size: 0 };
+      }
+      return q.data;
+    }),
+    isLoading,
     errors: validQueries.map(q => q.error).filter(Boolean),
   };
 }
