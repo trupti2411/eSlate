@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { 
   ChevronLeft, 
@@ -70,8 +71,10 @@ interface Answer {
 
 interface WorksheetAnswererProps {
   worksheetId: string;
-  studentId: string;
-  onClose: () => void;
+  studentId?: string;
+  assignmentId?: string;
+  onClose?: () => void;
+  onComplete?: () => void;
 }
 
 interface Point {
@@ -93,8 +96,9 @@ const questionTypeIcons: Record<QuestionType, any> = {
   text_image: Image,
 };
 
-export function WorksheetAnswerer({ worksheetId, studentId, onClose }: WorksheetAnswererProps) {
+export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, assignmentId, onClose, onComplete }: WorksheetAnswererProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
   const [inputMode, setInputMode] = useState<'type' | 'draw'>('type');
@@ -106,6 +110,8 @@ export function WorksheetAnswerer({ worksheetId, studentId, onClose }: Worksheet
   const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
   const [penColor] = useState('#000000');
   const [penWidth] = useState(2);
+  
+  const studentId = providedStudentId || (user?.id ? `student-${user.id}` : '');
 
   const { data: worksheet, isLoading } = useQuery<Worksheet>({
     queryKey: ['/api/worksheets', worksheetId],
@@ -157,7 +163,12 @@ export function WorksheetAnswerer({ worksheetId, studentId, onClose }: Worksheet
     onSuccess: () => {
       toast({ title: 'Worksheet submitted successfully!' });
       queryClient.invalidateQueries({ queryKey: ['/api/worksheets', worksheetId, 'answers', studentId] });
-      onClose();
+      if (onComplete) {
+        onComplete();
+      }
+      if (onClose) {
+        onClose();
+      }
     },
     onError: () => {
       toast({ title: 'Failed to submit worksheet', variant: 'destructive' });

@@ -6,6 +6,7 @@ import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMeta
 import { type Assignment, type Submission } from "@shared/schema";
 import { PDFAnnotator } from "./PDFAnnotator";
 import { ObjectUploader } from "./ObjectUploader";
+import { WorksheetAnswerer } from "./WorksheetAnswerer";
 import { 
   FileText, 
   Download, 
@@ -17,7 +18,8 @@ import {
   Monitor,
   Upload,
   Clock,
-  User
+  User,
+  ClipboardList
 } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -208,6 +210,89 @@ export function AssignmentCompletionArea({
     badge: "border border-black bg-white text-black",
   };
 
+  // For worksheet-type assignments, render the WorksheetAnswerer component
+  if (assignment.assignmentKind === 'worksheet' && assignment.worksheetId) {
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto">
+        {/* Assignment Header */}
+        <div className={`${eInkStyles.card} p-6`}>
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
+            <div>
+              <h1 className="text-2xl font-bold text-black mb-2">{assignment.title}</h1>
+              <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                <div className="flex items-center">
+                  <ClipboardList className="h-4 w-4 mr-1" />
+                  Interactive Worksheet
+                </div>
+                <div className="flex items-center">
+                  <BookOpen className="h-4 w-4 mr-1" />
+                  {assignment.subject}
+                </div>
+                <div className="flex items-center">
+                  <Calendar className="h-4 w-4 mr-1" />
+                  Week {assignment.week}
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge className={`${eInkStyles.badge} text-sm px-3 py-1`}>
+                {submission?.status === 'submitted' ? 'Completed' : 'In Progress'}
+              </Badge>
+            </div>
+          </div>
+
+          <div className="flex items-center p-3 bg-gray-50 rounded">
+            <Clock className="h-4 w-4 mr-2 text-gray-600" />
+            <div>
+              <div className="text-gray-600">Due Date</div>
+              <div className="font-medium">
+                {format(new Date(assignment.submissionDate), 'MMM dd, yyyy HH:mm')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Description & Instructions */}
+        {(assignment.description || assignment.instructions) && (
+          <div className={`${eInkStyles.card} p-6 space-y-4`}>
+            {assignment.description && (
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Description</h3>
+                <p className="text-gray-700 leading-relaxed">{assignment.description}</p>
+              </div>
+            )}
+            {assignment.instructions && (
+              <div>
+                <h3 className="font-semibold text-lg mb-2">Instructions</h3>
+                <div className="p-4 bg-blue-50 rounded border-l-4 border-blue-400">
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">
+                    {assignment.instructions}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Worksheet Answerer */}
+        <div className={`${eInkStyles.card} p-6`}>
+          <h3 className="font-semibold text-lg mb-4">Complete Your Worksheet</h3>
+          <WorksheetAnswerer
+            worksheetId={assignment.worksheetId}
+            assignmentId={assignment.id}
+            onComplete={() => {
+              onSubmissionUpdate();
+              toast({
+                title: "Worksheet Submitted",
+                description: "Your worksheet answers have been submitted successfully.",
+              });
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
       {/* Assignment Header */}
@@ -248,7 +333,7 @@ export function AssignmentCompletionArea({
             <User className="h-4 w-4 mr-2 text-gray-600" />
             <div>
               <div className="text-gray-600">Assignment Type</div>
-              <div className="font-medium">Individual Work</div>
+              <div className="font-medium">File Upload</div>
             </div>
           </div>
           <div className="flex items-center p-3 bg-gray-50 rounded">
