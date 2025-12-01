@@ -34,8 +34,35 @@ interface TextAnnotation {
   text: string;
 }
 
-// Global store for strokes that persists across remounts
+// Global store for strokes
 const strokeStore: Map<string, { strokes: Stroke[]; texts: TextAnnotation[] }> = new Map();
+
+function CanvasOverlay({ canvasRef, activeTool, onMouseDown, onMouseMove, onMouseUp, onMouseLeave, onTouchStart, onTouchMove, onTouchEnd }: any) {
+  return createPortal(
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
+        pointerEvents: activeTool ? 'auto' : 'none',
+        zIndex: 99999,
+        touchAction: activeTool ? 'none' : 'auto',
+      }}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      onMouseUp={onMouseUp}
+      onMouseLeave={onMouseLeave}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    />,
+    document.body
+  );
+}
 
 function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitted = false, documentUrl }: PDFAnnotatorProps) {
   const [activeTool, setActiveTool] = useState<Tool>(null);
@@ -44,7 +71,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
   
-  // Store strokes as data, not just on canvas
   const storeKey = `${assignmentId}-${documentUrl || pdfUrl}`;
   const [strokes, setStrokes] = useState<Stroke[]>(() => strokeStore.get(storeKey)?.strokes || []);
   const [texts, setTexts] = useState<TextAnnotation[]>(() => strokeStore.get(storeKey)?.texts || []);
@@ -54,17 +80,15 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   const pdfViewerRef = useRef<HTMLIFrameElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
-  const { toast } = useToast();
-
-  // Save to global store whenever strokes/texts change
-  useEffect(() => {
-    strokeStore.set(storeKey, { strokes, texts });
-  }, [strokes, texts, storeKey]);
-
-  // Use refs to avoid dependency chasing
   const strokesRef = useRef(strokes);
   const textsRef = useRef(texts);
   const currentStrokeRef = useRef(currentStroke);
+  
+  const { toast } = useToast();
+
+  useEffect(() => {
+    strokeStore.set(storeKey, { strokes, texts });
+  }, [strokes, texts, storeKey]);
 
   useEffect(() => {
     strokesRef.current = strokes;
@@ -78,22 +102,18 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     currentStrokeRef.current = currentStroke;
   }, [currentStroke]);
 
-  // Redraw all strokes and texts on canvas - STABLE FUNCTION
   const redrawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Get latest strokes from ref
     const currentStrokes = strokesRef.current;
     const currentTexts = textsRef.current;
     const currentDrawingStroke = currentStrokeRef.current;
 
-    // Redraw all strokes
     currentStrokes.forEach(stroke => {
       if (stroke.points.length < 2) return;
       
@@ -111,7 +131,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       ctx.stroke();
     });
 
-    // Draw current stroke being drawn
     if (currentDrawingStroke && currentDrawingStroke.points.length >= 2) {
       ctx.beginPath();
       ctx.globalCompositeOperation = currentDrawingStroke.compositeOperation;
@@ -127,7 +146,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       ctx.stroke();
     }
 
-    // Reset composite operation and draw texts
     ctx.globalCompositeOperation = 'source-over';
     ctx.font = '18px Arial';
     ctx.fillStyle = '#000000';
@@ -136,21 +154,16 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     });
   }, []);
 
-  // Initialize canvas with viewport dimensions
   const initializeCanvas = useCallback(() => {
     if (!canvasRef.current) return;
 
     const canvas = canvasRef.current;
-    
-    // Use window dimensions for fixed canvas
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     
-    // Redraw all existing strokes
     redrawCanvas();
   }, [redrawCanvas]);
 
-  // Redraw when strokes, texts, or current stroke change
   useEffect(() => {
     redrawCanvas();
   }, [strokes, texts, currentStroke, redrawCanvas]);
@@ -171,18 +184,12 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
     if (!activeTool || activeTool === 'text') {
       if (activeTool === 'text') {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-        
-        const rect = canvas.getBoundingClientRect();
-        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
+        const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
         const text = prompt('Enter text:');
         if (text) {
-          setTexts(prev => [...prev, { x, y, text }]);
+          setTexts(prev => [...prev, { x: clientX, y: clientY, text }]);
         }
       }
       return;
@@ -191,18 +198,12 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     e.preventDefault();
     setIsDrawing(true);
     
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
     const settings = getToolSettings(activeTool);
     setCurrentStroke({
-      points: [{ x, y }],
+      points: [{ x: clientX, y: clientY }],
       tool: activeTool as 'pen' | 'highlight' | 'eraser',
       ...settings
     });
@@ -212,20 +213,15 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     if (!isDrawing || !currentStroke) return;
     
     e.preventDefault();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
 
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY;
 
     setCurrentStroke(prev => {
       if (!prev) return prev;
       return {
         ...prev,
-        points: [...prev.points, { x, y }]
+        points: [...prev.points, { x: clientX, y: clientY }]
       };
     });
   };
@@ -274,7 +270,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
         return;
       }
 
-      // Redraw to ensure canvas is current
       redrawCanvas();
 
       const canvas = canvasRef.current;
@@ -284,9 +279,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
           else reject(new Error('Failed to create blob'));
         }, 'image/png', 1.0);
       });
-
-      const formData = new FormData();
-      formData.append('file', blob, `annotations-${assignmentId}.png`);
 
       const uploadResponse = await fetch('/api/objects/upload', {
         method: 'POST',
@@ -317,7 +309,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
 
       await onSave(annotatedFileUrl);
 
-      // Clear the stroke store after successful save
       if (isSubmittingNow) {
         strokeStore.delete(storeKey);
       }
@@ -351,11 +342,9 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
 
   useEffect(() => {
     initializeCanvas();
-  }, [initializeCanvas]);
-
-  useEffect(() => {
+    
     const handleResize = () => {
-      setTimeout(initializeCanvas, 100);
+      setTimeout(initializeCanvas, 50);
     };
 
     window.addEventListener('resize', handleResize);
@@ -363,178 +352,164 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   }, [initializeCanvas]);
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-lg shadow-xl max-w-6xl max-h-[90vh] w-full mx-4 overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b bg-gray-50">
-          <h2 className="text-xl font-bold text-black">Annotate Document</h2>
-          <div className="flex items-center gap-2">
-            {!isSubmitted && (
-              <>
-                <Button
-                  onClick={() => handleSaveAndSubmit(false)}
-                  disabled={isSaving || isSubmitting || !hasAnnotations}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  data-testid="button-save-work"
-                >
-                  <Save className="h-4 w-4 mr-2" />
-                  {isSaving && !isSubmitting ? 'Saving...' : 'Save Work'}
-                </Button>
-                <Button
-                  onClick={() => handleSaveAndSubmit(true)}
-                  disabled={isSaving || isSubmitting || !hasAnnotations}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  data-testid="button-submit-assignment"
-                >
-                  <Send className="h-4 w-4 mr-2" />
-                  {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
-                </Button>
-              </>
-            )}
-            <Button onClick={onClose} variant="ghost" data-testid="button-close-annotator">
-              <X className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex h-[calc(90vh-180px)]">
-          {/* Tool Sidebar */}
-          <div className="w-48 bg-gray-100 border-r p-4 flex flex-col gap-4">
-            {/* Navigation Mode */}
-            <div>
-              <h4 className="font-medium mb-2">Mode</h4>
-              <Button
-                onClick={() => handleToolChange(null)}
-                className={`w-full justify-start ${activeTool === null ? 'bg-black text-white' : 'bg-white'}`}
-              >
-                <Move className="h-4 w-4 mr-2" />
-                Navigate PDF
+    <>
+      <CanvasOverlay 
+        canvasRef={canvasRef}
+        activeTool={activeTool}
+        onMouseDown={startDrawing}
+        onMouseMove={draw}
+        onMouseUp={stopDrawing}
+        onMouseLeave={stopDrawing}
+        onTouchStart={startDrawing}
+        onTouchMove={draw}
+        onTouchEnd={stopDrawing}
+      />
+      
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9998]">
+        <div className="bg-white rounded-lg shadow-xl max-w-6xl max-h-[90vh] w-full mx-4 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between p-4 border-b bg-gray-50">
+            <h2 className="text-xl font-bold text-black">Annotate Document</h2>
+            <div className="flex items-center gap-2">
+              {!isSubmitted && (
+                <>
+                  <Button
+                    onClick={() => handleSaveAndSubmit(false)}
+                    disabled={isSaving || isSubmitting || !hasAnnotations}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    data-testid="button-save-work"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {isSaving && !isSubmitting ? 'Saving...' : 'Save Work'}
+                  </Button>
+                  <Button
+                    onClick={() => handleSaveAndSubmit(true)}
+                    disabled={isSaving || isSubmitting || !hasAnnotations}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    data-testid="button-submit-assignment"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
+                  </Button>
+                </>
+              )}
+              <Button onClick={onClose} variant="ghost" data-testid="button-close-annotator">
+                <X className="h-5 w-5" />
               </Button>
-            </div>
-
-            {/* Drawing Tools */}
-            <div>
-              <h4 className="font-medium mb-2">Drawing</h4>
-              <div className="space-y-2">
-                <Button
-                  onClick={() => handleToolChange('pen')}
-                  className={`w-full justify-start ${activeTool === 'pen' ? 'bg-black text-white' : 'bg-white'}`}
-                >
-                  <Pen className="h-4 w-4 mr-2" />
-                  Pen
-                </Button>
-                <Button
-                  onClick={() => handleToolChange('highlight')}
-                  className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-black text-white' : 'bg-white'}`}
-                >
-                  <Highlighter className="h-4 w-4 mr-2" />
-                  Highlight
-                </Button>
-              </div>
-            </div>
-
-            {/* Eraser */}
-            <div>
-              <h4 className="font-medium mb-2">Eraser</h4>
-              <Button
-                onClick={() => handleToolChange('eraser')}
-                className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-black text-white' : 'bg-white'}`}
-              >
-                <Eraser className="h-4 w-4 mr-2" />
-                Eraser
-              </Button>
-            </div>
-
-            {/* Text */}
-            <div>
-              <h4 className="font-medium mb-2">Text</h4>
-              <Button
-                onClick={() => handleToolChange('text')}
-                className={`w-full justify-start ${activeTool === 'text' ? 'bg-black text-white' : 'bg-white'}`}
-              >
-                <Type className="h-4 w-4 mr-2" />
-                Add Text
-              </Button>
-            </div>
-
-            {/* Actions */}
-            <div>
-              <h4 className="font-medium mb-2">Actions</h4>
-              <div className="space-y-2">
-                <Button onClick={clearCanvas} className="w-full justify-start" variant="outline">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Clear All
-                </Button>
-                <Button onClick={handleDownload} className="w-full justify-start" variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-              </div>
             </div>
           </div>
 
-          {/* PDF Viewer */}
-          <div className="flex-1 relative">
-            <div 
-              ref={containerRef}
-              className="relative w-full h-full overflow-auto bg-gray-100"
-            >
-              <iframe
-                ref={pdfViewerRef}
-                src={pdfUrl}
-                className="w-full h-full border-0"
-                onLoad={() => {
-                  setPdfLoaded(true);
-                  setTimeout(initializeCanvas, 100);
-                }}
-              />
-              
-              <canvas
-                ref={canvasRef}
-                className="fixed"
-                style={{
-                  top: 0,
-                  left: 0,
-                  cursor: activeTool === 'text' ? 'text' : activeTool === 'eraser' ? 'grab' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                  pointerEvents: activeTool ? 'auto' : 'none',
-                  zIndex: activeTool ? 9999 : 1,
-                  touchAction: activeTool ? 'none' : 'auto',
-                  width: '100vw',
-                  height: '100vh'
-                }}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
-              />
+          {/* Main Content */}
+          <div className="flex h-[calc(90vh-180px)]">
+            {/* Tool Sidebar */}
+            <div className="w-48 bg-gray-100 border-r p-4 flex flex-col gap-4">
+              <div>
+                <h4 className="font-medium mb-2">Mode</h4>
+                <Button
+                  onClick={() => handleToolChange(null)}
+                  className={`w-full justify-start ${activeTool === null ? 'bg-black text-white' : 'bg-white'}`}
+                >
+                  <Move className="h-4 w-4 mr-2" />
+                  Navigate PDF
+                </Button>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Drawing</h4>
+                <div className="space-y-2">
+                  <Button
+                    onClick={() => handleToolChange('pen')}
+                    className={`w-full justify-start ${activeTool === 'pen' ? 'bg-black text-white' : 'bg-white'}`}
+                  >
+                    <Pen className="h-4 w-4 mr-2" />
+                    Pen
+                  </Button>
+                  <Button
+                    onClick={() => handleToolChange('highlight')}
+                    className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-black text-white' : 'bg-white'}`}
+                  >
+                    <Highlighter className="h-4 w-4 mr-2" />
+                    Highlight
+                  </Button>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Eraser</h4>
+                <Button
+                  onClick={() => handleToolChange('eraser')}
+                  className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-black text-white' : 'bg-white'}`}
+                >
+                  <Eraser className="h-4 w-4 mr-2" />
+                  Eraser
+                </Button>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Text</h4>
+                <Button
+                  onClick={() => handleToolChange('text')}
+                  className={`w-full justify-start ${activeTool === 'text' ? 'bg-black text-white' : 'bg-white'}`}
+                >
+                  <Type className="h-4 w-4 mr-2" />
+                  Add Text
+                </Button>
+              </div>
+
+              <div>
+                <h4 className="font-medium mb-2">Actions</h4>
+                <div className="space-y-2">
+                  <Button onClick={clearCanvas} className="w-full justify-start" variant="outline">
+                    <RotateCcw className="h-4 w-4 mr-2" />
+                    Clear All
+                  </Button>
+                  <Button onClick={handleDownload} className="w-full justify-start" variant="outline">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {/* PDF Viewer */}
+            <div className="flex-1 relative">
+              <div 
+                ref={containerRef}
+                className="relative w-full h-full overflow-auto bg-gray-100"
+              >
+                <iframe
+                  ref={pdfViewerRef}
+                  src={pdfUrl}
+                  className="w-full h-full border-0"
+                  onLoad={() => {
+                    setPdfLoaded(true);
+                    setTimeout(initializeCanvas, 100);
+                  }}
+                />
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Instructions */}
-        <div className="p-4 border-t bg-gray-50 text-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <strong>Instructions:</strong> Select "Navigate PDF" to scroll and read, then choose a tool to annotate. Click "Save Work" when finished.
-              {hasAnnotations && <span className="ml-2 text-green-600 font-medium">({strokes.length} strokes, {texts.length} text annotations)</span>}
-            </div>
-            {!pdfLoaded && (
-              <div className="flex items-center text-gray-600">
-                Loading PDF...
+          {/* Instructions */}
+          <div className="p-4 border-t bg-gray-50 text-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <strong>Instructions:</strong> Select "Navigate PDF" to scroll and read, then choose a tool to annotate. Click "Save Work" when finished.
+                {hasAnnotations && <span className="ml-2 text-green-600 font-medium">({strokes.length} strokes, {texts.length} text annotations)</span>}
               </div>
-            )}
+              {!pdfLoaded && (
+                <div className="flex items-center text-gray-600">
+                  Loading PDF...
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
-// Use portal to render at document body level, preventing unmount from parent re-renders
 export function PDFAnnotator(props: PDFAnnotatorProps) {
   const [mounted, setMounted] = useState(false);
 
