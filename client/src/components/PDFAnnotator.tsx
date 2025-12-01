@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Save, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download, Send, Move, ZoomIn, ZoomOut } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
+import * as fabricModule from 'fabric';
+const { fabric } = fabricModule as any;
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
@@ -18,32 +20,10 @@ interface PDFAnnotatorProps {
 
 type Tool = 'pen' | 'eraser' | 'text' | 'highlight' | null;
 
-interface Point {
-  x: number;
-  y: number;
-}
-
-interface Stroke {
-  points: Point[];
-  tool: 'pen' | 'highlight' | 'eraser';
-  color: string;
-  lineWidth: number;
-  compositeOperation: GlobalCompositeOperation;
-  pageIndex: number;
-}
-
-interface TextAnnotation {
-  x: number;
-  y: number;
-  text: string;
-  pageIndex: number;
-}
-
-const strokeStore: Map<string, { strokes: Stroke[]; texts: TextAnnotation[] }> = new Map();
+const strokeStore: Map<string, any> = new Map();
 
 function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitted = false, documentUrl }: PDFAnnotatorProps) {
   const [activeTool, setActiveTool] = useState<Tool>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
@@ -51,26 +31,13 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.5);
   
-  // Persistent refs that don't trigger re-renders
   const storeKey = `${assignmentId}-${documentUrl || pdfUrl}`;
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
-  const annotationCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
-  
-  // Data refs that persist across re-renders
-  const strokesRef = useRef<Stroke[]>(strokeStore.get(storeKey)?.strokes || []);
-  const textsRef = useRef<TextAnnotation[]>(strokeStore.get(storeKey)?.texts || []);
-  const currentStrokeRef = useRef<Stroke | null>(null);
-  const currentPageRef = useRef(0);
-  const drawingStateRef = useRef({ isDirty: false, needsRedraw: new Set<number>() });
-  
+  const fabricCanvasRefs = useRef<Map<number, fabric.Canvas>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
+  
   const { toast } = useToast();
-
-  // Save to store whenever strokes change
-  useEffect(() => {
-    strokeStore.set(storeKey, { strokes: strokesRef.current, texts: textsRef.current });
-  }, [storeKey]);
 
   // Load PDF
   useEffect(() => {
@@ -84,7 +51,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
         setPdfLoaded(true);
       } catch (error) {
         console.error('Error loading PDF:', error);
-        setPdfError('Failed to load PDF. The file may be inaccessible or in an unsupported format.');
+        setPdfError('Failed to load PDF.');
       }
     };
     loadPDF();
@@ -100,7 +67,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       const page = await pdfDocRef.current.getPage(pageNum);
       const viewport = page.getViewport({ scale });
       const pdfCanvas = pageCanvasRefs.current.get(pageNum);
-      const annotCanvas = annotationCanvasRefs.current.get(pageNum);
 
       if (pdfCanvas) {
         pdfCanvas.width = viewport.width;
@@ -113,53 +79,34 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             canvas: pdfCanvas
           } as any).promise;
         }
-      }
 
-      if (annotCanvas) {
-        annotCanvas.width = viewport.width;
-        annotCanvas.height = viewport.height;
-        redrawPage(pageNum - 1);
+        // Initialize or update Fabric canvas
+        let fabricCanvas = fabricCanvasRefs.current.get(pageNum);
+        if (!fabricCanvas) {
+          fabricCanvas = new fabric.Canvas(null, {
+            width: viewport.width,
+            height: viewport.height,
+            isDrawingMode: false,
+            preserveObjectStacking: true
+          });
+          fabricCanvasRefs.current.set(pageNum, fabricCanvas);
+        } else {
+          fabricCanvas.setWidth(viewport.width);
+          fabricCanvas.setHeight(viewport.height);
+        }
+
+        // Restore saved objects if they exist
+        const saved = strokeStore.get(storeKey);
+        if (saved && saved[pageNum]) {
+          fabricCanvas.loadFromJSON(saved[pageNum], () => {
+            fabricCanvas.renderAll();
+          });
+        }
       }
     } catch (error) {
       console.error(`Error rendering page ${pageNum}:`, error);
     }
-  }, [scale]);
-
-  // Redraw annotations for a page
-  const redrawPage = useCallback((pageIndex: number) => {
-    const canvas = annotationCanvasRefs.current.get(pageIndex + 1);
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    const pageStrokes = strokesRef.current.filter(s => s.pageIndex === pageIndex);
-    const pageTexts = textsRef.current.filter(t => t.pageIndex === pageIndex);
-
-    pageStrokes.forEach(stroke => {
-      if (stroke.points.length < 2) return;
-      ctx.beginPath();
-      ctx.globalCompositeOperation = stroke.compositeOperation;
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.lineWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-      }
-      ctx.stroke();
-    });
-
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.font = '18px Arial';
-    ctx.fillStyle = '#000000';
-    pageTexts.forEach(text => {
-      ctx.fillText(text.text, text.x, text.y);
-    });
-  }, []);
+  }, [scale, storeKey]);
 
   // Render all pages when PDF loads or scale changes
   useEffect(() => {
@@ -171,105 +118,53 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     })();
   }, [pdfLoaded, numPages, scale, renderPDFPage]);
 
-  const getToolSettings = (tool: Tool): Pick<Stroke, 'color' | 'lineWidth' | 'compositeOperation'> => {
-    switch (tool) {
-      case 'pen':
-        return { color: '#000000', lineWidth: 3, compositeOperation: 'source-over' };
-      case 'highlight':
-        return { color: 'rgba(255, 255, 0, 0.5)', lineWidth: 20, compositeOperation: 'multiply' };
-      case 'eraser':
-        return { color: '#ffffff', lineWidth: 20, compositeOperation: 'destination-out' };
-      default:
-        return { color: '#000000', lineWidth: 3, compositeOperation: 'source-over' };
-    }
-  };
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, pageIndex: number) => {
-    const canvas = e.currentTarget as HTMLCanvasElement;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
-
-    if (activeTool === 'text') {
-      const text = prompt('Enter text:');
-      if (text) {
-        textsRef.current.push({ x, y, text, pageIndex });
-        redrawPage(pageIndex);
+  // Setup drawing on Fabric canvas
+  useEffect(() => {
+    for (const [pageNum, fabricCanvas] of Array.from(fabricCanvasRefs.current.entries())) {
+      if (activeTool === 'text') {
+        fabricCanvas.isDrawingMode = false;
+      } else if (activeTool) {
+        fabricCanvas.isDrawingMode = true;
+        fabricCanvas.freeDrawingBrush.color = 
+          activeTool === 'highlight' ? 'rgba(255, 255, 0, 0.5)' : '#000000';
+        fabricCanvas.freeDrawingBrush.width = activeTool === 'highlight' ? 20 : 3;
+      } else {
+        fabricCanvas.isDrawingMode = false;
       }
-      return;
     }
+  }, [activeTool]);
 
-    if (!activeTool) return;
-    
-    e.preventDefault();
-    setIsDrawing(true);
-    currentPageRef.current = pageIndex;
+  // Add text on click
+  const addText = (e: React.MouseEvent<HTMLCanvasElement>, pageNum: number) => {
+    if (activeTool !== 'text') return;
 
-    const settings = getToolSettings(activeTool);
-    currentStrokeRef.current = {
-      points: [{ x, y }],
-      tool: activeTool as 'pen' | 'highlight' | 'eraser',
-      pageIndex,
-      ...settings
-    };
+    const text = prompt('Enter text:');
+    if (!text) return;
 
-    drawOnCanvas(canvas, pageIndex);
-  };
+    const fabricCanvas = fabricCanvasRefs.current.get(pageNum);
+    if (!fabricCanvas) return;
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, pageIndex: number) => {
-    if (!isDrawing || !currentStrokeRef.current) return;
-    
-    e.preventDefault();
-    const canvas = e.currentTarget as HTMLCanvasElement;
-    const rect = canvas.getBoundingClientRect();
-    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const x = clientX - rect.left;
-    const y = clientY - rect.top;
+    const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
 
-    currentStrokeRef.current.points.push({ x, y });
-    drawOnCanvas(canvas, pageIndex);
-  };
+    const fabricText = new fabric.Text(text, {
+      left: x,
+      top: y,
+      fontSize: 20,
+      fill: '#000000',
+      fontFamily: 'Arial'
+    });
 
-  const drawOnCanvas = (canvas: HTMLCanvasElement, pageIndex: number) => {
-    if (!currentStrokeRef.current) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const stroke = currentStrokeRef.current;
-    const points = stroke.points;
-
-    if (points.length < 2) return;
-
-    // Draw just the new segment
-    ctx.beginPath();
-    ctx.globalCompositeOperation = stroke.compositeOperation;
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = stroke.lineWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.moveTo(points[points.length - 2].x, points[points.length - 2].y);
-    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    if (currentStrokeRef.current && currentStrokeRef.current.points.length >= 2) {
-      strokesRef.current.push(currentStrokeRef.current);
-    }
-    currentStrokeRef.current = null;
-    setIsDrawing(false);
+    fabricCanvas.add(fabricText);
+    fabricCanvas.renderAll();
   };
 
   const clearCanvas = () => {
-    strokesRef.current = [];
-    textsRef.current = [];
-    strokeStore.delete(storeKey);
-    for (let i = 0; i < numPages; i++) {
-      redrawPage(i);
+    for (const fabricCanvas of fabricCanvasRefs.current.values()) {
+      fabricCanvas.clear();
     }
+    strokeStore.delete(storeKey);
   };
 
   const handleDownload = async () => {
@@ -281,27 +176,33 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
 
     let totalHeight = 0;
     let maxWidth = 0;
-    const pageData: { pdfCanvas: HTMLCanvasElement; annotCanvas: HTMLCanvasElement }[] = [];
+    const pageData: { pdfCanvas: HTMLCanvasElement; fabricCanvas: fabric.Canvas }[] = [];
 
     for (let i = 1; i <= numPages; i++) {
       const pdfCanvas = pageCanvasRefs.current.get(i);
-      const annotCanvas = annotationCanvasRefs.current.get(i);
-      if (pdfCanvas && annotCanvas) {
-        pageData.push({ pdfCanvas, annotCanvas });
+      const fabricCanvas = fabricCanvasRefs.current.get(i);
+      if (pdfCanvas && fabricCanvas) {
+        pageData.push({ pdfCanvas, fabricCanvas });
         totalHeight += pdfCanvas.height;
         maxWidth = Math.max(maxWidth, pdfCanvas.width);
       }
     }
 
+    if (maxWidth === 0 || totalHeight === 0) return;
+    
     combinedCanvas.width = maxWidth;
     combinedCanvas.height = totalHeight;
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
 
     let yOffset = 0;
-    for (const { pdfCanvas, annotCanvas } of pageData) {
+    const pageDataArray = Array.from(pageData);
+    for (const { pdfCanvas, fabricCanvas } of pageDataArray) {
       ctx.drawImage(pdfCanvas, 0, yOffset);
-      ctx.drawImage(annotCanvas, 0, yOffset);
+      const fabricElement = fabricCanvas.getElement() as HTMLCanvasElement;
+      if (fabricElement) {
+        ctx.drawImage(fabricElement, 0, yOffset);
+      }
       yOffset += pdfCanvas.height;
     }
 
@@ -311,11 +212,10 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     link.click();
   };
 
-  const hasAnnotations = strokesRef.current.length > 0 || textsRef.current.length > 0;
+  const hasAnnotations = fabricCanvasRefs.current.size > 0 && 
+    Array.from(fabricCanvasRefs.current.values()).some(c => c.getObjects().length > 0);
 
   const handleSaveAndSubmit = async (submitAfterSave: boolean = false) => {
-    if (!pdfDocRef.current || isSaving || isSubmitting) return;
-
     const isSubmittingNow = isSaving ? false : submitAfterSave;
     if (isSubmittingNow) setIsSubmitting(true);
     setIsSaving(true);
@@ -338,27 +238,33 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
 
       let totalHeight = 0;
       let maxWidth = 0;
-      const pageData: { pdfCanvas: HTMLCanvasElement; annotCanvas: HTMLCanvasElement }[] = [];
+      const pageData: { pdfCanvas: HTMLCanvasElement; fabricCanvas: any }[] = [];
 
       for (let i = 1; i <= numPages; i++) {
         const pdfCanvas = pageCanvasRefs.current.get(i);
-        const annotCanvas = annotationCanvasRefs.current.get(i);
-        if (pdfCanvas && annotCanvas) {
-          pageData.push({ pdfCanvas, annotCanvas });
+        const fabricCanvas = fabricCanvasRefs.current.get(i);
+        if (pdfCanvas && fabricCanvas) {
+          pageData.push({ pdfCanvas, fabricCanvas });
           totalHeight += pdfCanvas.height;
           maxWidth = Math.max(maxWidth, pdfCanvas.width);
         }
       }
 
+      if (maxWidth === 0 || totalHeight === 0) throw new Error('No pages to save');
+      
       combinedCanvas.width = maxWidth;
       combinedCanvas.height = totalHeight;
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
 
       let yOffset = 0;
-      for (const { pdfCanvas, annotCanvas } of pageData) {
+      const pageDataArray = Array.from(pageData);
+      for (const { pdfCanvas, fabricCanvas } of pageDataArray) {
         ctx.drawImage(pdfCanvas, 0, yOffset);
-        ctx.drawImage(annotCanvas, 0, yOffset);
+        const fabricElement = fabricCanvas.getElement() as HTMLCanvasElement;
+        if (fabricElement) {
+          ctx.drawImage(fabricElement, 0, yOffset);
+        }
         yOffset += pdfCanvas.height;
       }
 
@@ -400,7 +306,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
         title: isSubmittingNow ? "Assignment Submitted" : "Work Saved",
         description: isSubmittingNow 
           ? "Your annotated work has been submitted successfully."
-          : "Your annotations have been saved. You can continue working or submit when ready.",
+          : "Your annotations have been saved.",
       });
 
       if (isSubmittingNow) {
@@ -410,7 +316,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       console.error('Error saving annotations:', error);
       toast({
         title: "Error",
-        description: "Failed to save annotations. Please try again.",
+        description: "Failed to save annotations.",
         variant: "destructive",
       });
     } finally {
@@ -432,7 +338,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                   onClick={() => handleSaveAndSubmit(false)}
                   disabled={isSaving || isSubmitting || !hasAnnotations}
                   className="bg-blue-600 hover:bg-blue-700 text-white"
-                  data-testid="button-save-work"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   {isSaving && !isSubmitting ? 'Saving...' : 'Save Work'}
@@ -441,22 +346,21 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                   onClick={() => handleSaveAndSubmit(true)}
                   disabled={isSaving || isSubmitting || !hasAnnotations}
                   className="bg-green-600 hover:bg-green-700 text-white"
-                  data-testid="button-submit-assignment"
                 >
                   <Send className="h-4 w-4 mr-2" />
                   {isSubmitting ? 'Submitting...' : 'Submit Assignment'}
                 </Button>
               </>
             )}
-            <Button onClick={onClose} variant="ghost" data-testid="button-close-annotator">
+            <Button onClick={onClose} variant="ghost">
               <X className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
-        {/* Main Content */}
+        {/* Main */}
         <div className="flex flex-1 overflow-hidden">
-          {/* Tool Sidebar */}
+          {/* Sidebar */}
           <div className="w-48 bg-gray-100 border-r p-4 flex flex-col gap-4 shrink-0 overflow-y-auto">
             <div>
               <h4 className="font-medium mb-2">Mode</h4>
@@ -465,24 +369,18 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                 className={`w-full justify-start ${activeTool === null ? 'bg-black text-white' : 'bg-white'}`}
               >
                 <Move className="h-4 w-4 mr-2" />
-                Navigate PDF
+                Navigate
               </Button>
             </div>
 
             <div>
-              <h4 className="font-medium mb-2">Drawing</h4>
+              <h4 className="font-medium mb-2">Draw</h4>
               <div className="space-y-2">
-                <Button
-                  onClick={() => setActiveTool('pen')}
-                  className={`w-full justify-start ${activeTool === 'pen' ? 'bg-black text-white' : 'bg-white'}`}
-                >
+                <Button onClick={() => setActiveTool('pen')} className={`w-full justify-start ${activeTool === 'pen' ? 'bg-black text-white' : 'bg-white'}`}>
                   <Pen className="h-4 w-4 mr-2" />
                   Pen
                 </Button>
-                <Button
-                  onClick={() => setActiveTool('highlight')}
-                  className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-black text-white' : 'bg-white'}`}
-                >
+                <Button onClick={() => setActiveTool('highlight')} className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-black text-white' : 'bg-white'}`}>
                   <Highlighter className="h-4 w-4 mr-2" />
                   Highlight
                 </Button>
@@ -490,24 +388,9 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             </div>
 
             <div>
-              <h4 className="font-medium mb-2">Eraser</h4>
-              <Button
-                onClick={() => setActiveTool('eraser')}
-                className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-black text-white' : 'bg-white'}`}
-              >
-                <Eraser className="h-4 w-4 mr-2" />
-                Eraser
-              </Button>
-            </div>
-
-            <div>
-              <h4 className="font-medium mb-2">Text</h4>
-              <Button
-                onClick={() => setActiveTool('text')}
-                className={`w-full justify-start ${activeTool === 'text' ? 'bg-black text-white' : 'bg-white'}`}
-              >
+              <Button onClick={() => setActiveTool('text')} className={`w-full justify-start ${activeTool === 'text' ? 'bg-black text-white' : 'bg-white'}`}>
                 <Type className="h-4 w-4 mr-2" />
-                Add Text
+                Text
               </Button>
             </div>
 
@@ -521,91 +404,74 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                   <ZoomIn className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="text-center text-sm text-gray-600 mt-1">
-                {Math.round(scale * 100)}%
-              </div>
+              <div className="text-center text-sm mt-1">{Math.round(scale * 100)}%</div>
             </div>
 
-            <div>
-              <h4 className="font-medium mb-2">Actions</h4>
-              <div className="space-y-2">
-                <Button onClick={clearCanvas} className="w-full justify-start" variant="outline">
-                  <RotateCcw className="h-4 w-4 mr-2" />
-                  Clear All
-                </Button>
-                <Button onClick={handleDownload} className="w-full justify-start" variant="outline">
-                  <Download className="h-4 w-4 mr-2" />
-                  Download
-                </Button>
-              </div>
+            <div className="space-y-2">
+              <Button onClick={clearCanvas} className="w-full justify-start" variant="outline">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Clear
+              </Button>
+              <Button onClick={handleDownload} className="w-full justify-start" variant="outline">
+                <Download className="h-4 w-4 mr-2" />
+                Download
+              </Button>
             </div>
           </div>
 
-          {/* PDF Viewer */}
+          {/* PDF */}
           <div ref={containerRef} className="flex-1 overflow-auto bg-gray-300 p-4">
             {pdfError ? (
               <div className="flex items-center justify-center h-full">
-                <div className="bg-white p-6 rounded-lg shadow text-center">
-                  <div className="text-red-600 text-lg font-medium mb-2">Error Loading PDF</div>
-                  <div className="text-gray-600">{pdfError}</div>
+                <div className="bg-white p-6 rounded text-center">
+                  <div className="text-red-600 font-medium">Error Loading PDF</div>
                 </div>
               </div>
             ) : !pdfLoaded ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center">
                   <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
-                  <div className="text-gray-600">Loading PDF...</div>
+                  <div>Loading...</div>
                 </div>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-4">
-                {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-                  <div key={pageNum} className="relative bg-white shadow-lg">
-                    <canvas
-                      ref={(el) => {
-                        if (el) pageCanvasRefs.current.set(pageNum, el);
-                      }}
-                      className="block"
-                    />
-                    <canvas
-                      ref={(el) => {
-                        if (el) annotationCanvasRefs.current.set(pageNum, el);
-                      }}
-                      className="absolute top-0 left-0"
-                      style={{
-                        pointerEvents: activeTool ? 'auto' : 'none',
-                        touchAction: activeTool ? 'none' : 'auto',
-                        cursor: activeTool === 'text' ? 'text' : 
-                                activeTool === 'eraser' ? 'grab' : 
-                                activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 
-                                'default',
-                      }}
-                      onMouseDown={(e) => startDrawing(e, pageNum - 1)}
-                      onMouseMove={(e) => draw(e, pageNum - 1)}
-                      onMouseUp={stopDrawing}
-                      onMouseLeave={stopDrawing}
-                      onTouchStart={(e) => startDrawing(e, pageNum - 1)}
-                      onTouchMove={(e) => draw(e, pageNum - 1)}
-                      onTouchEnd={stopDrawing}
-                    />
-                    <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
-                      Page {pageNum} of {numPages}
+                {Array.from({ length: numPages }).map((_, i) => {
+                  const pageNum = i + 1;
+                  return (
+                    <div key={pageNum} className="relative bg-white shadow-lg">
+                      <canvas
+                        ref={(el) => {
+                          if (el) pageCanvasRefs.current.set(pageNum, el);
+                        }}
+                        className="block"
+                      />
+                      <canvas
+                        ref={(el) => {
+                          if (el) fabricCanvasRefs.current.get(pageNum)?.setElement?.(el);
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          cursor: activeTool === 'text' ? 'text' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default'
+                        }}
+                        onMouseDown={(e) => activeTool === 'text' && addText(e, pageNum)}
+                      />
+                      <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1">
+                        Page {pageNum}/{numPages}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
         </div>
 
-        {/* Instructions */}
+        {/* Footer */}
         <div className="p-4 border-t bg-gray-50 text-sm shrink-0">
-          <div className="flex items-center justify-between">
-            <div>
-              <strong>Instructions:</strong> Select "Navigate PDF" to scroll and read, then choose a tool to annotate. Click "Save Work" when finished.
-              {hasAnnotations && <span className="ml-2 text-green-600 font-medium">({strokesRef.current.length} strokes, {textsRef.current.length} text annotations)</span>}
-            </div>
-          </div>
+          <strong>Instructions:</strong> Select "Navigate" to scroll, then choose a tool to annotate.
         </div>
       </div>
     </div>
