@@ -30,6 +30,7 @@ export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', '
 export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed', 'late', 'needs_revision']);
 export const submissionStatusEnum = pgEnum('submission_status', ['draft', 'submitted', 'late', 'graded', 'parent_verified', 'needs_revision']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
+export const questionTypeEnum = pgEnum('question_type', ['short_text', 'long_text', 'multiple_choice', 'fill_blank', 'text_image']);
 
 // User storage table with custom authentication
 export const users = pgTable("users", {
@@ -573,6 +574,116 @@ export type InsertStudentAssignment = z.infer<typeof insertStudentClassAssignmen
 
 export type InsertCompanyAdmin = z.infer<typeof insertCompanyAdminSchema>;
 export type CompanyAdmin = typeof companyAdmins.$inferSelect;
+
+// ==========================================
+// WORKSHEET SYSTEM TABLES
+// ==========================================
+
+// Worksheets table - main worksheet document
+export const worksheets = pgTable("worksheets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  subject: varchar("subject"),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  isPublished: boolean("is_published").notNull().default(false),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Worksheet pages - each page in a worksheet
+export const worksheetPages = pgTable("worksheet_pages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  worksheetId: varchar("worksheet_id").notNull().references(() => worksheets.id, { onDelete: 'cascade' }),
+  pageNumber: integer("page_number").notNull(),
+  title: varchar("title"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Worksheet questions - questions on each page
+export const worksheetQuestions = pgTable("worksheet_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  pageId: varchar("page_id").notNull().references(() => worksheetPages.id, { onDelete: 'cascade' }),
+  questionType: questionTypeEnum("question_type").notNull(),
+  questionText: text("question_text").notNull(),
+  questionNumber: integer("question_number").notNull(),
+  options: jsonb("options"), // For multiple choice: [{id, text, isCorrect}]
+  imageUrl: varchar("image_url"), // For text+image questions
+  correctAnswer: text("correct_answer"), // For fill-blank
+  points: integer("points").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Worksheet assignments - assign worksheets to students/classes
+export const worksheetAssignments = pgTable("worksheet_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  worksheetId: varchar("worksheet_id").notNull().references(() => worksheets.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").references(() => students.id, { onDelete: 'cascade' }),
+  classId: varchar("class_id").references(() => classes.id, { onDelete: 'cascade' }),
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Student worksheet answers - student responses to questions
+export const worksheetAnswers = pgTable("worksheet_answers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  questionId: varchar("question_id").notNull().references(() => worksheetQuestions.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").notNull().references(() => students.id),
+  worksheetId: varchar("worksheet_id").notNull().references(() => worksheets.id),
+  textAnswer: text("text_answer"), // For typed answers
+  handwritingData: text("handwriting_data"), // For pen/stylus input (SVG or canvas data)
+  selectedOption: varchar("selected_option"), // For multiple choice
+  isSubmitted: boolean("is_submitted").notNull().default(false),
+  submittedAt: timestamp("submitted_at"),
+  grade: integer("grade"),
+  feedback: text("feedback"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Worksheet type exports
+export type Worksheet = typeof worksheets.$inferSelect;
+export type WorksheetPage = typeof worksheetPages.$inferSelect;
+export type WorksheetQuestion = typeof worksheetQuestions.$inferSelect;
+export type WorksheetAssignment = typeof worksheetAssignments.$inferSelect;
+export type WorksheetAnswer = typeof worksheetAnswers.$inferSelect;
+
+// Worksheet insert schemas
+export const insertWorksheetSchema = createInsertSchema(worksheets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertWorksheetPageSchema = createInsertSchema(worksheetPages).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorksheetQuestionSchema = createInsertSchema(worksheetQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorksheetAssignmentSchema = createInsertSchema(worksheetAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertWorksheetAnswerSchema = createInsertSchema(worksheetAnswers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertWorksheet = z.infer<typeof insertWorksheetSchema>;
+export type InsertWorksheetPage = z.infer<typeof insertWorksheetPageSchema>;
+export type InsertWorksheetQuestion = z.infer<typeof insertWorksheetQuestionSchema>;
+export type InsertWorksheetAssignment = z.infer<typeof insertWorksheetAssignmentSchema>;
+export type InsertWorksheetAnswer = z.infer<typeof insertWorksheetAnswerSchema>;
 
 // Authentication schemas
 export const registerSchema = z.object({

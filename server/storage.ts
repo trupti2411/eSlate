@@ -14,6 +14,11 @@ import {
   studentClassAssignments,
   assignments,
   submissions,
+  worksheets,
+  worksheetPages,
+  worksheetQuestions,
+  worksheetAssignments,
+  worksheetAnswers,
   type User,
   type Student,
   type InsertStudent,
@@ -42,6 +47,16 @@ import {
   type Submission,
   type InsertSubmission,
   type InsertUser,
+  type Worksheet,
+  type InsertWorksheet,
+  type WorksheetPage,
+  type InsertWorksheetPage,
+  type WorksheetQuestion,
+  type InsertWorksheetQuestion,
+  type WorksheetAssignment,
+  type InsertWorksheetAssignment,
+  type WorksheetAnswer,
+  type InsertWorksheetAnswer,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains, inArray } from "drizzle-orm";
@@ -1224,6 +1239,152 @@ export class DatabaseStorage implements IStorage {
       console.error("Error in getCompanySubmissions:", error);
       return [];
     }
+  }
+
+  // ==========================================
+  // WORKSHEET OPERATIONS
+  // ==========================================
+
+  async createWorksheet(data: InsertWorksheet): Promise<Worksheet> {
+    const [worksheet] = await db.insert(worksheets).values(data).returning();
+    return worksheet;
+  }
+
+  async getWorksheet(id: string): Promise<Worksheet | undefined> {
+    const [worksheet] = await db.select().from(worksheets).where(eq(worksheets.id, id));
+    return worksheet;
+  }
+
+  async getWorksheetsByCompany(companyId: string): Promise<Worksheet[]> {
+    return db.select().from(worksheets).where(eq(worksheets.companyId, companyId)).orderBy(desc(worksheets.createdAt));
+  }
+
+  async updateWorksheet(id: string, data: Partial<InsertWorksheet>): Promise<Worksheet> {
+    const [worksheet] = await db.update(worksheets).set({ ...data, updatedAt: new Date() }).where(eq(worksheets.id, id)).returning();
+    return worksheet;
+  }
+
+  async deleteWorksheet(id: string): Promise<void> {
+    await db.delete(worksheets).where(eq(worksheets.id, id));
+  }
+
+  async createWorksheetPage(data: InsertWorksheetPage): Promise<WorksheetPage> {
+    const [page] = await db.insert(worksheetPages).values(data).returning();
+    return page;
+  }
+
+  async getWorksheetPages(worksheetId: string): Promise<WorksheetPage[]> {
+    return db.select().from(worksheetPages).where(eq(worksheetPages.worksheetId, worksheetId)).orderBy(worksheetPages.pageNumber);
+  }
+
+  async updateWorksheetPage(id: string, data: Partial<InsertWorksheetPage>): Promise<WorksheetPage> {
+    const [page] = await db.update(worksheetPages).set(data).where(eq(worksheetPages.id, id)).returning();
+    return page;
+  }
+
+  async deleteWorksheetPage(id: string): Promise<void> {
+    await db.delete(worksheetPages).where(eq(worksheetPages.id, id));
+  }
+
+  async createWorksheetQuestion(data: InsertWorksheetQuestion): Promise<WorksheetQuestion> {
+    const [question] = await db.insert(worksheetQuestions).values(data).returning();
+    return question;
+  }
+
+  async getWorksheetQuestions(pageId: string): Promise<WorksheetQuestion[]> {
+    return db.select().from(worksheetQuestions).where(eq(worksheetQuestions.pageId, pageId)).orderBy(worksheetQuestions.questionNumber);
+  }
+
+  async updateWorksheetQuestion(id: string, data: Partial<InsertWorksheetQuestion>): Promise<WorksheetQuestion> {
+    const [question] = await db.update(worksheetQuestions).set(data).where(eq(worksheetQuestions.id, id)).returning();
+    return question;
+  }
+
+  async deleteWorksheetQuestion(id: string): Promise<void> {
+    await db.delete(worksheetQuestions).where(eq(worksheetQuestions.id, id));
+  }
+
+  async createWorksheetAssignment(data: InsertWorksheetAssignment): Promise<WorksheetAssignment> {
+    const [assignment] = await db.insert(worksheetAssignments).values(data).returning();
+    return assignment;
+  }
+
+  async getWorksheetAssignments(worksheetId: string): Promise<WorksheetAssignment[]> {
+    return db.select().from(worksheetAssignments).where(eq(worksheetAssignments.worksheetId, worksheetId));
+  }
+
+  async getStudentWorksheetAssignments(studentId: string): Promise<any[]> {
+    const results = await db.select({
+      assignment: worksheetAssignments,
+      worksheet: worksheets,
+    })
+    .from(worksheetAssignments)
+    .innerJoin(worksheets, eq(worksheetAssignments.worksheetId, worksheets.id))
+    .where(eq(worksheetAssignments.studentId, studentId));
+    
+    return results;
+  }
+
+  async deleteWorksheetAssignment(id: string): Promise<void> {
+    await db.delete(worksheetAssignments).where(eq(worksheetAssignments.id, id));
+  }
+
+  async createWorksheetAnswer(data: InsertWorksheetAnswer): Promise<WorksheetAnswer> {
+    const [answer] = await db.insert(worksheetAnswers).values(data).returning();
+    return answer;
+  }
+
+  async getWorksheetAnswers(worksheetId: string, studentId: string): Promise<WorksheetAnswer[]> {
+    return db.select().from(worksheetAnswers)
+      .where(and(eq(worksheetAnswers.worksheetId, worksheetId), eq(worksheetAnswers.studentId, studentId)));
+  }
+
+  async updateWorksheetAnswer(id: string, data: Partial<InsertWorksheetAnswer>): Promise<WorksheetAnswer> {
+    const [answer] = await db.update(worksheetAnswers).set({ ...data, updatedAt: new Date() }).where(eq(worksheetAnswers.id, id)).returning();
+    return answer;
+  }
+
+  async upsertWorksheetAnswer(questionId: string, studentId: string, worksheetId: string, data: Partial<InsertWorksheetAnswer>): Promise<WorksheetAnswer> {
+    const [existing] = await db.select().from(worksheetAnswers)
+      .where(and(
+        eq(worksheetAnswers.questionId, questionId),
+        eq(worksheetAnswers.studentId, studentId)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(worksheetAnswers)
+        .set({ ...data, updatedAt: new Date() })
+        .where(eq(worksheetAnswers.id, existing.id))
+        .returning();
+      return updated;
+    } else {
+      const [created] = await db.insert(worksheetAnswers)
+        .values({ questionId, studentId, worksheetId, ...data } as InsertWorksheetAnswer)
+        .returning();
+      return created;
+    }
+  }
+
+  async submitWorksheetAnswers(worksheetId: string, studentId: string): Promise<void> {
+    await db.update(worksheetAnswers)
+      .set({ isSubmitted: true, submittedAt: new Date() })
+      .where(and(
+        eq(worksheetAnswers.worksheetId, worksheetId),
+        eq(worksheetAnswers.studentId, studentId)
+      ));
+  }
+
+  async getFullWorksheet(worksheetId: string): Promise<any> {
+    const worksheet = await this.getWorksheet(worksheetId);
+    if (!worksheet) return null;
+    
+    const pages = await this.getWorksheetPages(worksheetId);
+    const pagesWithQuestions = await Promise.all(pages.map(async (page) => {
+      const questions = await this.getWorksheetQuestions(page.id);
+      return { ...page, questions };
+    }));
+    
+    return { ...worksheet, pages: pagesWithQuestions };
   }
 }
 
