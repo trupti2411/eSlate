@@ -691,17 +691,17 @@ export function StudentPortal() {
     };
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-black">Assignments</h2>
             <p className="text-gray-500 mt-1">View and complete your assignments</p>
           </div>
           <div className="flex gap-2">
-            <Badge variant="outline" className="text-sm px-3 py-1">
+            <Badge variant="outline" className="text-xs px-2 py-1">
               {pendingCount} Pending
             </Badge>
-            <Badge className="bg-green-100 text-green-800 text-sm px-3 py-1">
+            <Badge className="bg-green-100 text-green-800 text-xs px-2 py-1">
               {completedCount} Completed
             </Badge>
           </div>
@@ -713,57 +713,100 @@ export function StudentPortal() {
           </div>
         ) : typedAssignments.length === 0 ? (
           <Card className="border-2 border-dashed border-gray-300">
-            <CardContent className="text-center py-12">
-              <FileText className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No Assignments Found</h3>
-              <p className="text-gray-400">You don't have any assignments yet.</p>
+            <CardContent className="text-center py-8">
+              <FileText className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+              <h3 className="text-sm font-semibold text-gray-600 mb-1">No Assignments</h3>
+              <p className="text-xs text-gray-400">You don't have any assignments yet.</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-3">
             {Object.entries(groupedAssignments).map(([termId, termGroup]: [string, any]) => (
-              <div key={termId} className="space-y-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-black rounded-lg flex items-center justify-center">
-                    <Calendar className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-black">{getTermName(termId)}</h3>
-                    <p className="text-sm text-gray-500">
-                      {Object.values(termGroup as Record<string, any[]>).flat().length} assignments
-                    </p>
+              <div key={termId} className="border border-gray-200 rounded-lg overflow-hidden">
+                {/* Term Header */}
+                <div className="bg-gray-50 px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-gray-600" />
+                    <h3 className="text-sm font-bold text-black">{getTermName(termId)}</h3>
+                    <Badge variant="secondary" className="text-xs px-1.5 py-0">
+                      {Object.values(termGroup as Record<string, any[]>).flat().length}
+                    </Badge>
                   </div>
                 </div>
 
-                {Object.entries(termGroup).map(([subject, subjectAssignments]: [string, any]) => (
-                  <div key={subject} className="ml-4 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className="font-medium">{subject}</Badge>
-                      <span className="text-xs text-gray-400">
-                        {subjectAssignments.length} assignment{subjectAssignments.length !== 1 ? 's' : ''}
-                      </span>
+                {/* Subject Groups */}
+                <div className="divide-y divide-gray-200">
+                  {Object.entries(termGroup).map(([subject, subjectAssignments]: [string, any]) => (
+                    <div key={subject}>
+                      {/* Subject Header */}
+                      <div className="px-3 py-1.5 bg-white flex items-center gap-2 border-b border-gray-100">
+                        <Badge variant="outline" className="text-xs px-1.5 py-0 font-medium">
+                          {subject}
+                        </Badge>
+                        <span className="text-xs text-gray-400">
+                          {subjectAssignments.length}
+                        </span>
+                      </div>
+
+                      {/* Assignments */}
+                      <div className="divide-y divide-gray-100">
+                        {subjectAssignments.map((assignment: Assignment) => {
+                          const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
+                          const status = submission?.status || (isPast(new Date(assignment.submissionDate)) ? 'overdue' : 'pending');
+                          const daysLeft = differenceInDays(new Date(assignment.submissionDate), new Date());
+
+                          return (
+                            <div 
+                              key={assignment.id} 
+                              className="px-3 py-2 hover:bg-gray-50 transition-colors"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h4 className="text-sm font-medium text-black truncate">
+                                      {assignment.title}
+                                    </h4>
+                                    <Badge 
+                                      className={`text-xs px-1.5 py-0 ${getStatusColor(status)} whitespace-nowrap`}
+                                    >
+                                      {status}
+                                    </Badge>
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                                    <span>
+                                      Due: {format(new Date(assignment.submissionDate), 'MMM dd')}
+                                    </span>
+                                    {daysLeft >= 0 && daysLeft <= 3 && (
+                                      <span className="text-yellow-600 font-medium">
+                                        ({daysLeft} days)
+                                      </span>
+                                    )}
+                                    {daysLeft < 0 && (
+                                      <span className="text-red-600 font-medium">
+                                        ({Math.abs(daysLeft)} days overdue)
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2 text-xs whitespace-nowrap flex-shrink-0"
+                                  onClick={() => {
+                                    // Would open the assignment detail/completion view
+                                  }}
+                                >
+                                  {submission ? 'View' : 'Start'}
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    
-                    <div className="space-y-3 ml-2">
-                      {subjectAssignments.map((assignment: Assignment) => {
-                        const submission = typedSubmissions.find((s: Submission) => s.assignmentId === assignment.id);
-                        
-                        return (
-                          <AssignmentCompletionArea
-                            key={assignment.id}
-                            assignment={assignment}
-                            submission={submission}
-                            onSubmissionUpdate={() => {
-                              queryClient.invalidateQueries({
-                                queryKey: [`/api/students/student-${user?.id}/submissions`]
-                              });
-                            }}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             ))}
           </div>
