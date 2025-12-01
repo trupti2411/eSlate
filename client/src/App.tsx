@@ -52,7 +52,20 @@ function Router() {
       <Route path="/register" component={SimpleRegistration} />
 
       {!isAuthenticated ? (
-        <Route path="/" component={AuthPage} />
+        <>
+          <Route path="/" component={AuthPage} />
+          {/* Redirect any protected route to auth page when not logged in */}
+          <Route path="/company" component={AuthPage} />
+          <Route path="/company/:rest*" component={AuthPage} />
+          <Route path="/admin" component={AuthPage} />
+          <Route path="/admin/:rest*" component={AuthPage} />
+          <Route path="/student" component={AuthPage} />
+          <Route path="/student/:rest*" component={AuthPage} />
+          <Route path="/tutor" component={AuthPage} />
+          <Route path="/tutor/:rest*" component={AuthPage} />
+          <Route path="/parent" component={AuthPage} />
+          <Route path="/parent/:rest*" component={AuthPage} />
+        </>
       ) : (
         <>
           <Route path="/">

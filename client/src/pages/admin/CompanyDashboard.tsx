@@ -99,7 +99,7 @@ export default function CompanyDashboard() {
     }
   }, [isAuthenticated, isLoading]);
 
-  const { data: companyAdminData } = useQuery({
+  const { data: companyAdminData, isLoading: companyAdminLoading } = useQuery<CompanyAdmin>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
     enabled: !!user && user.role === 'company_admin',
   });
@@ -218,7 +218,7 @@ export default function CompanyDashboard() {
     setIsStudentProfileOpen(true);
   };
 
-  if (isLoading) {
+  if (isLoading || companyAdminLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
