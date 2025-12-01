@@ -97,7 +97,7 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
 
   const updateWorksheetMutation = useMutation({
     mutationFn: (data: Partial<Worksheet>) => 
-      apiRequest('PATCH', `/api/worksheets/${worksheetId}`, data),
+      apiRequest(`/api/worksheets/${worksheetId}`, 'PATCH', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/worksheets', worksheetId] });
       toast({ title: 'Worksheet saved' });
@@ -105,7 +105,7 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
   });
 
   const addPageMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `/api/worksheets/${worksheetId}/pages`, {}),
+    mutationFn: () => apiRequest(`/api/worksheets/${worksheetId}/pages`, 'POST', {}),
     onSuccess: () => {
       refetch();
       toast({ title: 'Page added' });
@@ -113,7 +113,7 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
   });
 
   const deletePageMutation = useMutation({
-    mutationFn: (pageId: string) => apiRequest('DELETE', `/api/worksheets/pages/${pageId}`),
+    mutationFn: (pageId: string) => apiRequest(`/api/worksheets/pages/${pageId}`, 'DELETE'),
     onSuccess: () => {
       refetch();
       if (currentPageIndex > 0) setCurrentPageIndex(currentPageIndex - 1);
@@ -123,7 +123,7 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
 
   const addQuestionMutation = useMutation({
     mutationFn: (data: { pageId: string; question: Partial<Question> }) =>
-      apiRequest('POST', `/api/worksheets/pages/${data.pageId}/questions`, data.question),
+      apiRequest(`/api/worksheets/pages/${data.pageId}/questions`, 'POST', data.question),
     onSuccess: () => {
       refetch();
       setShowAddQuestion(false);
@@ -139,7 +139,7 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
 
   const updateQuestionMutation = useMutation({
     mutationFn: (data: { questionId: string; updates: Partial<Question> }) =>
-      apiRequest('PATCH', `/api/worksheets/questions/${data.questionId}`, data.updates),
+      apiRequest(`/api/worksheets/questions/${data.questionId}`, 'PATCH', data.updates),
     onSuccess: () => {
       refetch();
       setEditingQuestion(null);
@@ -148,7 +148,7 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
   });
 
   const deleteQuestionMutation = useMutation({
-    mutationFn: (questionId: string) => apiRequest('DELETE', `/api/worksheets/questions/${questionId}`),
+    mutationFn: (questionId: string) => apiRequest(`/api/worksheets/questions/${questionId}`, 'DELETE'),
     onSuccess: () => {
       refetch();
       toast({ title: 'Question deleted' });

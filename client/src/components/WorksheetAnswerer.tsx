@@ -142,7 +142,7 @@ export function WorksheetAnswerer({ worksheetId, studentId, onClose }: Worksheet
 
   const saveAnswerMutation = useMutation({
     mutationFn: (data: { questionId: string; answer: Partial<Answer> }) =>
-      apiRequest('POST', `/api/worksheets/${worksheetId}/answers`, {
+      apiRequest(`/api/worksheets/${worksheetId}/answers`, 'POST', {
         questionId: data.questionId,
         studentId,
         ...data.answer,
@@ -153,7 +153,7 @@ export function WorksheetAnswerer({ worksheetId, studentId, onClose }: Worksheet
   });
 
   const submitWorksheetMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `/api/worksheets/${worksheetId}/submit/${studentId}`),
+    mutationFn: () => apiRequest(`/api/worksheets/${worksheetId}/submit/${studentId}`, 'POST'),
     onSuccess: () => {
       toast({ title: 'Worksheet submitted successfully!' });
       queryClient.invalidateQueries({ queryKey: ['/api/worksheets', worksheetId, 'answers', studentId] });

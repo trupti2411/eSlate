@@ -95,7 +95,7 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
 
   const createWorksheetMutation = useMutation({
     mutationFn: (data: typeof newWorksheet) =>
-      apiRequest('POST', `/api/companies/${companyId}/worksheets`, data),
+      apiRequest(`/api/companies/${companyId}/worksheets`, 'POST', data),
     onSuccess: (worksheet: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'worksheets'] });
       setShowCreateDialog(false);
@@ -109,7 +109,7 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
   });
 
   const deleteWorksheetMutation = useMutation({
-    mutationFn: (worksheetId: string) => apiRequest('DELETE', `/api/worksheets/${worksheetId}`),
+    mutationFn: (worksheetId: string) => apiRequest(`/api/worksheets/${worksheetId}`, 'DELETE'),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'worksheets'] });
       toast({ title: 'Worksheet deleted' });
@@ -118,7 +118,7 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
 
   const assignWorksheetMutation = useMutation({
     mutationFn: (data: { worksheetId: string; studentIds: string[]; classIds: string[]; dueDate?: string }) =>
-      apiRequest('POST', `/api/worksheets/${data.worksheetId}/assign`, data),
+      apiRequest(`/api/worksheets/${data.worksheetId}/assign`, 'POST', data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/worksheets'] });
       setShowAssignDialog(false);
