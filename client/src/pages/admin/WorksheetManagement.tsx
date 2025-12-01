@@ -82,14 +82,14 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
   });
 
   const { data: students = [] } = useQuery<Student[]>({
-    queryKey: ['/api/admin/company-admin', companyId, 'students'],
-    queryFn: () => fetch(`/api/admin/company-admin/${companyId}/students`, { credentials: 'include' }).then(r => r.json()),
+    queryKey: ['/api/companies', companyId, 'students'],
+    queryFn: () => fetch(`/api/companies/${companyId}/students`, { credentials: 'include' }).then(r => r.json()),
     enabled: !!companyId,
   });
 
   const { data: classes = [] } = useQuery<Class[]>({
-    queryKey: ['/api/admin/company-admin', companyId, 'classes'],
-    queryFn: () => fetch(`/api/admin/company-admin/${companyId}/classes`, { credentials: 'include' }).then(r => r.json()),
+    queryKey: ['/api/companies', companyId, 'classes'],
+    queryFn: () => fetch(`/api/companies/${companyId}/classes`, { credentials: 'include' }).then(r => r.json()),
     enabled: !!companyId,
   });
 
