@@ -77,10 +77,12 @@ export default function AdminDashboard() {
               Companies
             </Button>
           </Link>
-          <Button className="border-2 border-black hover:bg-gray-100 py-3 px-6 font-semibold">
-            <Settings className="h-5 w-5 mr-2" />
-            Settings
-          </Button>
+          <Link href="/admin/settings">
+            <Button className="border-2 border-black hover:bg-gray-100 py-3 px-6 font-semibold">
+              <Settings className="h-5 w-5 mr-2" />
+              Settings
+            </Button>
+          </Link>
         </div>
 
         {/* Stats Grid */}

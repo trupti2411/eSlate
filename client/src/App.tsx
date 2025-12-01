@@ -20,6 +20,7 @@ import CompanyManagement from "@/pages/admin/CompanyManagement";
 import CompanyDashboard from "@/pages/admin/CompanyDashboard";
 import CompanyStudents from "@/pages/admin/CompanyStudents";
 import CompanyAcademicManagement from "@/pages/admin/CompanyAcademicManagement";
+import AdminSettings from "@/pages/admin/Settings";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
 import { StudentAssignments } from "@/pages/assignments/StudentAssignments";
 import { StudentPortal } from "@/pages/student/StudentPortal";
@@ -68,6 +69,7 @@ function Router() {
           <Route path="/admin/users" component={Users} />
           <Route path="/admin/companies" component={Companies} />
           <Route path="/admin/companies/:id" component={CompanyManagement} />
+          <Route path="/admin/settings" component={AdminSettings} />
           <Route path="/admin/test" component={TestUserCreation} />
           <Route path="/company" component={CompanyDashboard} />
           <Route path="/company/tutors" component={CompanyTutorDashboard} />
