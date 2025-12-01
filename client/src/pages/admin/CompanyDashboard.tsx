@@ -165,11 +165,19 @@ export default function CompanyDashboard() {
 
   const createDocumentMutation = useMutation({
     mutationFn: async (data: any) => {
-      return await apiRequest("/api/assignments", "POST", {
-        ...data,
+      const payload: any = {
+        title: data.title,
+        description: data.description,
+        instructions: data.instructions,
+        subject: data.subject,
         companyId: companyAdmin?.companyId,
-        submissionDate: new Date(data.dueDate),
-      });
+        submissionDate: new Date(data.dueDate).toISOString(),
+      };
+      // Only include classId if it has a value
+      if (data.classId) {
+        payload.classId = data.classId;
+      }
+      return await apiRequest("/api/assignments", "POST", payload);
     },
     onSuccess: () => {
       toast({ title: "Success", description: "Document assignment created successfully" });
@@ -311,25 +319,25 @@ export default function CompanyDashboard() {
               <DialogHeader>
                 <DialogTitle>Create Document Assignment</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreateDocument} className="space-y-4">
+              <form onSubmit={handleCreateDocument} className="space-y-3">
                 <div>
-                  <Label htmlFor="docTitle">Document Title</Label>
+                  <Label htmlFor="docTitle" className="text-xs">Worksheet Title *</Label>
                   <Input id="docTitle" value={documentFormData.title} onChange={(e) => setDocumentFormData({ ...documentFormData, title: e.target.value })} placeholder="e.g., Algebra Worksheet" required />
                 </div>
                 <div>
-                  <Label htmlFor="subject">Subject</Label>
+                  <Label htmlFor="subject" className="text-xs">Subject *</Label>
                   <Input id="subject" value={documentFormData.subject} onChange={(e) => setDocumentFormData({ ...documentFormData, subject: e.target.value })} placeholder="e.g., Mathematics" required />
                 </div>
                 <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Input id="description" value={documentFormData.description} onChange={(e) => setDocumentFormData({ ...documentFormData, description: e.target.value })} placeholder="Brief description" />
+                  <Label htmlFor="description" className="text-xs">Description</Label>
+                  <Input id="description" value={documentFormData.description} onChange={(e) => setDocumentFormData({ ...documentFormData, description: e.target.value })} placeholder="What this worksheet covers" />
                 </div>
                 <div>
-                  <Label htmlFor="dueDate">Due Date</Label>
+                  <Label htmlFor="dueDate" className="text-xs">Due Date *</Label>
                   <Input id="dueDate" type="datetime-local" value={documentFormData.dueDate} onChange={(e) => setDocumentFormData({ ...documentFormData, dueDate: e.target.value })} required />
                 </div>
-                <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800" disabled={createDocumentMutation.isPending}>
-                  {createDocumentMutation.isPending ? "Creating..." : "Create Assignment"}
+                <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800 text-sm" disabled={createDocumentMutation.isPending}>
+                  {createDocumentMutation.isPending ? "Creating..." : "Create Worksheet"}
                 </Button>
               </form>
             </DialogContent>
