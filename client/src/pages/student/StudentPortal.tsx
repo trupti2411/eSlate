@@ -285,13 +285,6 @@ export function StudentPortal() {
               {activeTerm ? `Current Term: ${activeTerm.name}` : 'No active term'}
             </p>
           </div>
-          <div className="text-right">
-            <div className="text-4xl font-bold">{progressPercentage}%</div>
-            <p className="text-gray-300 text-sm">Overall Progress</p>
-          </div>
-        </div>
-        <div className="mt-4">
-          <Progress value={progressPercentage} className="h-2 bg-gray-600" />
         </div>
       </div>
 
@@ -508,16 +501,8 @@ export function StudentPortal() {
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
                       <span>{format(startDate, 'MMM dd')} - {format(endDate, 'MMM dd, yyyy')}</span>
-                      <span className="text-gray-300">•</span>
-                      <span>{termProgress}% complete</span>
                     </div>
                   </div>
-                  {isCurrentTerm && (
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-lg font-bold text-black">{termProgress}%</div>
-                      <Progress value={termProgress} className="h-1 w-16 mt-1" />
-                    </div>
-                  )}
                 </div>
               </div>
             );
@@ -586,9 +571,9 @@ export function StudentPortal() {
                         <span className="text-gray-300">•</span>
                         <span>{cls.startTime} - {cls.endTime}</span>
                       </div>
-                      {cls.description && (
-                        <p className="text-xs text-gray-400 mt-1 truncate">{cls.description}</p>
-                      )}
+                      <div className="mt-1 text-xs text-gray-600">
+                        <span className="font-medium">Tutor:</span> {(cls as any).tutorName || (cls as any).instructor || 'Not assigned'}
+                      </div>
                     </div>
                   </div>
                 </div>
