@@ -122,6 +122,7 @@ export function StudentPortal() {
   const [selectedTab, setSelectedTab] = useState("dashboard");
   const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
   const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
+  const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
 
   const studentId = user?.id ? `student-${user.id}` : '';
 
@@ -458,14 +459,14 @@ export function StudentPortal() {
   );
 
   const renderTerms = () => (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-black">Academic Terms</h2>
           <p className="text-gray-500 mt-1">Your enrolled academic terms and schedules</p>
         </div>
-        <Badge variant="outline" className="text-sm px-3 py-1">
-          {typedStudentTerms.length} Terms
+        <Badge variant="outline" className="text-xs px-2 py-1">
+          {typedStudentTerms.length}
         </Badge>
       </div>
 
@@ -475,15 +476,15 @@ export function StudentPortal() {
         </div>
       ) : typedStudentTerms.length === 0 ? (
         <Card className="border-2 border-dashed border-gray-300">
-          <CardContent className="text-center py-12">
-            <Calendar className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Terms Found</h3>
-            <p className="text-gray-400">You haven't been enrolled in any academic terms yet.</p>
+          <CardContent className="text-center py-8">
+            <Calendar className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+            <h3 className="text-sm font-semibold text-gray-600 mb-1">No Terms</h3>
+            <p className="text-xs text-gray-400">You haven't been enrolled in any academic terms yet.</p>
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
-          {typedStudentTerms.map((term: AcademicTerm, index: number) => {
+        <div className="space-y-2 border border-gray-200 rounded-lg overflow-hidden">
+          {typedStudentTerms.map((term: AcademicTerm) => {
             const isCurrentTerm = term.isActive;
             const startDate = new Date(term.startDate);
             const endDate = new Date(term.endDate);
@@ -493,64 +494,32 @@ export function StudentPortal() {
             const termProgress = Math.min(100, Math.max(0, Math.round((daysElapsed / totalDays) * 100)));
             
             return (
-              <Card 
-                key={term.id} 
-                className={`border-2 transition-all hover:shadow-lg ${
-                  isCurrentTerm ? 'border-black bg-gray-50' : 'border-gray-200'
-                }`}
+              <div 
+                key={term.id}
+                className="px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
               >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                        isCurrentTerm ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'
-                      }`}>
-                        <CalendarDays className="h-6 w-6" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-xl font-bold text-black">{term.name}</h3>
-                          {isCurrentTerm && (
-                            <Badge className="bg-green-100 text-green-800">Active</Badge>
-                          )}
-                        </div>
-                        <p className="text-gray-500 text-sm mt-1">
-                          Academic Year {term.academicYearId ? `ID: ${term.academicYearId.substring(0, 8)}...` : 'Not assigned'}
-                        </p>
-                      </div>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h4 className="text-sm font-bold text-black">{term.name}</h4>
+                      {isCurrentTerm && (
+                        <Badge className="bg-green-100 text-green-800 text-xs px-1.5 py-0">Active</Badge>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-black">{termProgress}%</div>
-                      <p className="text-xs text-gray-500">Progress</p>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                      <span>{format(startDate, 'MMM dd')} - {format(endDate, 'MMM dd, yyyy')}</span>
+                      <span className="text-gray-300">•</span>
+                      <span>{termProgress}% complete</span>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">Start Date</p>
-                      <p className="font-semibold text-black mt-1">
-                        {format(startDate, 'MMMM dd, yyyy')}
-                      </p>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-lg p-3">
-                      <p className="text-xs text-gray-500 uppercase tracking-wide">End Date</p>
-                      <p className="font-semibold text-black mt-1">
-                        {format(endDate, 'MMMM dd, yyyy')}
-                      </p>
-                    </div>
-                  </div>
-
                   {isCurrentTerm && (
-                    <div>
-                      <div className="flex justify-between text-xs text-gray-500 mb-1">
-                        <span>Term Progress</span>
-                        <span>{daysElapsed} / {totalDays} days</span>
-                      </div>
-                      <Progress value={termProgress} className="h-2" />
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-lg font-bold text-black">{termProgress}%</div>
+                      <Progress value={termProgress} className="h-1 w-16 mt-1" />
                     </div>
                   )}
-                </CardContent>
-              </Card>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -568,21 +537,16 @@ export function StudentPortal() {
       }
       return String(day);
     };
-
-    const getShortDayName = (day: string | number): string => {
-      const name = getDayName(day);
-      return name.substring(0, 3);
-    };
     
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-black">My Classes</h2>
             <p className="text-gray-500 mt-1">Your enrolled classes and schedules</p>
           </div>
-          <Badge variant="outline" className="text-sm px-3 py-1">
-            {typedStudentClasses.length} Classes
+          <Badge variant="outline" className="text-xs px-2 py-1">
+            {typedStudentClasses.length}
           </Badge>
         </div>
 
@@ -592,14 +556,14 @@ export function StudentPortal() {
           </div>
         ) : typedStudentClasses.length === 0 ? (
           <Card className="border-2 border-dashed border-gray-300">
-            <CardContent className="text-center py-12">
-              <GraduationCap className="h-16 w-16 mx-auto text-gray-300 mb-4" />
-              <h3 className="text-lg font-semibold text-gray-600 mb-2">No Classes Found</h3>
-              <p className="text-gray-400">You haven't been enrolled in any classes yet.</p>
+            <CardContent className="text-center py-8">
+              <GraduationCap className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+              <h3 className="text-sm font-semibold text-gray-600 mb-1">No Classes</h3>
+              <p className="text-xs text-gray-400">You haven't been enrolled in any classes yet.</p>
             </CardContent>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2 border border-gray-200 rounded-lg overflow-hidden">
             {typedStudentClasses.map((cls: Class) => {
               const daysList = cls.daysOfWeek.map(getDayName);
               const sortedDays = [...daysList].sort((a, b) => 
@@ -607,63 +571,27 @@ export function StudentPortal() {
               );
               
               return (
-                <Card 
-                  key={cls.id} 
-                  className="border-2 border-gray-200 hover:border-black transition-all hover:shadow-lg"
+                <div 
+                  key={cls.id}
+                  className="px-3 py-2.5 hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
                 >
-                  <CardContent className="p-6">
-                    <div className="flex items-start gap-4 mb-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-gray-800 to-gray-600 rounded-xl flex items-center justify-center text-white">
-                        <BookOpen className="h-6 w-6" />
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 bg-black rounded-full mt-1.5 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-sm font-bold text-black">{cls.name}</h4>
                       </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-black">{cls.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1">
-                          {cls.description || 'No description available'}
-                        </p>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 flex-wrap">
+                        <span>{sortedDays.slice(0, 2).join(', ')}{sortedDays.length > 2 ? '...' : ''}</span>
+                        <span className="text-gray-300">•</span>
+                        <span>{cls.startTime} - {cls.endTime}</span>
                       </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <Calendar className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase tracking-wide">Schedule</p>
-                          <p className="font-medium text-black">
-                            {sortedDays.map(d => d.substring(0, 3)).join(', ')}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                        <Clock className="h-5 w-5 text-gray-500" />
-                        <div>
-                          <p className="text-xs text-gray-500 uppercase tracking-wide">Time</p>
-                          <p className="font-medium text-black">
-                            {cls.startTime} - {cls.endTime}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex gap-2 mt-4">
-                      {sortedDays.slice(0, 5).map((day, idx) => (
-                        <Badge 
-                          key={`${day}-${idx}`} 
-                          variant="outline" 
-                          className="text-xs px-2 py-1"
-                        >
-                          {day.substring(0, 3)}
-                        </Badge>
-                      ))}
-                      {sortedDays.length > 5 && (
-                        <Badge variant="secondary" className="text-xs px-2 py-1">
-                          +{sortedDays.length - 5}
-                        </Badge>
+                      {cls.description && (
+                        <p className="text-xs text-gray-400 mt-1 truncate">{cls.description}</p>
                       )}
                     </div>
-                  </CardContent>
-                </Card>
+                  </div>
+                </div>
               );
             })}
           </div>
@@ -756,50 +684,65 @@ export function StudentPortal() {
                           const daysLeft = differenceInDays(new Date(assignment.submissionDate), new Date());
 
                           return (
-                            <div 
-                              key={assignment.id} 
-                              className="px-3 py-2 hover:bg-gray-50 transition-colors"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0" />
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <h4 className="text-sm font-medium text-black truncate">
-                                      {assignment.title}
-                                    </h4>
-                                    <Badge 
-                                      className={`text-xs px-1.5 py-0 ${getStatusColor(status)} whitespace-nowrap`}
-                                    >
-                                      {status}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                                    <span>
-                                      Due: {format(new Date(assignment.submissionDate), 'MMM dd')}
-                                    </span>
-                                    {daysLeft >= 0 && daysLeft <= 3 && (
-                                      <span className="text-yellow-600 font-medium">
-                                        ({daysLeft} days)
+                            <div key={assignment.id}>
+                              <div 
+                                className="px-3 py-2 hover:bg-gray-50 transition-colors"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0" />
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <h4 className="text-sm font-medium text-black truncate">
+                                        {assignment.title}
+                                      </h4>
+                                      <Badge 
+                                        className={`text-xs px-1.5 py-0 ${getStatusColor(status)} whitespace-nowrap`}
+                                      >
+                                        {status}
+                                      </Badge>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
+                                      <span>
+                                        Due: {format(new Date(assignment.submissionDate), 'MMM dd')}
                                       </span>
-                                    )}
-                                    {daysLeft < 0 && (
-                                      <span className="text-red-600 font-medium">
-                                        ({Math.abs(daysLeft)} days overdue)
-                                      </span>
-                                    )}
+                                      {daysLeft >= 0 && daysLeft <= 3 && (
+                                        <span className="text-yellow-600 font-medium">
+                                          ({daysLeft} days)
+                                        </span>
+                                      )}
+                                      {daysLeft < 0 && (
+                                        <span className="text-red-600 font-medium">
+                                          ({Math.abs(daysLeft)} days overdue)
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-7 px-2 text-xs whitespace-nowrap flex-shrink-0"
+                                    onClick={() => {
+                                      setExpandedAssignment(expandedAssignment === assignment.id ? null : assignment.id);
+                                    }}
+                                  >
+                                    {expandedAssignment === assignment.id ? 'Hide' : (submission ? 'View' : 'Start')}
+                                  </Button>
                                 </div>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2 text-xs whitespace-nowrap flex-shrink-0"
-                                  onClick={() => {
-                                    // Would open the assignment detail/completion view
-                                  }}
-                                >
-                                  {submission ? 'View' : 'Start'}
-                                </Button>
                               </div>
+                              {expandedAssignment === assignment.id && (
+                                <div className="px-3 py-3 bg-white border-t border-gray-100">
+                                  <AssignmentCompletionArea
+                                    assignment={assignment}
+                                    submission={submission}
+                                    onSubmissionUpdate={() => {
+                                      queryClient.invalidateQueries({
+                                        queryKey: [`/api/students/student-${user?.id}/submissions`]
+                                      });
+                                      setExpandedAssignment(null);
+                                    }}
+                                  />
+                                </div>
+                              )}
                             </div>
                           );
                         })}
