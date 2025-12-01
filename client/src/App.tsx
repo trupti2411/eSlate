@@ -7,6 +7,7 @@ import { useAuth, AuthProvider } from "@/hooks/useAuth.tsx";
 import AuthPage from "@/pages/auth-page";
 import SimpleRegistration from "@/pages/simple-registration";
 import StudentDashboard from "@/pages/student/Dashboard";
+import StudentHome from "@/pages/student/StudentHome";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
@@ -51,13 +52,14 @@ function Router() {
       ) : (
         <>
           <Route path="/">
-            {user?.role === 'student' && <StudentPortal />}
+            {user?.role === 'student' && <StudentHome />}
             {user?.role === 'parent' && <ParentDashboard />}
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
             {user?.role === 'company_admin' && <CompanyDashboard />}
           </Route>
-          <Route path="/student" component={StudentPortal} />
+          <Route path="/student" component={StudentHome} />
+          <Route path="/student/home" component={StudentHome} />
           <Route path="/student/dashboard" component={StudentDashboard} />
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
