@@ -769,31 +769,31 @@ export function StudentPortal() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-black rounded-xl p-1 mb-6">
+          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-black rounded-xl p-2 mb-6 gap-2">
             <TabsTrigger 
               value="dashboard" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
             >
               <TrendingUp className="h-4 w-4 shrink-0" />
               <span>Dashboard</span>
             </TabsTrigger>
             <TabsTrigger 
               value="terms" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
             >
               <Calendar className="h-4 w-4 shrink-0" />
               <span>Terms</span>
             </TabsTrigger>
             <TabsTrigger 
               value="classes" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
             >
               <GraduationCap className="h-4 w-4 shrink-0" />
               <span>Classes</span>
             </TabsTrigger>
             <TabsTrigger 
               value="assignments" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
             >
               <FileText className="h-4 w-4 shrink-0" />
               <span>Assignments</span>
