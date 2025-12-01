@@ -25,6 +25,8 @@ interface User {
   deletedAt?: string;
   deletedBy?: string;
   createdAt: string;
+  companyName?: string | null;
+  companyId?: string | null;
 }
 
 export default function UsersManagement() {
@@ -125,6 +127,7 @@ export default function UsersManagement() {
         description: "User deleted successfully",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/deleted-users"] });
     },
     onError: (error: Error) => {
       toast({
@@ -626,7 +629,7 @@ export default function UsersManagement() {
           </CardContent>
           </Card>
 
-          {/* Recently Deleted Users Section */}
+          {/* Recently Deleted Users Section - Organized by Company */}
           <Card className="eink-card border-red-200">
             <CardHeader>
               <CardTitle className="text-red-700 flex items-center">
@@ -642,32 +645,66 @@ export default function UsersManagement() {
               {deletedUsersLoading ? (
                 <p className="text-sm text-gray-500">Loading deleted users...</p>
               ) : deletedUsers.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {deletedUsers.map((user) => (
-                    <Card key={user.id} className="border border-red-200 bg-red-50">
-                      <CardContent className="p-4">
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <h4 className="font-semibold text-red-800">
-                                {user.firstName} {user.lastName}
-                              </h4>
-                              <p className="text-xs text-red-600 capitalize">
-                                {user.role.replace('_', ' ')}
-                              </p>
-                            </div>
-                            <Badge variant="destructive">Deleted</Badge>
-                          </div>
-                          
-                          <div className="pt-2 border-t border-red-200">
-                            <p className="text-xs text-red-600">
-                              Deleted: {user.deletedAt ? new Date(user.deletedAt).toLocaleDateString() : 'Unknown'}
-                            </p>
-                          </div>
+                <div className="space-y-6">
+                  {/* Group deleted users by company */}
+                  {(() => {
+                    const groupedByCompany = deletedUsers.reduce((acc: Record<string, User[]>, user) => {
+                      const key = user.companyName || 'System Users (No Company)';
+                      if (!acc[key]) acc[key] = [];
+                      acc[key].push(user);
+                      return acc;
+                    }, {});
+                    
+                    // Sort so companies come first, then system users
+                    const sortedKeys = Object.keys(groupedByCompany).sort((a, b) => {
+                      if (a === 'System Users (No Company)') return 1;
+                      if (b === 'System Users (No Company)') return -1;
+                      return a.localeCompare(b);
+                    });
+                    
+                    return sortedKeys.map((companyName) => (
+                      <div key={companyName} className="space-y-3">
+                        <div className="flex items-center gap-2 pb-2 border-b border-red-200">
+                          <Badge variant={companyName === 'System Users (No Company)' ? 'secondary' : 'outline'} className="text-sm">
+                            {companyName}
+                          </Badge>
+                          <span className="text-xs text-gray-500">
+                            ({groupedByCompany[companyName].length} deleted user{groupedByCompany[companyName].length !== 1 ? 's' : ''})
+                          </span>
                         </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {groupedByCompany[companyName].map((user) => (
+                            <Card key={user.id} className="border border-red-200 bg-red-50">
+                              <CardContent className="p-4">
+                                <div className="space-y-2">
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <h4 className="font-semibold text-red-800">
+                                        {user.firstName} {user.lastName}
+                                      </h4>
+                                      <p className="text-xs text-red-600 capitalize">
+                                        {user.role.replace('_', ' ')}
+                                      </p>
+                                      <p className="text-xs text-gray-500 mt-1">
+                                        {user.email}
+                                      </p>
+                                    </div>
+                                    <Badge variant="destructive">Deleted</Badge>
+                                  </div>
+                                  
+                                  <div className="pt-2 border-t border-red-200">
+                                    <p className="text-xs text-red-600">
+                                      Deleted: {user.deletedAt ? new Date(user.deletedAt).toLocaleDateString() : 'Unknown'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
+                    ));
+                  })()}
                 </div>
               ) : (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">

@@ -1178,6 +1178,63 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Get deleted users with company info
+  app.get('/api/admin/deleted-users', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const deletedUsers = await storage.getDeletedUsers();
+      
+      // Enrich with company info based on role-specific data
+      const enrichedUsers = await Promise.all(deletedUsers.map(async (user) => {
+        let companyName = null;
+        let companyId = null;
+        
+        try {
+          if (user.role === 'student') {
+            const student = await storage.getStudentByUserId(user.id);
+            if (student?.companyId) {
+              const company = await storage.getCompany(student.companyId);
+              companyName = company?.name || null;
+              companyId = student.companyId;
+            }
+          } else if (user.role === 'tutor') {
+            const tutor = await storage.getTutorByUserId(user.id);
+            if (tutor?.companyId) {
+              const company = await storage.getCompany(tutor.companyId);
+              companyName = company?.name || null;
+              companyId = tutor.companyId;
+            }
+          } else if (user.role === 'company_admin') {
+            const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+            if (companyAdmin?.companyId) {
+              const company = await storage.getCompany(companyAdmin.companyId);
+              companyName = company?.name || null;
+              companyId = companyAdmin.companyId;
+            }
+          }
+        } catch (e) {
+          // Role-specific data may have been deleted
+        }
+        
+        return {
+          ...user,
+          companyName,
+          companyId
+        };
+      }));
+      
+      res.json(enrichedUsers);
+    } catch (error) {
+      console.error("Error fetching deleted users:", error);
+      res.status(500).json({ message: "Failed to fetch deleted users" });
+    }
+  });
+
   app.delete('/api/admin/users/:userId', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
