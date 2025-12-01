@@ -215,6 +215,13 @@ export function StudentAssignments() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
+          <div className="flex items-center gap-2 mb-2">
+            <Link href="/student/home">
+              <Button variant="outline" size="sm" className="border-black text-black hover:bg-gray-100">
+                ← Home
+              </Button>
+            </Link>
+          </div>
           <h1 className="text-3xl font-bold">My Assignments</h1>
           <p className="text-muted-foreground">View and complete your assignments</p>
         </div>

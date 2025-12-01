@@ -273,6 +273,11 @@ export default function UsersManagement() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
+            <Link href="/admin">
+              <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
+                ← Back to Admin
+              </Button>
+            </Link>
             <h1 className="page-title flex items-center space-x-3">
               <Users className="w-8 h-8 text-blue-600" />
               <span>User Management</span>

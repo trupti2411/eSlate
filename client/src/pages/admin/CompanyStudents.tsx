@@ -91,6 +91,11 @@ export default function CompanyStudents() {
         {/* Header */}
         <div className="flex justify-between items-start">
           <div>
+            <Link href="/company">
+              <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
+                ← Back to Company
+              </Button>
+            </Link>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
               {company.name} - Students
             </h1>

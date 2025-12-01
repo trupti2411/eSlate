@@ -122,6 +122,11 @@ export default function Companies() {
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
         <div>
+          <Link href="/admin">
+            <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
+              ← Back to Admin
+            </Button>
+          </Link>
           <h1 className="text-3xl font-bold">Tutoring Companies</h1>
           <p className="text-gray-600">Manage tutoring companies and their staff</p>
         </div>

@@ -309,6 +309,11 @@ export default function TutorDashboard() {
       <div className="container py-8">
         <div className="flex justify-between items-start mb-8">
           <div>
+            <Link href="/company">
+              <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
+                ← Back to Company
+              </Button>
+            </Link>
             <h1 className="page-title">
               {user?.role === 'company_admin' ? 'Company Homework Dashboard' : 'Tutor Dashboard'}
             </h1>

@@ -443,6 +443,11 @@ export function AssignmentManagement() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
+            <Link href="/company">
+              <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
+                ← Back to Company
+              </Button>
+            </Link>
             <h1 className="text-3xl font-bold">Assignment Management</h1>
             <p className="text-muted-foreground">Create and manage assignments for your classes</p>
           </div>
