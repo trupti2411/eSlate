@@ -254,21 +254,21 @@ export default function CompanyDashboard() {
           </Dialog>
 
           <Link href="/company/tutors">
-            <Button className="border-2 border-black text-black hover:bg-gray-100 py-3 px-6 font-semibold">
+            <Button variant="outline" className="border-2 border-black bg-white text-black hover:bg-gray-100 py-3 px-6 font-semibold">
               <Users className="h-5 w-5 mr-2" />
               Manage Tutors
             </Button>
           </Link>
 
           <Link href="/company/assignments">
-            <Button className="border-2 border-black text-black hover:bg-gray-100 py-3 px-6 font-semibold">
+            <Button variant="outline" className="border-2 border-black bg-white text-black hover:bg-gray-100 py-3 px-6 font-semibold">
               <FileText className="h-5 w-5 mr-2" />
               Assignments
             </Button>
           </Link>
 
           <Link href="/company/academic">
-            <Button className="border-2 border-black text-black hover:bg-gray-100 py-3 px-6 font-semibold">
+            <Button variant="outline" className="border-2 border-black bg-white text-black hover:bg-gray-100 py-3 px-6 font-semibold">
               <Calendar className="h-5 w-5 mr-2" />
               Academic Setup
             </Button>

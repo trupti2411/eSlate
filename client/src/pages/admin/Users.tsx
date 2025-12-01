@@ -682,9 +682,9 @@ export default function UsersManagement() {
                     return (
                       <>
                         {/* List Header */}
-                        <div className="bg-red-100 border border-red-200 rounded-t-lg px-4 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-red-800">
-                          <div className="col-span-3">Name</div>
-                          <div className="col-span-3">Email</div>
+                        <div className="bg-red-100 border border-red-200 rounded-t-lg px-4 py-2 grid grid-cols-12 gap-4 text-xs font-semibold text-red-800">
+                          <div className="col-span-2">Name</div>
+                          <div className="col-span-4">Email</div>
                           <div className="col-span-2">Role</div>
                           <div className="col-span-2">Company</div>
                           <div className="col-span-2">Deleted On</div>
@@ -708,20 +708,20 @@ export default function UsersManagement() {
                                     </span>
                                   </div>
                                 )}
-                                <div className="px-4 py-3 grid grid-cols-12 gap-2 items-center hover:bg-red-50 transition-colors">
-                                  <div className="col-span-3">
-                                    <span className="font-medium text-red-800">{user.firstName} {user.lastName}</span>
+                                <div className="px-4 py-3 grid grid-cols-12 gap-4 items-center hover:bg-red-50 transition-colors">
+                                  <div className="col-span-2">
+                                    <span className="font-medium text-red-800 text-sm">{user.firstName} {user.lastName}</span>
                                   </div>
-                                  <div className="col-span-3">
-                                    <span className="text-sm text-gray-600 truncate">{user.email}</span>
+                                  <div className="col-span-4 overflow-hidden">
+                                    <span className="text-sm text-gray-600 block truncate">{user.email}</span>
                                   </div>
                                   <div className="col-span-2">
-                                    <Badge variant="outline" className="text-xs capitalize">
+                                    <Badge variant="outline" className="text-xs capitalize whitespace-nowrap">
                                       {user.role.replace('_', ' ')}
                                     </Badge>
                                   </div>
-                                  <div className="col-span-2">
-                                    <span className="text-xs text-gray-500">
+                                  <div className="col-span-2 overflow-hidden">
+                                    <span className="text-xs text-gray-500 block truncate">
                                       {user.companyName || '-'}
                                     </span>
                                   </div>
