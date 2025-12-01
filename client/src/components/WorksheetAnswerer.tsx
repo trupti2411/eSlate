@@ -362,6 +362,14 @@ export function WorksheetAnswerer({ worksheetId, studentId, onClose }: Worksheet
     );
   }
 
+  if (!worksheet.pages || worksheet.pages.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-lg text-red-600">This worksheet has no pages</div>
+      </div>
+    );
+  }
+
   const currentPage = worksheet.pages[currentPageIndex];
   const totalPages = worksheet.pages.length;
 
