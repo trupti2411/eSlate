@@ -308,6 +308,13 @@ export default function CompanyDashboard() {
             </Button>
           </Link>
 
+          <Link href="/company/worksheets">
+            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold" data-testid="button-worksheets">
+              <BookOpen className="h-5 w-5 mr-2" />
+              Worksheets
+            </Button>
+          </Link>
+
           <Dialog open={isCreateDocumentOpen} onOpenChange={setIsCreateDocumentOpen}>
             <DialogTrigger asChild>
               <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold">

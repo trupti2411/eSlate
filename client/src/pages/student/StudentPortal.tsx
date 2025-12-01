@@ -344,7 +344,7 @@ export function StudentPortal() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card 
           className="border-2 border-black hover:shadow-lg transition-all cursor-pointer group"
           onClick={() => setSelectedTab('terms')}
@@ -398,6 +398,23 @@ export function StudentPortal() {
             <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
           </CardContent>
         </Card>
+
+        <Link href="/student/worksheets">
+          <Card className="border-2 border-black hover:shadow-lg transition-all cursor-pointer group h-full">
+            <CardContent className="p-6 flex items-center justify-between h-full">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
+                  <BookOpen className="h-6 w-6 text-blue-600 group-hover:text-white" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-lg">Worksheets</h3>
+                  <p className="text-sm text-gray-500">Interactive learning</p>
+                </div>
+              </div>
+              <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
+            </CardContent>
+          </Card>
+        </Link>
       </div>
 
       {/* Recent Assignments */}
