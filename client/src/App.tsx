@@ -10,6 +10,7 @@ import StudentDashboard from "@/pages/student/Dashboard";
 import StudentHome from "@/pages/student/StudentHome";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
+import CompanyTutorDashboard from "@/pages/company/TutorDashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
 import Users from "@/pages/admin/Users";
@@ -69,7 +70,7 @@ function Router() {
           <Route path="/admin/companies/:id" component={CompanyManagement} />
           <Route path="/admin/test" component={TestUserCreation} />
           <Route path="/company" component={CompanyDashboard} />
-          {/* <Route path="/company/tutors" component={TutorDashboardCompany} /> */}
+          <Route path="/company/tutors" component={CompanyTutorDashboard} />
           <Route path="/company/students" component={CompanyStudents} />
           <Route path="/company/academic" component={() => <CompanyAcademicManagement />} />
           <Route path="/company/assignments" component={AssignmentManagement} />
