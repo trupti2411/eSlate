@@ -15,7 +15,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { insertAssignmentSchema, type Assignment, type Class } from "@shared/schema";
-import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload } from "lucide-react";
+import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload, FileQuestion, BookOpen } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { WorksheetEditor } from "@/components/WorksheetEditor";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { format } from "date-fns";
@@ -27,9 +29,19 @@ const assignmentFormSchema = insertAssignmentSchema.extend({
   academicYearId: z.string().optional(),
   termId: z.string().optional(),
   week: z.number().optional(),
+  assignmentKind: z.enum(['file_upload', 'worksheet']).default('file_upload'),
+  worksheetId: z.string().optional(),
 }).omit({
   companyId: true,
   createdBy: true,
+}).superRefine((data, ctx) => {
+  if (data.assignmentKind === 'worksheet' && !data.worksheetId) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Please select or create a worksheet",
+      path: ["worksheetId"],
+    });
+  }
 });
 
 type AssignmentFormData = z.infer<typeof assignmentFormSchema>;
@@ -214,6 +226,8 @@ export function AssignmentManagement() {
   const [preSelectedClass, setPreSelectedClass] = useState<{ id: string; name: string } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
+  const [showWorksheetEditor, setShowWorksheetEditor] = useState(false);
+  const [editingWorksheetId, setEditingWorksheetId] = useState<string | null>(null);
 
   // Get user's company ID from roleData
   const companyId = (user as any)?.roleData?.companyId;
@@ -238,6 +252,12 @@ export function AssignmentManagement() {
 
   const { data: academicTerms = [] } = useQuery<any[]>({
     queryKey: ['/api/companies', companyId, 'academic-terms'],
+    enabled: !!companyId,
+  });
+
+  // Fetch worksheets for worksheet assignment type
+  const { data: worksheets = [] } = useQuery<any[]>({
+    queryKey: ['/api/companies', companyId, 'worksheets'],
     enabled: !!companyId,
   });
 
@@ -339,6 +359,8 @@ export function AssignmentManagement() {
       termId: "",
       week: undefined,
       classId: "",
+      assignmentKind: 'file_upload',
+      worksheetId: "",
       attachmentUrls: [],
       allowedFileTypes: ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg'],
       maxFileSize: 31457280,
@@ -346,6 +368,8 @@ export function AssignmentManagement() {
       isActive: true,
     },
   });
+
+  const assignmentKind = form.watch('assignmentKind');
 
   const onSubmit = (data: AssignmentFormData) => {
     console.log("Form submission triggered!");
@@ -506,6 +530,46 @@ export function AssignmentManagement() {
                           {...field} 
                           value={field.value || ""} 
                         />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Assignment Type Selector */}
+                <FormField
+                  control={form.control}
+                  name="assignmentKind"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel>Assignment Type *</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          value={field.value}
+                          className="grid grid-cols-2 gap-4"
+                        >
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="file_upload" id="type-file" />
+                            <label htmlFor="type-file" className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg flex-1 hover:bg-muted">
+                              <Upload className="h-5 w-5 text-blue-600" />
+                              <div>
+                                <p className="font-medium">File Upload</p>
+                                <p className="text-xs text-muted-foreground">Students upload documents</p>
+                              </div>
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="worksheet" id="type-worksheet" />
+                            <label htmlFor="type-worksheet" className="flex items-center gap-2 cursor-pointer p-3 border rounded-lg flex-1 hover:bg-muted">
+                              <BookOpen className="h-5 w-5 text-green-600" />
+                              <div>
+                                <p className="font-medium">Interactive Worksheet</p>
+                                <p className="text-xs text-muted-foreground">Students answer questions online</p>
+                              </div>
+                            </label>
+                          </div>
+                        </RadioGroup>
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -688,63 +752,128 @@ export function AssignmentManagement() {
 
                 </div>
 
-                {/* File Upload Section */}
-                <div className="space-y-4 border-t pt-4">
-                  <h3 className="text-lg font-medium">Upload Files (Optional)</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Upload assignment files for students. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, PNG, JPEG (Max 30MB)
-                  </p>
-                  
-                  <ObjectUploader
-                    maxNumberOfFiles={5}
-                    maxFileSize={31457280} // 30MB
-                    onGetUploadParameters={async () => {
-                      const response = await apiRequest('/api/objects/upload', 'POST');
-                      return {
-                        method: 'PUT' as const,
-                        url: response.uploadURL,
-                      };
-                    }}
-                    onComplete={async (result) => {
-                      console.log("Files uploaded:", result);
-                      if (result.successful && result.successful.length > 0) {
-                        // Set metadata for each uploaded file to preserve original filename
-                        for (const file of result.successful) {
-                          try {
-                            await apiRequest('/api/objects/metadata', 'POST', {
-                              uploadURL: file.uploadURL,
-                              originalFileName: file.name
-                            });
-                          } catch (error) {
-                            console.error("Failed to set file metadata:", error);
+                {/* Conditional: File Upload OR Worksheet Selection */}
+                {assignmentKind === 'file_upload' ? (
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-lg font-medium">Upload Files (Optional)</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Upload assignment files for students. Accepted formats: PDF, DOC, DOCX, XLS, XLSX, PNG, JPEG (Max 30MB)
+                    </p>
+                    
+                    <ObjectUploader
+                      maxNumberOfFiles={5}
+                      maxFileSize={31457280} // 30MB
+                      onGetUploadParameters={async () => {
+                        const response = await apiRequest('/api/objects/upload', 'POST');
+                        return {
+                          method: 'PUT' as const,
+                          url: response.uploadURL,
+                        };
+                      }}
+                      onComplete={async (result) => {
+                        console.log("Files uploaded:", result);
+                        if (result.successful && result.successful.length > 0) {
+                          for (const file of result.successful) {
+                            try {
+                              await apiRequest('/api/objects/metadata', 'POST', {
+                                uploadURL: file.uploadURL,
+                                originalFileName: file.name
+                              });
+                            } catch (error) {
+                              console.error("Failed to set file metadata:", error);
+                            }
                           }
+                          
+                          const uploadedUrls = result.successful.map((file: any) => file.uploadURL);
+                          const currentUrls = form.getValues('attachmentUrls') || [];
+                          form.setValue('attachmentUrls', [...currentUrls, ...uploadedUrls]);
+                          toast({
+                            title: "Success",
+                            description: `${result.successful.length} file(s) uploaded successfully`,
+                          });
                         }
-                        
-                        const uploadedUrls = result.successful.map((file: any) => file.uploadURL);
-                        const currentUrls = form.getValues('attachmentUrls') || [];
-                        form.setValue('attachmentUrls', [...currentUrls, ...uploadedUrls]);
-                        toast({
-                          title: "Success",
-                          description: `${result.successful.length} file(s) uploaded successfully`,
-                        });
-                      }
-                    }}
-                    buttonClassName="w-full"
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Upload Assignment Files
-                  </ObjectUploader>
+                      }}
+                      buttonClassName="w-full"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Upload Assignment Files
+                    </ObjectUploader>
 
-                  {/* Show uploaded files with metadata */}
-                  <UploadedFilesList 
-                    attachmentUrls={form.watch('attachmentUrls') || []}
-                    onRemoveFile={(index: number) => {
-                      const currentUrls = form.getValues('attachmentUrls') || [];
-                      const newUrls = currentUrls.filter((_: string, i: number) => i !== index);
-                      form.setValue('attachmentUrls', newUrls);
-                    }}
-                  />
-                </div>
+                    <UploadedFilesList 
+                      attachmentUrls={form.watch('attachmentUrls') || []}
+                      onRemoveFile={(index: number) => {
+                        const currentUrls = form.getValues('attachmentUrls') || [];
+                        const newUrls = currentUrls.filter((_: string, i: number) => i !== index);
+                        form.setValue('attachmentUrls', newUrls);
+                      }}
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-4 border-t pt-4">
+                    <h3 className="text-lg font-medium">Select Worksheet *</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose an existing worksheet or create a new one for students to complete.
+                    </p>
+                    
+                    <FormField
+                      control={form.control}
+                      name="worksheetId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Worksheet</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || ""}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a worksheet" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {worksheets.filter((w: any) => w.isPublished).map((worksheet: any) => (
+                                <SelectItem key={worksheet.id} value={worksheet.id}>
+                                  {worksheet.title} {worksheet.subject ? `- ${worksheet.subject}` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setShowWorksheetEditor(true);
+                          setEditingWorksheetId(null);
+                        }}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create New Worksheet
+                      </Button>
+                      {form.watch('worksheetId') && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => {
+                            setShowWorksheetEditor(true);
+                            setEditingWorksheetId(form.getValues('worksheetId') || null);
+                          }}
+                        >
+                          <Edit className="w-4 h-4 mr-2" />
+                          Edit Selected Worksheet
+                        </Button>
+                      )}
+                    </div>
+
+                    {worksheets.filter((w: any) => w.isPublished).length === 0 && (
+                      <p className="text-sm text-yellow-600 bg-yellow-50 p-3 rounded-md">
+                        No published worksheets available. Create and publish a worksheet first.
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex justify-end space-x-2 pt-4">
                   <Button type="button" variant="outline" onClick={resetForm}>
@@ -823,6 +952,36 @@ export function AssignmentManagement() {
               {deleteAssignmentMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Worksheet Editor Modal */}
+      <Dialog open={showWorksheetEditor} onOpenChange={setShowWorksheetEditor}>
+        <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{editingWorksheetId ? 'Edit Worksheet' : 'Create New Worksheet'}</DialogTitle>
+            <DialogDescription>
+              Create interactive questions for students to complete online.
+            </DialogDescription>
+          </DialogHeader>
+          <WorksheetEditor
+            worksheetId={editingWorksheetId || undefined}
+            companyId={companyId}
+            onSave={(worksheetId: string) => {
+              form.setValue('worksheetId', worksheetId);
+              queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'worksheets'] });
+              setShowWorksheetEditor(false);
+              setEditingWorksheetId(null);
+              toast({
+                title: "Worksheet saved",
+                description: "The worksheet has been saved successfully.",
+              });
+            }}
+            onClose={() => {
+              setShowWorksheetEditor(false);
+              setEditingWorksheetId(null);
+            }}
+          />
         </DialogContent>
       </Dialog>
       </div>

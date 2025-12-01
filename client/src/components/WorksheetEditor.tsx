@@ -26,7 +26,8 @@ import {
   Copy,
   Eye,
   Send,
-  GripVertical
+  GripVertical,
+  Check
 } from 'lucide-react';
 
 type QuestionType = 'short_text' | 'long_text' | 'multiple_choice' | 'fill_blank' | 'text_image';
@@ -64,9 +65,10 @@ interface Worksheet {
 }
 
 interface WorksheetEditorProps {
-  worksheetId: string;
+  worksheetId?: string;
   companyId: string;
   onClose: () => void;
+  onSave?: (worksheetId: string) => void;
 }
 
 const questionTypeLabels: Record<QuestionType, { label: string; icon: any; description: string }> = {
@@ -77,8 +79,9 @@ const questionTypeLabels: Record<QuestionType, { label: string; icon: any; descr
   text_image: { label: 'Text + Image', icon: Image, description: 'Question with an image attachment' },
 };
 
-export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEditorProps) {
+export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, onClose, onSave }: WorksheetEditorProps) {
   const { toast } = useToast();
+  const [worksheetId, setWorksheetId] = useState<string | undefined>(initialWorksheetId);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
@@ -88,11 +91,22 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
     points: 1,
     options: [{ id: '1', text: '', isCorrect: true }, { id: '2', text: '', isCorrect: false }],
   });
+  const [newWorksheetTitle, setNewWorksheetTitle] = useState('');
+  const [newWorksheetSubject, setNewWorksheetSubject] = useState('');
 
   const { data: worksheet, isLoading, refetch } = useQuery<Worksheet>({
     queryKey: ['/api/worksheets', worksheetId],
     queryFn: () => fetch(`/api/worksheets/${worksheetId}`, { credentials: 'include' }).then(r => r.json()),
     enabled: !!worksheetId,
+  });
+
+  const createWorksheetMutation = useMutation({
+    mutationFn: (data: { title: string; subject?: string; companyId: string }) =>
+      apiRequest('/api/worksheets', 'POST', data),
+    onSuccess: (newWorksheet: any) => {
+      setWorksheetId(newWorksheet.id);
+      toast({ title: 'Worksheet created' });
+    },
   });
 
   const updateWorksheetMutation = useMutation({
@@ -155,10 +169,61 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
     },
   });
 
-  if (isLoading) {
+  if (isLoading && worksheetId) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-lg">Loading worksheet...</div>
+      </div>
+    );
+  }
+
+  if (!worksheetId) {
+    return (
+      <div className="p-6 space-y-6">
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Create New Worksheet</h3>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="new-worksheet-title">Worksheet Title *</Label>
+              <Input
+                id="new-worksheet-title"
+                value={newWorksheetTitle}
+                onChange={(e) => setNewWorksheetTitle(e.target.value)}
+                placeholder="Enter worksheet title"
+              />
+            </div>
+            <div>
+              <Label htmlFor="new-worksheet-subject">Subject (optional)</Label>
+              <Input
+                id="new-worksheet-subject"
+                value={newWorksheetSubject}
+                onChange={(e) => setNewWorksheetSubject(e.target.value)}
+                placeholder="e.g., Mathematics, English"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => {
+                  if (!newWorksheetTitle.trim()) {
+                    toast({ title: 'Error', description: 'Please enter a title', variant: 'destructive' });
+                    return;
+                  }
+                  createWorksheetMutation.mutate({
+                    title: newWorksheetTitle,
+                    subject: newWorksheetSubject || undefined,
+                    companyId,
+                  });
+                }}
+                disabled={createWorksheetMutation.isPending}
+              >
+                {createWorksheetMutation.isPending ? 'Creating...' : 'Create Worksheet'}
+              </Button>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -431,9 +496,20 @@ export function WorksheetEditor({ worksheetId, companyId, onClose }: WorksheetEd
           >
             {worksheet.isPublished ? 'Unpublish' : 'Publish'}
           </Button>
-          <Button variant="default" data-testid="button-assign-worksheet">
-            <Send className="h-4 w-4 mr-2" /> Assign
-          </Button>
+          {onSave && (
+            <Button 
+              variant="default" 
+              onClick={() => {
+                if (!worksheet.isPublished) {
+                  updateWorksheetMutation.mutate({ isPublished: true });
+                }
+                onSave(worksheet.id);
+              }}
+              data-testid="button-save-and-use"
+            >
+              <Check className="h-4 w-4 mr-2" /> Save & Use
+            </Button>
+          )}
         </div>
       </div>
 
