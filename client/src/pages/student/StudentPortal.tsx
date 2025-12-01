@@ -769,34 +769,34 @@ export function StudentPortal() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-black rounded-xl p-1.5 mb-6 gap-1">
+          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-black rounded-xl p-1 mb-6">
             <TabsTrigger 
               value="dashboard" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
             >
-              <TrendingUp className="h-4 w-4 mr-2" />
-              Dashboard
+              <TrendingUp className="h-4 w-4 shrink-0" />
+              <span>Dashboard</span>
             </TabsTrigger>
             <TabsTrigger 
               value="terms" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
             >
-              <Calendar className="h-4 w-4 mr-2" />
-              Terms
+              <Calendar className="h-4 w-4 shrink-0" />
+              <span>Terms</span>
             </TabsTrigger>
             <TabsTrigger 
               value="classes" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
             >
-              <GraduationCap className="h-4 w-4 mr-2" />
-              Classes
+              <GraduationCap className="h-4 w-4 shrink-0" />
+              <span>Classes</span>
             </TabsTrigger>
             <TabsTrigger 
               value="assignments" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 font-medium transition-all"
             >
-              <FileText className="h-4 w-4 mr-2" />
-              Assignments
+              <FileText className="h-4 w-4 shrink-0" />
+              <span>Assignments</span>
             </TabsTrigger>
           </TabsList>
 
