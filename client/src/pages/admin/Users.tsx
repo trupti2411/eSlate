@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Users, UserPlus, Power, PowerOff, Trash2, Filter } from "lucide-react";
+import { Users, UserPlus, Power, PowerOff, Trash2, Filter, ChevronLeft, ChevronRight } from "lucide-react";
 
 interface User {
   id: string;
@@ -49,6 +49,10 @@ export default function UsersManagement() {
     isActive: true,
     companyId: "",
   });
+  
+  // Pagination state for deleted users
+  const [deletedUsersPage, setDeletedUsersPage] = useState(1);
+  const deletedUsersPageSize = 10;
 
   // Get current user to check if master admin
   const { data: currentUser } = useQuery<{ id: string; role: string }>({
@@ -629,7 +633,7 @@ export default function UsersManagement() {
           </CardContent>
           </Card>
 
-          {/* Recently Deleted Users Section - Organized by Company */}
+          {/* Recently Deleted Users Section - Organized by Company with Pagination */}
           <Card className="eink-card border-red-200">
             <CardHeader>
               <CardTitle className="text-red-700 flex items-center">
@@ -645,7 +649,7 @@ export default function UsersManagement() {
               {deletedUsersLoading ? (
                 <p className="text-sm text-gray-500">Loading deleted users...</p>
               ) : deletedUsers.length > 0 ? (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Group deleted users by company */}
                   {(() => {
                     const groupedByCompany = deletedUsers.reduce((acc: Record<string, User[]>, user) => {
@@ -662,48 +666,111 @@ export default function UsersManagement() {
                       return a.localeCompare(b);
                     });
                     
-                    return sortedKeys.map((companyName) => (
-                      <div key={companyName} className="space-y-3">
-                        <div className="flex items-center gap-2 pb-2 border-b border-red-200">
-                          <Badge variant={companyName === 'System Users (No Company)' ? 'secondary' : 'outline'} className="text-sm">
-                            {companyName}
-                          </Badge>
-                          <span className="text-xs text-gray-500">
-                            ({groupedByCompany[companyName].length} deleted user{groupedByCompany[companyName].length !== 1 ? 's' : ''})
-                          </span>
+                    // Flatten all users with company info for pagination
+                    const allDeletedWithCompany = sortedKeys.flatMap(companyName => 
+                      groupedByCompany[companyName].map(user => ({ ...user, groupName: companyName }))
+                    );
+                    
+                    // Pagination
+                    const totalPages = Math.ceil(allDeletedWithCompany.length / deletedUsersPageSize);
+                    const startIndex = (deletedUsersPage - 1) * deletedUsersPageSize;
+                    const paginatedUsers = allDeletedWithCompany.slice(startIndex, startIndex + deletedUsersPageSize);
+                    
+                    // Group paginated users by company for display
+                    let currentGroup = '';
+                    
+                    return (
+                      <>
+                        {/* List Header */}
+                        <div className="bg-red-100 border border-red-200 rounded-t-lg px-4 py-2 grid grid-cols-12 gap-2 text-xs font-semibold text-red-800">
+                          <div className="col-span-3">Name</div>
+                          <div className="col-span-3">Email</div>
+                          <div className="col-span-2">Role</div>
+                          <div className="col-span-2">Company</div>
+                          <div className="col-span-2">Deleted On</div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {groupedByCompany[companyName].map((user) => (
-                            <Card key={user.id} className="border border-red-200 bg-red-50">
-                              <CardContent className="p-4">
-                                <div className="space-y-2">
-                                  <div className="flex justify-between items-start">
-                                    <div className="flex-1">
-                                      <h4 className="font-semibold text-red-800">
-                                        {user.firstName} {user.lastName}
-                                      </h4>
-                                      <p className="text-xs text-red-600 capitalize">
-                                        {user.role.replace('_', ' ')}
-                                      </p>
-                                      <p className="text-xs text-gray-500 mt-1">
-                                        {user.email}
-                                      </p>
-                                    </div>
-                                    <Badge variant="destructive">Deleted</Badge>
+                        
+                        {/* List Items */}
+                        <div className="border border-red-200 border-t-0 rounded-b-lg divide-y divide-red-100">
+                          {paginatedUsers.map((user, index) => {
+                            const showGroupHeader = user.groupName !== currentGroup;
+                            currentGroup = user.groupName;
+                            
+                            return (
+                              <div key={user.id}>
+                                {showGroupHeader && (
+                                  <div className="bg-red-50 px-4 py-2 flex items-center gap-2">
+                                    <Badge variant={user.groupName === 'System Users (No Company)' ? 'secondary' : 'outline'} className="text-xs">
+                                      {user.groupName}
+                                    </Badge>
+                                    <span className="text-xs text-gray-500">
+                                      ({groupedByCompany[user.groupName].length} user{groupedByCompany[user.groupName].length !== 1 ? 's' : ''})
+                                    </span>
                                   </div>
-                                  
-                                  <div className="pt-2 border-t border-red-200">
-                                    <p className="text-xs text-red-600">
-                                      Deleted: {user.deletedAt ? new Date(user.deletedAt).toLocaleDateString() : 'Unknown'}
-                                    </p>
+                                )}
+                                <div className="px-4 py-3 grid grid-cols-12 gap-2 items-center hover:bg-red-50 transition-colors">
+                                  <div className="col-span-3">
+                                    <span className="font-medium text-red-800">{user.firstName} {user.lastName}</span>
+                                  </div>
+                                  <div className="col-span-3">
+                                    <span className="text-sm text-gray-600 truncate">{user.email}</span>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <Badge variant="outline" className="text-xs capitalize">
+                                      {user.role.replace('_', ' ')}
+                                    </Badge>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-xs text-gray-500">
+                                      {user.companyName || '-'}
+                                    </span>
+                                  </div>
+                                  <div className="col-span-2">
+                                    <span className="text-xs text-red-600">
+                                      {user.deletedAt ? new Date(user.deletedAt).toLocaleDateString() : 'Unknown'}
+                                    </span>
                                   </div>
                                 </div>
-                              </CardContent>
-                            </Card>
-                          ))}
+                              </div>
+                            );
+                          })}
                         </div>
-                      </div>
-                    ));
+                        
+                        {/* Pagination Controls */}
+                        {totalPages > 1 && (
+                          <div className="flex items-center justify-between pt-4 border-t border-red-200">
+                            <div className="text-sm text-gray-600">
+                              Showing {startIndex + 1}-{Math.min(startIndex + deletedUsersPageSize, allDeletedWithCompany.length)} of {allDeletedWithCompany.length} deleted users
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDeletedUsersPage(p => Math.max(1, p - 1))}
+                                disabled={deletedUsersPage === 1}
+                                className="border-red-200 hover:bg-red-50"
+                              >
+                                <ChevronLeft className="w-4 h-4" />
+                                Previous
+                              </Button>
+                              <span className="text-sm text-gray-600 px-2">
+                                Page {deletedUsersPage} of {totalPages}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setDeletedUsersPage(p => Math.min(totalPages, p + 1))}
+                                disabled={deletedUsersPage === totalPages}
+                                className="border-red-200 hover:bg-red-50"
+                              >
+                                Next
+                                <ChevronRight className="w-4 h-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    );
                   })()}
                 </div>
               ) : (
