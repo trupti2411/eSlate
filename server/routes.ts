@@ -2362,6 +2362,274 @@ Good luck with your assignment!"
     }
   });
 
+  // ===== WORKSHEET SYSTEM ROUTES =====
+
+  // Get all worksheets for a company
+  app.get('/api/companies/:companyId/worksheets', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const worksheets = await storage.getWorksheetsByCompany(companyId);
+      res.json(worksheets);
+    } catch (error) {
+      console.error('Error fetching worksheets:', error);
+      res.status(500).json({ error: 'Failed to fetch worksheets' });
+    }
+  });
+
+  // Create a new worksheet
+  app.post('/api/companies/:companyId/worksheets', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      
+      const worksheetData = {
+        ...req.body,
+        companyId,
+        createdBy: user.id,
+      };
+      
+      const worksheet = await storage.createWorksheet(worksheetData);
+      
+      // Create first page automatically
+      await storage.createWorksheetPage({
+        worksheetId: worksheet.id,
+        pageNumber: 1,
+        title: 'Page 1',
+      });
+      
+      res.status(201).json(worksheet);
+    } catch (error) {
+      console.error('Error creating worksheet:', error);
+      res.status(500).json({ error: 'Failed to create worksheet' });
+    }
+  });
+
+  // Get full worksheet with pages and questions
+  app.get('/api/worksheets/:worksheetId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId } = req.params;
+      const worksheet = await storage.getFullWorksheet(worksheetId);
+      
+      if (!worksheet) {
+        return res.status(404).json({ error: 'Worksheet not found' });
+      }
+      
+      res.json(worksheet);
+    } catch (error) {
+      console.error('Error fetching worksheet:', error);
+      res.status(500).json({ error: 'Failed to fetch worksheet' });
+    }
+  });
+
+  // Update worksheet
+  app.patch('/api/worksheets/:worksheetId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId } = req.params;
+      const worksheet = await storage.updateWorksheet(worksheetId, req.body);
+      res.json(worksheet);
+    } catch (error) {
+      console.error('Error updating worksheet:', error);
+      res.status(500).json({ error: 'Failed to update worksheet' });
+    }
+  });
+
+  // Delete worksheet
+  app.delete('/api/worksheets/:worksheetId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId } = req.params;
+      await storage.deleteWorksheet(worksheetId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting worksheet:', error);
+      res.status(500).json({ error: 'Failed to delete worksheet' });
+    }
+  });
+
+  // Add page to worksheet
+  app.post('/api/worksheets/:worksheetId/pages', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId } = req.params;
+      const pages = await storage.getWorksheetPages(worksheetId);
+      const nextPageNumber = pages.length + 1;
+      
+      const page = await storage.createWorksheetPage({
+        worksheetId,
+        pageNumber: nextPageNumber,
+        title: req.body.title || `Page ${nextPageNumber}`,
+      });
+      
+      res.status(201).json(page);
+    } catch (error) {
+      console.error('Error adding page:', error);
+      res.status(500).json({ error: 'Failed to add page' });
+    }
+  });
+
+  // Delete page
+  app.delete('/api/worksheets/pages/:pageId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { pageId } = req.params;
+      await storage.deleteWorksheetPage(pageId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting page:', error);
+      res.status(500).json({ error: 'Failed to delete page' });
+    }
+  });
+
+  // Add question to page
+  app.post('/api/worksheets/pages/:pageId/questions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { pageId } = req.params;
+      const questions = await storage.getWorksheetQuestions(pageId);
+      const nextQuestionNumber = questions.length + 1;
+      
+      const question = await storage.createWorksheetQuestion({
+        pageId,
+        questionNumber: nextQuestionNumber,
+        ...req.body,
+      });
+      
+      res.status(201).json(question);
+    } catch (error) {
+      console.error('Error adding question:', error);
+      res.status(500).json({ error: 'Failed to add question' });
+    }
+  });
+
+  // Update question
+  app.patch('/api/worksheets/questions/:questionId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { questionId } = req.params;
+      const question = await storage.updateWorksheetQuestion(questionId, req.body);
+      res.json(question);
+    } catch (error) {
+      console.error('Error updating question:', error);
+      res.status(500).json({ error: 'Failed to update question' });
+    }
+  });
+
+  // Delete question
+  app.delete('/api/worksheets/questions/:questionId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { questionId } = req.params;
+      await storage.deleteWorksheetQuestion(questionId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      res.status(500).json({ error: 'Failed to delete question' });
+    }
+  });
+
+  // Assign worksheet to students/classes
+  app.post('/api/worksheets/:worksheetId/assign', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId } = req.params;
+      const user = req.user!;
+      const { studentIds, classIds, dueDate } = req.body;
+      
+      const assignments = [];
+      
+      // Assign to individual students
+      if (studentIds && studentIds.length > 0) {
+        for (const studentId of studentIds) {
+          const assignment = await storage.createWorksheetAssignment({
+            worksheetId,
+            studentId,
+            assignedBy: user.id,
+            dueDate: dueDate ? new Date(dueDate) : null,
+          });
+          assignments.push(assignment);
+        }
+      }
+      
+      // Assign to classes
+      if (classIds && classIds.length > 0) {
+        for (const classId of classIds) {
+          const assignment = await storage.createWorksheetAssignment({
+            worksheetId,
+            classId,
+            assignedBy: user.id,
+            dueDate: dueDate ? new Date(dueDate) : null,
+          });
+          assignments.push(assignment);
+        }
+      }
+      
+      res.status(201).json(assignments);
+    } catch (error) {
+      console.error('Error assigning worksheet:', error);
+      res.status(500).json({ error: 'Failed to assign worksheet' });
+    }
+  });
+
+  // Get worksheet assignments
+  app.get('/api/worksheets/:worksheetId/assignments', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId } = req.params;
+      const assignments = await storage.getWorksheetAssignments(worksheetId);
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error fetching assignments:', error);
+      res.status(500).json({ error: 'Failed to fetch assignments' });
+    }
+  });
+
+  // Get student's assigned worksheets
+  app.get('/api/students/:studentId/worksheets', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const assignments = await storage.getStudentWorksheetAssignments(studentId);
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error fetching student worksheets:', error);
+      res.status(500).json({ error: 'Failed to fetch worksheets' });
+    }
+  });
+
+  // Save/Update student answer
+  app.post('/api/worksheets/:worksheetId/answers', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId } = req.params;
+      const { questionId, studentId, textAnswer, handwritingData, selectedOption } = req.body;
+      
+      const answer = await storage.upsertWorksheetAnswer(questionId, studentId, worksheetId, {
+        textAnswer,
+        handwritingData,
+        selectedOption,
+      });
+      
+      res.json(answer);
+    } catch (error) {
+      console.error('Error saving answer:', error);
+      res.status(500).json({ error: 'Failed to save answer' });
+    }
+  });
+
+  // Get student's answers for a worksheet
+  app.get('/api/worksheets/:worksheetId/answers/:studentId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId, studentId } = req.params;
+      const answers = await storage.getWorksheetAnswers(worksheetId, studentId);
+      res.json(answers);
+    } catch (error) {
+      console.error('Error fetching answers:', error);
+      res.status(500).json({ error: 'Failed to fetch answers' });
+    }
+  });
+
+  // Submit worksheet (final submission)
+  app.post('/api/worksheets/:worksheetId/submit/:studentId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId, studentId } = req.params;
+      await storage.submitWorksheetAnswers(worksheetId, studentId);
+      res.json({ success: true, message: 'Worksheet submitted successfully' });
+    } catch (error) {
+      console.error('Error submitting worksheet:', error);
+      res.status(500).json({ error: 'Failed to submit worksheet' });
+    }
+  });
+
   // Create HTTP server without WebSocket conflicts
   const httpServer = createServer(app);
 
