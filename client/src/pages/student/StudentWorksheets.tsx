@@ -44,10 +44,9 @@ export function StudentWorksheets() {
   const [, setLocation] = useLocation();
   const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
 
-  const { data: student } = useQuery<Student>({
-    queryKey: ['/api/students/me'],
-    queryFn: () => fetch('/api/students/me', { credentials: 'include' }).then(r => r.json()),
-    enabled: !!user,
+  const { data: student, isLoading: studentLoading } = useQuery<Student>({
+    queryKey: ['/api/auth/student-profile'],
+    enabled: !!user && user?.role === 'student',
   });
 
   const { data: assignments = [], isLoading } = useQuery<WorksheetAssignment[]>({
