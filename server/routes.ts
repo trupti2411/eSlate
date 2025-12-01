@@ -2364,6 +2364,11 @@ Good luck with your assignment!"
 
   // ===== WORKSHEET SYSTEM ROUTES =====
 
+  // Helper: Check if user can manage worksheets (tutor, company_admin, or admin)
+  const canManageWorksheets = (user: any): boolean => {
+    return user && ['admin', 'company_admin', 'tutor'].includes(user.role);
+  };
+
   // Get all worksheets for a company
   app.get('/api/companies/:companyId/worksheets', isAuthenticated, async (req: any, res: any) => {
     try {
@@ -2376,11 +2381,16 @@ Good luck with your assignment!"
     }
   });
 
-  // Create a new worksheet
+  // Create a new worksheet (tutors and company admins only)
   app.post('/api/companies/:companyId/worksheets', isAuthenticated, async (req: any, res: any) => {
     try {
-      const { companyId } = req.params;
       const user = req.user!;
+      
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can create worksheets' });
+      }
+      
+      const { companyId } = req.params;
       
       const worksheetData = {
         ...req.body,
@@ -2421,9 +2431,14 @@ Good luck with your assignment!"
     }
   });
 
-  // Update worksheet
+  // Update worksheet (tutors and company admins only)
   app.patch('/api/worksheets/:worksheetId', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can update worksheets' });
+      }
+      
       const { worksheetId } = req.params;
       const worksheet = await storage.updateWorksheet(worksheetId, req.body);
       res.json(worksheet);
@@ -2433,9 +2448,14 @@ Good luck with your assignment!"
     }
   });
 
-  // Delete worksheet
+  // Delete worksheet (tutors and company admins only)
   app.delete('/api/worksheets/:worksheetId', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can delete worksheets' });
+      }
+      
       const { worksheetId } = req.params;
       await storage.deleteWorksheet(worksheetId);
       res.json({ success: true });
@@ -2445,9 +2465,14 @@ Good luck with your assignment!"
     }
   });
 
-  // Add page to worksheet
+  // Add page to worksheet (tutors and company admins only)
   app.post('/api/worksheets/:worksheetId/pages', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can modify worksheets' });
+      }
+      
       const { worksheetId } = req.params;
       const pages = await storage.getWorksheetPages(worksheetId);
       const nextPageNumber = pages.length + 1;
@@ -2465,9 +2490,14 @@ Good luck with your assignment!"
     }
   });
 
-  // Delete page
+  // Delete page (tutors and company admins only)
   app.delete('/api/worksheets/pages/:pageId', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can modify worksheets' });
+      }
+      
       const { pageId } = req.params;
       await storage.deleteWorksheetPage(pageId);
       res.json({ success: true });
@@ -2477,9 +2507,14 @@ Good luck with your assignment!"
     }
   });
 
-  // Add question to page
+  // Add question to page (tutors and company admins only)
   app.post('/api/worksheets/pages/:pageId/questions', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can modify worksheets' });
+      }
+      
       const { pageId } = req.params;
       const questions = await storage.getWorksheetQuestions(pageId);
       const nextQuestionNumber = questions.length + 1;
@@ -2497,9 +2532,14 @@ Good luck with your assignment!"
     }
   });
 
-  // Update question
+  // Update question (tutors and company admins only)
   app.patch('/api/worksheets/questions/:questionId', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can modify worksheets' });
+      }
+      
       const { questionId } = req.params;
       const question = await storage.updateWorksheetQuestion(questionId, req.body);
       res.json(question);
@@ -2509,9 +2549,14 @@ Good luck with your assignment!"
     }
   });
 
-  // Delete question
+  // Delete question (tutors and company admins only)
   app.delete('/api/worksheets/questions/:questionId', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can modify worksheets' });
+      }
+      
       const { questionId } = req.params;
       await storage.deleteWorksheetQuestion(questionId);
       res.json({ success: true });
@@ -2521,14 +2566,18 @@ Good luck with your assignment!"
     }
   });
 
-  // Assign worksheet to students/classes
+  // Assign worksheet to students/classes (tutors and company admins only)
   app.post('/api/worksheets/:worksheetId/assign', isAuthenticated, async (req: any, res: any) => {
     try {
-      const { worksheetId } = req.params;
       const user = req.user!;
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can assign worksheets' });
+      }
+      
+      const { worksheetId } = req.params;
       const { studentIds, classIds, dueDate } = req.body;
       
-      const assignments = [];
+      const assignmentResults = [];
       
       // Assign to individual students
       if (studentIds && studentIds.length > 0) {
@@ -2539,24 +2588,30 @@ Good luck with your assignment!"
             assignedBy: user.id,
             dueDate: dueDate ? new Date(dueDate) : null,
           });
-          assignments.push(assignment);
+          assignmentResults.push(assignment);
         }
       }
       
-      // Assign to classes
+      // Assign to classes - get all students in each class and assign to them
       if (classIds && classIds.length > 0) {
         for (const classId of classIds) {
-          const assignment = await storage.createWorksheetAssignment({
-            worksheetId,
-            classId,
-            assignedBy: user.id,
-            dueDate: dueDate ? new Date(dueDate) : null,
-          });
-          assignments.push(assignment);
+          // Get all students assigned to this class
+          const classStudents = await storage.getStudentsByClass(classId);
+          
+          for (const studentAssignment of classStudents) {
+            const assignment = await storage.createWorksheetAssignment({
+              worksheetId,
+              studentId: studentAssignment.studentId,
+              classId,
+              assignedBy: user.id,
+              dueDate: dueDate ? new Date(dueDate) : null,
+            });
+            assignmentResults.push(assignment);
+          }
         }
       }
       
-      res.status(201).json(assignments);
+      res.status(201).json(assignmentResults);
     } catch (error) {
       console.error('Error assigning worksheet:', error);
       res.status(500).json({ error: 'Failed to assign worksheet' });
@@ -2587,17 +2642,21 @@ Good luck with your assignment!"
     }
   });
 
-  // Save/Update student answer
+  // Save/Update student answer (students only)
   app.post('/api/worksheets/:worksheetId/answers', isAuthenticated, async (req: any, res: any) => {
     try {
       const { worksheetId } = req.params;
       const { questionId, studentId, textAnswer, handwritingData, selectedOption } = req.body;
       
+      // Save the answer
       const answer = await storage.upsertWorksheetAnswer(questionId, studentId, worksheetId, {
         textAnswer,
         handwritingData,
         selectedOption,
       });
+      
+      // Update assignment status to in_progress if still assigned
+      await storage.updateWorksheetAssignmentProgress(worksheetId, studentId);
       
       res.json(answer);
     } catch (error) {

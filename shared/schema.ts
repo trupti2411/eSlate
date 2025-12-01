@@ -616,6 +616,14 @@ export const worksheetQuestions = pgTable("worksheet_questions", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Worksheet assignment status enum
+export const worksheetAssignmentStatusEnum = pgEnum("worksheet_assignment_status", [
+  "assigned",
+  "in_progress",
+  "submitted",
+  "graded",
+]);
+
 // Worksheet assignments - assign worksheets to students/classes
 export const worksheetAssignments = pgTable("worksheet_assignments", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -624,6 +632,8 @@ export const worksheetAssignments = pgTable("worksheet_assignments", {
   classId: varchar("class_id").references(() => classes.id, { onDelete: 'cascade' }),
   assignedBy: varchar("assigned_by").notNull().references(() => users.id),
   dueDate: timestamp("due_date"),
+  status: worksheetAssignmentStatusEnum("status").notNull().default("assigned"),
+  submittedAt: timestamp("submitted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

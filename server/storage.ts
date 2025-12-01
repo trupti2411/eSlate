@@ -1366,12 +1366,39 @@ export class DatabaseStorage implements IStorage {
   }
 
   async submitWorksheetAnswers(worksheetId: string, studentId: string): Promise<void> {
+    const now = new Date();
+    
+    // Update all answers as submitted
     await db.update(worksheetAnswers)
-      .set({ isSubmitted: true, submittedAt: new Date() })
+      .set({ isSubmitted: true, submittedAt: now })
       .where(and(
         eq(worksheetAnswers.worksheetId, worksheetId),
         eq(worksheetAnswers.studentId, studentId)
       ));
+    
+    // Update the assignment status to submitted
+    await db.update(worksheetAssignments)
+      .set({ status: 'submitted', submittedAt: now })
+      .where(and(
+        eq(worksheetAssignments.worksheetId, worksheetId),
+        eq(worksheetAssignments.studentId, studentId)
+      ));
+  }
+  
+  async updateWorksheetAssignmentProgress(worksheetId: string, studentId: string): Promise<void> {
+    // Mark assignment as in progress when student starts saving answers
+    const [assignment] = await db.select().from(worksheetAssignments)
+      .where(and(
+        eq(worksheetAssignments.worksheetId, worksheetId),
+        eq(worksheetAssignments.studentId, studentId),
+        eq(worksheetAssignments.status, 'assigned')
+      ));
+    
+    if (assignment) {
+      await db.update(worksheetAssignments)
+        .set({ status: 'in_progress' })
+        .where(eq(worksheetAssignments.id, assignment.id));
+    }
   }
 
   async getFullWorksheet(worksheetId: string): Promise<any> {
