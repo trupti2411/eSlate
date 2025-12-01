@@ -1178,6 +1178,28 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  app.delete('/api/admin/users/:userId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { userId } = req.params;
+
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      // Prevent deleting yourself
+      if (user.id === userId) {
+        return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      await storage.deleteUser(userId, user.id);
+      res.json({ message: "User deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting user:", error);
+      res.status(500).json({ message: "Failed to delete user" });
+    }
+  });
+
   // Company management routes
   app.get('/api/companies', isAuthenticated, async (req: any, res: any) => {
     try {
