@@ -2692,6 +2692,41 @@ Good luck with your assignment!"
     try {
       const { worksheetId, studentId } = req.params;
       await storage.submitWorksheetAnswers(worksheetId, studentId);
+      
+      // Try to link worksheet submission to a standard assignment for status tracking
+      // This allows the StudentPortal to correctly display worksheet completion status
+      try {
+        const assignmentWithWorksheet = await storage.getAssignmentByWorksheetAndStudent(worksheetId, studentId);
+        if (assignmentWithWorksheet) {
+          // Check if a submission already exists for this assignment/student
+          const existingSubmissions = await storage.getSubmissionsByAssignmentAndStudent(assignmentWithWorksheet.id, studentId);
+          if (existingSubmissions.length > 0) {
+            // Update existing submission to submitted status
+            await storage.updateSubmission(existingSubmissions[0].id, {
+              status: 'submitted',
+              isDraft: false,
+            });
+          } else {
+            // Create new submission with all required and default fields
+            await storage.createSubmission({
+              assignmentId: assignmentWithWorksheet.id,
+              studentId: studentId,
+              status: 'submitted',
+              isDraft: false,
+              isLate: new Date() > new Date(assignmentWithWorksheet.submissionDate),
+              content: null,
+              documentUrl: null,
+              deviceType: null,
+              inputMethod: null,
+              fileUrls: [],
+            });
+          }
+        }
+      } catch (linkError) {
+        // Don't fail the worksheet submission if linking fails
+        console.log('Note: Could not link worksheet submission to assignment:', linkError);
+      }
+      
       res.json({ success: true, message: 'Worksheet submitted successfully' });
     } catch (error) {
       console.error('Error submitting worksheet:', error);

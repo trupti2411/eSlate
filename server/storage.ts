@@ -197,6 +197,9 @@ export interface IStorage {
   getStudentClasses(studentId: string): Promise<Class[]>;
   getStudentAssignments(studentId: string): Promise<Assignment[]>;
   getStudentSubmissions(studentId: string): Promise<Submission[]>;
+  
+  // Worksheet-Assignment link
+  getAssignmentByWorksheetAndStudent(worksheetId: string, studentId: string): Promise<Assignment | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1155,6 +1158,34 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(submissions)
       .where(eq(submissions.studentId, studentId))
       .orderBy(desc(submissions.createdAt));
+  }
+
+  async getAssignmentByWorksheetAndStudent(worksheetId: string, studentId: string): Promise<Assignment | undefined> {
+    // Find an assignment that uses this worksheet and is assigned to a class containing this student
+    const student = await this.getStudent(studentId);
+    if (!student) {
+      return undefined;
+    }
+    
+    // Get classes for this student
+    const studentClasses = await db.select().from(studentClassAssignments)
+      .where(eq(studentClassAssignments.studentId, studentId));
+    const classIds = studentClasses.map((a: any) => a.classId);
+    
+    if (classIds.length === 0) {
+      return undefined;
+    }
+    
+    // Find assignment with this worksheet in any of the student's classes
+    const [assignment] = await db.select().from(assignments)
+      .where(and(
+        eq(assignments.worksheetId, worksheetId),
+        eq(assignments.assignmentKind, 'worksheet'),
+        inArray(assignments.classId, classIds)
+      ))
+      .limit(1);
+    
+    return assignment;
   }
 
   async getCompanySubmissions(companyId: string): Promise<any[]> {
