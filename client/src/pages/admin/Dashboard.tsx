@@ -5,7 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, BookOpen, Settings, BarChart3, UserPlus, Shield, Building2 } from "lucide-react";
+import { Users, BookOpen, Settings, BarChart3, UserPlus, Shield, Building2, Home } from "lucide-react";
 
 interface AdminStats {
   totalUsers: number;
@@ -51,13 +51,22 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b-2 border-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-black">Admin Dashboard</h1>
-              <p className="text-gray-600 mt-2">System management and platform oversight</p>
+            <div className="flex items-center gap-4">
+              <Link href="/admin">
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
+                  <Home className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+              <div className="h-6 w-px bg-gray-300" />
+              <div>
+                <h1 className="text-2xl font-bold text-black">Admin Portal</h1>
+                <p className="text-gray-500 text-sm">System management and platform oversight</p>
+              </div>
             </div>
-            <Shield className="h-16 w-16 text-black opacity-10" />
+            <Shield className="h-12 w-12 text-black opacity-10" />
           </div>
         </div>
       </div>

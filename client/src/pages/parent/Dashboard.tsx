@@ -1,12 +1,13 @@
 import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, CheckCircle, BookOpen, TrendingUp } from "lucide-react";
+import { Users, CheckCircle, BookOpen, TrendingUp, Home } from "lucide-react";
 
 export default function ParentDashboard() {
   const { toast } = useToast();
@@ -56,13 +57,22 @@ export default function ParentDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b-2 border-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-black">Parent Dashboard</h1>
-              <p className="text-gray-600 mt-2">Monitor children's progress and verify work</p>
+            <div className="flex items-center gap-4">
+              <Link href="/parent">
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
+                  <Home className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+              <div className="h-6 w-px bg-gray-300" />
+              <div>
+                <h1 className="text-2xl font-bold text-black">Parent Portal</h1>
+                <p className="text-gray-500 text-sm">Monitor children's progress and verify work</p>
+              </div>
             </div>
-            <Users className="h-16 w-16 text-black opacity-10" />
+            <Users className="h-12 w-12 text-black opacity-10" />
           </div>
         </div>
       </div>

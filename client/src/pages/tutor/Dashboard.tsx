@@ -6,7 +6,7 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, Calendar, TrendingUp, Plus, ArrowRight } from "lucide-react";
+import { Users, BookOpen, Calendar, TrendingUp, Plus, ArrowRight, Home } from "lucide-react";
 import { format } from "date-fns";
 
 export default function TutorDashboard() {
@@ -56,13 +56,22 @@ export default function TutorDashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white border-b-2 border-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-4xl font-bold text-black">Tutor Dashboard</h1>
-              <p className="text-gray-600 mt-2">Manage students and track their progress</p>
+            <div className="flex items-center gap-4">
+              <Link href="/tutor">
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
+                  <Home className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+              <div className="h-6 w-px bg-gray-300" />
+              <div>
+                <h1 className="text-2xl font-bold text-black">Tutor Portal</h1>
+                <p className="text-gray-500 text-sm">Manage students and track their progress</p>
+              </div>
             </div>
-            <BookOpen className="h-16 w-16 text-black opacity-10" />
+            <BookOpen className="h-12 w-12 text-black opacity-10" />
           </div>
         </div>
       </div>

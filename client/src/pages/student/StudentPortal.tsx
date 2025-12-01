@@ -752,15 +752,15 @@ export function StudentPortal() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/student/home">
-                <Button variant="outline" size="sm" className="border-black hover:bg-gray-100">
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
                   <Home className="h-4 w-4 mr-2" />
-                  Home
+                  Dashboard
                 </Button>
               </Link>
               <div className="h-6 w-px bg-gray-300" />
-              <h1 className="text-xl font-bold text-black">Student Portal</h1>
+              <h1 className="text-2xl font-bold text-black">Student Portal</h1>
             </div>
-            <Badge className="bg-black text-white px-3 py-1">
+            <Badge className="bg-black text-white px-4 py-2 text-sm">
               {user?.firstName} {user?.lastName}
             </Badge>
           </div>
@@ -769,31 +769,31 @@ export function StudentPortal() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-black rounded-lg p-1 mb-6">
+          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-black rounded-xl p-1.5 mb-6 gap-1">
             <TabsTrigger 
               value="dashboard" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
             >
               <TrendingUp className="h-4 w-4 mr-2" />
               Dashboard
             </TabsTrigger>
             <TabsTrigger 
               value="terms" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
             >
               <Calendar className="h-4 w-4 mr-2" />
               Terms
             </TabsTrigger>
             <TabsTrigger 
               value="classes" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
             >
               <GraduationCap className="h-4 w-4 mr-2" />
               Classes
             </TabsTrigger>
             <TabsTrigger 
               value="assignments" 
-              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-md transition-all"
+              className="data-[state=active]:bg-black data-[state=active]:text-white rounded-lg py-2.5 px-4 font-medium transition-all"
             >
               <FileText className="h-4 w-4 mr-2" />
               Assignments
