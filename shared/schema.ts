@@ -31,6 +31,7 @@ export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'su
 export const submissionStatusEnum = pgEnum('submission_status', ['draft', 'submitted', 'late', 'graded', 'parent_verified', 'needs_revision']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
 export const questionTypeEnum = pgEnum('question_type', ['short_text', 'long_text', 'multiple_choice', 'fill_blank', 'text_image']);
+export const assignmentKindEnum = pgEnum('assignment_kind', ['file_upload', 'worksheet']);
 
 // User storage table with custom authentication
 export const users = pgTable("users", {
@@ -122,6 +123,10 @@ export const assignments = pgTable("assignments", {
   companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),
   classId: varchar("class_id").references(() => classes.id), // Assign to entire class
+  
+  // Assignment type: 'file_upload' for traditional file submissions, 'worksheet' for interactive worksheets
+  assignmentKind: assignmentKindEnum("assignment_kind").notNull().default('file_upload'),
+  worksheetId: varchar("worksheet_id"), // Reference to worksheet (when assignmentKind is 'worksheet')
   
   // Academic organization fields
   academicYearId: varchar("academic_year_id").references(() => academicYears.id),
