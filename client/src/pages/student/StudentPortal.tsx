@@ -153,6 +153,12 @@ export function StudentPortal() {
     enabled: !!studentDbId
   });
 
+  const { data: worksheetAssignments = [] } = useQuery({
+    queryKey: ['/api/students', studentDbId, 'worksheets'],
+    enabled: !!studentDbId
+  });
+
+  const typedWorksheetAssignments = worksheetAssignments as any[];
   const typedStudentTerms = studentTerms as AcademicTerm[];
   const typedStudentClasses = studentClasses as Class[];
   const typedAssignments = assignments as Assignment[];
@@ -408,7 +414,11 @@ export function StudentPortal() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-lg">Worksheets</h3>
-                  <p className="text-sm text-gray-500">Interactive learning</p>
+                  <p className="text-sm text-gray-500">
+                    {typedWorksheetAssignments.length > 0 
+                      ? `${typedWorksheetAssignments.length} assigned worksheets` 
+                      : 'Interactive learning'}
+                  </p>
                 </div>
               </div>
               <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
