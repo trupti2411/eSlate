@@ -48,9 +48,7 @@ export default function StudentHome() {
   );
 
   const completedAssignments = submissions.filter((s: any) => s.status === 'submitted').length;
-  const completionRate = assignments.length > 0 
-    ? Math.round((completedAssignments / assignments.length) * 100) 
-    : 0;
+  const gradedAssignments = submissions.filter((s: any) => s.status === 'graded').length;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -87,12 +85,12 @@ export default function StudentHome() {
             <CardHeader className="pb-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <CheckCircle className="h-4 w-4" />
-                Completed
+                Graded Work
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{completedAssignments}</div>
-              <p className="text-xs text-gray-600 mt-1">{completionRate}% completion</p>
+              <div className="text-3xl font-bold text-black">{gradedAssignments}</div>
+              <p className="text-xs text-gray-600 mt-1">{completedAssignments} submitted</p>
             </CardContent>
           </Card>
 
