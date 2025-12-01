@@ -83,15 +83,6 @@ export default function CompanyDashboard() {
     tutorId: "",
   });
 
-  const [isCreateDocumentOpen, setIsCreateDocumentOpen] = useState(false);
-  const [documentFormData, setDocumentFormData] = useState({
-    title: "",
-    description: "",
-    instructions: "",
-    subject: "",
-    dueDate: "",
-    classId: "",
-  });
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -163,31 +154,6 @@ export default function CompanyDashboard() {
     },
   });
 
-  const createDocumentMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const payload: any = {
-        title: data.title,
-        description: data.description,
-        instructions: data.instructions,
-        subject: data.subject,
-        companyId: companyAdmin?.companyId,
-        submissionDate: new Date(data.dueDate).toISOString(),
-      };
-      // Only include classId if it has a value
-      if (data.classId) {
-        payload.classId = data.classId;
-      }
-      return await apiRequest("/api/assignments", "POST", payload);
-    },
-    onSuccess: () => {
-      toast({ title: "Success", description: "Document assignment created successfully" });
-      setIsCreateDocumentOpen(false);
-      setDocumentFormData({ title: "", description: "", instructions: "", subject: "", dueDate: "", classId: "" });
-    },
-    onError: (error: any) => {
-      toast({ title: "Error", description: error.message || "Failed to create document assignment", variant: "destructive" });
-    },
-  });
 
   const handleCreateTutor = (e: React.FormEvent) => {
     e.preventDefault();
@@ -198,13 +164,6 @@ export default function CompanyDashboard() {
     e.preventDefault();
     if (selectedStudentId && tutorAssignmentData.tutorId) {
       assignTutorMutation.mutate({ studentId: selectedStudentId, tutorId: tutorAssignmentData.tutorId });
-    }
-  };
-
-  const handleCreateDocument = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (documentFormData.title && documentFormData.subject && documentFormData.dueDate) {
-      createDocumentMutation.mutate(documentFormData);
     }
   };
 
@@ -314,41 +273,6 @@ export default function CompanyDashboard() {
               Worksheets
             </Button>
           </Link>
-
-          <Dialog open={isCreateDocumentOpen} onOpenChange={setIsCreateDocumentOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold">
-                <FileText className="h-5 w-5 mr-2" />
-                Create Document
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>Create Document Assignment</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateDocument} className="space-y-3">
-                <div>
-                  <Label htmlFor="docTitle" className="text-xs">Worksheet Title *</Label>
-                  <Input id="docTitle" value={documentFormData.title} onChange={(e) => setDocumentFormData({ ...documentFormData, title: e.target.value })} placeholder="e.g., Algebra Worksheet" required />
-                </div>
-                <div>
-                  <Label htmlFor="subject" className="text-xs">Subject *</Label>
-                  <Input id="subject" value={documentFormData.subject} onChange={(e) => setDocumentFormData({ ...documentFormData, subject: e.target.value })} placeholder="e.g., Mathematics" required />
-                </div>
-                <div>
-                  <Label htmlFor="description" className="text-xs">Description</Label>
-                  <Input id="description" value={documentFormData.description} onChange={(e) => setDocumentFormData({ ...documentFormData, description: e.target.value })} placeholder="What this worksheet covers" />
-                </div>
-                <div>
-                  <Label htmlFor="dueDate" className="text-xs">Due Date *</Label>
-                  <Input id="dueDate" type="datetime-local" value={documentFormData.dueDate} onChange={(e) => setDocumentFormData({ ...documentFormData, dueDate: e.target.value })} required />
-                </div>
-                <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800 text-sm" disabled={createDocumentMutation.isPending}>
-                  {createDocumentMutation.isPending ? "Creating..." : "Create Worksheet"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
 
           <Link href="/company/assignments">
             <Button variant="outline" className="border-2 border-black bg-white text-black hover:bg-gray-100 py-3 px-6 font-semibold">
