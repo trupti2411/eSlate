@@ -5,7 +5,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Save, X, Pen, Highlighter, Eraser, Type, RotateCcw, Download, Send, Move, ZoomIn, ZoomOut } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Set up PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface PDFAnnotatorProps {
@@ -40,7 +39,6 @@ interface TextAnnotation {
   pageIndex: number;
 }
 
-// Global store for strokes
 const strokeStore: Map<string, { strokes: Stroke[]; texts: TextAnnotation[] }> = new Map();
 
 function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitted = false, documentUrl }: PDFAnnotatorProps) {
@@ -52,36 +50,27 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   const [pdfError, setPdfError] = useState<string | null>(null);
   const [numPages, setNumPages] = useState(0);
   const [scale, setScale] = useState(1.5);
-  const [currentPage, setCurrentPage] = useState(0);
   
+  // Persistent refs that don't trigger re-renders
   const storeKey = `${assignmentId}-${documentUrl || pdfUrl}`;
-  const [strokes, setStrokes] = useState<Stroke[]>(() => strokeStore.get(storeKey)?.strokes || []);
-  const [texts, setTexts] = useState<TextAnnotation[]>(() => strokeStore.get(storeKey)?.texts || []);
-  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
-  
-  const containerRef = useRef<HTMLDivElement>(null);
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const annotationCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   
-  const strokesRef = useRef(strokes);
-  const textsRef = useRef(texts);
-  const currentStrokeRef = useRef(currentStroke);
+  // Data refs that persist across re-renders
+  const strokesRef = useRef<Stroke[]>(strokeStore.get(storeKey)?.strokes || []);
+  const textsRef = useRef<TextAnnotation[]>(strokeStore.get(storeKey)?.texts || []);
+  const currentStrokeRef = useRef<Stroke | null>(null);
+  const currentPageRef = useRef(0);
+  const drawingStateRef = useRef({ isDirty: false, needsRedraw: new Set<number>() });
   
+  const containerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Save to store whenever strokes change
   useEffect(() => {
-    strokeStore.set(storeKey, { strokes, texts });
-    strokesRef.current = strokes;
-  }, [strokes, texts, storeKey]);
-
-  useEffect(() => {
-    textsRef.current = texts;
-  }, [texts]);
-
-  useEffect(() => {
-    currentStrokeRef.current = currentStroke;
-  }, [currentStroke]);
+    strokeStore.set(storeKey, { strokes: strokesRef.current, texts: textsRef.current });
+  }, [storeKey]);
 
   // Load PDF
   useEffect(() => {
@@ -96,70 +85,48 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       } catch (error) {
         console.error('Error loading PDF:', error);
         setPdfError('Failed to load PDF. The file may be inaccessible or in an unsupported format.');
-        setPdfLoaded(false);
       }
     };
-
     loadPDF();
-
     return () => {
-      if (pdfDocRef.current) {
-        pdfDocRef.current.destroy();
-        pdfDocRef.current = null;
-      }
+      if (pdfDocRef.current) pdfDocRef.current.destroy();
     };
   }, [pdfUrl]);
 
-  // Render a single page
-  const renderPage = useCallback(async (pageNum: number) => {
+  // Render PDF page
+  const renderPDFPage = useCallback(async (pageNum: number) => {
     if (!pdfDocRef.current) return;
-
     try {
       const page = await pdfDocRef.current.getPage(pageNum);
       const viewport = page.getViewport({ scale });
-
       const pdfCanvas = pageCanvasRefs.current.get(pageNum);
-      const annotationCanvas = annotationCanvasRefs.current.get(pageNum);
+      const annotCanvas = annotationCanvasRefs.current.get(pageNum);
 
       if (pdfCanvas) {
-        const context = pdfCanvas.getContext('2d');
-        if (context) {
-          pdfCanvas.width = viewport.width;
-          pdfCanvas.height = viewport.height;
-          
+        pdfCanvas.width = viewport.width;
+        pdfCanvas.height = viewport.height;
+        const ctx = pdfCanvas.getContext('2d');
+        if (ctx) {
           await page.render({
-            canvasContext: context,
+            canvasContext: ctx,
             viewport: viewport,
             canvas: pdfCanvas
           } as any).promise;
         }
       }
 
-      if (annotationCanvas) {
-        annotationCanvas.width = viewport.width;
-        annotationCanvas.height = viewport.height;
-        redrawAnnotationsForPage(pageNum - 1);
+      if (annotCanvas) {
+        annotCanvas.width = viewport.width;
+        annotCanvas.height = viewport.height;
+        redrawPage(pageNum - 1);
       }
     } catch (error) {
       console.error(`Error rendering page ${pageNum}:`, error);
     }
   }, [scale]);
 
-  // Render all pages
-  useEffect(() => {
-    if (!pdfLoaded || !pdfDocRef.current) return;
-
-    const renderAllPages = async () => {
-      for (let i = 1; i <= numPages; i++) {
-        await renderPage(i);
-      }
-    };
-
-    renderAllPages();
-  }, [pdfLoaded, numPages, scale, renderPage]);
-
-  // Redraw annotations for a specific page
-  const redrawAnnotationsForPage = useCallback((pageIndex: number) => {
+  // Redraw annotations for a page
+  const redrawPage = useCallback((pageIndex: number) => {
     const canvas = annotationCanvasRefs.current.get(pageIndex + 1);
     if (!canvas) return;
     
@@ -168,20 +135,17 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const currentStrokes = strokesRef.current.filter(s => s.pageIndex === pageIndex);
-    const currentTexts = textsRef.current.filter(t => t.pageIndex === pageIndex);
-    const drawingStroke = currentStrokeRef.current;
+    const pageStrokes = strokesRef.current.filter(s => s.pageIndex === pageIndex);
+    const pageTexts = textsRef.current.filter(t => t.pageIndex === pageIndex);
 
-    currentStrokes.forEach(stroke => {
+    pageStrokes.forEach(stroke => {
       if (stroke.points.length < 2) return;
-      
       ctx.beginPath();
       ctx.globalCompositeOperation = stroke.compositeOperation;
       ctx.strokeStyle = stroke.color;
       ctx.lineWidth = stroke.lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      
       ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
       for (let i = 1; i < stroke.points.length; i++) {
         ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
@@ -189,35 +153,23 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       ctx.stroke();
     });
 
-    if (drawingStroke && drawingStroke.pageIndex === pageIndex && drawingStroke.points.length >= 2) {
-      ctx.beginPath();
-      ctx.globalCompositeOperation = drawingStroke.compositeOperation;
-      ctx.strokeStyle = drawingStroke.color;
-      ctx.lineWidth = drawingStroke.lineWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      ctx.moveTo(drawingStroke.points[0].x, drawingStroke.points[0].y);
-      for (let i = 1; i < drawingStroke.points.length; i++) {
-        ctx.lineTo(drawingStroke.points[i].x, drawingStroke.points[i].y);
-      }
-      ctx.stroke();
-    }
-
     ctx.globalCompositeOperation = 'source-over';
     ctx.font = '18px Arial';
     ctx.fillStyle = '#000000';
-    currentTexts.forEach(textAnnotation => {
-      ctx.fillText(textAnnotation.text, textAnnotation.x, textAnnotation.y);
+    pageTexts.forEach(text => {
+      ctx.fillText(text.text, text.x, text.y);
     });
   }, []);
 
-  // Redraw all annotations when they change
+  // Render all pages when PDF loads or scale changes
   useEffect(() => {
-    for (let i = 0; i < numPages; i++) {
-      redrawAnnotationsForPage(i);
-    }
-  }, [strokes, texts, currentStroke, numPages, redrawAnnotationsForPage]);
+    if (!pdfLoaded || !pdfDocRef.current) return;
+    (async () => {
+      for (let i = 1; i <= numPages; i++) {
+        await renderPDFPage(i);
+      }
+    })();
+  }, [pdfLoaded, numPages, scale, renderPDFPage]);
 
   const getToolSettings = (tool: Tool): Pick<Stroke, 'color' | 'lineWidth' | 'compositeOperation'> => {
     switch (tool) {
@@ -232,35 +184,19 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     }
   };
 
-  const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement) => {
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, pageIndex: number) => {
+    const canvas = e.currentTarget as HTMLCanvasElement;
     const rect = canvas.getBoundingClientRect();
     const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
-    };
-  };
-
-  const getPageIndexFromCanvas = (canvas: HTMLCanvasElement): number => {
-    const entries = Array.from(annotationCanvasRefs.current.entries());
-    for (const [pageNum, canvasEl] of entries) {
-      if (canvasEl === canvas) {
-        return pageNum - 1;
-      }
-    }
-    return 0;
-  };
-
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    const canvas = e.currentTarget as HTMLCanvasElement;
-    const pageIndex = getPageIndexFromCanvas(canvas);
-    const { x, y } = getCanvasCoordinates(e, canvas);
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
     if (activeTool === 'text') {
       const text = prompt('Enter text:');
       if (text) {
-        setTexts(prev => [...prev, { x, y, text, pageIndex }]);
+        textsRef.current.push({ x, y, text, pageIndex });
+        redrawPage(pageIndex);
       }
       return;
     }
@@ -269,68 +205,90 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     
     e.preventDefault();
     setIsDrawing(true);
-    setCurrentPage(pageIndex);
+    currentPageRef.current = pageIndex;
 
     const settings = getToolSettings(activeTool);
-    setCurrentStroke({
+    currentStrokeRef.current = {
       points: [{ x, y }],
       tool: activeTool as 'pen' | 'highlight' | 'eraser',
       pageIndex,
       ...settings
-    });
+    };
+
+    drawOnCanvas(canvas, pageIndex);
   };
 
-  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !currentStroke) return;
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, pageIndex: number) => {
+    if (!isDrawing || !currentStrokeRef.current) return;
     
     e.preventDefault();
     const canvas = e.currentTarget as HTMLCanvasElement;
-    const { x, y } = getCanvasCoordinates(e, canvas);
+    const rect = canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
 
-    setCurrentStroke(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        points: [...prev.points, { x, y }]
-      };
-    });
+    currentStrokeRef.current.points.push({ x, y });
+    drawOnCanvas(canvas, pageIndex);
+  };
+
+  const drawOnCanvas = (canvas: HTMLCanvasElement, pageIndex: number) => {
+    if (!currentStrokeRef.current) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const stroke = currentStrokeRef.current;
+    const points = stroke.points;
+
+    if (points.length < 2) return;
+
+    // Draw just the new segment
+    ctx.beginPath();
+    ctx.globalCompositeOperation = stroke.compositeOperation;
+    ctx.strokeStyle = stroke.color;
+    ctx.lineWidth = stroke.lineWidth;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.moveTo(points[points.length - 2].x, points[points.length - 2].y);
+    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+    ctx.stroke();
   };
 
   const stopDrawing = () => {
-    if (currentStroke && currentStroke.points.length >= 2) {
-      setStrokes(prev => [...prev, currentStroke]);
+    if (currentStrokeRef.current && currentStrokeRef.current.points.length >= 2) {
+      strokesRef.current.push(currentStrokeRef.current);
     }
-    setCurrentStroke(null);
+    currentStrokeRef.current = null;
     setIsDrawing(false);
   };
 
   const clearCanvas = () => {
-    setStrokes([]);
-    setTexts([]);
+    strokesRef.current = [];
+    textsRef.current = [];
     strokeStore.delete(storeKey);
     for (let i = 0; i < numPages; i++) {
-      redrawAnnotationsForPage(i);
+      redrawPage(i);
     }
   };
 
   const handleDownload = async () => {
     if (!pdfDocRef.current) return;
     
-    // Create a combined canvas with all pages and annotations
     const combinedCanvas = document.createElement('canvas');
     const ctx = combinedCanvas.getContext('2d');
     if (!ctx) return;
 
     let totalHeight = 0;
     let maxWidth = 0;
-    const pageData: { pdfCanvas: HTMLCanvasElement; annotCanvas: HTMLCanvasElement; height: number }[] = [];
+    const pageData: { pdfCanvas: HTMLCanvasElement; annotCanvas: HTMLCanvasElement }[] = [];
 
     for (let i = 1; i <= numPages; i++) {
       const pdfCanvas = pageCanvasRefs.current.get(i);
       const annotCanvas = annotationCanvasRefs.current.get(i);
       if (pdfCanvas && annotCanvas) {
-        pageData.push({ pdfCanvas, annotCanvas, height: pdfCanvas.height });
-        totalHeight += pdfCanvas.height + 10; // 10px gap between pages
+        pageData.push({ pdfCanvas, annotCanvas });
+        totalHeight += pdfCanvas.height;
         maxWidth = Math.max(maxWidth, pdfCanvas.width);
       }
     }
@@ -341,10 +299,10 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
 
     let yOffset = 0;
-    for (const { pdfCanvas, annotCanvas, height } of pageData) {
+    for (const { pdfCanvas, annotCanvas } of pageData) {
       ctx.drawImage(pdfCanvas, 0, yOffset);
       ctx.drawImage(annotCanvas, 0, yOffset);
-      yOffset += height + 10;
+      yOffset += pdfCanvas.height;
     }
 
     const link = document.createElement('a');
@@ -353,7 +311,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     link.click();
   };
 
-  const hasAnnotations = strokes.length > 0 || texts.length > 0;
+  const hasAnnotations = strokesRef.current.length > 0 || textsRef.current.length > 0;
 
   const handleSaveAndSubmit = async (submitAfterSave: boolean = false) => {
     if (!pdfDocRef.current || isSaving || isSubmitting) return;
@@ -374,20 +332,19 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
         return;
       }
 
-      // Create combined canvas
       const combinedCanvas = document.createElement('canvas');
       const ctx = combinedCanvas.getContext('2d');
       if (!ctx) throw new Error('Could not get canvas context');
 
       let totalHeight = 0;
       let maxWidth = 0;
-      const pageData: { pdfCanvas: HTMLCanvasElement; annotCanvas: HTMLCanvasElement; height: number }[] = [];
+      const pageData: { pdfCanvas: HTMLCanvasElement; annotCanvas: HTMLCanvasElement }[] = [];
 
       for (let i = 1; i <= numPages; i++) {
         const pdfCanvas = pageCanvasRefs.current.get(i);
         const annotCanvas = annotationCanvasRefs.current.get(i);
         if (pdfCanvas && annotCanvas) {
-          pageData.push({ pdfCanvas, annotCanvas, height: pdfCanvas.height });
+          pageData.push({ pdfCanvas, annotCanvas });
           totalHeight += pdfCanvas.height;
           maxWidth = Math.max(maxWidth, pdfCanvas.width);
         }
@@ -399,10 +356,10 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       ctx.fillRect(0, 0, combinedCanvas.width, combinedCanvas.height);
 
       let yOffset = 0;
-      for (const { pdfCanvas, annotCanvas, height } of pageData) {
+      for (const { pdfCanvas, annotCanvas } of pageData) {
         ctx.drawImage(pdfCanvas, 0, yOffset);
         ctx.drawImage(annotCanvas, 0, yOffset);
-        yOffset += height;
+        yOffset += pdfCanvas.height;
       }
 
       const blob = await new Promise<Blob>((resolve, reject) => {
@@ -417,23 +374,17 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
         credentials: 'include'
       });
 
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to get upload URL');
-      }
+      if (!uploadResponse.ok) throw new Error('Failed to get upload URL');
 
       const uploadData = await uploadResponse.json();
       
       const putResponse = await fetch(uploadData.uploadURL, {
         method: 'PUT',
         body: blob,
-        headers: {
-          'Content-Type': 'image/png'
-        }
+        headers: { 'Content-Type': 'image/png' }
       });
 
-      if (!putResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
+      if (!putResponse.ok) throw new Error('Failed to upload file');
 
       const urlParts = uploadData.uploadURL.split('/');
       const objectKey = urlParts[urlParts.length - 1].split('?')[0];
@@ -467,13 +418,6 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       if (isSubmittingNow) setIsSubmitting(false);
     }
   };
-
-  const handleToolChange = (tool: Tool) => {
-    setActiveTool(tool);
-  };
-
-  const zoomIn = () => setScale(prev => Math.min(prev + 0.25, 3));
-  const zoomOut = () => setScale(prev => Math.max(prev - 0.25, 0.5));
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
@@ -517,7 +461,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             <div>
               <h4 className="font-medium mb-2">Mode</h4>
               <Button
-                onClick={() => handleToolChange(null)}
+                onClick={() => setActiveTool(null)}
                 className={`w-full justify-start ${activeTool === null ? 'bg-black text-white' : 'bg-white'}`}
               >
                 <Move className="h-4 w-4 mr-2" />
@@ -529,14 +473,14 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
               <h4 className="font-medium mb-2">Drawing</h4>
               <div className="space-y-2">
                 <Button
-                  onClick={() => handleToolChange('pen')}
+                  onClick={() => setActiveTool('pen')}
                   className={`w-full justify-start ${activeTool === 'pen' ? 'bg-black text-white' : 'bg-white'}`}
                 >
                   <Pen className="h-4 w-4 mr-2" />
                   Pen
                 </Button>
                 <Button
-                  onClick={() => handleToolChange('highlight')}
+                  onClick={() => setActiveTool('highlight')}
                   className={`w-full justify-start ${activeTool === 'highlight' ? 'bg-black text-white' : 'bg-white'}`}
                 >
                   <Highlighter className="h-4 w-4 mr-2" />
@@ -548,7 +492,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             <div>
               <h4 className="font-medium mb-2">Eraser</h4>
               <Button
-                onClick={() => handleToolChange('eraser')}
+                onClick={() => setActiveTool('eraser')}
                 className={`w-full justify-start ${activeTool === 'eraser' ? 'bg-black text-white' : 'bg-white'}`}
               >
                 <Eraser className="h-4 w-4 mr-2" />
@@ -559,7 +503,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             <div>
               <h4 className="font-medium mb-2">Text</h4>
               <Button
-                onClick={() => handleToolChange('text')}
+                onClick={() => setActiveTool('text')}
                 className={`w-full justify-start ${activeTool === 'text' ? 'bg-black text-white' : 'bg-white'}`}
               >
                 <Type className="h-4 w-4 mr-2" />
@@ -570,10 +514,10 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             <div>
               <h4 className="font-medium mb-2">Zoom</h4>
               <div className="flex gap-2">
-                <Button onClick={zoomOut} variant="outline" className="flex-1">
+                <Button onClick={() => setScale(prev => Math.max(prev - 0.25, 0.5))} variant="outline" className="flex-1">
                   <ZoomOut className="h-4 w-4" />
                 </Button>
-                <Button onClick={zoomIn} variant="outline" className="flex-1">
+                <Button onClick={() => setScale(prev => Math.min(prev + 0.25, 3))} variant="outline" className="flex-1">
                   <ZoomIn className="h-4 w-4" />
                 </Button>
               </div>
@@ -597,11 +541,8 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             </div>
           </div>
 
-          {/* PDF Viewer with annotations */}
-          <div 
-            ref={containerRef}
-            className="flex-1 overflow-auto bg-gray-300 p-4"
-          >
+          {/* PDF Viewer */}
+          <div ref={containerRef} className="flex-1 overflow-auto bg-gray-300 p-4">
             {pdfError ? (
               <div className="flex items-center justify-center h-full">
                 <div className="bg-white p-6 rounded-lg shadow text-center">
@@ -619,24 +560,13 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             ) : (
               <div className="flex flex-col items-center gap-4">
                 {Array.from({ length: numPages }, (_, i) => i + 1).map((pageNum) => (
-                  <div 
-                    key={pageNum} 
-                    className="relative bg-white shadow-lg"
-                    style={{ 
-                      cursor: activeTool === 'text' ? 'text' : 
-                              activeTool === 'eraser' ? 'grab' : 
-                              activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 
-                              'default' 
-                    }}
-                  >
-                    {/* PDF Page Canvas */}
+                  <div key={pageNum} className="relative bg-white shadow-lg">
                     <canvas
                       ref={(el) => {
                         if (el) pageCanvasRefs.current.set(pageNum, el);
                       }}
                       className="block"
                     />
-                    {/* Annotation Canvas Overlay */}
                     <canvas
                       ref={(el) => {
                         if (el) annotationCanvasRefs.current.set(pageNum, el);
@@ -644,17 +574,20 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                       className="absolute top-0 left-0"
                       style={{
                         pointerEvents: activeTool ? 'auto' : 'none',
-                        touchAction: activeTool ? 'none' : 'auto'
+                        touchAction: activeTool ? 'none' : 'auto',
+                        cursor: activeTool === 'text' ? 'text' : 
+                                activeTool === 'eraser' ? 'grab' : 
+                                activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 
+                                'default',
                       }}
-                      onMouseDown={startDrawing}
-                      onMouseMove={draw}
+                      onMouseDown={(e) => startDrawing(e, pageNum - 1)}
+                      onMouseMove={(e) => draw(e, pageNum - 1)}
                       onMouseUp={stopDrawing}
                       onMouseLeave={stopDrawing}
-                      onTouchStart={startDrawing}
-                      onTouchMove={draw}
+                      onTouchStart={(e) => startDrawing(e, pageNum - 1)}
+                      onTouchMove={(e) => draw(e, pageNum - 1)}
                       onTouchEnd={stopDrawing}
                     />
-                    {/* Page number */}
                     <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
                       Page {pageNum} of {numPages}
                     </div>
@@ -670,7 +603,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
           <div className="flex items-center justify-between">
             <div>
               <strong>Instructions:</strong> Select "Navigate PDF" to scroll and read, then choose a tool to annotate. Click "Save Work" when finished.
-              {hasAnnotations && <span className="ml-2 text-green-600 font-medium">({strokes.length} strokes, {texts.length} text annotations)</span>}
+              {hasAnnotations && <span className="ml-2 text-green-600 font-medium">({strokesRef.current.length} strokes, {textsRef.current.length} text annotations)</span>}
             </div>
           </div>
         </div>
