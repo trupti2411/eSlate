@@ -2,31 +2,22 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
-import Layout from "@/components/Layout";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, Calendar, TrendingUp, Plus } from "lucide-react";
+import { Users, BookOpen, Calendar, TrendingUp, Plus, ArrowRight } from "lucide-react";
+import { format } from "date-fns";
 
 export default function TutorDashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
+      setTimeout(() => window.location.href = "/api/login", 500);
     }
-  }, [isAuthenticated, isLoading, toast]);
+  }, [isAuthenticated, isLoading]);
 
   const { data: students, isLoading: studentsLoading } = useQuery({
     queryKey: ["/api/students"],
@@ -48,7 +39,7 @@ export default function TutorDashboard() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-black">Loading dashboard...</p>
+          <p className="text-black">Loading...</p>
         </div>
       </div>
     );
@@ -59,305 +50,184 @@ export default function TutorDashboard() {
     return eventDate === new Date().toDateString();
   }) || [];
 
-  const pendingReview = assignments?.filter(a => a.status === 'submitted') || [];
-  const activeStudents = students?.length || 0;
+  const pendingReview = assignments?.filter((a: any) => a.status === 'submitted') || [];
 
   return (
-    <Layout>
-      <div className="container py-8">
-        <div className="flex justify-between items-start mb-8">
-          <div>
-            <h1 className="page-title">Tutor Dashboard</h1>
-            <p className="text-gray-600">Manage your students and track their progress</p>
-          </div>
-          <div className="flex space-x-3">
-            <Button className="eink-button">
-              <Plus className="h-4 w-4 mr-2" />
-              New Assignment
-            </Button>
-            <Button className="eink-button">
-              <Calendar className="h-4 w-4 mr-2" />
-              Schedule Class
-            </Button>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b-2 border-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-black">Tutor Dashboard</h1>
+              <p className="text-gray-600 mt-2">Manage students and track their progress</p>
+            </div>
+            <BookOpen className="h-16 w-16 text-black opacity-10" />
           </div>
         </div>
+      </div>
 
-        {/* Stats Overview */}
-        <div className="dashboard-grid mb-8">
-          <Card className="eink-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Users className="h-5 w-5 mr-2" />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick Actions */}
+        <div className="flex gap-4 mb-8">
+          <Link href="/company/assignments">
+            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold">
+              <Plus className="h-5 w-5 mr-2" />
+              New Assignment
+            </Button>
+          </Link>
+          <Button className="border-2 border-black hover:bg-gray-100 py-3 px-6 font-semibold">
+            <Calendar className="h-5 w-5 mr-2" />
+            Schedule Class
+          </Button>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Users className="h-4 w-4" />
                 Students
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{activeStudents}</div>
-              <p className="text-gray-600 text-sm">Active students</p>
+              <div className="text-3xl font-bold text-black">{students?.length || 0}</div>
+              <p className="text-xs text-gray-600 mt-1">Active students</p>
             </CardContent>
           </Card>
 
-          <Card className="eink-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <BookOpen className="h-5 w-5 mr-2" />
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
                 Assignments
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-black">{assignments?.length || 0}</div>
-              <p className="text-gray-600 text-sm">Total created</p>
+              <p className="text-xs text-gray-600 mt-1">Total created</p>
             </CardContent>
           </Card>
 
-          <Card className="eink-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <TrendingUp className="h-5 w-5 mr-2" />
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
                 Pending Review
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-black">{pendingReview.length}</div>
-              <p className="text-gray-600 text-sm">Need grading</p>
+              <p className="text-xs text-gray-600 mt-1">Need grading</p>
             </CardContent>
           </Card>
 
-          <Card className="eink-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Calendar className="h-5 w-5 mr-2" />
-                Today's Classes
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Calendar className="h-4 w-4" />
+                Today
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-black">{todayEvents.length}</div>
-              <p className="text-gray-600 text-sm">Scheduled today</p>
+              <p className="text-xs text-gray-600 mt-1">Classes scheduled</p>
             </CardContent>
           </Card>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Recent Students */}
-          <div>
-            <h2 className="section-title">Your Students</h2>
-            {studentsLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="eink-card p-4 animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                  </div>
-                ))}
-              </div>
-            ) : students && students.length > 0 ? (
-              <div className="space-y-4">
-                {students.slice(0, 5).map((student) => (
-                  <Card key={student.id} className="eink-card">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="font-semibold text-black">
-                            {student.user?.firstName} {student.user?.lastName}
-                          </h4>
-                          <p className="text-sm text-gray-600">Grade {student.gradeLevel || 'N/A'}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge className="status-badge status-assigned">
-                            {student.assignments?.length || 0} assignments
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card className="eink-card">
-                <CardContent className="p-8 text-center">
-                  <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-semibold text-black mb-2">No Students Yet</h3>
-                  <p className="text-gray-600">You haven't been assigned any students yet.</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-
-          {/* Recent Assignments & Submissions */}
-          <div>
-            <h2 className="section-title">Recent Assignments & Submissions</h2>
-            {assignmentsLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => (
-                  <div key={i} className="eink-card p-4 animate-pulse">
-                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                  </div>
-                ))}
-              </div>
-            ) : assignments && assignments.length > 0 ? (
-              <div className="space-y-6">
-                {assignments.slice(0, 8).map((assignment) => (
-                  <Card key={assignment.id} className="eink-card">
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h4 className="font-semibold text-black">{assignment.title}</h4>
-                          <p className="text-sm text-gray-600">
-                            Due: {assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'No due date'}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Created: {new Date(assignment.createdAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <Badge className={`status-badge status-${assignment.status}`}>
-                            {assignment.status}
-                          </Badge>
-                          {assignment.maxPoints && (
-                            <span className="text-xs text-gray-600">Max: {assignment.maxPoints} pts</span>
-                          )}
-                        </div>
-                      </div>
-                      
-                      {/* Show all submissions for this assignment */}
-                      {assignment.submissions && assignment.submissions.length > 0 ? (
-                        <div className="border-t pt-4">
-                          <h5 className="text-sm font-medium text-gray-700 mb-3">
-                            Student Submissions ({assignment.submissions.length}):
-                          </h5>
-                          <div className="space-y-3">
-                            {assignment.submissions.map((submission) => (
-                              <div key={submission.id} className="p-3 bg-gray-50 rounded-lg border">
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex items-center space-x-3">
-                                    <span className="font-medium text-black">
-                                      {submission.student?.user?.firstName} {submission.student?.user?.lastName}
-                                    </span>
-                                    <Badge className={`text-xs ${
-                                      submission.status === 'submitted' ? 'bg-green-100 text-green-800' :
-                                      submission.status === 'graded' ? 'bg-blue-100 text-blue-800' :
-                                      submission.isDraft ? 'bg-yellow-100 text-yellow-800' :
-                                      'bg-gray-100 text-gray-800'
-                                    }`}>
-                                      {submission.isDraft ? 'draft' : submission.status}
-                                    </Badge>
-                                    {submission.isLate && (
-                                      <Badge className="text-xs bg-red-100 text-red-800">
-                                        Late
-                                      </Badge>
-                                    )}
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {submission.score !== null && (
-                                      <span className="text-sm text-blue-600 font-medium">
-                                        {submission.score}/{assignment.maxPoints || '?'}
-                                      </span>
-                                    )}
-                                    <span className="text-xs text-gray-500">
-                                      {submission.submittedAt ? 
-                                        new Date(submission.submittedAt).toLocaleDateString() : 
-                                        new Date(submission.createdAt).toLocaleDateString()}
-                                    </span>
-                                  </div>
-                                </div>
-
-                                {/* Student message */}
-                                {submission.content && (
-                                  <div className="mb-2 p-2 bg-white rounded border">
-                                    <p className="text-sm text-gray-700">
-                                      <strong>Message:</strong> {submission.content}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Files */}
-                                {submission.fileUrls && submission.fileUrls.length > 0 && (
-                                  <div className="mb-2">
-                                    <p className="text-xs text-gray-600 mb-1">Files attached:</p>
-                                    <div className="flex gap-2">
-                                      {submission.fileUrls.map((fileUrl, fileIndex) => (
-                                        <a
-                                          key={fileIndex}
-                                          href={fileUrl}
-                                          target="_blank"
-                                          rel="noopener noreferrer"
-                                          className="inline-flex items-center px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
-                                          download
-                                        >
-                                          📄 File {fileIndex + 1}
-                                        </a>
-                                      ))}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Feedback */}
-                                {submission.feedback && (
-                                  <div className="p-2 bg-blue-50 rounded border border-blue-200">
-                                    <p className="text-xs text-blue-700">
-                                      <strong>Your Feedback:</strong> {submission.feedback}
-                                    </p>
-                                  </div>
-                                )}
-
-                                {/* Action needed indicators */}
-                                {submission.status === 'submitted' && !submission.score && (
-                                  <div className="mt-2 p-2 bg-yellow-50 rounded border border-yellow-200">
-                                    <p className="text-xs text-yellow-700">⏳ Needs grading</p>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="border-t pt-3">
-                          <p className="text-sm text-gray-500 italic">No submissions yet</p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <Card className="eink-card">
-                <CardContent className="p-8 text-center">
-                  <BookOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <h3 className="text-lg font-semibold text-black mb-2">No Assignments Yet</h3>
-                  <p className="text-gray-600">Create your first assignment to get started.</p>
-                </CardContent>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* Today's Schedule */}
-        {todayEvents.length > 0 && (
-          <div className="mt-8">
-            <h2 className="section-title">Today's Schedule</h2>
-            <div className="space-y-3">
-              {todayEvents.map((event) => (
-                <Card key={event.id} className="eink-card">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Students */}
+          <Card className="border-2 border-black lg:col-span-2">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Your Students
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {studentsLoading ? (
+                <div className="text-center py-8">
+                  <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
+                </div>
+              ) : !students || students.length === 0 ? (
+                <p className="text-gray-600 text-center py-8">No students assigned yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {students.slice(0, 6).map((student: any) => (
+                    <div key={student.id} className="p-3 bg-gray-50 rounded border border-gray-200 hover:border-black transition-colors flex items-center justify-between">
                       <div>
-                        <h4 className="font-semibold text-black">{event.title}</h4>
-                        <p className="text-sm text-gray-600">
-                          {new Date(event.startTime).toLocaleTimeString()} - {new Date(event.endTime).toLocaleTimeString()}
-                        </p>
+                        <h4 className="font-semibold text-black">
+                          {student.user?.firstName} {student.user?.lastName}
+                        </h4>
+                        <p className="text-xs text-gray-600">Grade {student.gradeLevel || 'N/A'}</p>
                       </div>
-                      <Badge className="status-badge status-assigned">
-                        {event.eventType}
+                      <Badge variant="outline" className="border-black text-black">
+                        {student.assignments?.length || 0} tasks
                       </Badge>
                     </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Today & Pending */}
+          <div className="space-y-6">
+            <Card className="border-2 border-black bg-blue-50">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Calendar className="h-5 w-5" />
+                  Today's Classes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {todayEvents.length === 0 ? (
+                  <p className="text-gray-600 text-sm">No classes scheduled</p>
+                ) : (
+                  <div className="space-y-2">
+                    {todayEvents.slice(0, 3).map((event: any, idx: number) => (
+                      <div key={idx} className="p-2 bg-white rounded border border-blue-200">
+                        <p className="font-medium text-sm text-black">{event.title}</p>
+                        <p className="text-xs text-gray-600">
+                          {format(new Date(event.startTime), 'HH:mm')}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-2 border-black">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5" />
+                  Pending Review
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {pendingReview.length === 0 ? (
+                  <p className="text-gray-600 text-sm">All caught up!</p>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="font-bold text-lg text-black">{pendingReview.length}</p>
+                    <p className="text-xs text-gray-600">submissions waiting</p>
+                    <Link href="/company/homework">
+                      <Button size="sm" className="w-full bg-black text-white mt-3 hover:bg-gray-800">
+                        Review Now
+                        <ArrowRight className="h-3 w-3 ml-2" />
+                      </Button>
+                    </Link>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        )}
+        </div>
       </div>
-    </Layout>
+    </div>
   );
 }

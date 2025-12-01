@@ -2,32 +2,21 @@ import { useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
-import { isUnauthorizedError } from "@/lib/authUtils";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, CheckCircle, AlertCircle, Clock, BookOpen } from "lucide-react";
+import { Users, CheckCircle, BookOpen, TrendingUp } from "lucide-react";
 
 export default function ParentDashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
 
-  // Redirect if not authenticated
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      toast({
-        title: "Unauthorized",
-        description: "You are logged out. Logging in again...",
-        variant: "destructive",
-      });
-      setTimeout(() => {
-        window.location.href = "/api/login";
-      }, 500);
-      return;
+      setTimeout(() => window.location.href = "/api/login", 500);
     }
-  }, [isAuthenticated, isLoading, toast]);
+  }, [isAuthenticated, isLoading]);
 
   const { data: students, isLoading: studentsLoading } = useQuery({
     queryKey: ["/api/students"],
@@ -36,33 +25,15 @@ export default function ParentDashboard() {
 
   const verifySubmissionMutation = useMutation({
     mutationFn: async (submissionId: string) => {
-      await apiRequest("PATCH", `/api/submissions/${submissionId}/verify`);
+      await apiRequest(`/api/submissions/${submissionId}/verify`, 'PATCH', {});
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Submission verified successfully!",
-      });
+      toast({ title: "Success", description: "Submission verified!" });
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
     },
-    onError: (error) => {
-      if (isUnauthorizedError(error)) {
-        toast({
-          title: "Unauthorized",
-          description: "You are logged out. Logging in again...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = "/api/login";
-        }, 500);
-        return;
-      }
-      toast({
-        title: "Error",
-        description: "Failed to verify submission. Please try again.",
-        variant: "destructive",
-      });
-    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to verify submission.", variant: "destructive" });
+    }
   });
 
   if (isLoading) {
@@ -70,239 +41,153 @@ export default function ParentDashboard() {
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
           <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-black">Loading dashboard...</p>
+          <p className="text-black">Loading...</p>
         </div>
       </div>
     );
   }
 
-  return (
-    <Layout>
-      <div className="container py-8">
-        <div className="mb-8">
-          <h1 className="page-title">Parent Dashboard</h1>
-          <p className="text-gray-600">Monitor your children's progress and verify their work</p>
-        </div>
+  const completedCount = students?.reduce((acc: number, s: any) => 
+    acc + (s.submissions?.filter((sub: any) => sub.status === 'submitted').length || 0), 0) || 0;
+  const totalSubmissions = students?.reduce((acc: number, s: any) => 
+    acc + (s.submissions?.length || 0), 0) || 0;
 
-        {/* Stats Overview */}
-        <div className="dashboard-grid mb-8">
-          <Card className="eink-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <Users className="h-5 w-5 mr-2" />
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b-2 border-black">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-black">Parent Dashboard</h1>
+              <p className="text-gray-600 mt-2">Monitor children's progress and verify work</p>
+            </div>
+            <Users className="h-16 w-16 text-black opacity-10" />
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Users className="h-4 w-4" />
                 Children
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-black">{students?.length || 0}</div>
-              <p className="text-gray-600 text-sm">Under your care</p>
+              <p className="text-xs text-gray-600 mt-1">Under your care</p>
             </CardContent>
           </Card>
 
-          <Card className="eink-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <BookOpen className="h-5 w-5 mr-2" />
-                Active Students
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Total Work
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{students?.length || 0}</div>
-              <p className="text-gray-600 text-sm">Currently enrolled</p>
+              <div className="text-3xl font-bold text-black">{totalSubmissions}</div>
+              <p className="text-xs text-gray-600 mt-1">Submitted items</p>
             </CardContent>
           </Card>
 
-          <Card className="eink-card">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center">
-                <BookOpen className="h-5 w-5 mr-2" />
-                Total Submissions
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <CheckCircle className="h-4 w-4" />
+                Verified
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold text-green-600">{completedCount}</div>
+              <p className="text-xs text-gray-600 mt-1">Reviewed submissions</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Progress
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-black">
-                {students?.reduce((acc, student) => 
-                  acc + (student.submissions?.length || 0), 0) || 0}
+                {totalSubmissions > 0 ? Math.round((completedCount / totalSubmissions) * 100) : 0}%
               </div>
-              <p className="text-gray-600 text-sm">From all children</p>
+              <p className="text-xs text-gray-600 mt-1">Completion rate</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Students and Their Progress */}
-        <div>
-          <h2 className="section-title">Your Children</h2>
-          {studentsLoading ? (
-            <div className="space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className="eink-card p-6 animate-pulse">
-                  <div className="h-6 bg-gray-200 rounded mb-4"></div>
-                  <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                  <div className="h-4 bg-gray-200 rounded w-2/3"></div>
-                </div>
-              ))}
-            </div>
-          ) : students && students.length > 0 ? (
-            <div className="space-y-6">
-              {students.map((student) => (
-                <Card key={student.id} className="eink-card">
-                  <CardHeader>
-                    <CardTitle className="flex items-center justify-between">
-                      <span>{student.user?.firstName} {student.user?.lastName}</span>
-                      <Badge className="status-badge status-assigned">
-                        Grade {student.gradeLevel || 'N/A'}
+        {/* Children List */}
+        <Card className="border-2 border-black">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Your Children
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {studentsLoading ? (
+              <div className="text-center py-8">
+                <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
+              </div>
+            ) : !students || students.length === 0 ? (
+              <p className="text-gray-600 text-center py-8">No children linked to your account</p>
+            ) : (
+              <div className="space-y-4">
+                {students.map((student: any) => (
+                  <div key={student.id} className="p-4 border-2 border-gray-200 rounded-lg hover:border-black transition-colors">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-semibold text-black text-lg">
+                          {student.user?.firstName} {student.user?.lastName}
+                        </h4>
+                        <p className="text-xs text-gray-600">Grade {student.gradeLevel || 'N/A'}</p>
+                      </div>
+                      <Badge className="border-black text-black bg-white">
+                        {student.submissions?.length || 0} submissions
                       </Badge>
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid md:grid-cols-3 gap-4">
-                      {/* Assignments Overview */}
-                      <div className="text-center p-4 border border-gray-200 rounded">
-                        <div className="text-2xl font-bold text-black">
-                          {student.assignments?.length || 0}
-                        </div>
-                        <p className="text-sm text-gray-600">Total Assignments</p>
-                      </div>
-
-                      {/* Completed Work */}
-                      <div className="text-center p-4 border border-gray-200 rounded">
-                        <div className="text-2xl font-bold text-green-600">
-                          {student.assignments?.filter(a => a.status === 'completed')?.length || 0}
-                        </div>
-                        <p className="text-sm text-gray-600">Completed</p>
-                      </div>
-
-                      {/* Recent Submissions */}
-                      <div className="text-center p-4 border border-gray-200 rounded">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {student.submissions?.length || 0}
-                        </div>
-                        <p className="text-sm text-gray-600">Total Submissions</p>
-                      </div>
                     </div>
-
-                    {/* Recent Submissions */}
+                    
                     {student.submissions && student.submissions.length > 0 && (
-                      <div className="mt-6">
-                        <h4 className="font-semibold text-black mb-3">Recent Submissions ({student.submissions.length})</h4>
-                        <div className="space-y-3">
-                          {student.submissions
-                            .slice(0, 10)
-                            .map((submission) => {
-                              // Find the assignment this submission belongs to
-                              const assignment = student.assignments?.find(a => a.id === submission.assignmentId);
-                              return (
-                                <div key={submission.id} className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                                  <div className="flex items-start justify-between mb-3">
-                                    <div className="flex-1">
-                                      <h5 className="font-medium text-black">
-                                        {assignment?.title || `Assignment #${submission.assignmentId.slice(-6)}`}
-                                      </h5>
-                                      <p className="text-sm text-gray-600">
-                                        Submitted: {submission.submittedAt ? new Date(submission.submittedAt).toLocaleDateString() : 'Draft'}
-                                      </p>
-                                      {assignment?.dueDate && (
-                                        <p className="text-xs text-gray-500">
-                                          Due: {new Date(assignment.dueDate).toLocaleDateString()}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div className="flex flex-col gap-2 items-end">
-                                      <Badge className={`status-badge ${
-                                        submission.status === 'submitted' ? 'status-submitted' : 
-                                        submission.status === 'graded' ? 'status-completed' : 
-                                        submission.isDraft ? 'status-assigned' : 'status-assigned'
-                                      }`}>
-                                        {submission.isDraft ? 'draft' : submission.status}
-                                      </Badge>
-                                      {submission.score !== null && (
-                                        <Badge className="bg-blue-100 text-blue-800">
-                                          Score: {submission.score}/{assignment?.maxPoints || '?'}
-                                        </Badge>
-                                      )}
-                                      {submission.isLate && (
-                                        <Badge className="bg-red-100 text-red-800">
-                                          Late
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Student's message/content */}
-                                  {submission.content && (
-                                    <div className="mb-3 p-3 bg-white rounded border">
-                                      <h6 className="text-sm font-medium text-gray-700 mb-1">Student Message:</h6>
-                                      <p className="text-sm text-gray-600">{submission.content}</p>
-                                    </div>
-                                  )}
-
-                                  {/* Downloadable files */}
-                                  {submission.fileUrls && submission.fileUrls.length > 0 && (
-                                    <div className="mb-3">
-                                      <h6 className="text-sm font-medium text-gray-700 mb-2">Attached Files:</h6>
-                                      <div className="flex flex-wrap gap-2">
-                                        {submission.fileUrls.map((fileUrl, index) => (
-                                          <a
-                                            key={index}
-                                            href={fileUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center px-3 py-1 text-xs bg-blue-100 text-blue-700 rounded-md hover:bg-blue-200 transition-colors"
-                                            download
-                                          >
-                                            📄 File {index + 1}
-                                          </a>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  )}
-
-                                  {/* Feedback from tutor */}
-                                  {submission.feedback && (
-                                    <div className="p-3 bg-blue-50 rounded border border-blue-200">
-                                      <h6 className="text-sm font-medium text-blue-800 mb-1">Tutor Feedback:</h6>
-                                      <p className="text-sm text-blue-700">{submission.feedback}</p>
-                                      {submission.gradedAt && (
-                                        <p className="text-xs text-blue-600 mt-1">
-                                          Graded on: {new Date(submission.gradedAt).toLocaleDateString()}
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-
-                                  {/* Revision needed */}
-                                  {submission.needsRevision && (
-                                    <div className="p-3 bg-yellow-50 rounded border border-yellow-200">
-                                      <h6 className="text-sm font-medium text-yellow-800 mb-1">Revision Needed:</h6>
-                                      <p className="text-sm text-yellow-700">{submission.revisionFeedback}</p>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          {student.submissions.length > 10 && (
-                            <div className="text-center text-sm text-gray-500">
-                              Showing 10 of {student.submissions.length} submissions
+                      <div className="space-y-2 mt-3">
+                        {student.submissions.slice(0, 3).map((sub: any, idx: number) => (
+                          <div key={idx} className="flex items-center justify-between text-sm p-2 bg-gray-50 rounded">
+                            <span className="text-gray-700">{sub.assignmentTitle || `Assignment ${idx + 1}`}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={sub.status === 'submitted' ? 'default' : 'outline'}>
+                                {sub.status}
+                              </Badge>
+                              {sub.status === 'submitted' && !sub.verified && (
+                                <Button 
+                                  size="sm" 
+                                  onClick={() => verifySubmissionMutation.mutate(sub.id)}
+                                  disabled={verifySubmissionMutation.isPending}
+                                  className="bg-green-600 text-white hover:bg-green-700"
+                                >
+                                  Verify
+                                </Button>
+                              )}
+                              {sub.verified && <CheckCircle className="h-4 w-4 text-green-600" />}
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        ))}
                       </div>
                     )}
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card className="eink-card">
-              <CardContent className="p-8 text-center">
-                <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <h3 className="text-lg font-semibold text-black mb-2">No Students Found</h3>
-                <p className="text-gray-600">No children are currently linked to your parent account.</p>
-              </CardContent>
-            </Card>
-          )}
-        </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </Layout>
+    </div>
   );
 }
