@@ -848,7 +848,30 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Accept terms and privacy policy
+  app.post('/api/users/accept-terms', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        return res.status(401).json({ message: 'User not authenticated' });
+      }
 
+      const { version } = req.body;
+      if (!version) {
+        return res.status(400).json({ message: 'Terms version is required' });
+      }
+
+      await storage.updateUser(userId, {
+        termsAcceptedAt: new Date(),
+        termsVersion: version,
+      });
+
+      res.json({ success: true, message: 'Terms accepted successfully' });
+    } catch (error) {
+      console.error('Error accepting terms:', error);
+      res.status(500).json({ message: 'Failed to accept terms' });
+    }
+  });
 
   // Get all submissions for company review
   app.get('/api/company/submissions', isAuthenticated, async (req: any, res: any) => {

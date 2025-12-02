@@ -1,16 +1,30 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tablet, LogOut, User, Home, BookOpen, Users, Settings, Calendar } from "lucide-react";
+import { Tablet, LogOut, User, Home, BookOpen, Users, Settings, Calendar, Shield, FileText, Scale } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { TermsAcceptanceModal } from "./TermsAcceptanceModal";
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
+const CURRENT_TERMS_VERSION = "1.0";
+
 export default function Layout({ children }: LayoutProps) {
   const { user } = useAuth();
   const [location] = useLocation();
+  const [showTermsModal, setShowTermsModal] = useState(false);
+
+  useEffect(() => {
+    if (user && !user.termsAcceptedAt) {
+      const needsTermsAcceptance = ['student', 'parent', 'company_admin'].includes(user.role || '');
+      if (needsTermsAcceptance) {
+        setShowTermsModal(true);
+      }
+    }
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -83,6 +97,13 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Terms Acceptance Modal */}
+      <TermsAcceptanceModal
+        isOpen={showTermsModal}
+        onAccepted={() => setShowTermsModal(false)}
+        userRole={user?.role}
+      />
+
       {/* Header */}
       <header className="border-b-2 border-black bg-white">
         <div className="container py-4">
@@ -215,8 +236,19 @@ export default function Layout({ children }: LayoutProps) {
                 </div>
               </div>
 
-              {/* Bottom Bar */}
+              {/* Legal Links */}
               <div className="border-t border-gray-200 mt-6 pt-4">
+                <div className="flex flex-wrap justify-center gap-4 mb-4">
+                  <Link href="/legal/privacy" className="text-xs text-gray-600 hover:text-black flex items-center gap-1" data-testid="link-footer-privacy">
+                    <Shield className="w-3 h-3" /> Privacy Policy
+                  </Link>
+                  <Link href="/legal/terms" className="text-xs text-gray-600 hover:text-black flex items-center gap-1" data-testid="link-footer-terms">
+                    <Scale className="w-3 h-3" /> Terms of Service
+                  </Link>
+                  <Link href="/legal/agreement" className="text-xs text-gray-600 hover:text-black flex items-center gap-1" data-testid="link-footer-agreement">
+                    <FileText className="w-3 h-3" /> User Agreement
+                  </Link>
+                </div>
                 <div className="flex flex-col md:flex-row justify-between items-center">
                   <p className="text-xs text-gray-500 mb-2 md:mb-0">
                     © 2024 eSlate Educational Platform. Designed for accessibility and learning.

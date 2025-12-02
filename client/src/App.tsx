@@ -30,6 +30,9 @@ import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { WorksheetManagementPage } from "@/pages/admin/WorksheetManagementPage";
 import TestManagement from "@/pages/tests/TestManagement";
 import TestGrading from "@/pages/tests/TestGrading";
+import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
+import TermsOfService from "@/pages/legal/TermsOfService";
+import UserAgreement from "@/pages/legal/UserAgreement";
 
 import NotFound from "@/pages/not-found";
 
@@ -52,6 +55,11 @@ function Router() {
       {/* Always available auth route for registration */}
       <Route path="/auth" component={AuthPage} />
       <Route path="/register" component={SimpleRegistration} />
+      
+      {/* Legal pages - always accessible */}
+      <Route path="/legal/privacy" component={PrivacyPolicy} />
+      <Route path="/legal/terms" component={TermsOfService} />
+      <Route path="/legal/agreement" component={UserAgreement} />
 
       {!isAuthenticated ? (
         <>
