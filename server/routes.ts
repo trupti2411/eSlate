@@ -2844,6 +2844,413 @@ Good luck with your assignment!"
     }
   });
 
+  // ============================================
+  // Test/Exam Routes
+  // ============================================
+  
+  // Get all tests for a company
+  app.get('/api/companies/:companyId/tests', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const tests = await storage.getTestsByCompany(companyId);
+      res.json(tests);
+    } catch (error) {
+      console.error('Error fetching tests:', error);
+      res.status(500).json({ error: 'Failed to fetch tests' });
+    }
+  });
+
+  // Create a new test
+  app.post('/api/companies/:companyId/tests', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const userId = req.user?.id;
+      
+      const testData = {
+        ...req.body,
+        companyId,
+        createdBy: userId,
+      };
+      
+      const test = await storage.createTest(testData);
+      res.json(test);
+    } catch (error) {
+      console.error('Error creating test:', error);
+      res.status(500).json({ error: 'Failed to create test' });
+    }
+  });
+
+  // Get a specific test with questions
+  app.get('/api/tests/:testId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      const isStudent = req.user?.role === 'student';
+      
+      const testWithQuestions = await storage.getTestWithQuestions(testId);
+      if (!testWithQuestions) {
+        return res.status(404).json({ error: 'Test not found' });
+      }
+      
+      // Filter out correct answers for students
+      if (isStudent) {
+        testWithQuestions.questions = testWithQuestions.questions.map((q: any) => ({
+          ...q,
+          correctAnswer: undefined,
+          options: q.options ? (q.options as any[]).map((opt: any) => ({
+            id: opt.id,
+            text: opt.text,
+            // Remove isCorrect for students
+          })) : null,
+          explanation: undefined,
+        }));
+      }
+      
+      res.json(testWithQuestions);
+    } catch (error) {
+      console.error('Error fetching test:', error);
+      res.status(500).json({ error: 'Failed to fetch test' });
+    }
+  });
+
+  // Update a test
+  app.patch('/api/tests/:testId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      const test = await storage.updateTest(testId, req.body);
+      res.json(test);
+    } catch (error) {
+      console.error('Error updating test:', error);
+      res.status(500).json({ error: 'Failed to update test' });
+    }
+  });
+
+  // Delete a test
+  app.delete('/api/tests/:testId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      await storage.deleteTest(testId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting test:', error);
+      res.status(500).json({ error: 'Failed to delete test' });
+    }
+  });
+
+  // Add a question to a test
+  app.post('/api/tests/:testId/questions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      const questionData = {
+        ...req.body,
+        testId,
+      };
+      const question = await storage.createTestQuestion(questionData);
+      res.json(question);
+    } catch (error) {
+      console.error('Error creating question:', error);
+      res.status(500).json({ error: 'Failed to create question' });
+    }
+  });
+
+  // Update a question
+  app.patch('/api/tests/questions/:questionId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { questionId } = req.params;
+      const question = await storage.updateTestQuestion(questionId, req.body);
+      res.json(question);
+    } catch (error) {
+      console.error('Error updating question:', error);
+      res.status(500).json({ error: 'Failed to update question' });
+    }
+  });
+
+  // Delete a question
+  app.delete('/api/tests/questions/:questionId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { questionId } = req.params;
+      await storage.deleteTestQuestion(questionId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error deleting question:', error);
+      res.status(500).json({ error: 'Failed to delete question' });
+    }
+  });
+
+  // Assign test to students or class
+  app.post('/api/tests/:testId/assign', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      const { studentIds, classId, dueDate } = req.body;
+      const userId = req.user?.id;
+      
+      const assignments = [];
+      
+      if (classId) {
+        // Assign to entire class
+        const assignment = await storage.createTestAssignment({
+          testId,
+          classId,
+          assignedBy: userId,
+          dueDate: dueDate ? new Date(dueDate) : undefined,
+        });
+        assignments.push(assignment);
+      }
+      
+      if (studentIds && Array.isArray(studentIds)) {
+        // Assign to individual students
+        for (const studentId of studentIds) {
+          const assignment = await storage.createTestAssignment({
+            testId,
+            studentId,
+            assignedBy: userId,
+            dueDate: dueDate ? new Date(dueDate) : undefined,
+          });
+          assignments.push(assignment);
+        }
+      }
+      
+      // Update test status to published if it was draft
+      const test = await storage.getTest(testId);
+      if (test && test.status === 'draft') {
+        await storage.updateTest(testId, { status: 'published' });
+      }
+      
+      res.json({ success: true, assignments });
+    } catch (error) {
+      console.error('Error assigning test:', error);
+      res.status(500).json({ error: 'Failed to assign test' });
+    }
+  });
+
+  // Get test assignments
+  app.get('/api/tests/:testId/assignments', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      const assignments = await storage.getTestAssignments(testId);
+      res.json(assignments);
+    } catch (error) {
+      console.error('Error fetching test assignments:', error);
+      res.status(500).json({ error: 'Failed to fetch test assignments' });
+    }
+  });
+
+  // Get student's assigned tests
+  app.get('/api/students/:studentId/tests', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const testAssignments = await storage.getStudentTestAssignments(studentId);
+      
+      // Get attempt status for each test
+      const attempts = await storage.getTestAttemptsByStudent(studentId);
+      
+      const testsWithStatus = testAssignments.map((ta: any) => {
+        const testAttempts = attempts.filter(a => a.testId === ta.test.id);
+        const hasAttempt = testAttempts.length > 0;
+        const latestAttempt = testAttempts[0];
+        
+        return {
+          ...ta,
+          attemptStatus: hasAttempt ? latestAttempt.status : 'not_started',
+          latestAttempt: latestAttempt || null,
+        };
+      });
+      
+      res.json(testsWithStatus);
+    } catch (error) {
+      console.error('Error fetching student tests:', error);
+      res.status(500).json({ error: 'Failed to fetch student tests' });
+    }
+  });
+
+  // Start a test attempt
+  app.post('/api/tests/:testId/start', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      const { studentId } = req.body;
+      
+      // Check if student already has an in-progress attempt
+      const existingAttempts = await storage.getTestAttemptsByStudent(studentId);
+      const inProgressAttempt = existingAttempts.find(a => a.testId === testId && a.status === 'in_progress');
+      
+      if (inProgressAttempt) {
+        return res.json(inProgressAttempt);
+      }
+      
+      // Check if retakes are allowed
+      const test = await storage.getTest(testId);
+      if (!test) {
+        return res.status(404).json({ error: 'Test not found' });
+      }
+      
+      const submittedAttempts = existingAttempts.filter(a => a.testId === testId && a.status !== 'in_progress');
+      if (submittedAttempts.length > 0 && !test.allowRetakes) {
+        return res.status(400).json({ error: 'Retakes are not allowed for this test' });
+      }
+      
+      const attempt = await storage.createTestAttempt({
+        testId,
+        studentId,
+        status: 'in_progress',
+      });
+      
+      res.json(attempt);
+    } catch (error) {
+      console.error('Error starting test:', error);
+      res.status(500).json({ error: 'Failed to start test' });
+    }
+  });
+
+  // Save/update a test answer
+  app.post('/api/tests/attempts/:attemptId/answers', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { attemptId } = req.params;
+      const { questionId, studentAnswer, selectedOption } = req.body;
+      
+      // Check if answer already exists
+      const existingAnswers = await storage.getTestAnswersByAttempt(attemptId);
+      const existingAnswer = existingAnswers.find(a => a.questionId === questionId);
+      
+      if (existingAnswer) {
+        const updated = await storage.updateTestAnswer(existingAnswer.id, {
+          studentAnswer,
+          selectedOption,
+        });
+        return res.json(updated);
+      }
+      
+      const answer = await storage.createTestAnswer({
+        attemptId,
+        questionId,
+        studentAnswer,
+        selectedOption,
+      });
+      
+      res.json(answer);
+    } catch (error) {
+      console.error('Error saving answer:', error);
+      res.status(500).json({ error: 'Failed to save answer' });
+    }
+  });
+
+  // Get answers for a test attempt
+  app.get('/api/tests/attempts/:attemptId/answers', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { attemptId } = req.params;
+      const answers = await storage.getTestAnswersByAttempt(attemptId);
+      res.json(answers);
+    } catch (error) {
+      console.error('Error fetching answers:', error);
+      res.status(500).json({ error: 'Failed to fetch answers' });
+    }
+  });
+
+  // Submit a test attempt
+  app.post('/api/tests/attempts/:attemptId/submit', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { attemptId } = req.params;
+      
+      const attempt = await storage.getTestAttempt(attemptId);
+      if (!attempt) {
+        return res.status(404).json({ error: 'Attempt not found' });
+      }
+      
+      // Update attempt status
+      const updatedAttempt = await storage.updateTestAttempt(attemptId, {
+        status: 'submitted',
+        submittedAt: new Date(),
+      });
+      
+      // Auto-grade what we can
+      const { totalScore, percentageScore } = await storage.autoGradeTestAttempt(attemptId);
+      
+      // Get the test to check if we should show results immediately
+      const test = await storage.getTest(attempt.testId);
+      
+      res.json({
+        ...updatedAttempt,
+        autoGradedScore: totalScore,
+        percentageScore,
+        showResults: test?.showResultsImmediately || false,
+      });
+    } catch (error) {
+      console.error('Error submitting test:', error);
+      res.status(500).json({ error: 'Failed to submit test' });
+    }
+  });
+
+  // Get all attempts for a test (for tutors)
+  app.get('/api/tests/:testId/attempts', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { testId } = req.params;
+      const attempts = await storage.getTestAttemptsByTest(testId);
+      
+      // Enrich with student info
+      const enrichedAttempts = await Promise.all(attempts.map(async (attempt) => {
+        const student = await storage.getStudent(attempt.studentId);
+        const studentUser = student ? await storage.getUser(student.userId) : null;
+        return {
+          ...attempt,
+          studentName: studentUser ? `${studentUser.firstName} ${studentUser.lastName}` : 'Unknown',
+        };
+      }));
+      
+      res.json(enrichedAttempts);
+    } catch (error) {
+      console.error('Error fetching attempts:', error);
+      res.status(500).json({ error: 'Failed to fetch attempts' });
+    }
+  });
+
+  // Grade a test attempt (manual grading)
+  app.post('/api/tests/attempts/:attemptId/grade', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { attemptId } = req.params;
+      const { answerGrades, feedback } = req.body;
+      const userId = req.user?.id;
+      
+      // Update individual answer grades if provided
+      if (answerGrades && Array.isArray(answerGrades)) {
+        for (const grade of answerGrades) {
+          await storage.updateTestAnswer(grade.answerId, {
+            pointsAwarded: grade.pointsAwarded,
+            feedback: grade.feedback,
+            isCorrect: grade.isCorrect,
+            gradedAt: new Date(),
+          });
+        }
+      }
+      
+      // Calculate total score from all answers
+      const answers = await storage.getTestAnswersByAttempt(attemptId);
+      const totalScore = answers.reduce((sum, a) => sum + (a.pointsAwarded || 0), 0);
+      
+      const attempt = await storage.getTestAttempt(attemptId);
+      if (!attempt) {
+        return res.status(404).json({ error: 'Attempt not found' });
+      }
+      
+      const test = await storage.getTest(attempt.testId);
+      const percentageScore = test?.totalPoints ? Math.round((totalScore / test.totalPoints) * 100) : 0;
+      const isPassed = test?.passingScore ? percentageScore >= test.passingScore : undefined;
+      
+      // Update attempt with final grade
+      const gradedAttempt = await storage.updateTestAttempt(attemptId, {
+        status: 'graded',
+        totalScore,
+        percentageScore,
+        isPassed,
+        gradedBy: userId,
+        gradedAt: new Date(),
+        feedback,
+      });
+      
+      res.json(gradedAttempt);
+    } catch (error) {
+      console.error('Error grading attempt:', error);
+      res.status(500).json({ error: 'Failed to grade attempt' });
+    }
+  });
+
   // Create HTTP server without WebSocket conflicts
   const httpServer = createServer(app);
 
