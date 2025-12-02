@@ -79,6 +79,8 @@ export const parents = pgTable("parents", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().references(() => users.id),
   phoneNumber: varchar("phone_number"),
+  aiHintsEnabled: boolean("ai_hints_enabled").notNull().default(true),
+  maxHintsPerQuestion: integer("max_hints_per_question").default(3),
   createdAt: timestamp("created_at").defaultNow(),
 });
 

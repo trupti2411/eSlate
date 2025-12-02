@@ -3274,6 +3274,283 @@ Good luck with your assignment!"
     }
   });
 
+  // =====================
+  // AI ROUTES
+  // =====================
+  
+  const { aiService } = await import('./services/ai');
+
+  // Check if AI is configured
+  app.get('/api/ai/status', isAuthenticated, async (req: any, res: any) => {
+    res.json({ 
+      configured: aiService.isConfigured(),
+      message: aiService.isConfigured() 
+        ? 'AI features are enabled' 
+        : 'AI features require a GEMINI_API_KEY to be configured'
+    });
+  });
+
+  // Generate worksheet/test questions
+  app.post('/api/ai/generate-questions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      // Only tutors and company admins can generate questions
+      if (!['tutor', 'company_admin', 'admin'].includes(user?.role)) {
+        return res.status(403).json({ error: 'Only tutors can generate questions' });
+      }
+      
+      if (!aiService.isConfigured()) {
+        return res.status(503).json({ error: 'AI features are not configured. Please add GEMINI_API_KEY.' });
+      }
+      
+      const { subject, topic, gradeLevel, questionTypes, count, difficulty } = req.body;
+      
+      if (!subject || !topic || !questionTypes || !count || !difficulty) {
+        return res.status(400).json({ error: 'Missing required fields: subject, topic, questionTypes, count, difficulty' });
+      }
+      
+      const questions = await aiService.generateQuestions({
+        subject,
+        topic,
+        gradeLevel,
+        questionTypes,
+        count: Math.min(count, 10),
+        difficulty
+      });
+      
+      res.json({ questions });
+    } catch (error: any) {
+      console.error('Error generating questions:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate questions' });
+    }
+  });
+
+  // Get grading suggestion for essay/short answer
+  app.post('/api/ai/grading-suggestion', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      // Only tutors and company admins can get grading suggestions
+      if (!['tutor', 'company_admin', 'admin'].includes(user?.role)) {
+        return res.status(403).json({ error: 'Only tutors can get grading suggestions' });
+      }
+      
+      if (!aiService.isConfigured()) {
+        return res.status(503).json({ error: 'AI features are not configured. Please add GEMINI_API_KEY.' });
+      }
+      
+      const { question, studentAnswer, correctAnswer, rubric, maxPoints } = req.body;
+      
+      if (!question || !studentAnswer || !maxPoints) {
+        return res.status(400).json({ error: 'Missing required fields: question, studentAnswer, maxPoints' });
+      }
+      
+      const suggestion = await aiService.getGradingSuggestion({
+        question,
+        studentAnswer,
+        correctAnswer,
+        rubric,
+        maxPoints
+      });
+      
+      res.json(suggestion);
+    } catch (error: any) {
+      console.error('Error getting grading suggestion:', error);
+      res.status(500).json({ error: error.message || 'Failed to get grading suggestion' });
+    }
+  });
+
+  // Get student hint (with parent control check)
+  app.post('/api/ai/student-hint', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      // Only students can request hints
+      if (user?.role !== 'student') {
+        return res.status(403).json({ error: 'Only students can request hints' });
+      }
+      
+      if (!aiService.isConfigured()) {
+        return res.status(503).json({ error: 'AI features are not configured' });
+      }
+      
+      // Get student record to find parent
+      const student = await storage.getStudentByUserId(user.id);
+      if (!student) {
+        return res.status(404).json({ error: 'Student profile not found' });
+      }
+      
+      // Check parent's AI hint settings
+      if (student.parentId) {
+        const parent = await storage.getParent(student.parentId);
+        if (parent && !parent.aiHintsEnabled) {
+          return res.status(403).json({ 
+            error: 'AI hints have been disabled by your parent. Please contact them to enable this feature.',
+            parentControlled: true
+          });
+        }
+      }
+      
+      const { question, questionType, correctAnswer, helpText, studentAttempt, hintLevel } = req.body;
+      
+      if (!question || !questionType) {
+        return res.status(400).json({ error: 'Missing required fields: question, questionType' });
+      }
+      
+      const hint = await aiService.getStudentHint({
+        question,
+        questionType,
+        correctAnswer,
+        helpText,
+        studentAttempt,
+        hintLevel: hintLevel || 1
+      });
+      
+      res.json({ hint });
+    } catch (error: any) {
+      console.error('Error getting student hint:', error);
+      res.status(500).json({ error: error.message || 'Failed to get hint' });
+    }
+  });
+
+  // Generate progress insights for parents
+  app.post('/api/ai/progress-insights', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      // Only parents can get progress insights
+      if (user?.role !== 'parent') {
+        return res.status(403).json({ error: 'Only parents can view progress insights' });
+      }
+      
+      if (!aiService.isConfigured()) {
+        return res.status(503).json({ error: 'AI features are not configured. Please add GEMINI_API_KEY.' });
+      }
+      
+      const { studentId } = req.body;
+      
+      if (!studentId) {
+        return res.status(400).json({ error: 'Missing required field: studentId' });
+      }
+      
+      // Verify parent has access to this student
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ error: 'Parent profile not found' });
+      }
+      
+      const student = await storage.getStudent(studentId);
+      if (!student || student.parentId !== parent.id) {
+        return res.status(403).json({ error: 'You do not have access to this student' });
+      }
+      
+      const studentUser = await storage.getUser(student.userId);
+      if (!studentUser) {
+        return res.status(404).json({ error: 'Student user not found' });
+      }
+      
+      // Get student's submissions
+      const submissions = await storage.getSubmissionsByStudent(studentId);
+      const formattedSubmissions = await Promise.all(submissions.map(async (s) => {
+        const assignment = await storage.getAssignment(s.assignmentId);
+        return {
+          assignmentTitle: assignment?.title || 'Unknown Assignment',
+          subject: assignment?.subject || 'Unknown',
+          score: undefined,
+          maxScore: undefined,
+          submittedAt: s.submittedAt?.toISOString() || s.createdAt?.toISOString() || new Date().toISOString(),
+          isLate: s.isLate || false
+        };
+      }));
+      
+      // Get student's test results
+      const testAttempts = await storage.getTestAttemptsByStudent(studentId);
+      const formattedTests = await Promise.all(testAttempts.filter(t => t.status === 'graded').map(async (t) => {
+        const test = await storage.getTest(t.testId);
+        return {
+          testTitle: test?.title || 'Unknown Test',
+          subject: test?.subject || 'Unknown',
+          score: t.totalScore || 0,
+          totalPoints: test?.totalPoints || 100,
+          completedAt: t.completedAt?.toISOString() || t.createdAt?.toISOString() || new Date().toISOString()
+        };
+      }));
+      
+      const insights = await aiService.generateProgressInsights({
+        studentName: `${studentUser.firstName || ''} ${studentUser.lastName || ''}`.trim() || 'Student',
+        submissions: formattedSubmissions,
+        testResults: formattedTests
+      });
+      
+      res.json(insights);
+    } catch (error: any) {
+      console.error('Error generating progress insights:', error);
+      res.status(500).json({ error: error.message || 'Failed to generate insights' });
+    }
+  });
+
+  // Enhance content (question, help text, instructions)
+  app.post('/api/ai/enhance-content', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      // Only tutors and company admins can enhance content
+      if (!['tutor', 'company_admin', 'admin'].includes(user?.role)) {
+        return res.status(403).json({ error: 'Only tutors can enhance content' });
+      }
+      
+      if (!aiService.isConfigured()) {
+        return res.status(503).json({ error: 'AI features are not configured. Please add GEMINI_API_KEY.' });
+      }
+      
+      const { content, contentType } = req.body;
+      
+      if (!content || !contentType) {
+        return res.status(400).json({ error: 'Missing required fields: content, contentType' });
+      }
+      
+      if (!['question', 'helpText', 'instructions'].includes(contentType)) {
+        return res.status(400).json({ error: 'Invalid contentType. Must be: question, helpText, or instructions' });
+      }
+      
+      const enhanced = await aiService.enhanceContent(content, contentType);
+      
+      res.json({ enhanced });
+    } catch (error: any) {
+      console.error('Error enhancing content:', error);
+      res.status(500).json({ error: error.message || 'Failed to enhance content' });
+    }
+  });
+
+  // Update parent AI hint settings
+  app.patch('/api/parents/ai-settings', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      if (user?.role !== 'parent') {
+        return res.status(403).json({ error: 'Only parents can update AI settings' });
+      }
+      
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ error: 'Parent profile not found' });
+      }
+      
+      const { aiHintsEnabled, maxHintsPerQuestion } = req.body;
+      
+      const updated = await storage.updateParent(parent.id, {
+        aiHintsEnabled: aiHintsEnabled !== undefined ? aiHintsEnabled : parent.aiHintsEnabled,
+        maxHintsPerQuestion: maxHintsPerQuestion !== undefined ? maxHintsPerQuestion : parent.maxHintsPerQuestion
+      });
+      
+      res.json(updated);
+    } catch (error: any) {
+      console.error('Error updating AI settings:', error);
+      res.status(500).json({ error: error.message || 'Failed to update settings' });
+    }
+  });
+
   // Create HTTP server without WebSocket conflicts
   const httpServer = createServer(app);
 

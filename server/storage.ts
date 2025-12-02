@@ -99,6 +99,7 @@ export interface IStorage {
   getParent(id: string): Promise<Parent | undefined>;
   getParentByUserId(userId: string): Promise<Parent | undefined>;
   createParent(parentData: InsertParent): Promise<Parent>;
+  updateParent(id: string, updates: Partial<InsertParent>): Promise<Parent>;
   getParentChildrenWithProgress(parentId: string): Promise<any[]>;
   getParentUserByStudentId(studentId: string): Promise<{ parentId: string; email: string; firstName: string; lastName: string } | null>;
 
@@ -462,6 +463,11 @@ export class DatabaseStorage implements IStorage {
   async createParent(parentData: InsertParent): Promise<Parent> {
     const [parent] = await db.insert(parents).values(parentData).returning();
     return parent;
+  }
+
+  async updateParent(id: string, updates: Partial<InsertParent>): Promise<Parent> {
+    const [updated] = await db.update(parents).set(updates).where(eq(parents.id, id)).returning();
+    return updated;
   }
 
   async getParentUserByStudentId(studentId: string): Promise<{ parentId: string; email: string; firstName: string; lastName: string } | null> {
