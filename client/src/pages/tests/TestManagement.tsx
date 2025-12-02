@@ -14,7 +14,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, FileQuestion, Edit, Trash2, Users, Clock, Target, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { Plus, FileQuestion, Edit, Trash2, Users, Clock, Target, CheckCircle, AlertCircle, Loader2, ClipboardCheck } from "lucide-react";
+import { Link } from "wouter";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import Layout from "@/components/Layout";
@@ -62,6 +63,7 @@ export default function TestManagement() {
   const [selectedTest, setSelectedTest] = useState<Test | null>(null);
   const [editingTest, setEditingTest] = useState<Test | null>(null);
   const [editingQuestion, setEditingQuestion] = useState<TestQuestion | null>(null);
+  const [viewingResultsTest, setViewingResultsTest] = useState<Test | null>(null);
   
   // Get company ID for the current user
   const { data: tutorData } = useQuery<{ companyId: string }>({
@@ -442,6 +444,16 @@ export default function TestManagement() {
                     >
                       <Users className="mr-1 h-4 w-4" /> Assign
                     </Button>
+                    {test.status === "published" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setViewingResultsTest(test)}
+                        data-testid={`button-view-results-${test.id}`}
+                      >
+                        <ClipboardCheck className="mr-1 h-4 w-4" /> Results
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant="ghost"
@@ -677,13 +689,22 @@ export default function TestManagement() {
         </Dialog>
         
         {/* Question Management Section */}
-        {selectedTest && (
+        {selectedTest && !viewingResultsTest && (
           <QuestionManagementSection
             test={selectedTest}
             onAddQuestion={() => handleOpenQuestionDialog()}
             onEditQuestion={handleOpenQuestionDialog}
             onDeleteQuestion={(id) => deleteQuestionMutation.mutate(id)}
             onClose={() => setSelectedTest(null)}
+          />
+        )}
+        
+        {/* Test Results Section */}
+        {viewingResultsTest && (
+          <TestResultsSection
+            test={viewingResultsTest}
+            onClose={() => setViewingResultsTest(null)}
+            userRole={user?.role}
           />
         )}
         
@@ -1086,5 +1107,109 @@ function AssignTestDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Test Results Section Component
+function TestResultsSection({
+  test,
+  onClose,
+  userRole,
+}: {
+  test: Test;
+  onClose: () => void;
+  userRole: string | undefined;
+}) {
+  const { data: attempts = [], isLoading } = useQuery<any[]>({
+    queryKey: ['/api/tests', test.id, 'attempts'],
+    enabled: !!test.id,
+  });
+  
+  const basePath = userRole === "tutor" ? "/tutor/tests" : "/company/tests";
+  
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case "in_progress":
+        return <Badge variant="outline" className="bg-yellow-100 text-yellow-800">In Progress</Badge>;
+      case "submitted":
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Needs Grading</Badge>;
+      case "graded":
+        return <Badge variant="outline" className="bg-green-100 text-green-800">Graded</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+  
+  return (
+    <Card data-testid="test-results-section">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle className="text-xl">Results: {test.title}</CardTitle>
+          <CardDescription>
+            {attempts.length} submission{attempts.length !== 1 ? "s" : ""}
+          </CardDescription>
+        </div>
+        <Button variant="outline" onClick={onClose} size="sm" data-testid="button-close-results">
+          Close
+        </Button>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : attempts.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground" data-testid="no-results">
+            <ClipboardCheck className="h-12 w-12 mx-auto mb-4 opacity-50" />
+            <p>No submissions yet</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {attempts.map((attempt: any) => (
+              <div
+                key={attempt.id}
+                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50"
+                data-testid={`attempt-item-${attempt.id}`}
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium">{attempt.studentName || "Unknown Student"}</span>
+                    {getStatusBadge(attempt.status)}
+                  </div>
+                  <div className="flex gap-4 text-sm text-muted-foreground">
+                    {attempt.submittedAt && (
+                      <span>Submitted: {format(new Date(attempt.submittedAt), "PPp")}</span>
+                    )}
+                    {attempt.status === "graded" && (
+                      <>
+                        <span>Score: {attempt.totalScore || 0}/{test.totalPoints || 0}</span>
+                        <span>({attempt.percentageScore || 0}%)</span>
+                        {attempt.isPassed !== undefined && (
+                          <Badge variant={attempt.isPassed ? "default" : "destructive"} className={attempt.isPassed ? "bg-green-500" : ""}>
+                            {attempt.isPassed ? "PASS" : "FAIL"}
+                          </Badge>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Link href={`${basePath}/${test.id}/grade/${attempt.id}`}>
+                    <Button
+                      size="sm"
+                      variant={attempt.status === "submitted" ? "default" : "outline"}
+                      data-testid={`button-grade-attempt-${attempt.id}`}
+                    >
+                      <ClipboardCheck className="mr-1 h-4 w-4" />
+                      {attempt.status === "submitted" ? "Grade" : "View"}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

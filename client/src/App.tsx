@@ -29,6 +29,7 @@ import GoogleDocsViewer from "@/pages/GoogleDocsViewer";
 import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { WorksheetManagementPage } from "@/pages/admin/WorksheetManagementPage";
 import TestManagement from "@/pages/tests/TestManagement";
+import TestGrading from "@/pages/tests/TestGrading";
 
 import NotFound from "@/pages/not-found";
 
@@ -82,6 +83,7 @@ function Router() {
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
           <Route path="/tutor/tests" component={TestManagement} />
+          <Route path="/tutor/tests/:testId/grade/:attemptId" component={TestGrading} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={Users} />
           <Route path="/admin/companies" component={Companies} />
@@ -96,6 +98,7 @@ function Router() {
           <Route path="/company/homework" component={SubmittedHomework} />
           <Route path="/company/worksheets" component={WorksheetManagementPage} />
           <Route path="/company/tests" component={TestManagement} />
+          <Route path="/company/tests/:testId/grade/:attemptId" component={TestGrading} />
           <Route path="/assignments" component={StudentAssignments} />
           <Route path="/student/assignments" component={StudentAssignments} />
           <Route path="/student/portal" component={StudentPortal} />
