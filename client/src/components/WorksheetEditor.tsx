@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { AIQuestionGenerator } from './AIQuestionGenerator';
 import { 
   Plus, 
   Trash2, 
@@ -28,7 +29,8 @@ import {
   Send,
   GripVertical,
   Check,
-  Info
+  Info,
+  Sparkles
 } from 'lucide-react';
 
 type QuestionType = 'short_text' | 'long_text' | 'multiple_choice' | 'fill_blank' | 'text_image' | 'information';
@@ -95,6 +97,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
   });
   const [newWorksheetTitle, setNewWorksheetTitle] = useState('');
   const [newWorksheetSubject, setNewWorksheetSubject] = useState('');
+  const [showAIGenerator, setShowAIGenerator] = useState(false);
 
   const { data: worksheet, isLoading, refetch } = useQuery<Worksheet>({
     queryKey: ['/api/worksheets', worksheetId],
@@ -587,31 +590,40 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
               <div className="max-w-3xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-2xl font-bold">Page {currentPage.pageNumber}</h2>
-                  <Dialog open={showAddQuestion} onOpenChange={setShowAddQuestion}>
-                    <DialogTrigger asChild>
-                      <Button data-testid="button-add-question">
-                        <Plus className="h-4 w-4 mr-2" /> Add Question
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="max-w-lg">
-                      <DialogHeader>
-                        <DialogTitle>Add Question</DialogTitle>
-                      </DialogHeader>
-                      {renderQuestionForm(newQuestion, setNewQuestion)}
-                      <div className="flex justify-end gap-2 mt-4">
-                        <Button variant="outline" onClick={() => setShowAddQuestion(false)}>
-                          Cancel
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline"
+                      onClick={() => setShowAIGenerator(true)}
+                      data-testid="button-ai-generate"
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" /> AI Generate
+                    </Button>
+                    <Dialog open={showAddQuestion} onOpenChange={setShowAddQuestion}>
+                      <DialogTrigger asChild>
+                        <Button data-testid="button-add-question">
+                          <Plus className="h-4 w-4 mr-2" /> Add Question
                         </Button>
-                        <Button 
-                          onClick={handleAddQuestion}
-                          disabled={!newQuestion.questionText}
-                          data-testid="button-confirm-add-question"
-                        >
-                          Add Question
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-lg">
+                        <DialogHeader>
+                          <DialogTitle>Add Question</DialogTitle>
+                        </DialogHeader>
+                        {renderQuestionForm(newQuestion, setNewQuestion)}
+                        <div className="flex justify-end gap-2 mt-4">
+                          <Button variant="outline" onClick={() => setShowAddQuestion(false)}>
+                            Cancel
+                          </Button>
+                          <Button 
+                            onClick={handleAddQuestion}
+                            disabled={!newQuestion.questionText}
+                            data-testid="button-confirm-add-question"
+                          >
+                            Add Question
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
                 </div>
 
                 {currentPage.questions.length === 0 ? (
@@ -662,6 +674,27 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
               Save Changes
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Question Generator Dialog */}
+      <Dialog open={showAIGenerator} onOpenChange={setShowAIGenerator}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0">
+          <AIQuestionGenerator
+            subject={worksheet.subject}
+            onAddQuestion={(q) => {
+              if (currentPage) {
+                addQuestionMutation.mutate({
+                  pageId: currentPage.id,
+                  question: {
+                    ...q,
+                    questionType: q.questionType as QuestionType,
+                  },
+                });
+              }
+            }}
+            onClose={() => setShowAIGenerator(false)}
+          />
         </DialogContent>
       </Dialog>
 

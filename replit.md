@@ -2,6 +2,13 @@
 
 eSlate is a secure educational platform designed for e-ink devices and high-contrast displays. It functions as a comprehensive learning management system supporting students, parents, tutors, and administrators. Key features include homework management, real-time messaging, progress tracking, and calendar scheduling, all optimized for accessibility and readability on e-ink displays. The platform aims to provide a robust and inclusive educational experience.
 
+## AI Features (Powered by Google Gemini)
+The platform includes AI-powered features using Google Gemini (free tier) to enhance the learning experience:
+- **AI Question Generator** (Tutors): Generate multiple questions at once in WorksheetEditor
+- **AI Grading Assistant** (Tutors): Get draft feedback and scoring suggestions for essay/short-answer questions
+- **Smart Hint System** (Students): Progressive hints (3 levels) with parent-configurable controls
+- **Parent AI Controls**: Parents can enable/disable AI hints for their children via Settings in Parent Dashboard
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.

@@ -3523,7 +3523,66 @@ Good luck with your assignment!"
     }
   });
 
-  // Update parent AI hint settings
+  // Get parent settings
+  app.get('/api/parents/settings', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      if (user?.role !== 'parent') {
+        return res.status(403).json({ error: 'Only parents can access settings' });
+      }
+      
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ error: 'Parent profile not found' });
+      }
+      
+      res.json({
+        id: parent.id,
+        userId: parent.userId,
+        aiHintsEnabled: parent.aiHintsEnabled ?? true,
+        maxHintsPerQuestion: parent.maxHintsPerQuestion ?? 3
+      });
+    } catch (error: any) {
+      console.error('Error getting parent settings:', error);
+      res.status(500).json({ error: error.message || 'Failed to get settings' });
+    }
+  });
+
+  // Update parent settings
+  app.patch('/api/parents/settings', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      
+      if (user?.role !== 'parent') {
+        return res.status(403).json({ error: 'Only parents can update settings' });
+      }
+      
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ error: 'Parent profile not found' });
+      }
+      
+      const { aiHintsEnabled, maxHintsPerQuestion } = req.body;
+      
+      const updated = await storage.updateParent(parent.id, {
+        aiHintsEnabled: aiHintsEnabled !== undefined ? aiHintsEnabled : parent.aiHintsEnabled,
+        maxHintsPerQuestion: maxHintsPerQuestion !== undefined ? maxHintsPerQuestion : parent.maxHintsPerQuestion
+      });
+      
+      res.json({
+        id: updated.id,
+        userId: updated.userId,
+        aiHintsEnabled: updated.aiHintsEnabled ?? true,
+        maxHintsPerQuestion: updated.maxHintsPerQuestion ?? 3
+      });
+    } catch (error: any) {
+      console.error('Error updating parent settings:', error);
+      res.status(500).json({ error: error.message || 'Failed to update settings' });
+    }
+  });
+
+  // Update parent AI hint settings (legacy endpoint)
   app.patch('/api/parents/ai-settings', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user;

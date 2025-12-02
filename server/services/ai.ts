@@ -66,6 +66,25 @@ interface ProgressInsightParams {
 class AIService {
   private model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
+  private safeParseJSON<T>(response: string, type: 'array' | 'object'): T {
+    try {
+      const pattern = type === 'array' ? /\[[\s\S]*\]/ : /\{[\s\S]*\}/;
+      const jsonMatch = response.match(pattern);
+      if (!jsonMatch) {
+        throw new Error(`No valid JSON ${type} found in response`);
+      }
+      
+      const cleanJson = jsonMatch[0]
+        .replace(/[\x00-\x1F\x7F]/g, ' ')
+        .replace(/,\s*([}\]])/g, '$1');
+      
+      return JSON.parse(cleanJson) as T;
+    } catch (error) {
+      console.error(`Failed to parse AI response as ${type}:`, response.substring(0, 500));
+      throw new Error(`Failed to parse AI response. The AI returned an invalid format.`);
+    }
+  }
+
   async generateQuestions(params: QuestionGenerationParams): Promise<GeneratedQuestion[]> {
     const prompt = `You are an educational content expert. Generate ${params.count} questions for a ${params.gradeLevel || 'middle school'} level ${params.subject} class on the topic "${params.topic}".
 
@@ -95,16 +114,23 @@ Generate exactly ${params.count} questions covering different aspects of ${param
       const result = await this.model.generateContent(prompt);
       const response = result.response.text();
       
-      const jsonMatch = response.match(/\[[\s\S]*\]/);
-      if (!jsonMatch) {
-        throw new Error("Failed to parse AI response");
+      const questions = this.safeParseJSON<GeneratedQuestion[]>(response, 'array');
+      
+      if (!Array.isArray(questions) || questions.length === 0) {
+        throw new Error("AI returned no questions");
       }
       
-      const questions = JSON.parse(jsonMatch[0]) as GeneratedQuestion[];
-      return questions;
-    } catch (error) {
+      return questions.map(q => ({
+        type: q.type || 'short_text',
+        question: q.question || 'Question text missing',
+        options: q.options,
+        correctAnswer: q.correctAnswer || '',
+        helpText: q.helpText || 'Think carefully about this question.',
+        points: q.points || 10
+      }));
+    } catch (error: any) {
       console.error("Error generating questions:", error);
-      throw new Error("Failed to generate questions. Please try again.");
+      throw new Error(error.message || "Failed to generate questions. Please try again.");
     }
   }
 
@@ -138,15 +164,17 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
       const result = await this.model.generateContent(prompt);
       const response = result.response.text();
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Failed to parse AI response");
-      }
+      const grading = this.safeParseJSON<GradingResult>(response, 'object');
       
-      return JSON.parse(jsonMatch[0]) as GradingResult;
-    } catch (error) {
+      return {
+        suggestedScore: Math.max(0, Math.min(params.maxPoints, grading.suggestedScore || 0)),
+        feedback: grading.feedback || 'Please review this answer.',
+        strengths: Array.isArray(grading.strengths) ? grading.strengths : [],
+        improvements: Array.isArray(grading.improvements) ? grading.improvements : []
+      };
+    } catch (error: any) {
       console.error("Error getting grading suggestion:", error);
-      throw new Error("Failed to generate grading suggestion. Please try again.");
+      throw new Error(error.message || "Failed to generate grading suggestion. Please try again.");
     }
   }
 
@@ -222,15 +250,26 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
       const result = await this.model.generateContent(prompt);
       const response = result.response.text();
       
-      const jsonMatch = response.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) {
-        throw new Error("Failed to parse AI response");
-      }
+      const insights = this.safeParseJSON<{
+        summary: string;
+        strengths: string[];
+        areasForImprovement: string[];
+        recommendations: string[];
+        overallTrend: 'improving' | 'stable' | 'declining';
+      }>(response, 'object');
       
-      return JSON.parse(jsonMatch[0]);
-    } catch (error) {
+      return {
+        summary: insights.summary || 'No summary available.',
+        strengths: Array.isArray(insights.strengths) ? insights.strengths : [],
+        areasForImprovement: Array.isArray(insights.areasForImprovement) ? insights.areasForImprovement : [],
+        recommendations: Array.isArray(insights.recommendations) ? insights.recommendations : [],
+        overallTrend: ['improving', 'stable', 'declining'].includes(insights.overallTrend) 
+          ? insights.overallTrend 
+          : 'stable'
+      };
+    } catch (error: any) {
       console.error("Error generating progress insights:", error);
-      throw new Error("Failed to generate progress insights. Please try again.");
+      throw new Error(error.message || "Failed to generate progress insights. Please try again.");
     }
   }
 

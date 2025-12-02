@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import Layout from "@/components/Layout";
 import { Link } from "wouter";
+import { AIGradingAssistant } from "@/components/AIGradingAssistant";
 import type { Test, TestQuestion, TestAttempt, TestAnswer } from "@shared/schema";
 
 export default function TestGrading() {
@@ -319,6 +320,20 @@ export default function TestGrading() {
                           placeholder="Provide feedback to the student..."
                           className="mt-1"
                           data-testid={`input-feedback-${question.id}`}
+                        />
+                      </div>
+                      
+                      {/* AI Grading Assistant */}
+                      <div className="mt-4">
+                        <AIGradingAssistant
+                          question={question.questionText || ''}
+                          studentAnswer={answer.studentAnswer || ''}
+                          correctAnswer={question.correctAnswer || undefined}
+                          maxPoints={question.points || 1}
+                          onApplySuggestion={(score, feedback) => {
+                            handleGradeChange(answer.id, 'pointsAwarded', score);
+                            handleGradeChange(answer.id, 'feedback', feedback);
+                          }}
                         />
                       </div>
                     </div>

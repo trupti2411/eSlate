@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest, queryClient } from '@/lib/queryClient';
+import { AIHintButton } from './AIHintButton';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -439,6 +440,12 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
                   {question.questionType.replace('_', ' ')}
                 </span>
                 <span className="text-xs text-muted-foreground">({question.points} pts)</span>
+                <AIHintButton
+                  question={question.questionText}
+                  questionType={question.questionType}
+                  correctAnswer={question.correctAnswer}
+                  studentAttempt={answer?.textAnswer || answer?.selectedOption}
+                />
               </div>
               <p className="text-lg font-serif leading-relaxed">{question.questionText}</p>
               

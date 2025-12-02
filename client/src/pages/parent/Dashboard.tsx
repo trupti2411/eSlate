@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
@@ -8,10 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { apiRequest } from "@/lib/queryClient";
 import { 
   Users, CheckCircle, BookOpen, TrendingUp, Home, 
   Calendar, Clock, AlertCircle, GraduationCap, FileText,
-  User, ChevronRight, Eye
+  User, ChevronRight, Eye, Settings, Sparkles, Lightbulb
 } from "lucide-react";
 import { format, isPast, differenceInDays } from "date-fns";
 
@@ -69,14 +72,41 @@ interface ChildData {
   };
 }
 
+interface ParentSettings {
+  id: string;
+  userId: string;
+  aiHintsEnabled: boolean;
+  maxHintsPerQuestion: number;
+}
+
 export default function ParentDashboard() {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
 
   const { data: children, isLoading: childrenLoading, error } = useQuery<ChildData[]>({
     queryKey: ["/api/parents/children"],
     enabled: !!user && user.role === 'parent',
+  });
+
+  const { data: parentSettings } = useQuery<ParentSettings>({
+    queryKey: ["/api/parents/settings"],
+    enabled: !!user && user.role === 'parent',
+  });
+
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (updates: Partial<ParentSettings>) => {
+      return apiRequest('/api/parents/settings', 'PATCH', updates);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/parents/settings"] });
+      toast({ title: 'Settings updated', description: 'Your preferences have been saved.' });
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to update settings', description: error.message, variant: 'destructive' });
+    },
   });
 
   if (isLoading) {
@@ -180,12 +210,67 @@ export default function ParentDashboard() {
                 <p className="text-gray-500 text-sm">Monitor your children's learning progress</p>
               </div>
             </div>
-            <Badge className="bg-black text-white px-4 py-2 text-sm" data-testid="text-username">
-              {user?.firstName} {user?.lastName}
-            </Badge>
+            <div className="flex items-center gap-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-2 border-black hover:bg-gray-100"
+                onClick={() => setShowSettings(!showSettings)}
+                data-testid="button-settings"
+              >
+                <Settings className="h-4 w-4 mr-2" />
+                Settings
+              </Button>
+              <Badge className="bg-black text-white px-4 py-2 text-sm" data-testid="text-username">
+                {user?.firstName} {user?.lastName}
+              </Badge>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Settings Panel */}
+      {showSettings && (
+        <div className="bg-gray-50 border-b-2 border-black">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <Card className="border-2 border-black">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-purple-600" />
+                  AI Learning Features
+                </CardTitle>
+                <CardDescription>
+                  Control AI-powered features for your children's learning experience
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-3">
+                    <Lightbulb className="h-5 w-5 text-amber-600" />
+                    <div>
+                      <Label className="text-base font-medium">AI Hints</Label>
+                      <p className="text-sm text-gray-600">
+                        Allow your children to get helpful hints when they're stuck on questions
+                      </p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={parentSettings?.aiHintsEnabled ?? true}
+                    onCheckedChange={(checked) => {
+                      updateSettingsMutation.mutate({ aiHintsEnabled: checked });
+                    }}
+                    data-testid="switch-ai-hints"
+                  />
+                </div>
+                <p className="text-xs text-gray-500">
+                  Hints are provided in 3 progressive levels - from gentle nudges to more detailed guidance. 
+                  This helps students learn while still encouraging independent problem-solving.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {childrenLoading ? (
