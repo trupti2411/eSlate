@@ -207,28 +207,6 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
-  // Get student's assignments
-  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: any, res: any) => {
-    try {
-      const user = req.user!;
-      const { studentId } = req.params;
-      
-      // Verify student access
-      if (user.role === 'student') {
-        const studentProfile = await storage.getStudentByUserId(user.id);
-        if (!studentProfile || studentProfile.id !== studentId) {
-          return res.status(403).json({ message: "Access denied" });
-        }
-      }
-      
-      const assignments = await storage.getStudentAssignments(studentId);
-      res.json(assignments);
-    } catch (error) {
-      console.error("Error fetching student assignments:", error);
-      res.status(500).json({ message: "Failed to fetch assignments" });
-    }
-  });
-
   // Get student's submissions
   app.get('/api/students/:studentId/submissions', isAuthenticated, async (req: any, res: any) => {
     try {
