@@ -26,8 +26,8 @@ export function TermsAcceptanceModal({ isOpen, onAccepted, userRole }: TermsAcce
 
   const acceptTermsMutation = useMutation({
     mutationFn: () => apiRequest('/api/users/accept-terms', 'POST', { version: TERMS_VERSION }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+    onSuccess: (data) => {
+      queryClient.setQueryData(['/api/auth/user'], data.user);
       toast({
         title: "Terms Accepted",
         description: "Thank you for accepting our terms and policies.",
