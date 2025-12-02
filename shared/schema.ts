@@ -119,6 +119,8 @@ export const assignments = pgTable("assignments", {
   title: varchar("title").notNull(),
   description: text("description"),
   instructions: text("instructions"),
+  correctAnswer: text("correct_answer"), // Correct answer for tutor reference
+  helpText: text("help_text"), // Help/hints that students can view
   submissionDate: timestamp("submission_date").notNull(), // Required deadline field
   companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
   createdBy: varchar("created_by").notNull().references(() => users.id),

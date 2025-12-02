@@ -15,7 +15,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { insertAssignmentSchema, type Assignment, type Class } from "@shared/schema";
-import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload, FileQuestion, BookOpen } from "lucide-react";
+import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload, FileQuestion, BookOpen, HelpCircle, CheckCircle } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { WorksheetEditor } from "@/components/WorksheetEditor";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -31,6 +31,8 @@ const assignmentFormSchema = insertAssignmentSchema.extend({
   week: z.number().optional(),
   assignmentKind: z.enum(['file_upload', 'worksheet']).default('file_upload'),
   worksheetId: z.string().optional(),
+  correctAnswer: z.string().optional(),
+  helpText: z.string().optional(),
 }).omit({
   companyId: true,
   createdBy: true,
@@ -353,6 +355,8 @@ export function AssignmentManagement() {
       title: "",
       description: "",
       instructions: "",
+      correctAnswer: "",
+      helpText: "",
       submissionDate: "",
       subject: "",
       academicYearId: "",
@@ -405,6 +409,8 @@ export function AssignmentManagement() {
       title: assignment.title,
       description: assignment.description || '',
       instructions: assignment.instructions || '',
+      correctAnswer: (assignment as any).correctAnswer || '',
+      helpText: (assignment as any).helpText || '',
       subject: assignment.subject || '',
       academicYearId: (assignment as any).academicYearId || '',
       termId: (assignment as any).termId || '',
@@ -725,6 +731,62 @@ export function AssignmentManagement() {
                           value={field.value || ""} 
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Correct Answer field - visible only to tutors */}
+                <FormField
+                  control={form.control}
+                  name="correctAnswer"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="assignment-correct-answer" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4 text-green-600" />
+                        Correct Answer (Tutor Only)
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          id="assignment-correct-answer"
+                          placeholder="Enter the correct answer for grading reference (not shown to students)" 
+                          rows={3} 
+                          {...field} 
+                          value={field.value || ""} 
+                          data-testid="input-correct-answer"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        This answer is for your reference when grading. Students will not see this.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Help Text field - shown to students via help icon */}
+                <FormField
+                  control={form.control}
+                  name="helpText"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="assignment-help-text" className="flex items-center gap-2">
+                        <HelpCircle className="h-4 w-4 text-blue-600" />
+                        Help/Hints for Students
+                      </FormLabel>
+                      <FormControl>
+                        <Textarea 
+                          id="assignment-help-text"
+                          placeholder="Enter hints or guidance that students can access via the help icon" 
+                          rows={3} 
+                          {...field} 
+                          value={field.value || ""} 
+                          data-testid="input-help-text"
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Students can click a help icon to view this guidance while working on the assignment.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
