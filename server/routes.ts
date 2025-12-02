@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 
 import { storage } from "./storage";
-import { setupCustomAuth, isAuthenticated } from "./customAuth";
+import { setupCustomAuth, isAuthenticated, sendHomeworkSubmissionEmail } from "./customAuth";
 import {
   insertMessageSchema,
   insertProgressSchema,
@@ -51,6 +51,52 @@ function parseObjectPath(path: string): {
     bucketName,
     objectName,
   };
+}
+
+async function notifyParentOfSubmission(
+  studentId: string, 
+  assignmentId: string, 
+  submittedAt: Date,
+  status: string
+) {
+  try {
+    const parentInfo = await storage.getParentUserByStudentId(studentId);
+    if (!parentInfo) {
+      console.log('No parent found for student, skipping notification');
+      return;
+    }
+    
+    const student = await storage.getStudent(studentId);
+    if (!student) return;
+    
+    const studentUser = await storage.getUser(student.userId);
+    if (!studentUser) return;
+    
+    const assignment = await storage.getAssignment(assignmentId);
+    if (!assignment) return;
+    
+    let isLate = false;
+    if (assignment.submissionDate) {
+      isLate = submittedAt > new Date(assignment.submissionDate);
+    } else {
+      console.log(`Assignment ${assignmentId} has no due date, marking as on-time`);
+    }
+    
+    await sendHomeworkSubmissionEmail({
+      parentEmail: parentInfo.email,
+      parentFirstName: parentInfo.firstName,
+      studentFirstName: studentUser.firstName || '',
+      studentLastName: studentUser.lastName || '',
+      assignmentTitle: assignment.title,
+      submittedAt,
+      isLate,
+      status
+    });
+    
+    console.log(`Parent notification sent to ${parentInfo.email} for assignment: ${assignment.title}`);
+  } catch (error) {
+    console.error('Failed to send parent notification:', error);
+  }
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -475,6 +521,12 @@ trailer<</Size 5/Root 1 0 R>>
         submission = await storage.createSubmission(validatedData);
       }
       
+      // Send parent notification if this is a final submission (not a draft)
+      if (!req.body.isDraft && req.body.assignmentId) {
+        const submissionTime = submission.submittedAt ? new Date(submission.submittedAt) : new Date();
+        notifyParentOfSubmission(student.id, req.body.assignmentId, submissionTime, 'submitted');
+      }
+      
       res.status(existingSubmission ? 200 : 201).json(submission);
     } catch (error) {
       console.error("Error creating/updating submission:", error);
@@ -505,6 +557,13 @@ trailer<</Size 5/Root 1 0 R>>
       });
       
       const submission = await storage.createSubmission(validatedData);
+      
+      // Send parent notification if this is a final submission
+      if (!req.body.isDraft) {
+        const submissionTime = submission.submittedAt ? new Date(submission.submittedAt) : new Date();
+        notifyParentOfSubmission(student.id, assignmentId, submissionTime, 'submitted');
+      }
+      
       res.status(201).json(submission);
     } catch (error) {
       console.error("Error creating submission:", error);
@@ -2735,20 +2794,28 @@ Good luck with your assignment!"
         if (assignmentWithWorksheet) {
           // Check if a submission already exists for this assignment/student
           const existingSubmissions = await storage.getSubmissionsByAssignmentAndStudent(assignmentWithWorksheet.id, studentId);
+          const submissionTime = new Date();
+          
+          let savedSubmission;
           if (existingSubmissions.length > 0) {
             // Update existing submission to submitted status
-            await storage.updateSubmission(existingSubmissions[0].id, {
+            savedSubmission = await storage.updateSubmission(existingSubmissions[0].id, {
               status: 'submitted',
               isDraft: false,
+              submittedAt: submissionTime,
             });
           } else {
             // Create new submission with all required and default fields
-            await storage.createSubmission({
+            const isLate = assignmentWithWorksheet.submissionDate 
+              ? submissionTime > new Date(assignmentWithWorksheet.submissionDate) 
+              : false;
+            savedSubmission = await storage.createSubmission({
               assignmentId: assignmentWithWorksheet.id,
               studentId: studentId,
               status: 'submitted',
               isDraft: false,
-              isLate: new Date() > new Date(assignmentWithWorksheet.submissionDate),
+              isLate,
+              submittedAt: submissionTime,
               content: null,
               documentUrl: null,
               deviceType: null,
@@ -2756,6 +2823,14 @@ Good luck with your assignment!"
               fileUrls: [],
             });
           }
+          
+          // Send parent notification using the persisted submission timestamp
+          const actualSubmissionTime = savedSubmission.submittedAt 
+            ? new Date(savedSubmission.submittedAt) 
+            : submissionTime;
+          notifyParentOfSubmission(studentId, assignmentWithWorksheet.id, actualSubmissionTime, 'submitted');
+        } else {
+          console.log('Worksheet submission completed but no linked assignment found for parent notification');
         }
       } catch (linkError) {
         // Don't fail the worksheet submission if linking fails
