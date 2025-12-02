@@ -50,6 +50,8 @@ export const users = pgTable("users", {
   lastLogin: timestamp("last_login"),
   authProvider: varchar("auth_provider").default('email'), // 'email' or 'replit'
   replitId: varchar("replit_id"), // Keep for existing users
+  termsAcceptedAt: timestamp("terms_accepted_at"), // When user accepted terms & privacy policy
+  termsVersion: varchar("terms_version"), // Version of terms accepted (e.g., "1.0")
   isDeleted: boolean("is_deleted").notNull().default(false),
   deletedAt: timestamp("deleted_at"),
   deletedBy: varchar("deleted_by"),
