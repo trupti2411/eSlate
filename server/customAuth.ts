@@ -114,6 +114,91 @@ export async function sendPasswordResetEmail(email: string, token: string, first
   console.warn('Email service not configured. Reset link:', `http://localhost:5000/reset-password?token=${token}`);
 }
 
+export interface SubmissionNotificationData {
+  parentEmail: string;
+  parentFirstName: string;
+  studentFirstName: string;
+  studentLastName: string;
+  assignmentTitle: string;
+  submittedAt: Date;
+  isLate: boolean;
+  status: string;
+}
+
+export async function sendHomeworkSubmissionEmail(data: SubmissionNotificationData) {
+  const { parentEmail, parentFirstName, studentFirstName, studentLastName, assignmentTitle, submittedAt, isLate, status } = data;
+  
+  const formattedDate = submittedAt.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+  
+  const lateWarning = isLate ? '<p style="color: #dc2626; font-weight: bold;">Note: This submission was submitted after the due date.</p>' : '';
+  const statusBadge = status === 'submitted' 
+    ? '<span style="background-color: #22c55e; color: white; padding: 4px 8px; border-radius: 4px;">Submitted</span>'
+    : `<span style="background-color: #3b82f6; color: white; padding: 4px 8px; border-radius: 4px;">${status}</span>`;
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('=== PARENT HOMEWORK NOTIFICATION ===');
+    console.log(`To: ${parentEmail}`);
+    console.log(`Subject: ${studentFirstName} ${studentLastName} has submitted homework`);
+    console.log(`Hi ${parentFirstName},`);
+    console.log(`Your child ${studentFirstName} ${studentLastName} has submitted their homework:`);
+    console.log(`- Assignment: ${assignmentTitle}`);
+    console.log(`- Submitted: ${formattedDate}`);
+    console.log(`- Status: ${status}`);
+    if (isLate) console.log(`- Note: This was a late submission`);
+    console.log('=====================================');
+    return;
+  }
+
+  if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    console.warn('Email service not configured. Parent notification not sent for:', assignmentTitle);
+    return;
+  }
+
+  const transporter = nodemailer.createTransport({
+    host: process.env.EMAIL_HOST,
+    port: 587,
+    secure: false,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: process.env.EMAIL_FROM || 'noreply@eslate.com',
+    to: parentEmail,
+    subject: `${studentFirstName} ${studentLastName} has submitted homework - eSlate`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <h2 style="color: #1f2937;">Homework Submission Notification</h2>
+        <p>Hi ${parentFirstName},</p>
+        <p>Your child <strong>${studentFirstName} ${studentLastName}</strong> has submitted their homework.</p>
+        
+        <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+          <p style="margin: 0 0 8px 0;"><strong>Assignment:</strong> ${assignmentTitle}</p>
+          <p style="margin: 0 0 8px 0;"><strong>Submitted:</strong> ${formattedDate}</p>
+          <p style="margin: 0;"><strong>Status:</strong> ${statusBadge}</p>
+        </div>
+        
+        ${lateWarning}
+        
+        <p>You can log in to eSlate to view more details about your child's progress.</p>
+        
+        <p style="color: #6b7280; font-size: 12px; margin-top: 24px;">
+          This is an automated notification from eSlate. Please do not reply to this email.
+        </p>
+      </div>
+    `,
+  });
+}
+
 // Authentication middleware
 export interface AuthenticatedRequest extends Request {
   user?: User;
