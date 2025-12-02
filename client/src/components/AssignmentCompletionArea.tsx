@@ -19,7 +19,9 @@ import {
   Upload,
   Clock,
   User,
-  ClipboardList
+  ClipboardList,
+  HelpCircle,
+  X
 } from "lucide-react";
 import { format } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -85,6 +87,10 @@ export function AssignmentCompletionArea({
   const [selectedPDFUrl, setSelectedPDFUrl] = useState<string>("");
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [selectedDocumentUrl, setSelectedDocumentUrl] = useState<string>("");
+  const [showHelp, setShowHelp] = useState(false);
+  
+  // Check if assignment has help text (access from extended assignment type)
+  const helpText = (assignment as any).helpText;
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -235,11 +241,48 @@ export function AssignmentCompletionArea({
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* Help Icon Button - Only show if help text exists */}
+              {helpText && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowHelp(!showHelp)}
+                  className={`${eInkStyles.button} flex items-center gap-1 ${showHelp ? 'bg-blue-50' : ''}`}
+                  data-testid="button-show-help"
+                >
+                  <HelpCircle className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm">Help</span>
+                </Button>
+              )}
               <Badge className={`${eInkStyles.badge} text-sm px-3 py-1`}>
                 {submission?.status === 'submitted' ? 'Completed' : 'In Progress'}
               </Badge>
             </div>
           </div>
+
+          {/* Help Text Section - Expandable */}
+          {helpText && showHelp && (
+            <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg" data-testid="section-help-text">
+              <div className="flex items-start justify-between">
+                <div className="flex items-start gap-2">
+                  <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h4 className="font-semibold text-blue-800 mb-1">Hints & Guidance</h4>
+                    <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{helpText}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowHelp(false)}
+                  className="h-6 w-6 p-0"
+                  data-testid="button-close-help"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="flex items-center p-3 bg-gray-50 rounded">
             <Clock className="h-4 w-4 mr-2 text-gray-600" />
@@ -312,11 +355,48 @@ export function AssignmentCompletionArea({
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Help Icon Button - Only show if help text exists */}
+            {helpText && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowHelp(!showHelp)}
+                className={`${eInkStyles.button} flex items-center gap-1 ${showHelp ? 'bg-blue-50' : ''}`}
+                data-testid="button-show-help"
+              >
+                <HelpCircle className="h-4 w-4 text-blue-600" />
+                <span className="text-sm">Help</span>
+              </Button>
+            )}
             <Badge className={`${eInkStyles.badge} text-sm px-3 py-1`}>
               {submission?.status === 'submitted' ? 'Completed' : 'In Progress'}
             </Badge>
           </div>
         </div>
+
+        {/* Help Text Section - Expandable */}
+        {helpText && showHelp && (
+          <div className="mb-4 p-4 bg-blue-50 border-2 border-blue-200 rounded-lg" data-testid="section-help-text">
+            <div className="flex items-start justify-between">
+              <div className="flex items-start gap-2">
+                <HelpCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                <div>
+                  <h4 className="font-semibold text-blue-800 mb-1">Hints & Guidance</h4>
+                  <p className="text-gray-700 whitespace-pre-wrap leading-relaxed">{helpText}</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHelp(false)}
+                className="h-6 w-6 p-0"
+                data-testid="button-close-help"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Assignment Info Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 text-sm">

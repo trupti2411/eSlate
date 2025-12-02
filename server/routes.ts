@@ -438,7 +438,19 @@ trailer<</Size 5/Root 1 0 R>>
         assignments.push(...classAssignments);
       }
       
-      res.json(assignments);
+      // Enrich assignments with worksheet data if applicable
+      const enrichedAssignments = await Promise.all(assignments.map(async (assignment) => {
+        if (assignment.assignmentKind === 'worksheet' && assignment.worksheetId) {
+          const worksheet = await storage.getWorksheetWithDetails(assignment.worksheetId);
+          return { ...assignment, worksheet };
+        }
+        return assignment;
+      }));
+      
+      // Filter out correctAnswer field - students should not see this
+      const safeAssignments = enrichedAssignments.map(({ correctAnswer, ...assignment }) => assignment);
+      
+      res.json(safeAssignments);
     } catch (error) {
       console.error("Error fetching student assignments:", error);
       res.status(500).json({ message: "Failed to fetch assignments" });
@@ -765,27 +777,6 @@ trailer<</Size 5/Root 1 0 R>>
     } catch (error) {
       console.error('Error fetching student classes:', error);
       res.status(500).json({ message: 'Failed to fetch classes' });
-    }
-  });
-
-  app.get('/api/students/:studentId/assignments', isAuthenticated, async (req: any, res: any) => {
-    try {
-      const { studentId } = req.params;
-      const studentAssignments = await storage.getStudentAssignments(studentId);
-      
-      // Enrich assignments with worksheet data if applicable
-      const enrichedAssignments = await Promise.all(studentAssignments.map(async (assignment) => {
-        if (assignment.assignmentKind === 'worksheet' && assignment.worksheetId) {
-          const worksheet = await storage.getWorksheetWithDetails(assignment.worksheetId);
-          return { ...assignment, worksheet };
-        }
-        return assignment;
-      }));
-      
-      res.json(enrichedAssignments);
-    } catch (error) {
-      console.error('Error fetching student assignments:', error);
-      res.status(500).json({ message: 'Failed to fetch assignments' });
     }
   });
 
