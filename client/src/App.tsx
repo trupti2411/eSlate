@@ -28,6 +28,7 @@ import { StudentWorksheets } from "@/pages/student/StudentWorksheets";
 import GoogleDocsViewer from "@/pages/GoogleDocsViewer";
 import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { WorksheetManagementPage } from "@/pages/admin/WorksheetManagementPage";
+import TestManagement from "@/pages/tests/TestManagement";
 
 import NotFound from "@/pages/not-found";
 
@@ -80,6 +81,7 @@ function Router() {
           <Route path="/student/dashboard" component={StudentDashboard} />
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
+          <Route path="/tutor/tests" component={TestManagement} />
           <Route path="/admin" component={AdminDashboard} />
           <Route path="/admin/users" component={Users} />
           <Route path="/admin/companies" component={Companies} />
@@ -93,6 +95,7 @@ function Router() {
           <Route path="/company/assignments" component={AssignmentManagement} />
           <Route path="/company/homework" component={SubmittedHomework} />
           <Route path="/company/worksheets" component={WorksheetManagementPage} />
+          <Route path="/company/tests" component={TestManagement} />
           <Route path="/assignments" component={StudentAssignments} />
           <Route path="/student/assignments" component={StudentAssignments} />
           <Route path="/student/portal" component={StudentPortal} />

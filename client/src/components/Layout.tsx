@@ -55,6 +55,7 @@ export default function Layout({ children }: LayoutProps) {
           ...baseItems,
           { href: '/students', icon: Users, label: 'Students' },
           { href: '/assignments', icon: BookOpen, label: 'Assignments' },
+          { href: '/tutor/tests', icon: BookOpen, label: 'Tests & Exams' },
           { href: '/calendar', icon: Settings, label: 'Schedule' },
         ];
       case 'admin':
@@ -71,6 +72,7 @@ export default function Layout({ children }: LayoutProps) {
           { href: '/company/students', icon: Users, label: 'Students' },
           { href: '/company/academic', icon: Calendar, label: 'Academic Management' },
           { href: '/company/assignments', icon: BookOpen, label: 'Assignment Management' },
+          { href: '/company/tests', icon: BookOpen, label: 'Tests & Exams' },
           { href: '/company/homework', icon: BookOpen, label: 'Submitted Homework' },
           { href: '/company/reports', icon: BookOpen, label: 'Reports' },
         ];
