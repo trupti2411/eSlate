@@ -27,10 +27,11 @@ import {
   FileText,
   AlignLeft,
   List,
-  Image
+  Image,
+  Info
 } from 'lucide-react';
 
-type QuestionType = 'short_text' | 'long_text' | 'multiple_choice' | 'fill_blank' | 'text_image';
+type QuestionType = 'short_text' | 'long_text' | 'multiple_choice' | 'fill_blank' | 'text_image' | 'information';
 
 interface Question {
   id: string;
@@ -94,6 +95,7 @@ const questionTypeIcons: Record<QuestionType, any> = {
   multiple_choice: List,
   fill_blank: FileText,
   text_image: Image,
+  information: Info,
 };
 
 export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, assignmentId, onClose, onComplete }: WorksheetAnswererProps) {
@@ -386,12 +388,13 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
 
   const getAnswerProgress = () => {
     const allQuestions = worksheet.pages.flatMap(p => p.questions);
-    const answeredCount = allQuestions.filter(q => {
+    const answerableQuestions = allQuestions.filter(q => q.questionType !== 'information');
+    const answeredCount = answerableQuestions.filter(q => {
       const answer = answers[q.id];
       const strokes = currentStrokes[q.id];
       return answer?.textAnswer || answer?.selectedOption || (strokes && strokes.length > 0);
     }).length;
-    return { answered: answeredCount, total: allQuestions.length };
+    return { answered: answeredCount, total: answerableQuestions.length };
   };
 
   const progress = getAnswerProgress();
@@ -399,6 +402,30 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
   const renderQuestionInput = (question: Question) => {
     const answer = answers[question.id];
     const Icon = questionTypeIcons[question.questionType];
+
+    if (question.questionType === 'information') {
+      return (
+        <Card key={question.id} className="mb-6 border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950">
+          <CardContent className="pt-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <Info className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300 uppercase">
+                    Information
+                  </span>
+                </div>
+                <div className="prose prose-lg dark:prose-invert max-w-none">
+                  <p className="text-base font-serif leading-relaxed whitespace-pre-wrap">{question.questionText}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
 
     return (
       <Card key={question.id} className="mb-6 border-2">

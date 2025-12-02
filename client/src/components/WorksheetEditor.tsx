@@ -27,10 +27,11 @@ import {
   Eye,
   Send,
   GripVertical,
-  Check
+  Check,
+  Info
 } from 'lucide-react';
 
-type QuestionType = 'short_text' | 'long_text' | 'multiple_choice' | 'fill_blank' | 'text_image';
+type QuestionType = 'short_text' | 'long_text' | 'multiple_choice' | 'fill_blank' | 'text_image' | 'information';
 
 interface Question {
   id?: string;
@@ -77,6 +78,7 @@ const questionTypeLabels: Record<QuestionType, { label: string; icon: any; descr
   multiple_choice: { label: 'Multiple Choice', icon: List, description: 'Select one correct answer from options' },
   fill_blank: { label: 'Fill in the Blank', icon: FileText, description: 'Complete the sentence with missing word' },
   text_image: { label: 'Text + Image', icon: Image, description: 'Question with an image attachment' },
+  information: { label: 'Information Block', icon: Info, description: 'Display text/instructions without requiring an answer' },
 };
 
 export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, onClose, onSave }: WorksheetEditorProps) {
@@ -282,15 +284,24 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
       </div>
 
       <div>
-        <Label htmlFor="questionText">Question Text</Label>
+        <Label htmlFor="questionText">
+          {question.questionType === 'information' ? 'Content' : 'Question Text'}
+        </Label>
         <Textarea
           id="questionText"
           value={question.questionText || ''}
           onChange={(e) => onChange({ ...question, questionText: e.target.value })}
-          placeholder="Enter your question..."
-          className="min-h-[80px]"
+          placeholder={question.questionType === 'information' 
+            ? "Enter information, instructions, or content to display..." 
+            : "Enter your question..."}
+          className={question.questionType === 'information' ? "min-h-[150px]" : "min-h-[80px]"}
           data-testid="input-question-text"
         />
+        {question.questionType === 'information' && (
+          <p className="text-xs text-muted-foreground mt-1">
+            This content will be displayed to students without requiring an answer.
+          </p>
+        )}
       </div>
 
       {question.questionType === 'multiple_choice' && (
@@ -380,18 +391,20 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
         </div>
       )}
 
-      <div>
-        <Label htmlFor="points">Points</Label>
-        <Input
-          id="points"
-          type="number"
-          min="1"
-          value={question.points || 1}
-          onChange={(e) => onChange({ ...question, points: parseInt(e.target.value) || 1 })}
-          className="w-24"
-          data-testid="input-points"
-        />
-      </div>
+      {question.questionType !== 'information' && (
+        <div>
+          <Label htmlFor="points">Points</Label>
+          <Input
+            id="points"
+            type="number"
+            min="1"
+            value={question.points || 1}
+            onChange={(e) => onChange({ ...question, points: parseInt(e.target.value) || 1 })}
+            className="w-24"
+            data-testid="input-points"
+          />
+        </div>
+      )}
     </div>
   );
 
@@ -411,9 +424,17 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
               <div className="flex items-center gap-2 mb-2">
                 <Icon className="h-4 w-4 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground uppercase">{typeInfo.label}</span>
-                <span className="text-xs text-muted-foreground">({question.points} pts)</span>
+                {question.questionType !== 'information' && (
+                  <span className="text-xs text-muted-foreground">({question.points} pts)</span>
+                )}
               </div>
-              <p className="text-lg mb-2">{question.questionText}</p>
+              {question.questionType === 'information' ? (
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2">
+                  <p className="text-base whitespace-pre-wrap">{question.questionText}</p>
+                </div>
+              ) : (
+                <p className="text-lg mb-2">{question.questionText}</p>
+              )}
               
               {question.questionType === 'multiple_choice' && question.options && (
                 <div className="space-y-1 ml-4">

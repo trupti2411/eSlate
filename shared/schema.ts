@@ -30,7 +30,7 @@ export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', '
 export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed', 'late', 'needs_revision']);
 export const submissionStatusEnum = pgEnum('submission_status', ['draft', 'submitted', 'late', 'graded', 'parent_verified', 'needs_revision']);
 export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
-export const questionTypeEnum = pgEnum('question_type', ['short_text', 'long_text', 'multiple_choice', 'fill_blank', 'text_image']);
+export const questionTypeEnum = pgEnum('question_type', ['short_text', 'long_text', 'multiple_choice', 'fill_blank', 'text_image', 'information']);
 export const assignmentKindEnum = pgEnum('assignment_kind', ['file_upload', 'worksheet']);
 
 // User storage table with custom authentication
