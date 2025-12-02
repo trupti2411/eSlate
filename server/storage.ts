@@ -19,6 +19,11 @@ import {
   worksheetQuestions,
   worksheetAssignments,
   worksheetAnswers,
+  tests,
+  testQuestions,
+  testAssignments,
+  testAttempts,
+  testAnswers,
   type User,
   type Student,
   type InsertStudent,
@@ -57,6 +62,16 @@ import {
   type InsertWorksheetAssignment,
   type WorksheetAnswer,
   type InsertWorksheetAnswer,
+  type Test,
+  type InsertTest,
+  type TestQuestion,
+  type InsertTestQuestion,
+  type TestAssignment,
+  type InsertTestAssignment,
+  type TestAttempt,
+  type InsertTestAttempt,
+  type TestAnswer,
+  type InsertTestAnswer,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains, inArray } from "drizzle-orm";
@@ -202,6 +217,43 @@ export interface IStorage {
   
   // Worksheet-Assignment link
   getAssignmentByWorksheetAndStudent(worksheetId: string, studentId: string): Promise<Assignment | undefined>;
+
+  // Test/Exam operations
+  createTest(testData: InsertTest): Promise<Test>;
+  getTest(id: string): Promise<Test | undefined>;
+  getTestsByCompany(companyId: string): Promise<Test[]>;
+  getTestsByClass(classId: string): Promise<Test[]>;
+  updateTest(id: string, updates: Partial<InsertTest>): Promise<Test>;
+  deleteTest(id: string): Promise<void>;
+  getTestWithQuestions(testId: string): Promise<any>;
+
+  // Test question operations
+  createTestQuestion(questionData: InsertTestQuestion): Promise<TestQuestion>;
+  getTestQuestions(testId: string): Promise<TestQuestion[]>;
+  updateTestQuestion(id: string, updates: Partial<InsertTestQuestion>): Promise<TestQuestion>;
+  deleteTestQuestion(id: string): Promise<void>;
+
+  // Test assignment operations
+  createTestAssignment(assignmentData: InsertTestAssignment): Promise<TestAssignment>;
+  getTestAssignments(testId: string): Promise<TestAssignment[]>;
+  getStudentTestAssignments(studentId: string): Promise<any[]>;
+  deleteTestAssignment(id: string): Promise<void>;
+
+  // Test attempt operations
+  createTestAttempt(attemptData: InsertTestAttempt): Promise<TestAttempt>;
+  getTestAttempt(id: string): Promise<TestAttempt | undefined>;
+  getTestAttemptsByTest(testId: string): Promise<TestAttempt[]>;
+  getTestAttemptsByStudent(studentId: string): Promise<TestAttempt[]>;
+  updateTestAttempt(id: string, updates: Partial<InsertTestAttempt>): Promise<TestAttempt>;
+
+  // Test answer operations
+  createTestAnswer(answerData: InsertTestAnswer): Promise<TestAnswer>;
+  getTestAnswersByAttempt(attemptId: string): Promise<TestAnswer[]>;
+  updateTestAnswer(id: string, updates: Partial<InsertTestAnswer>): Promise<TestAnswer>;
+  
+  // Grading operations
+  gradeTestAttempt(attemptId: string, gradedBy: string, feedback?: string): Promise<TestAttempt>;
+  autoGradeTestAttempt(attemptId: string): Promise<{ totalScore: number; percentageScore: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1571,6 +1623,224 @@ export class DatabaseStorage implements IStorage {
     }));
     
     return { ...worksheet, pages: pagesWithQuestions };
+  }
+
+  // Test/Exam operations
+  async createTest(testData: InsertTest): Promise<Test> {
+    const [test] = await db.insert(tests).values(testData).returning();
+    return test;
+  }
+
+  async getTest(id: string): Promise<Test | undefined> {
+    const [test] = await db.select().from(tests).where(eq(tests.id, id));
+    return test;
+  }
+
+  async getTestsByCompany(companyId: string): Promise<Test[]> {
+    return db.select().from(tests).where(eq(tests.companyId, companyId)).orderBy(desc(tests.createdAt));
+  }
+
+  async getTestsByClass(classId: string): Promise<Test[]> {
+    return db.select().from(tests).where(eq(tests.classId, classId)).orderBy(desc(tests.createdAt));
+  }
+
+  async updateTest(id: string, updates: Partial<InsertTest>): Promise<Test> {
+    const [test] = await db.update(tests).set({ ...updates, updatedAt: new Date() }).where(eq(tests.id, id)).returning();
+    return test;
+  }
+
+  async deleteTest(id: string): Promise<void> {
+    await db.delete(tests).where(eq(tests.id, id));
+  }
+
+  async getTestWithQuestions(testId: string): Promise<any> {
+    const test = await this.getTest(testId);
+    if (!test) return null;
+    
+    const questions = await this.getTestQuestions(testId);
+    return { ...test, questions };
+  }
+
+  // Test question operations
+  async createTestQuestion(questionData: InsertTestQuestion): Promise<TestQuestion> {
+    const [question] = await db.insert(testQuestions).values(questionData).returning();
+    
+    // Update total points on the test
+    const allQuestions = await this.getTestQuestions(questionData.testId);
+    const totalPoints = allQuestions.reduce((sum, q) => sum + (q.points || 0), 0) + (questionData.points || 1);
+    await this.updateTest(questionData.testId, { totalPoints });
+    
+    return question;
+  }
+
+  async getTestQuestions(testId: string): Promise<TestQuestion[]> {
+    return db.select().from(testQuestions).where(eq(testQuestions.testId, testId)).orderBy(testQuestions.questionNumber);
+  }
+
+  async updateTestQuestion(id: string, updates: Partial<InsertTestQuestion>): Promise<TestQuestion> {
+    const [question] = await db.update(testQuestions).set(updates).where(eq(testQuestions.id, id)).returning();
+    
+    // Recalculate total points if points changed
+    if (updates.points !== undefined) {
+      const allQuestions = await this.getTestQuestions(question.testId);
+      const totalPoints = allQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
+      await this.updateTest(question.testId, { totalPoints });
+    }
+    
+    return question;
+  }
+
+  async deleteTestQuestion(id: string): Promise<void> {
+    const [question] = await db.select().from(testQuestions).where(eq(testQuestions.id, id));
+    if (question) {
+      await db.delete(testQuestions).where(eq(testQuestions.id, id));
+      // Recalculate total points
+      const allQuestions = await this.getTestQuestions(question.testId);
+      const totalPoints = allQuestions.reduce((sum, q) => sum + (q.points || 0), 0);
+      await this.updateTest(question.testId, { totalPoints });
+    }
+  }
+
+  // Test assignment operations
+  async createTestAssignment(assignmentData: InsertTestAssignment): Promise<TestAssignment> {
+    const [assignment] = await db.insert(testAssignments).values(assignmentData).returning();
+    return assignment;
+  }
+
+  async getTestAssignments(testId: string): Promise<TestAssignment[]> {
+    return db.select().from(testAssignments).where(eq(testAssignments.testId, testId));
+  }
+
+  async getStudentTestAssignments(studentId: string): Promise<any[]> {
+    const results = await db.select({
+      assignment: testAssignments,
+      test: tests,
+    })
+    .from(testAssignments)
+    .innerJoin(tests, eq(testAssignments.testId, tests.id))
+    .where(eq(testAssignments.studentId, studentId));
+    
+    return results;
+  }
+
+  async deleteTestAssignment(id: string): Promise<void> {
+    await db.delete(testAssignments).where(eq(testAssignments.id, id));
+  }
+
+  // Test attempt operations
+  async createTestAttempt(attemptData: InsertTestAttempt): Promise<TestAttempt> {
+    const [attempt] = await db.insert(testAttempts).values(attemptData).returning();
+    return attempt;
+  }
+
+  async getTestAttempt(id: string): Promise<TestAttempt | undefined> {
+    const [attempt] = await db.select().from(testAttempts).where(eq(testAttempts.id, id));
+    return attempt;
+  }
+
+  async getTestAttemptsByTest(testId: string): Promise<TestAttempt[]> {
+    return db.select().from(testAttempts).where(eq(testAttempts.testId, testId)).orderBy(desc(testAttempts.createdAt));
+  }
+
+  async getTestAttemptsByStudent(studentId: string): Promise<TestAttempt[]> {
+    return db.select().from(testAttempts).where(eq(testAttempts.studentId, studentId)).orderBy(desc(testAttempts.createdAt));
+  }
+
+  async updateTestAttempt(id: string, updates: Partial<InsertTestAttempt>): Promise<TestAttempt> {
+    const [attempt] = await db.update(testAttempts).set(updates).where(eq(testAttempts.id, id)).returning();
+    return attempt;
+  }
+
+  // Test answer operations
+  async createTestAnswer(answerData: InsertTestAnswer): Promise<TestAnswer> {
+    const [answer] = await db.insert(testAnswers).values(answerData).returning();
+    return answer;
+  }
+
+  async getTestAnswersByAttempt(attemptId: string): Promise<TestAnswer[]> {
+    return db.select().from(testAnswers).where(eq(testAnswers.attemptId, attemptId));
+  }
+
+  async updateTestAnswer(id: string, updates: Partial<InsertTestAnswer>): Promise<TestAnswer> {
+    const [answer] = await db.update(testAnswers).set({ ...updates, updatedAt: new Date() }).where(eq(testAnswers.id, id)).returning();
+    return answer;
+  }
+
+  // Auto-grade a test attempt for multiple choice and true/false questions
+  async autoGradeTestAttempt(attemptId: string): Promise<{ totalScore: number; percentageScore: number }> {
+    const attempt = await this.getTestAttempt(attemptId);
+    if (!attempt) throw new Error("Attempt not found");
+
+    const test = await this.getTest(attempt.testId);
+    if (!test) throw new Error("Test not found");
+
+    const questions = await this.getTestQuestions(attempt.testId);
+    const answers = await this.getTestAnswersByAttempt(attemptId);
+
+    let totalScore = 0;
+
+    for (const answer of answers) {
+      const question = questions.find(q => q.id === answer.questionId);
+      if (!question) continue;
+
+      let isCorrect = false;
+      let pointsAwarded = 0;
+
+      if (question.questionType === 'multiple_choice' || question.questionType === 'true_false') {
+        const options = question.options as { id: string; text: string; isCorrect: boolean }[] | null;
+        if (options && answer.selectedOption) {
+          const selectedOpt = options.find(o => o.id === answer.selectedOption);
+          isCorrect = selectedOpt?.isCorrect || false;
+          pointsAwarded = isCorrect ? (question.points || 1) : 0;
+        }
+      } else if (question.questionType === 'fill_blank' && question.correctAnswer) {
+        isCorrect = answer.studentAnswer?.toLowerCase().trim() === question.correctAnswer.toLowerCase().trim();
+        pointsAwarded = isCorrect ? (question.points || 1) : 0;
+      }
+
+      await this.updateTestAnswer(answer.id, {
+        isCorrect,
+        pointsAwarded,
+        gradedAt: new Date(),
+      });
+
+      totalScore += pointsAwarded;
+    }
+
+    const percentageScore = test.totalPoints ? Math.round((totalScore / test.totalPoints) * 100) : 0;
+
+    return { totalScore, percentageScore };
+  }
+
+  // Grade a test attempt (includes manual grading and finalization)
+  async gradeTestAttempt(attemptId: string, gradedBy: string, feedback?: string): Promise<TestAttempt> {
+    const attempt = await this.getTestAttempt(attemptId);
+    if (!attempt) throw new Error("Attempt not found");
+
+    const test = await this.getTest(attempt.testId);
+    if (!test) throw new Error("Test not found");
+
+    // First, auto-grade what we can
+    const { totalScore, percentageScore } = await this.autoGradeTestAttempt(attemptId);
+
+    // Determine if passed
+    const isPassed = test.passingScore ? percentageScore >= test.passingScore : undefined;
+
+    // Update the attempt with final grading
+    const [gradedAttempt] = await db.update(testAttempts)
+      .set({
+        status: 'graded',
+        totalScore,
+        percentageScore,
+        isPassed,
+        gradedBy,
+        gradedAt: new Date(),
+        feedback,
+      })
+      .where(eq(testAttempts.id, attemptId))
+      .returning();
+
+    return gradedAttempt;
   }
 }
 

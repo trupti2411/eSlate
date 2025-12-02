@@ -702,6 +702,140 @@ export type InsertWorksheetQuestion = z.infer<typeof insertWorksheetQuestionSche
 export type InsertWorksheetAssignment = z.infer<typeof insertWorksheetAssignmentSchema>;
 export type InsertWorksheetAnswer = z.infer<typeof insertWorksheetAnswerSchema>;
 
+// Test/Exam status enum
+export const testStatusEnum = pgEnum("test_status", ["draft", "published", "archived"]);
+
+// Test question type enum
+export const testQuestionTypeEnum = pgEnum("test_question_type", [
+  "multiple_choice",
+  "true_false", 
+  "short_answer",
+  "essay",
+  "fill_blank"
+]);
+
+// Test attempt status enum
+export const testAttemptStatusEnum = pgEnum("test_attempt_status", ["in_progress", "submitted", "graded"]);
+
+// Tests table - main test/exam record
+export const tests = pgTable("tests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: varchar("title").notNull(),
+  description: text("description"),
+  subject: varchar("subject"),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
+  createdBy: varchar("created_by").notNull().references(() => users.id),
+  classId: varchar("class_id").references(() => classes.id),
+  status: testStatusEnum("status").notNull().default("draft"),
+  duration: integer("duration"), // Duration in minutes
+  totalPoints: integer("total_points").default(0),
+  passingScore: integer("passing_score"), // Minimum score to pass
+  dueDate: timestamp("due_date"),
+  allowRetakes: boolean("allow_retakes").default(false),
+  showResultsImmediately: boolean("show_results_immediately").default(true),
+  shuffleQuestions: boolean("shuffle_questions").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Test questions table
+export const testQuestions = pgTable("test_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: 'cascade' }),
+  questionType: testQuestionTypeEnum("question_type").notNull(),
+  questionText: text("question_text").notNull(),
+  questionNumber: integer("question_number").notNull(),
+  options: jsonb("options"), // For multiple choice: [{id, text, isCorrect}]
+  correctAnswer: text("correct_answer"), // For short answer, fill blank
+  points: integer("points").default(1),
+  explanation: text("explanation"), // Explanation shown after grading
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Test assignments - assign tests to students/classes
+export const testAssignments = pgTable("test_assignments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").references(() => students.id, { onDelete: 'cascade' }),
+  classId: varchar("class_id").references(() => classes.id, { onDelete: 'cascade' }),
+  assignedBy: varchar("assigned_by").notNull().references(() => users.id),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Test attempts - track student test sessions
+export const testAttempts = pgTable("test_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id").notNull().references(() => students.id),
+  status: testAttemptStatusEnum("status").notNull().default("in_progress"),
+  startedAt: timestamp("started_at").defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+  totalScore: integer("total_score"),
+  percentageScore: integer("percentage_score"),
+  isPassed: boolean("is_passed"),
+  gradedBy: varchar("graded_by").references(() => users.id),
+  gradedAt: timestamp("graded_at"),
+  feedback: text("feedback"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Test answers - student responses to questions
+export const testAnswers = pgTable("test_answers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  attemptId: varchar("attempt_id").notNull().references(() => testAttempts.id, { onDelete: 'cascade' }),
+  questionId: varchar("question_id").notNull().references(() => testQuestions.id, { onDelete: 'cascade' }),
+  studentAnswer: text("student_answer"),
+  selectedOption: varchar("selected_option"), // For multiple choice
+  isCorrect: boolean("is_correct"),
+  pointsAwarded: integer("points_awarded"),
+  feedback: text("feedback"),
+  gradedAt: timestamp("graded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Test type exports
+export type Test = typeof tests.$inferSelect;
+export type TestQuestion = typeof testQuestions.$inferSelect;
+export type TestAssignment = typeof testAssignments.$inferSelect;
+export type TestAttempt = typeof testAttempts.$inferSelect;
+export type TestAnswer = typeof testAnswers.$inferSelect;
+
+// Test insert schemas
+export const insertTestSchema = createInsertSchema(tests).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTestQuestionSchema = createInsertSchema(testQuestions).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTestAssignmentSchema = createInsertSchema(testAssignments).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTestAttemptSchema = createInsertSchema(testAttempts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertTestAnswerSchema = createInsertSchema(testAnswers).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTest = z.infer<typeof insertTestSchema>;
+export type InsertTestQuestion = z.infer<typeof insertTestQuestionSchema>;
+export type InsertTestAssignment = z.infer<typeof insertTestAssignmentSchema>;
+export type InsertTestAttempt = z.infer<typeof insertTestAttemptSchema>;
+export type InsertTestAnswer = z.infer<typeof insertTestAnswerSchema>;
+
 // Authentication schemas
 export const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
