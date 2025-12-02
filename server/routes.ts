@@ -948,6 +948,72 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Parent routes - Get parent profile
+  app.get("/api/parents/me", isAuthenticated, async (req: any, res: any) => {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+    if (user.role !== 'parent') return res.status(403).json({ message: "Parent access required" });
+
+    try {
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent profile not found" });
+      }
+      res.json({ ...parent, user });
+    } catch (error) {
+      console.error("Error fetching parent profile:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get parent's children with their assignment progress
+  app.get("/api/parents/children", isAuthenticated, async (req: any, res: any) => {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+    if (user.role !== 'parent') return res.status(403).json({ message: "Parent access required" });
+
+    try {
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent profile not found" });
+      }
+
+      const children = await storage.getParentChildrenWithProgress(parent.id);
+      res.json(children);
+    } catch (error) {
+      console.error("Error fetching children:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
+  // Get specific child's details and assignments (parent only)
+  app.get("/api/parents/children/:studentId", isAuthenticated, async (req: any, res: any) => {
+    const user = req.user;
+    const { studentId } = req.params;
+    if (!user) return res.status(401).json({ message: "Authentication required" });
+    if (user.role !== 'parent') return res.status(403).json({ message: "Parent access required" });
+
+    try {
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent profile not found" });
+      }
+
+      // Verify this child belongs to the parent
+      const children = await storage.getParentChildrenWithProgress(parent.id);
+      const child = children.find(c => c.id === studentId);
+      
+      if (!child) {
+        return res.status(403).json({ message: "This child is not linked to your account" });
+      }
+
+      res.json(child);
+    } catch (error) {
+      console.error("Error fetching child details:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  });
+
   // Student profile routes
   app.get("/api/students/:studentId", isAuthenticated, async (req: any, res: any) => {
     const { studentId } = req.params;

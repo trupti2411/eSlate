@@ -84,6 +84,7 @@ export interface IStorage {
   getParent(id: string): Promise<Parent | undefined>;
   getParentByUserId(userId: string): Promise<Parent | undefined>;
   createParent(parentData: InsertParent): Promise<Parent>;
+  getParentChildrenWithProgress(parentId: string): Promise<any[]>;
 
   // Tutor operations
   getTutor(id: string): Promise<Tutor | undefined>;
@@ -408,6 +409,108 @@ export class DatabaseStorage implements IStorage {
   async createParent(parentData: InsertParent): Promise<Parent> {
     const [parent] = await db.insert(parents).values(parentData).returning();
     return parent;
+  }
+
+  async getParentChildrenWithProgress(parentId: string): Promise<any[]> {
+    // Get all students linked to this parent with user info
+    const studentData = await db.select({
+      id: students.id,
+      userId: students.userId,
+      gradeLevel: students.gradeLevel,
+      schoolName: students.schoolName,
+      parentId: students.parentId,
+      tutorId: students.tutorId,
+      companyId: students.companyId,
+      classId: students.classId,
+      user: {
+        id: users.id,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+        profileImageUrl: users.profileImageUrl,
+      }
+    })
+    .from(students)
+    .leftJoin(users, eq(students.userId, users.id))
+    .where(eq(students.parentId, parentId));
+
+    // For each student, get their assignments and submissions
+    const childrenWithProgress = await Promise.all(
+      studentData.map(async (student) => {
+        // Get class info if assigned
+        let classInfo = null;
+        if (student.classId) {
+          const [classData] = await db.select({
+            id: classes.id,
+            name: classes.name,
+            subject: classes.subject,
+          }).from(classes).where(eq(classes.id, student.classId));
+          classInfo = classData;
+        }
+
+        // Get assignments for this student's class
+        const studentAssignments = student.classId 
+          ? await db.select({
+              id: assignments.id,
+              title: assignments.title,
+              description: assignments.description,
+              subject: assignments.subject,
+              submissionDate: assignments.submissionDate,
+              status: assignments.status,
+              assignmentKind: assignments.assignmentKind,
+              createdAt: assignments.createdAt,
+            })
+            .from(assignments)
+            .where(eq(assignments.classId, student.classId))
+            .orderBy(desc(assignments.createdAt))
+          : [];
+
+        // Get all submissions for this student
+        const studentSubmissions = await db.select({
+          id: submissions.id,
+          assignmentId: submissions.assignmentId,
+          status: submissions.status,
+          submittedAt: submissions.submittedAt,
+          isLate: submissions.isLate,
+          createdAt: submissions.createdAt,
+        })
+        .from(submissions)
+        .where(eq(submissions.studentId, student.id))
+        .orderBy(desc(submissions.createdAt));
+
+        // Calculate progress stats
+        const totalAssignments = studentAssignments.length;
+        const submittedCount = studentSubmissions.filter(s => s.status !== 'draft').length;
+        const gradedCount = studentSubmissions.filter(s => s.status === 'graded' || s.status === 'parent_verified').length;
+        const pendingCount = totalAssignments - submittedCount;
+
+        // Enrich assignments with submission status
+        const assignmentsWithStatus = studentAssignments.map(assignment => {
+          const submission = studentSubmissions.find(s => s.assignmentId === assignment.id);
+          return {
+            ...assignment,
+            submission: submission || null,
+            submissionStatus: submission?.status || 'not_started',
+          };
+        });
+
+        return {
+          ...student,
+          classInfo,
+          assignments: assignmentsWithStatus,
+          submissions: studentSubmissions,
+          progress: {
+            totalAssignments,
+            submittedCount,
+            gradedCount,
+            pendingCount,
+            completionRate: totalAssignments > 0 ? Math.round((submittedCount / totalAssignments) * 100) : 0,
+          }
+        };
+      })
+    );
+
+    return childrenWithProgress;
   }
 
   // Tutor operations
