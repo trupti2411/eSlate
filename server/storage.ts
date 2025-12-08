@@ -24,6 +24,9 @@ import {
   testAssignments,
   testAttempts,
   testAnswers,
+  classSessions,
+  sessionAttendance,
+  academicHolidays,
   type User,
   type Student,
   type InsertStudent,
@@ -72,6 +75,12 @@ import {
   type InsertTestAttempt,
   type TestAnswer,
   type InsertTestAnswer,
+  type ClassSession,
+  type InsertClassSession,
+  type SessionAttendance,
+  type InsertSessionAttendance,
+  type AcademicHoliday,
+  type InsertAcademicHoliday,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains, inArray } from "drizzle-orm";
@@ -255,6 +264,50 @@ export interface IStorage {
   // Grading operations
   gradeTestAttempt(attemptId: string, gradedBy: string, feedback?: string): Promise<TestAttempt>;
   autoGradeTestAttempt(attemptId: string): Promise<{ totalScore: number; percentageScore: number }>;
+
+  // Class Session operations
+  createClassSession(sessionData: InsertClassSession): Promise<ClassSession>;
+  getClassSession(id: string): Promise<ClassSession | undefined>;
+  getClassSessionsByClass(classId: string): Promise<ClassSession[]>;
+  getClassSessionsByTutor(tutorId: string, startDate?: Date, endDate?: Date): Promise<ClassSession[]>;
+  getClassSessionsByStudent(studentId: string, startDate?: Date, endDate?: Date): Promise<any[]>;
+  getClassSessionsByCompany(companyId: string, startDate?: Date, endDate?: Date): Promise<any[]>;
+  getClassSessionsForDate(companyId: string, date: Date): Promise<any[]>;
+  updateClassSession(id: string, updates: Partial<InsertClassSession>): Promise<ClassSession>;
+  deleteClassSession(id: string): Promise<void>;
+  generateSessionsForClass(classId: string, termStartDate: Date, termEndDate: Date): Promise<ClassSession[]>;
+
+  // Session Attendance operations
+  markAttendance(attendanceData: InsertSessionAttendance): Promise<SessionAttendance>;
+  getAttendance(id: string): Promise<SessionAttendance | undefined>;
+  getAttendanceBySession(sessionId: string): Promise<SessionAttendance[]>;
+  getAttendanceByStudent(studentId: string, startDate?: Date, endDate?: Date): Promise<SessionAttendance[]>;
+  updateAttendance(id: string, updates: Partial<InsertSessionAttendance>): Promise<SessionAttendance>;
+  markAllPresent(sessionId: string, markedBy: string): Promise<void>;
+  overrideAttendance(id: string, newStatus: string, overrideBy: string, notes?: string): Promise<SessionAttendance>;
+  lockSessionAttendance(sessionId: string): Promise<void>;
+  getStudentAttendanceSummary(studentId: string, startDate?: Date, endDate?: Date): Promise<{
+    totalSessions: number;
+    present: number;
+    absent: number;
+    late: number;
+    excused: number;
+    attendancePercentage: number;
+  }>;
+  getStudentAttendanceBySubject(studentId: string): Promise<any[]>;
+  getStudentLearningHours(studentId: string, startDate?: Date, endDate?: Date): Promise<{
+    totalMinutes: number;
+    bySubject: { subject: string; minutes: number }[];
+    byWeek: { week: string; minutes: number }[];
+  }>;
+
+  // Academic Holiday operations
+  createAcademicHoliday(holidayData: InsertAcademicHoliday): Promise<AcademicHoliday>;
+  getAcademicHoliday(id: string): Promise<AcademicHoliday | undefined>;
+  getAcademicHolidaysByCompany(companyId: string): Promise<AcademicHoliday[]>;
+  getPublicHolidays(startDate?: Date, endDate?: Date): Promise<AcademicHoliday[]>;
+  updateAcademicHoliday(id: string, updates: Partial<InsertAcademicHoliday>): Promise<AcademicHoliday>;
+  deleteAcademicHoliday(id: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1847,6 +1900,535 @@ export class DatabaseStorage implements IStorage {
       .returning();
 
     return gradedAttempt;
+  }
+
+  // ==========================================
+  // CLASS SESSION OPERATIONS
+  // ==========================================
+
+  async createClassSession(sessionData: InsertClassSession): Promise<ClassSession> {
+    const [session] = await db.insert(classSessions).values(sessionData).returning();
+    return session;
+  }
+
+  async getClassSession(id: string): Promise<ClassSession | undefined> {
+    const [session] = await db.select().from(classSessions).where(eq(classSessions.id, id));
+    return session;
+  }
+
+  async getClassSessionsByClass(classId: string): Promise<ClassSession[]> {
+    return db.select().from(classSessions)
+      .where(eq(classSessions.classId, classId))
+      .orderBy(classSessions.sessionDate);
+  }
+
+  async getClassSessionsByTutor(tutorId: string, startDate?: Date, endDate?: Date): Promise<ClassSession[]> {
+    let query = db.select().from(classSessions).where(eq(classSessions.tutorId, tutorId));
+    
+    if (startDate && endDate) {
+      return db.select().from(classSessions)
+        .where(and(
+          eq(classSessions.tutorId, tutorId),
+          sql`${classSessions.sessionDate} >= ${startDate}`,
+          sql`${classSessions.sessionDate} <= ${endDate}`
+        ))
+        .orderBy(classSessions.sessionDate);
+    }
+    
+    return db.select().from(classSessions)
+      .where(eq(classSessions.tutorId, tutorId))
+      .orderBy(classSessions.sessionDate);
+  }
+
+  async getClassSessionsByStudent(studentId: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+    const studentClasses = await db.select({ classId: studentClassAssignments.classId })
+      .from(studentClassAssignments)
+      .where(eq(studentClassAssignments.studentId, studentId));
+    
+    const classIds = studentClasses.map(c => c.classId);
+    if (classIds.length === 0) return [];
+
+    let whereCondition = inArray(classSessions.classId, classIds);
+    if (startDate && endDate) {
+      whereCondition = and(
+        inArray(classSessions.classId, classIds),
+        sql`${classSessions.sessionDate} >= ${startDate}`,
+        sql`${classSessions.sessionDate} <= ${endDate}`
+      )!;
+    }
+
+    const sessions = await db.select({
+      session: classSessions,
+      class: classes,
+    })
+    .from(classSessions)
+    .innerJoin(classes, eq(classSessions.classId, classes.id))
+    .where(whereCondition)
+    .orderBy(classSessions.sessionDate);
+
+    // Get attendance for each session
+    const sessionIds = sessions.map(s => s.session.id);
+    const attendanceRecords = sessionIds.length > 0
+      ? await db.select().from(sessionAttendance)
+          .where(and(
+            inArray(sessionAttendance.sessionId, sessionIds),
+            eq(sessionAttendance.studentId, studentId)
+          ))
+      : [];
+
+    return sessions.map(s => ({
+      ...s.session,
+      class: s.class,
+      attendance: attendanceRecords.find(a => a.sessionId === s.session.id),
+    }));
+  }
+
+  async getClassSessionsByCompany(companyId: string, startDate?: Date, endDate?: Date): Promise<any[]> {
+    let whereCondition = eq(classes.companyId, companyId);
+    if (startDate && endDate) {
+      whereCondition = and(
+        eq(classes.companyId, companyId),
+        sql`${classSessions.sessionDate} >= ${startDate}`,
+        sql`${classSessions.sessionDate} <= ${endDate}`
+      )!;
+    }
+
+    return db.select({
+      session: classSessions,
+      class: classes,
+      tutor: tutors,
+    })
+    .from(classSessions)
+    .innerJoin(classes, eq(classSessions.classId, classes.id))
+    .leftJoin(tutors, eq(classSessions.tutorId, tutors.id))
+    .where(whereCondition)
+    .orderBy(classSessions.sessionDate);
+  }
+
+  async getClassSessionsForDate(companyId: string, date: Date): Promise<any[]> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return db.select({
+      session: classSessions,
+      class: classes,
+      tutor: tutors,
+    })
+    .from(classSessions)
+    .innerJoin(classes, eq(classSessions.classId, classes.id))
+    .leftJoin(tutors, eq(classSessions.tutorId, tutors.id))
+    .where(and(
+      eq(classes.companyId, companyId),
+      sql`${classSessions.sessionDate} >= ${startOfDay}`,
+      sql`${classSessions.sessionDate} <= ${endOfDay}`
+    ))
+    .orderBy(classSessions.startTime);
+  }
+
+  async updateClassSession(id: string, updates: Partial<InsertClassSession>): Promise<ClassSession> {
+    const [session] = await db.update(classSessions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(classSessions.id, id))
+      .returning();
+    return session;
+  }
+
+  async deleteClassSession(id: string): Promise<void> {
+    await db.delete(classSessions).where(eq(classSessions.id, id));
+  }
+
+  async generateSessionsForClass(classId: string, termStartDate: Date, termEndDate: Date): Promise<ClassSession[]> {
+    const classData = await this.getClass(classId);
+    if (!classData) throw new Error("Class not found");
+
+    const createdSessions: ClassSession[] = [];
+    const daysOfWeek = classData.daysOfWeek || (classData.dayOfWeek !== null ? [classData.dayOfWeek] : []);
+    
+    // Calculate duration from start/end times
+    const [startHour, startMin] = classData.startTime.split(':').map(Number);
+    const [endHour, endMin] = classData.endTime.split(':').map(Number);
+    const durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
+
+    // Iterate through each day in the term
+    const currentDate = new Date(termStartDate);
+    while (currentDate <= termEndDate) {
+      const dayOfWeek = currentDate.getDay();
+      
+      if (daysOfWeek.includes(dayOfWeek)) {
+        const sessionDate = new Date(currentDate);
+        
+        const session = await this.createClassSession({
+          classId,
+          tutorId: classData.tutorId,
+          sessionDate,
+          startTime: classData.startTime,
+          endTime: classData.endTime,
+          durationMinutes,
+          status: 'scheduled',
+          deliveryMode: 'in_person',
+          locationUrl: classData.location,
+        });
+        
+        createdSessions.push(session);
+      }
+      
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    return createdSessions;
+  }
+
+  // ==========================================
+  // SESSION ATTENDANCE OPERATIONS
+  // ==========================================
+
+  async markAttendance(attendanceData: InsertSessionAttendance): Promise<SessionAttendance> {
+    // Check if attendance already exists for this student and session
+    const [existing] = await db.select().from(sessionAttendance)
+      .where(and(
+        eq(sessionAttendance.sessionId, attendanceData.sessionId),
+        eq(sessionAttendance.studentId, attendanceData.studentId)
+      ));
+
+    if (existing) {
+      // Update existing
+      return this.updateAttendance(existing.id, attendanceData);
+    }
+
+    const [attendance] = await db.insert(sessionAttendance).values(attendanceData).returning();
+    return attendance;
+  }
+
+  async getAttendance(id: string): Promise<SessionAttendance | undefined> {
+    const [attendance] = await db.select().from(sessionAttendance).where(eq(sessionAttendance.id, id));
+    return attendance;
+  }
+
+  async getAttendanceBySession(sessionId: string): Promise<SessionAttendance[]> {
+    return db.select({
+      attendance: sessionAttendance,
+      student: students,
+      user: users,
+    })
+    .from(sessionAttendance)
+    .innerJoin(students, eq(sessionAttendance.studentId, students.id))
+    .innerJoin(users, eq(students.userId, users.id))
+    .where(eq(sessionAttendance.sessionId, sessionId)) as any;
+  }
+
+  async getAttendanceByStudent(studentId: string, startDate?: Date, endDate?: Date): Promise<SessionAttendance[]> {
+    if (startDate && endDate) {
+      return db.select({
+        attendance: sessionAttendance,
+        session: classSessions,
+      })
+      .from(sessionAttendance)
+      .innerJoin(classSessions, eq(sessionAttendance.sessionId, classSessions.id))
+      .where(and(
+        eq(sessionAttendance.studentId, studentId),
+        sql`${classSessions.sessionDate} >= ${startDate}`,
+        sql`${classSessions.sessionDate} <= ${endDate}`
+      )) as any;
+    }
+
+    return db.select().from(sessionAttendance)
+      .where(eq(sessionAttendance.studentId, studentId));
+  }
+
+  async updateAttendance(id: string, updates: Partial<InsertSessionAttendance>): Promise<SessionAttendance> {
+    const [attendance] = await db.update(sessionAttendance)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(sessionAttendance.id, id))
+      .returning();
+    return attendance;
+  }
+
+  async markAllPresent(sessionId: string, markedBy: string): Promise<void> {
+    // Get session's class
+    const session = await this.getClassSession(sessionId);
+    if (!session) throw new Error("Session not found");
+
+    // Get all students in the class
+    const studentAssignments = await this.getStudentsByClass(session.classId);
+    
+    // Mark each as present
+    for (const assignment of studentAssignments) {
+      await this.markAttendance({
+        sessionId,
+        studentId: assignment.studentId,
+        status: 'present',
+        markedBy,
+        markedAt: new Date(),
+      });
+    }
+
+    // Update session attended count
+    await this.updateClassSession(sessionId, {
+      attendedCount: studentAssignments.length,
+    });
+  }
+
+  async overrideAttendance(id: string, newStatus: string, overrideBy: string, notes?: string): Promise<SessionAttendance> {
+    const [attendance] = await db.update(sessionAttendance)
+      .set({
+        status: newStatus as any,
+        isOverride: true,
+        overrideBy,
+        overrideAt: new Date(),
+        notes: notes || undefined,
+        updatedAt: new Date(),
+      })
+      .where(eq(sessionAttendance.id, id))
+      .returning();
+    return attendance;
+  }
+
+  async lockSessionAttendance(sessionId: string): Promise<void> {
+    await db.update(classSessions)
+      .set({
+        attendanceLocked: true,
+        attendanceLockedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(classSessions.id, sessionId));
+  }
+
+  async getStudentAttendanceSummary(studentId: string, startDate?: Date, endDate?: Date): Promise<{
+    totalSessions: number;
+    present: number;
+    absent: number;
+    late: number;
+    excused: number;
+    attendancePercentage: number;
+  }> {
+    // Get student's classes
+    const studentClasses = await db.select({ classId: studentClassAssignments.classId })
+      .from(studentClassAssignments)
+      .where(eq(studentClassAssignments.studentId, studentId));
+    
+    const classIds = studentClasses.map(c => c.classId);
+    if (classIds.length === 0) {
+      return { totalSessions: 0, present: 0, absent: 0, late: 0, excused: 0, attendancePercentage: 0 };
+    }
+
+    // Get all sessions for these classes
+    let sessionsCondition: any = and(
+      inArray(classSessions.classId, classIds),
+      or(eq(classSessions.status, 'completed'), eq(classSessions.status, 'in_progress'))
+    );
+    
+    if (startDate && endDate) {
+      sessionsCondition = and(
+        sessionsCondition,
+        sql`${classSessions.sessionDate} >= ${startDate}`,
+        sql`${classSessions.sessionDate} <= ${endDate}`
+      );
+    }
+
+    const sessions = await db.select().from(classSessions).where(sessionsCondition);
+    const totalSessions = sessions.length;
+
+    if (totalSessions === 0) {
+      return { totalSessions: 0, present: 0, absent: 0, late: 0, excused: 0, attendancePercentage: 0 };
+    }
+
+    // Get attendance records
+    const sessionIds = sessions.map(s => s.id);
+    const attendanceRecords = await db.select().from(sessionAttendance)
+      .where(and(
+        inArray(sessionAttendance.sessionId, sessionIds),
+        eq(sessionAttendance.studentId, studentId)
+      ));
+
+    const present = attendanceRecords.filter(a => a.status === 'present').length;
+    const absent = totalSessions - attendanceRecords.length + attendanceRecords.filter(a => a.status === 'absent').length;
+    const late = attendanceRecords.filter(a => a.status === 'late').length;
+    const excused = attendanceRecords.filter(a => a.status === 'excused').length;
+    const attendancePercentage = Math.round(((present + late) / totalSessions) * 100);
+
+    return { totalSessions, present, absent, late, excused, attendancePercentage };
+  }
+
+  async getStudentAttendanceBySubject(studentId: string): Promise<any[]> {
+    // Get student's classes grouped by subject
+    const studentClasses = await db.select({
+      classId: studentClassAssignments.classId,
+      subject: classes.subject,
+    })
+    .from(studentClassAssignments)
+    .innerJoin(classes, eq(studentClassAssignments.classId, classes.id))
+    .where(eq(studentClassAssignments.studentId, studentId));
+
+    const subjectStats: { [key: string]: { total: number; attended: number } } = {};
+
+    for (const classData of studentClasses) {
+      if (!subjectStats[classData.subject]) {
+        subjectStats[classData.subject] = { total: 0, attended: 0 };
+      }
+
+      // Get completed sessions for this class
+      const sessions = await db.select().from(classSessions)
+        .where(and(
+          eq(classSessions.classId, classData.classId),
+          eq(classSessions.status, 'completed')
+        ));
+
+      subjectStats[classData.subject].total += sessions.length;
+
+      // Get attendance records
+      const sessionIds = sessions.map(s => s.id);
+      if (sessionIds.length > 0) {
+        const attendanceRecords = await db.select().from(sessionAttendance)
+          .where(and(
+            inArray(sessionAttendance.sessionId, sessionIds),
+            eq(sessionAttendance.studentId, studentId),
+            or(eq(sessionAttendance.status, 'present'), eq(sessionAttendance.status, 'late'))
+          ));
+        subjectStats[classData.subject].attended += attendanceRecords.length;
+      }
+    }
+
+    return Object.entries(subjectStats).map(([subject, stats]) => ({
+      subject,
+      totalSessions: stats.total,
+      attended: stats.attended,
+      attendancePercentage: stats.total > 0 ? Math.round((stats.attended / stats.total) * 100) : 0,
+    }));
+  }
+
+  async getStudentLearningHours(studentId: string, startDate?: Date, endDate?: Date): Promise<{
+    totalMinutes: number;
+    bySubject: { subject: string; minutes: number }[];
+    byWeek: { week: string; minutes: number }[];
+  }> {
+    // Get student's classes
+    const studentClasses = await db.select({
+      classId: studentClassAssignments.classId,
+      subject: classes.subject,
+    })
+    .from(studentClassAssignments)
+    .innerJoin(classes, eq(studentClassAssignments.classId, classes.id))
+    .where(eq(studentClassAssignments.studentId, studentId));
+
+    const classIds = studentClasses.map(c => c.classId);
+    if (classIds.length === 0) {
+      return { totalMinutes: 0, bySubject: [], byWeek: [] };
+    }
+
+    // Build condition for sessions
+    let sessionsCondition: any = and(
+      inArray(classSessions.classId, classIds),
+      eq(classSessions.status, 'completed')
+    );
+
+    if (startDate && endDate) {
+      sessionsCondition = and(
+        sessionsCondition,
+        sql`${classSessions.sessionDate} >= ${startDate}`,
+        sql`${classSessions.sessionDate} <= ${endDate}`
+      );
+    }
+
+    const sessions = await db.select({
+      session: classSessions,
+      subject: classes.subject,
+    })
+    .from(classSessions)
+    .innerJoin(classes, eq(classSessions.classId, classes.id))
+    .where(sessionsCondition);
+
+    // Get attendance records for attended sessions
+    const sessionIds = sessions.map(s => s.session.id);
+    const attendanceRecords = sessionIds.length > 0
+      ? await db.select().from(sessionAttendance)
+          .where(and(
+            inArray(sessionAttendance.sessionId, sessionIds),
+            eq(sessionAttendance.studentId, studentId),
+            or(eq(sessionAttendance.status, 'present'), eq(sessionAttendance.status, 'late'))
+          ))
+      : [];
+
+    const attendedSessionIds = new Set(attendanceRecords.map(a => a.sessionId));
+
+    // Calculate totals
+    let totalMinutes = 0;
+    const subjectMinutes: { [key: string]: number } = {};
+    const weekMinutes: { [key: string]: number } = {};
+
+    for (const { session, subject } of sessions) {
+      if (attendedSessionIds.has(session.id)) {
+        const duration = session.durationMinutes || 0;
+        totalMinutes += duration;
+
+        // By subject
+        subjectMinutes[subject] = (subjectMinutes[subject] || 0) + duration;
+
+        // By week
+        const weekStart = new Date(session.sessionDate!);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        const weekKey = weekStart.toISOString().split('T')[0];
+        weekMinutes[weekKey] = (weekMinutes[weekKey] || 0) + duration;
+      }
+    }
+
+    return {
+      totalMinutes,
+      bySubject: Object.entries(subjectMinutes).map(([subject, minutes]) => ({ subject, minutes })),
+      byWeek: Object.entries(weekMinutes).map(([week, minutes]) => ({ week, minutes })).sort((a, b) => a.week.localeCompare(b.week)),
+    };
+  }
+
+  // ==========================================
+  // ACADEMIC HOLIDAY OPERATIONS
+  // ==========================================
+
+  async createAcademicHoliday(holidayData: InsertAcademicHoliday): Promise<AcademicHoliday> {
+    const [holiday] = await db.insert(academicHolidays).values(holidayData).returning();
+    return holiday;
+  }
+
+  async getAcademicHoliday(id: string): Promise<AcademicHoliday | undefined> {
+    const [holiday] = await db.select().from(academicHolidays).where(eq(academicHolidays.id, id));
+    return holiday;
+  }
+
+  async getAcademicHolidaysByCompany(companyId: string): Promise<AcademicHoliday[]> {
+    return db.select().from(academicHolidays)
+      .where(or(
+        eq(academicHolidays.companyId, companyId),
+        eq(academicHolidays.isPublic, true)
+      ))
+      .orderBy(academicHolidays.startDate);
+  }
+
+  async getPublicHolidays(startDate?: Date, endDate?: Date): Promise<AcademicHoliday[]> {
+    let condition: any = eq(academicHolidays.isPublic, true);
+    
+    if (startDate && endDate) {
+      condition = and(
+        condition,
+        sql`${academicHolidays.startDate} >= ${startDate}`,
+        sql`${academicHolidays.endDate} <= ${endDate}`
+      );
+    }
+
+    return db.select().from(academicHolidays)
+      .where(condition)
+      .orderBy(academicHolidays.startDate);
+  }
+
+  async updateAcademicHoliday(id: string, updates: Partial<InsertAcademicHoliday>): Promise<AcademicHoliday> {
+    const [holiday] = await db.update(academicHolidays)
+      .set(updates)
+      .where(eq(academicHolidays.id, id))
+      .returning();
+    return holiday;
+  }
+
+  async deleteAcademicHoliday(id: string): Promise<void> {
+    await db.delete(academicHolidays).where(eq(academicHolidays.id, id));
   }
 }
 
