@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { TutorCalendarDashboard } from "@/components/calendar";
 import { 
   Users, 
   GraduationCap, 
@@ -109,22 +110,23 @@ export default function TutorDashboard() {
     enabled: !!user,
   });
 
-  let companyId: string | undefined;
-  if (user?.role === 'tutor') {
-    // For tutors, we need to get their company ID from their tutor profile
-    const { data: tutorProfile } = useQuery({
-      queryKey: [`/api/tutors/${user.id}`],
-      enabled: !!user && user.role === 'tutor',
-    });
-    companyId = tutorProfile?.companyId;
-  } else if (user?.role === 'company_admin') {
-    // For company admins, we need to get their company ID from their admin profile
-    const { data: adminProfile } = useQuery({
-      queryKey: [`/api/admin/company-admin/${user.id}`],
-      enabled: !!user && user.role === 'company_admin',
-    });
-    companyId = adminProfile?.companyId;
-  }
+  // Always call both hooks unconditionally, use enabled flag to control execution
+  const { data: tutorProfile } = useQuery<{ companyId?: string }>({
+    queryKey: [`/api/tutors/${user?.id}`],
+    enabled: !!user && user.role === 'tutor',
+  });
+
+  const { data: adminProfile } = useQuery<{ companyId?: string }>({
+    queryKey: [`/api/admin/company-admin/${user?.id}`],
+    enabled: !!user && user.role === 'company_admin',
+  });
+
+  // Derive companyId from the appropriate profile based on role
+  const companyId = user?.role === 'tutor' 
+    ? tutorProfile?.companyId 
+    : user?.role === 'company_admin' 
+      ? adminProfile?.companyId 
+      : undefined;
 
   const { data: tutors = [] } = useQuery<Tutor[]>({
     queryKey: [`/api/companies/${companyId}/tutors`],
@@ -134,6 +136,9 @@ export default function TutorDashboard() {
     queryKey: [`/api/companies/${companyId}/students`],
     enabled: !!companyId,
   });
+
+  // Main tab navigation state
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar'>('overview');
 
   // State and mutations for editing tutors
   const [selectedTutor, setSelectedTutor] = useState<any>(null);
@@ -324,6 +329,34 @@ export default function TutorDashboard() {
           </div>
         </div>
 
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-8">
+          <Button
+            variant={mainTab === 'overview' ? 'default' : 'outline'}
+            onClick={() => setMainTab('overview')}
+            data-testid="tab-overview"
+          >
+            <BookOpen className="h-4 w-4 mr-2" />
+            Overview
+          </Button>
+          <Button
+            variant={mainTab === 'calendar' ? 'default' : 'outline'}
+            onClick={() => setMainTab('calendar')}
+            data-testid="tab-calendar"
+          >
+            <Calendar className="h-4 w-4 mr-2" />
+            Calendar
+          </Button>
+        </div>
+
+        {/* Calendar Tab */}
+        {mainTab === 'calendar' && (
+          <TutorCalendarDashboard />
+        )}
+
+        {/* Overview Tab - Stats Overview */}
+        {mainTab === 'overview' && (
+          <>
         {/* Stats Overview */}
         <div className="dashboard-grid mb-8">
           <Card className="eink-card">
@@ -892,6 +925,8 @@ export default function TutorDashboard() {
             </Card>
           )}
         </div>
+        </>
+        )}
       </div>
     </Layout>
   );

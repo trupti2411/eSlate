@@ -1,19 +1,21 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import Layout from "@/components/Layout";
 import ProgressChart from "@/components/ProgressChart";
 import MessageCenter from "@/components/MessageCenter";
+import { StudentCalendarDashboard } from "@/components/calendar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Clock, CheckCircle, MessageSquare, ExternalLink } from "lucide-react";
+import { BookOpen, Clock, CheckCircle, MessageSquare, ExternalLink, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 
 export default function StudentDashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar'>('overview');
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -52,8 +54,35 @@ export default function StudentDashboard() {
         <div className="mb-8">
           <h1 className="page-title">Student Dashboard</h1>
           <p className="text-gray-600">Welcome back, {user?.firstName || 'Student'}!</p>
+          
+          <div className="flex gap-2 mt-4">
+            <Button
+              variant={mainTab === 'overview' ? 'default' : 'outline'}
+              onClick={() => setMainTab('overview')}
+              className={mainTab === 'overview' ? 'bg-black text-white' : ''}
+              data-testid="tab-overview"
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Overview
+            </Button>
+            <Button
+              variant={mainTab === 'calendar' ? 'default' : 'outline'}
+              onClick={() => setMainTab('calendar')}
+              className={mainTab === 'calendar' ? 'bg-black text-white' : ''}
+              data-testid="tab-calendar"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Calendar
+            </Button>
+          </div>
         </div>
 
+        {mainTab === 'calendar' && (
+          <StudentCalendarDashboard />
+        )}
+
+        {mainTab === 'overview' && (
+        <>
         {/* Quick Actions */}
         <div className="mb-8">
           <Card className="eink-card bg-gray-50 border-2 border-black">
@@ -198,6 +227,8 @@ export default function StudentDashboard() {
             </CardContent>
           </Card>
         </div>
+        </>
+        )}
       </div>
     </Layout>
   );

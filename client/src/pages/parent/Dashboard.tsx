@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { apiRequest } from "@/lib/queryClient";
+import { ParentCalendarDashboard } from "@/components/calendar";
 import { 
   Users, CheckCircle, BookOpen, TrendingUp, Home, 
   Calendar, Clock, AlertCircle, GraduationCap, FileText,
@@ -85,6 +86,7 @@ export default function ParentDashboard() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [selectedChild, setSelectedChild] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar'>('overview');
 
   const { data: children, isLoading: childrenLoading, error } = useQuery<ChildData[]>({
     queryKey: ["/api/parents/children"],
@@ -205,6 +207,29 @@ export default function ParentDashboard() {
                 </Button>
               </Link>
               <div className="h-6 w-px bg-gray-300" />
+              <div className="flex items-center gap-1">
+                <Button
+                  variant={mainTab === 'overview' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setMainTab('overview')}
+                  className={mainTab === 'overview' ? 'bg-black text-white' : ''}
+                  data-testid="tab-overview"
+                >
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  Overview
+                </Button>
+                <Button
+                  variant={mainTab === 'calendar' ? 'default' : 'ghost'}
+                  size="sm"
+                  onClick={() => setMainTab('calendar')}
+                  className={mainTab === 'calendar' ? 'bg-black text-white' : ''}
+                  data-testid="tab-calendar"
+                >
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Calendar
+                </Button>
+              </div>
+              <div className="h-6 w-px bg-gray-300" />
               <div>
                 <h1 className="text-2xl font-bold text-black">Parent Portal</h1>
                 <p className="text-gray-500 text-sm">Monitor your children's learning progress</p>
@@ -273,7 +298,9 @@ export default function ParentDashboard() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {childrenLoading ? (
+        {mainTab === 'calendar' ? (
+          <ParentCalendarDashboard />
+        ) : childrenLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
           </div>

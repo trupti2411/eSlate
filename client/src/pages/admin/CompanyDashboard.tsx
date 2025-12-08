@@ -12,7 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StudentProfileDialog } from "@/components/StudentProfileDialog";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home } from "lucide-react";
+import { CompanyCalendarDashboard } from "@/components/calendar";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
@@ -70,6 +71,7 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar'>('overview');
 
   const [tutorFormData, setTutorFormData] = useState({
     email: "",
@@ -225,6 +227,33 @@ export default function CompanyDashboard() {
         </div>
       </div>
 
+      {/* Tab Navigation */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex gap-1">
+            <Button
+              variant={mainTab === 'overview' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('overview')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'overview' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-overview"
+            >
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              Overview
+            </Button>
+            <Button
+              variant={mainTab === 'calendar' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('calendar')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'calendar' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-calendar"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Calendar
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {mainTab === 'overview' && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Quick Actions */}
         <div className="flex gap-4 mb-8 flex-wrap">
@@ -481,6 +510,13 @@ export default function CompanyDashboard() {
           </div>
         </div>
       </div>
+      )}
+
+      {mainTab === 'calendar' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <CompanyCalendarDashboard />
+        </div>
+      )}
 
       {/* Dialogs */}
       <Dialog open={isAssignTutorOpen} onOpenChange={setIsAssignTutorOpen}>
