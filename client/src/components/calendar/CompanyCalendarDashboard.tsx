@@ -1,0 +1,746 @@
+import { useState, useMemo } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { format, isToday, parseISO } from "date-fns";
+import { RoleCalendar, type CalendarSession, type CalendarHoliday, type CalendarEvent } from "./RoleCalendar";
+import { AttendanceStatusBadge, type AttendanceStatus } from "./AttendanceStatusBadge";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Users,
+  Clock,
+  CheckCircle2,
+  UserCheck,
+  AlertCircle,
+  CalendarDays,
+  Building2,
+  UserPlus,
+  ShieldCheck,
+  Eye,
+  RefreshCw,
+} from "lucide-react";
+
+type SessionStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+
+interface CompanySession {
+  session: {
+    id: string;
+    classId: string;
+    tutorId?: string;
+    startTime: string;
+    endTime: string;
+    status: SessionStatus;
+    notes?: string;
+    attendanceLocked?: boolean;
+  };
+  class: {
+    id: string;
+    name: string;
+    subject: string;
+    maxStudents?: number;
+    location?: string;
+  };
+  tutor?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  attendance?: AttendanceRecord[];
+  enrolledCount?: number;
+  attendedCount?: number;
+}
+
+interface CompanyCalendarData {
+  sessions: CompanySession[];
+  holidays: CalendarHoliday[];
+}
+
+interface TodaySessionData {
+  session: {
+    id: string;
+    classId: string;
+    tutorId?: string;
+    startTime: string;
+    endTime: string;
+    status: SessionStatus;
+    notes?: string;
+    attendanceLocked?: boolean;
+  };
+  class: {
+    id: string;
+    name: string;
+    subject: string;
+    maxStudents?: number;
+    location?: string;
+  };
+  tutor?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+  };
+  attendance: AttendanceRecord[];
+  enrolledCount: number;
+  attendedCount: number;
+}
+
+interface AttendanceRecord {
+  id: string;
+  studentId: string;
+  sessionId: string;
+  status: AttendanceStatus;
+  notes?: string;
+  markedBy?: string;
+  markedAt?: string;
+  student?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+  };
+}
+
+interface ClassInfo {
+  id: string;
+  name: string;
+  subject?: string;
+  maxStudents?: number;
+  tutorId?: string;
+  tutorName?: string;
+}
+
+interface TutorInfo {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+}
+
+export function CompanyCalendarDashboard() {
+  const { toast } = useToast();
+  const [selectedSession, setSelectedSession] = useState<TodaySessionData | null>(null);
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
+  const [selectedAttendance, setSelectedAttendance] = useState<AttendanceRecord | null>(null);
+  const [overrideStatus, setOverrideStatus] = useState<AttendanceStatus>("present");
+  const [overrideNotes, setOverrideNotes] = useState("");
+  const [classFilter, setClassFilter] = useState<string>("all");
+  const [tutorFilter, setTutorFilter] = useState<string>("all");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  const { data: calendarData, isLoading: isCalendarLoading } = useQuery<CompanyCalendarData>({
+    queryKey: ['/api/calendar/company'],
+  });
+
+  const { data: todaySessions, isLoading: isTodayLoading, refetch: refetchToday } = useQuery<TodaySessionData[]>({
+    queryKey: ['/api/sessions/today'],
+  });
+
+  const { data: sessionAttendance, isLoading: isAttendanceLoading, refetch: refetchAttendance } = useQuery<AttendanceRecord[]>({
+    queryKey: ['/api/sessions', selectedSession?.session.id, 'attendance'],
+    enabled: !!selectedSession?.session.id && isAttendanceModalOpen,
+  });
+
+  const overrideAttendanceMutation = useMutation({
+    mutationFn: async ({ attendanceId, status, notes }: { attendanceId: string; status: string; notes?: string }) => {
+      return apiRequest(`/api/attendance/${attendanceId}/override`, "POST", { status, notes });
+    },
+    onSuccess: () => {
+      toast({ title: "Attendance overridden", description: "Attendance has been updated by admin." });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions', selectedSession?.session.id, 'attendance'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions/today'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar/company'] });
+      setIsOverrideModalOpen(false);
+      refetchAttendance();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const uniqueClasses = useMemo(() => {
+    if (!calendarData?.sessions) return [];
+    const classMap = new Map<string, ClassInfo>();
+    calendarData.sessions.forEach((s) => {
+      if (s.class && !classMap.has(s.class.id)) {
+        classMap.set(s.class.id, {
+          id: s.class.id,
+          name: s.class.name,
+          subject: s.class.subject,
+          maxStudents: s.class.maxStudents,
+          tutorId: s.session.tutorId,
+          tutorName: s.tutor ? `${s.tutor.firstName || ''} ${s.tutor.lastName || ''}`.trim() : undefined,
+        });
+      }
+    });
+    return Array.from(classMap.values());
+  }, [calendarData?.sessions]);
+
+  const uniqueTutors = useMemo(() => {
+    if (!calendarData?.sessions) return [];
+    const tutorMap = new Map<string, TutorInfo>();
+    calendarData.sessions.forEach((s) => {
+      if (s.tutor && !tutorMap.has(s.tutor.id)) {
+        tutorMap.set(s.tutor.id, {
+          id: s.tutor.id,
+          firstName: s.tutor.firstName,
+          lastName: s.tutor.lastName,
+        });
+      }
+    });
+    return Array.from(tutorMap.values());
+  }, [calendarData?.sessions]);
+
+  const filteredSessions = useMemo(() => {
+    if (!calendarData?.sessions) return [];
+    return calendarData.sessions.filter((s) => {
+      const matchesClass = classFilter === "all" || s.class.id === classFilter;
+      const matchesTutor = tutorFilter === "all" || s.session.tutorId === tutorFilter;
+      const matchesStatus = statusFilter === "all" || s.session.status === statusFilter;
+      return matchesClass && matchesTutor && matchesStatus;
+    });
+  }, [calendarData?.sessions, classFilter, tutorFilter, statusFilter]);
+
+  const filteredTodaySessions = useMemo(() => {
+    if (!todaySessions) return [];
+    return todaySessions.filter((s) => {
+      const matchesClass = classFilter === "all" || s.class.id === classFilter;
+      const matchesTutor = tutorFilter === "all" || s.session.tutorId === tutorFilter;
+      const matchesStatus = statusFilter === "all" || s.session.status === statusFilter;
+      return matchesClass && matchesTutor && matchesStatus;
+    });
+  }, [todaySessions, classFilter, tutorFilter, statusFilter]);
+
+  const calendarSessions: CalendarSession[] = useMemo(() => {
+    return filteredSessions.map((s) => ({
+      id: s.session.id,
+      subject: s.class.subject,
+      className: s.class.name,
+      startTime: s.session.startTime,
+      endTime: s.session.endTime,
+      status: s.session.status,
+      tutorName: s.tutor ? `${s.tutor.firstName || ''} ${s.tutor.lastName || ''}`.trim() : undefined,
+      location: s.class.location,
+      notes: s.session.notes,
+    }));
+  }, [filteredSessions]);
+
+  const handleEventClick = (event: CalendarEvent) => {
+    if (event.type === 'session') {
+      const sessionData = event.data as CalendarSession;
+      const fullSession = todaySessions?.find((s) => s.session.id === sessionData.id);
+      if (fullSession) {
+        setSelectedSession(fullSession);
+        setIsAttendanceModalOpen(true);
+      }
+    }
+  };
+
+  const handleViewAttendance = (session: TodaySessionData) => {
+    setSelectedSession(session);
+    setIsAttendanceModalOpen(true);
+  };
+
+  const handleOpenOverride = (attendance: AttendanceRecord) => {
+    setSelectedAttendance(attendance);
+    setOverrideStatus(attendance.status);
+    setOverrideNotes(attendance.notes || "");
+    setIsOverrideModalOpen(true);
+  };
+
+  const handleOverrideSubmit = () => {
+    if (!selectedAttendance) return;
+    overrideAttendanceMutation.mutate({
+      attendanceId: selectedAttendance.id,
+      status: overrideStatus,
+      notes: overrideNotes,
+    });
+  };
+
+  const getStatusColor = (status: SessionStatus) => {
+    switch (status) {
+      case 'scheduled': return 'bg-blue-500';
+      case 'in_progress': return 'bg-yellow-500';
+      case 'completed': return 'bg-green-500';
+      case 'cancelled': return 'bg-gray-400';
+      default: return 'bg-gray-400';
+    }
+  };
+
+  const getCapacityBadgeVariant = (enrolled: number, max: number | undefined): "default" | "secondary" | "destructive" => {
+    if (!max) return "secondary";
+    if (enrolled >= max) return "destructive";
+    if (enrolled >= max * 0.8) return "default";
+    return "secondary";
+  };
+
+  const isClassFull = (enrolled: number, max: number | undefined): boolean => {
+    return max !== undefined && enrolled >= max;
+  };
+
+  const getAttendanceSummary = (attendance: AttendanceRecord[] | undefined, enrolledCount: number) => {
+    if (!attendance) return { present: 0, absent: 0, late: 0, excused: 0, unmarked: enrolledCount };
+    const present = attendance.filter(a => a.status === 'present').length;
+    const absent = attendance.filter(a => a.status === 'absent').length;
+    const late = attendance.filter(a => a.status === 'late').length;
+    const excused = attendance.filter(a => a.status === 'excused').length;
+    const unmarked = enrolledCount - (present + absent + late + excused);
+    return { present, absent, late, excused, unmarked };
+  };
+
+  const filters = (
+    <div className="flex flex-wrap gap-2">
+      <Select value={classFilter} onValueChange={setClassFilter}>
+        <SelectTrigger className="w-[160px]" data-testid="filter-class">
+          <SelectValue placeholder="All Classes" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Classes</SelectItem>
+          {uniqueClasses.map((cls) => (
+            <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={tutorFilter} onValueChange={setTutorFilter}>
+        <SelectTrigger className="w-[160px]" data-testid="filter-tutor">
+          <SelectValue placeholder="All Tutors" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Tutors</SelectItem>
+          {uniqueTutors.map((tutor) => (
+            <SelectItem key={tutor.id} value={tutor.id}>
+              {tutor.firstName} {tutor.lastName}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="w-[160px]" data-testid="filter-status">
+          <SelectValue placeholder="All Statuses" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Statuses</SelectItem>
+          <SelectItem value="scheduled">Scheduled</SelectItem>
+          <SelectItem value="in_progress">In Progress</SelectItem>
+          <SelectItem value="completed">Completed</SelectItem>
+          <SelectItem value="cancelled">Cancelled</SelectItem>
+        </SelectContent>
+      </Select>
+    </div>
+  );
+
+  if (isCalendarLoading) {
+    return (
+      <div className="space-y-4 p-4" data-testid="company-calendar-loading">
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-[400px] w-full" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6" data-testid="company-calendar-dashboard">
+      <Card className="border-2 border-black dark:border-white" data-testid="roll-call-panel">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CalendarDays className="w-5 h-5" />
+              Roll Call - Today's Classes
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" data-testid="today-session-count">
+                {filteredTodaySessions?.length || 0} sessions
+              </Badge>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => refetchToday()}
+                data-testid="btn-refresh-today"
+              >
+                <RefreshCw className="w-4 h-4 mr-1" />
+                Refresh
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {isTodayLoading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-16 w-full" />
+              <Skeleton className="h-16 w-full" />
+            </div>
+          ) : !filteredTodaySessions || filteredTodaySessions.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-4" data-testid="no-sessions-today">
+              No sessions scheduled for today.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {filteredTodaySessions.map((session) => {
+                const summary = getAttendanceSummary(session.attendance, session.enrolledCount);
+                const isFull = isClassFull(session.enrolledCount, session.class.maxStudents);
+                
+                return (
+                  <div
+                    key={session.session.id}
+                    className="p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    data-testid={`today-session-${session.session.id}`}
+                  >
+                    <div className="flex items-start justify-between flex-wrap gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-3 h-3 rounded-full mt-1.5 ${getStatusColor(session.session.status)}`} />
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-medium" data-testid={`session-class-name-${session.session.id}`}>
+                              {session.class.name}
+                            </p>
+                            <Badge variant="secondary" className="text-xs">
+                              {session.class.subject}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            <Clock className="w-3 h-3 inline mr-1" />
+                            {format(parseISO(session.session.startTime), 'h:mm a')} - {format(parseISO(session.session.endTime), 'h:mm a')}
+                          </p>
+                          {session.tutor && (
+                            <p className="text-sm text-muted-foreground">
+                              <Users className="w-3 h-3 inline mr-1" />
+                              Tutor: {session.tutor.firstName} {session.tutor.lastName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge
+                            variant={getCapacityBadgeVariant(session.enrolledCount, session.class.maxStudents)}
+                            data-testid={`session-capacity-${session.session.id}`}
+                          >
+                            <Users className="w-3 h-3 mr-1" />
+                            {session.enrolledCount}/{session.class.maxStudents || '∞'} students
+                          </Badge>
+                          
+                          {!isFull ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-1"
+                              data-testid={`btn-add-student-${session.session.id}`}
+                            >
+                              <UserPlus className="w-4 h-4" />
+                              Add Student
+                            </Button>
+                          ) : (
+                            <Badge variant="destructive" data-testid={`class-full-${session.session.id}`}>
+                              <AlertCircle className="w-3 h-3 mr-1" />
+                              Full
+                            </Badge>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 text-xs" data-testid={`attendance-summary-${session.session.id}`}>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-green-500" />
+                              {summary.present}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-red-500" />
+                              {summary.absent}
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <span className="w-2 h-2 rounded-full bg-orange-500" />
+                              {summary.late}
+                            </span>
+                            {summary.unmarked > 0 && (
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <span className="w-2 h-2 rounded-full bg-gray-400" />
+                                {summary.unmarked} unmarked
+                              </span>
+                            )}
+                          </div>
+                          
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleViewAttendance(session)}
+                            data-testid={`btn-view-attendance-${session.session.id}`}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View Attendance
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-2 border-black dark:border-white" data-testid="class-overview-card">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Building2 className="w-5 h-5" />
+            Class Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {uniqueClasses.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-4" data-testid="no-classes">
+              No classes found.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {uniqueClasses.map((cls) => {
+                const enrolledCount = filteredSessions.find(s => s.class.id === cls.id)?.enrolledCount || 0;
+                const isFull = isClassFull(enrolledCount, cls.maxStudents);
+                
+                return (
+                  <div
+                    key={cls.id}
+                    className="p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                    data-testid={`class-card-${cls.id}`}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-medium">{cls.name}</p>
+                        {cls.subject && (
+                          <p className="text-sm text-muted-foreground">{cls.subject}</p>
+                        )}
+                        {cls.tutorName && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Tutor: {cls.tutorName}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge
+                          variant={getCapacityBadgeVariant(enrolledCount, cls.maxStudents)}
+                          data-testid={`class-capacity-${cls.id}`}
+                        >
+                          <Users className="w-3 h-3 mr-1" />
+                          {enrolledCount}/{cls.maxStudents || '∞'}
+                        </Badge>
+                        {!isFull && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 text-xs"
+                            data-testid={`btn-add-student-class-${cls.id}`}
+                          >
+                            <UserPlus className="w-3 h-3 mr-1" />
+                            Add
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <RoleCalendar
+        role="company"
+        sessions={calendarSessions}
+        holidays={calendarData?.holidays || []}
+        onEventClick={handleEventClick}
+        filters={filters}
+        isLoading={isCalendarLoading}
+      />
+
+      <Dialog open={isAttendanceModalOpen} onOpenChange={setIsAttendanceModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]" data-testid="attendance-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserCheck className="w-5 h-5" />
+              Attendance - {selectedSession?.class.name}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedSession && (
+                <span className="text-sm">
+                  {format(parseISO(selectedSession.session.startTime), 'EEEE, MMMM d, yyyy')} at {format(parseISO(selectedSession.session.startTime), 'h:mm a')}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              {selectedSession && (
+                <>
+                  <Badge variant="outline" data-testid="attendance-enrolled-count">
+                    {selectedSession.enrolledCount} enrolled
+                  </Badge>
+                  {selectedSession.tutor && (
+                    <Badge variant="secondary" data-testid="attendance-tutor">
+                      Tutor: {selectedSession.tutor.firstName} {selectedSession.tutor.lastName}
+                    </Badge>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <ShieldCheck className="w-4 h-4" />
+              Admin can override attendance
+            </div>
+          </div>
+
+          <Separator className="my-2" />
+
+          <ScrollArea className="h-[400px] pr-4">
+            {isAttendanceLoading ? (
+              <div className="space-y-2">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : !sessionAttendance || sessionAttendance.length === 0 ? (
+              <div className="py-8 text-center" data-testid="no-attendance-data">
+                <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
+                <p className="text-muted-foreground">No attendance records found.</p>
+                <p className="text-xs text-muted-foreground mt-1">Tutor has not submitted attendance yet.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sessionAttendance.map((attendance) => (
+                  <div
+                    key={attendance.id}
+                    className="flex items-center justify-between p-3 border rounded-lg"
+                    data-testid={`attendance-row-${attendance.id}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <AttendanceStatusBadge status={attendance.status} />
+                      <div>
+                        <p className="font-medium" data-testid={`student-name-${attendance.id}`}>
+                          {attendance.student?.firstName} {attendance.student?.lastName}
+                        </p>
+                        {attendance.notes && (
+                          <p className="text-xs text-muted-foreground">{attendance.notes}</p>
+                        )}
+                        {attendance.markedAt && (
+                          <p className="text-xs text-muted-foreground">
+                            Marked: {format(parseISO(attendance.markedAt), 'h:mm a')}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleOpenOverride(attendance)}
+                      data-testid={`btn-override-${attendance.id}`}
+                    >
+                      <ShieldCheck className="w-4 h-4 mr-1" />
+                      Override
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsAttendanceModalOpen(false)}
+              data-testid="btn-close-attendance"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isOverrideModalOpen} onOpenChange={setIsOverrideModalOpen}>
+        <DialogContent data-testid="override-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5" />
+              Override Attendance
+            </DialogTitle>
+            <DialogDescription>
+              {selectedAttendance?.student && (
+                <span>
+                  Overriding attendance for {selectedAttendance.student.firstName} {selectedAttendance.student.lastName}
+                </span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Current Status</label>
+              <AttendanceStatusBadge status={selectedAttendance?.status || 'unknown'} showLabel />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">New Status</label>
+              <Select value={overrideStatus} onValueChange={(v) => setOverrideStatus(v as AttendanceStatus)}>
+                <SelectTrigger data-testid="select-override-status">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="present">Present</SelectItem>
+                  <SelectItem value="absent">Absent</SelectItem>
+                  <SelectItem value="late">Late</SelectItem>
+                  <SelectItem value="excused">Excused</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Override Notes (Optional)</label>
+              <textarea
+                className="w-full min-h-[80px] p-2 border rounded-md text-sm"
+                placeholder="Reason for override..."
+                value={overrideNotes}
+                onChange={(e) => setOverrideNotes(e.target.value)}
+                data-testid="input-override-notes"
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsOverrideModalOpen(false)}
+              data-testid="btn-cancel-override"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleOverrideSubmit}
+              disabled={overrideAttendanceMutation.isPending}
+              data-testid="btn-confirm-override"
+            >
+              {overrideAttendanceMutation.isPending ? (
+                <>
+                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Confirm Override
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
