@@ -867,3 +867,125 @@ export type RegisterData = z.infer<typeof registerSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
+
+// =====================
+// CALENDAR & ATTENDANCE SYSTEM
+// =====================
+
+// Session status enum
+export const sessionStatusEnum = pgEnum("session_status", ["scheduled", "in_progress", "completed", "cancelled"]);
+
+// Attendance status enum
+export const attendanceStatusEnum = pgEnum("attendance_status", ["present", "absent", "late", "excused"]);
+
+// Class Sessions table - individual instances of a class
+export const classSessions = pgTable("class_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
+  tutorId: varchar("tutor_id").references(() => tutors.id, { onDelete: "set null" }),
+  sessionDate: timestamp("session_date").notNull(),
+  startTime: varchar("start_time").notNull(), // e.g., "09:00"
+  endTime: varchar("end_time").notNull(), // e.g., "10:30"
+  durationMinutes: integer("duration_minutes").notNull(),
+  status: sessionStatusEnum("status").notNull().default("scheduled"),
+  deliveryMode: varchar("delivery_mode").default("in_person"), // in_person, online, hybrid
+  locationUrl: varchar("location_url"), // Online meeting link if applicable
+  notes: text("notes"), // Lesson summary/notes
+  enrolledCount: integer("enrolled_count").default(0),
+  attendedCount: integer("attended_count").default(0),
+  attendanceLocked: boolean("attendance_locked").default(false),
+  attendanceLockedAt: timestamp("attendance_locked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Session Attendance table - individual attendance records
+export const sessionAttendance = pgTable("session_attendance", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: varchar("session_id").notNull().references(() => classSessions.id, { onDelete: "cascade" }),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  status: attendanceStatusEnum("status").notNull().default("absent"),
+  markedBy: varchar("marked_by").references(() => users.id),
+  markedAt: timestamp("marked_at"),
+  notes: text("notes"), // Tutor remarks
+  isOverride: boolean("is_override").default(false), // Admin override flag
+  overrideBy: varchar("override_by").references(() => users.id),
+  overrideAt: timestamp("override_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Academic Holidays table
+export const academicHolidays = pgTable("academic_holidays", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isPublic: boolean("is_public").default(true), // Public holiday vs company-specific
+  isRecurring: boolean("is_recurring").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Relations
+export const classSessionsRelations = relations(classSessions, ({ one, many }) => ({
+  class: one(classes, {
+    fields: [classSessions.classId],
+    references: [classes.id],
+  }),
+  tutor: one(tutors, {
+    fields: [classSessions.tutorId],
+    references: [tutors.id],
+  }),
+  attendance: many(sessionAttendance),
+}));
+
+export const sessionAttendanceRelations = relations(sessionAttendance, ({ one }) => ({
+  session: one(classSessions, {
+    fields: [sessionAttendance.sessionId],
+    references: [classSessions.id],
+  }),
+  student: one(students, {
+    fields: [sessionAttendance.studentId],
+    references: [students.id],
+  }),
+  markedByUser: one(users, {
+    fields: [sessionAttendance.markedBy],
+    references: [users.id],
+  }),
+}));
+
+export const academicHolidaysRelations = relations(academicHolidays, ({ one }) => ({
+  company: one(tutoringCompanies, {
+    fields: [academicHolidays.companyId],
+    references: [tutoringCompanies.id],
+  }),
+}));
+
+// Type exports
+export type ClassSession = typeof classSessions.$inferSelect;
+export type SessionAttendance = typeof sessionAttendance.$inferSelect;
+export type AcademicHoliday = typeof academicHolidays.$inferSelect;
+
+// Insert schemas
+export const insertClassSessionSchema = createInsertSchema(classSessions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertSessionAttendanceSchema = createInsertSchema(sessionAttendance).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertAcademicHolidaySchema = createInsertSchema(academicHolidays).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertClassSession = z.infer<typeof insertClassSessionSchema>;
+export type InsertSessionAttendance = z.infer<typeof insertSessionAttendanceSchema>;
+export type InsertAcademicHoliday = z.infer<typeof insertAcademicHolidaySchema>;
