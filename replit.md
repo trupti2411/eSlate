@@ -9,6 +9,34 @@ The platform includes AI-powered features using Google Gemini (free tier) to enh
 - **Smart Hint System** (Students): Progressive hints (3 levels) with parent-configurable controls
 - **Parent AI Controls**: Parents can enable/disable AI hints for their children via Settings in Parent Dashboard
 
+## Calendar and Attendance System
+Comprehensive calendar and attendance tracking with role-specific views:
+
+### Database Schema
+- **class_sessions**: Individual class instances with date, time, status, and delivery mode
+- **session_attendance**: Attendance records (present/absent/late/excused) with tutor remarks
+- **academic_holidays**: Public and company-specific holidays
+
+### Role-Specific Features
+- **Company Admin**: Roll-call control panel, all classes overview, attendance override, tutor/class filters
+- **Tutor**: Daily agenda, quick roll-call, bulk attendance marking, "Mark All Present", student roster with capacity indicators
+- **Student**: Weekly schedule, attendance summary cards, per-subject breakdown, learning hours tracking
+- **Parent**: Child's calendar view, attendance visibility with tutor remarks, class time summary
+
+### API Endpoints
+- `/api/calendar/company|tutor|student|parent` - Role-specific calendar data
+- `/api/sessions/*` - Session CRUD and attendance management
+- `/api/attendance/*` - Attendance marking, override, and summaries
+- `/api/holidays` - Holiday management
+
+### Frontend Components
+Located in `client/src/components/calendar/`:
+- `RoleCalendar.tsx` - Shared calendar with weekly/monthly/term views
+- `TutorCalendarDashboard.tsx` - Tutor's calendar with attendance sheet
+- `StudentCalendarDashboard.tsx` - Student's calendar with attendance summary
+- `ParentCalendarDashboard.tsx` - Parent's view of child's calendar
+- `CompanyCalendarDashboard.tsx` - Company admin's roll-call view
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
