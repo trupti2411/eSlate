@@ -1220,6 +1220,684 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // ==========================================
+  // CALENDAR & ATTENDANCE SYSTEM ROUTES
+  // ==========================================
+
+  // Get calendar data for company admin
+  app.get('/api/calendar/company', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) {
+        return res.status(404).json({ message: "Company admin not found" });
+      }
+
+      const { startDate, endDate, classId, tutorId, status } = req.query;
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      const sessions = await storage.getClassSessionsByCompany(companyAdmin.companyId, start, end);
+      const holidays = await storage.getAcademicHolidaysByCompany(companyAdmin.companyId);
+
+      // Filter by additional criteria if provided
+      let filteredSessions = sessions;
+      if (classId) {
+        filteredSessions = filteredSessions.filter((s: any) => s.session.classId === classId);
+      }
+      if (tutorId) {
+        filteredSessions = filteredSessions.filter((s: any) => s.session.tutorId === tutorId);
+      }
+      if (status) {
+        filteredSessions = filteredSessions.filter((s: any) => s.session.status === status);
+      }
+
+      res.json({ sessions: filteredSessions, holidays });
+    } catch (error) {
+      console.error("Error fetching company calendar:", error);
+      res.status(500).json({ message: "Failed to fetch calendar" });
+    }
+  });
+
+  // Get calendar data for tutor
+  app.get('/api/calendar/tutor', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const tutor = await storage.getTutorByUserId(user.id);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      const { startDate, endDate, status } = req.query;
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      const sessions = await storage.getClassSessionsByTutor(tutor.id, start, end);
+      const holidays = tutor.companyId 
+        ? await storage.getAcademicHolidaysByCompany(tutor.companyId)
+        : await storage.getPublicHolidays(start, end);
+
+      // Filter by status if provided
+      let filteredSessions = sessions;
+      if (status) {
+        filteredSessions = filteredSessions.filter((s: any) => s.status === status);
+      }
+
+      res.json({ sessions: filteredSessions, holidays });
+    } catch (error) {
+      console.error("Error fetching tutor calendar:", error);
+      res.status(500).json({ message: "Failed to fetch calendar" });
+    }
+  });
+
+  // Get calendar data for student
+  app.get('/api/calendar/student', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['student', 'parent', 'tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      let studentId = req.query.studentId as string;
+      
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) {
+          return res.status(404).json({ message: "Student not found" });
+        }
+        studentId = student.id;
+      } else if (user.role === 'parent' && studentId) {
+        // Verify parent has access to this student
+        const parent = await storage.getParentByUserId(user.id);
+        if (!parent) {
+          return res.status(404).json({ message: "Parent not found" });
+        }
+        const children = await storage.getStudentsByParent(parent.id);
+        if (!children.find(c => c.id === studentId)) {
+          return res.status(403).json({ message: "Access denied to this student" });
+        }
+      }
+
+      if (!studentId) {
+        return res.status(400).json({ message: "Student ID required" });
+      }
+
+      const { startDate, endDate } = req.query;
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      const sessions = await storage.getClassSessionsByStudent(studentId, start, end);
+      const assignments = await storage.getStudentAssignments(studentId);
+      const holidays = await storage.getPublicHolidays(start, end);
+
+      // Get homework deadlines
+      const homeworkDeadlines = assignments
+        .filter(a => a.dueDate)
+        .map(a => ({
+          id: a.id,
+          title: a.title,
+          dueDate: a.dueDate,
+          type: 'homework',
+          status: a.status,
+        }));
+
+      res.json({ sessions, holidays, homeworkDeadlines });
+    } catch (error) {
+      console.error("Error fetching student calendar:", error);
+      res.status(500).json({ message: "Failed to fetch calendar" });
+    }
+  });
+
+  // Get calendar data for parent (child's view)
+  app.get('/api/calendar/parent', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'parent') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) {
+        return res.status(404).json({ message: "Parent not found" });
+      }
+
+      const { startDate, endDate, childId } = req.query;
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      // Get all children's calendars
+      const children = await storage.getStudentsByParent(parent.id);
+      
+      if (childId) {
+        // Return specific child's calendar
+        const child = children.find(c => c.id === childId);
+        if (!child) {
+          return res.status(404).json({ message: "Child not found" });
+        }
+        const sessions = await storage.getClassSessionsByStudent(child.id, start, end);
+        const assignments = await storage.getStudentAssignments(child.id);
+        const holidays = await storage.getPublicHolidays(start, end);
+        
+        const homeworkDeadlines = assignments
+          .filter(a => a.dueDate)
+          .map(a => ({
+            id: a.id,
+            title: a.title,
+            dueDate: a.dueDate,
+            type: 'homework',
+          }));
+
+        res.json({ 
+          childId: child.id,
+          childName: `${child.firstName} ${child.lastName}`,
+          sessions, 
+          holidays, 
+          homeworkDeadlines 
+        });
+      } else {
+        // Return all children's summary
+        const childrenCalendars = await Promise.all(children.map(async child => {
+          const sessions = await storage.getClassSessionsByStudent(child.id, start, end);
+          const attendanceSummary = await storage.getStudentAttendanceSummary(child.id, start, end);
+          return {
+            childId: child.id,
+            childName: `${child.firstName} ${child.lastName}`,
+            sessionCount: sessions.length,
+            attendanceSummary,
+          };
+        }));
+
+        const holidays = await storage.getPublicHolidays(start, end);
+        res.json({ children: childrenCalendars, holidays });
+      }
+    } catch (error) {
+      console.error("Error fetching parent calendar:", error);
+      res.status(500).json({ message: "Failed to fetch calendar" });
+    }
+  });
+
+  // Get sessions for a specific date (Company roll-call view)
+  app.get('/api/sessions/today', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) {
+        return res.status(404).json({ message: "Company admin not found" });
+      }
+
+      const { date } = req.query;
+      const targetDate = date ? new Date(date as string) : new Date();
+
+      const sessions = await storage.getClassSessionsForDate(companyAdmin.companyId, targetDate);
+      
+      // Get attendance for each session
+      const sessionsWithAttendance = await Promise.all(sessions.map(async (s: any) => {
+        const attendance = await storage.getAttendanceBySession(s.session.id);
+        const studentAssignments = await storage.getStudentsByClass(s.session.classId);
+        return {
+          ...s,
+          attendance,
+          enrolledCount: studentAssignments.length,
+          attendedCount: attendance.filter((a: any) => 
+            a.attendance?.status === 'present' || a.attendance?.status === 'late'
+          ).length,
+        };
+      }));
+
+      res.json(sessionsWithAttendance);
+    } catch (error) {
+      console.error("Error fetching today's sessions:", error);
+      res.status(500).json({ message: "Failed to fetch sessions" });
+    }
+  });
+
+  // Create class session
+  app.post('/api/sessions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const session = await storage.createClassSession(req.body);
+      res.json(session);
+    } catch (error) {
+      console.error("Error creating session:", error);
+      res.status(500).json({ message: "Failed to create session" });
+    }
+  });
+
+  // Get session details
+  app.get('/api/sessions/:sessionId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { sessionId } = req.params;
+      const session = await storage.getClassSession(sessionId);
+      
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+
+      const classData = await storage.getClass(session.classId);
+      const attendance = await storage.getAttendanceBySession(sessionId);
+      const studentAssignments = await storage.getStudentsByClass(session.classId);
+
+      res.json({
+        session,
+        class: classData,
+        attendance,
+        enrolledCount: studentAssignments.length,
+      });
+    } catch (error) {
+      console.error("Error fetching session:", error);
+      res.status(500).json({ message: "Failed to fetch session" });
+    }
+  });
+
+  // Update session
+  app.patch('/api/sessions/:sessionId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { sessionId } = req.params;
+      const session = await storage.updateClassSession(sessionId, req.body);
+      res.json(session);
+    } catch (error) {
+      console.error("Error updating session:", error);
+      res.status(500).json({ message: "Failed to update session" });
+    }
+  });
+
+  // Generate sessions for a class
+  app.post('/api/classes/:classId/generate-sessions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { classId } = req.params;
+      const { termStartDate, termEndDate } = req.body;
+
+      const sessions = await storage.generateSessionsForClass(
+        classId,
+        new Date(termStartDate),
+        new Date(termEndDate)
+      );
+
+      res.json({ message: `Generated ${sessions.length} sessions`, sessions });
+    } catch (error) {
+      console.error("Error generating sessions:", error);
+      res.status(500).json({ message: "Failed to generate sessions" });
+    }
+  });
+
+  // ==========================================
+  // ATTENDANCE ROUTES
+  // ==========================================
+
+  // Get attendance for a session
+  app.get('/api/sessions/:sessionId/attendance', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { sessionId } = req.params;
+      const attendance = await storage.getAttendanceBySession(sessionId);
+      res.json(attendance);
+    } catch (error) {
+      console.error("Error fetching attendance:", error);
+      res.status(500).json({ message: "Failed to fetch attendance" });
+    }
+  });
+
+  // Mark attendance for a session
+  app.post('/api/sessions/:sessionId/attendance', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { sessionId } = req.params;
+      
+      // Check if session attendance is locked
+      const session = await storage.getClassSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      if (session.attendanceLocked && user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Attendance is locked for this session" });
+      }
+
+      const { studentId, status, notes } = req.body;
+
+      const attendance = await storage.markAttendance({
+        sessionId,
+        studentId,
+        status,
+        markedBy: user.id,
+        markedAt: new Date(),
+        notes,
+      });
+
+      res.json(attendance);
+    } catch (error) {
+      console.error("Error marking attendance:", error);
+      res.status(500).json({ message: "Failed to mark attendance" });
+    }
+  });
+
+  // Bulk mark attendance
+  app.post('/api/sessions/:sessionId/attendance/bulk', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { sessionId } = req.params;
+      const { attendanceList } = req.body; // [{studentId, status, notes?}]
+
+      const session = await storage.getClassSession(sessionId);
+      if (!session) {
+        return res.status(404).json({ message: "Session not found" });
+      }
+      if (session.attendanceLocked && user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Attendance is locked for this session" });
+      }
+
+      const results = await Promise.all(attendanceList.map(async (item: any) => {
+        return storage.markAttendance({
+          sessionId,
+          studentId: item.studentId,
+          status: item.status,
+          markedBy: user.id,
+          markedAt: new Date(),
+          notes: item.notes,
+        });
+      }));
+
+      // Update session counts
+      const presentCount = results.filter((r: any) => r.status === 'present' || r.status === 'late').length;
+      await storage.updateClassSession(sessionId, {
+        attendedCount: presentCount,
+        enrolledCount: attendanceList.length,
+      });
+
+      res.json({ message: "Attendance marked", results });
+    } catch (error) {
+      console.error("Error bulk marking attendance:", error);
+      res.status(500).json({ message: "Failed to mark attendance" });
+    }
+  });
+
+  // Mark all present for a session
+  app.post('/api/sessions/:sessionId/attendance/mark-all-present', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { sessionId } = req.params;
+      await storage.markAllPresent(sessionId, user.id);
+      
+      res.json({ message: "All students marked present" });
+    } catch (error) {
+      console.error("Error marking all present:", error);
+      res.status(500).json({ message: "Failed to mark all present" });
+    }
+  });
+
+  // Override attendance (company admin/admin only)
+  app.post('/api/attendance/:attendanceId/override', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { attendanceId } = req.params;
+      const { status, notes } = req.body;
+
+      const attendance = await storage.overrideAttendance(attendanceId, status, user.id, notes);
+      res.json(attendance);
+    } catch (error) {
+      console.error("Error overriding attendance:", error);
+      res.status(500).json({ message: "Failed to override attendance" });
+    }
+  });
+
+  // Lock session attendance
+  app.post('/api/sessions/:sessionId/lock-attendance', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { sessionId } = req.params;
+      await storage.lockSessionAttendance(sessionId);
+      
+      res.json({ message: "Attendance locked" });
+    } catch (error) {
+      console.error("Error locking attendance:", error);
+      res.status(500).json({ message: "Failed to lock attendance" });
+    }
+  });
+
+  // Get student attendance summary
+  app.get('/api/attendance/summary/student/:studentId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { studentId } = req.params;
+      const { startDate, endDate } = req.query;
+
+      // Verify access
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student || student.id !== studentId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      } else if (user.role === 'parent') {
+        const parent = await storage.getParentByUserId(user.id);
+        if (!parent) {
+          return res.status(404).json({ message: "Parent not found" });
+        }
+        const children = await storage.getStudentsByParent(parent.id);
+        if (!children.find(c => c.id === studentId)) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const start = startDate ? new Date(startDate as string) : undefined;
+      const end = endDate ? new Date(endDate as string) : undefined;
+
+      const summary = await storage.getStudentAttendanceSummary(studentId, start, end);
+      const bySubject = await storage.getStudentAttendanceBySubject(studentId);
+      const learningHours = await storage.getStudentLearningHours(studentId, start, end);
+
+      res.json({ summary, bySubject, learningHours });
+    } catch (error) {
+      console.error("Error fetching attendance summary:", error);
+      res.status(500).json({ message: "Failed to fetch attendance summary" });
+    }
+  });
+
+  // ==========================================
+  // ACADEMIC HOLIDAY ROUTES
+  // ==========================================
+
+  // Get holidays for company
+  app.get('/api/holidays', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { startDate, endDate } = req.query;
+
+      let holidays;
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (companyAdmin) {
+          holidays = await storage.getAcademicHolidaysByCompany(companyAdmin.companyId);
+        }
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (tutor?.companyId) {
+          holidays = await storage.getAcademicHolidaysByCompany(tutor.companyId);
+        }
+      } else {
+        const start = startDate ? new Date(startDate as string) : undefined;
+        const end = endDate ? new Date(endDate as string) : undefined;
+        holidays = await storage.getPublicHolidays(start, end);
+      }
+
+      res.json(holidays || []);
+    } catch (error) {
+      console.error("Error fetching holidays:", error);
+      res.status(500).json({ message: "Failed to fetch holidays" });
+    }
+  });
+
+  // Create holiday
+  app.post('/api/holidays', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      let companyId = null;
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (companyAdmin) {
+          companyId = companyAdmin.companyId;
+        }
+      }
+
+      const holiday = await storage.createAcademicHoliday({
+        ...req.body,
+        companyId,
+        startDate: new Date(req.body.startDate),
+        endDate: new Date(req.body.endDate),
+      });
+
+      res.json(holiday);
+    } catch (error) {
+      console.error("Error creating holiday:", error);
+      res.status(500).json({ message: "Failed to create holiday" });
+    }
+  });
+
+  // Update holiday
+  app.patch('/api/holidays/:holidayId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { holidayId } = req.params;
+      const holiday = await storage.updateAcademicHoliday(holidayId, {
+        ...req.body,
+        startDate: req.body.startDate ? new Date(req.body.startDate) : undefined,
+        endDate: req.body.endDate ? new Date(req.body.endDate) : undefined,
+      });
+
+      res.json(holiday);
+    } catch (error) {
+      console.error("Error updating holiday:", error);
+      res.status(500).json({ message: "Failed to update holiday" });
+    }
+  });
+
+  // Delete holiday
+  app.delete('/api/holidays/:holidayId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { holidayId } = req.params;
+      await storage.deleteAcademicHoliday(holidayId);
+
+      res.json({ message: "Holiday deleted" });
+    } catch (error) {
+      console.error("Error deleting holiday:", error);
+      res.status(500).json({ message: "Failed to delete holiday" });
+    }
+  });
+
+  // Get tutor's students with attendance history
+  app.get('/api/tutor/students-roster', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const tutor = await storage.getTutorByUserId(user.id);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      const { classId } = req.query;
+
+      // Get classes for this tutor
+      const classes = await storage.getClassesByTutor(tutor.id);
+      
+      // Filter by classId if provided
+      const targetClasses = classId 
+        ? classes.filter(c => c.id === classId)
+        : classes;
+
+      // Get students for each class with attendance info
+      const classesWithStudents = await Promise.all(targetClasses.map(async (classData) => {
+        const studentAssignments = await storage.getStudentsByClass(classData.id);
+        
+        const studentsWithDetails = await Promise.all(studentAssignments.map(async (assignment: any) => {
+          const student = await storage.getStudent(assignment.studentId);
+          if (!student) return null;
+          
+          const studentUser = await storage.getUser(student.userId);
+          const attendanceSummary = await storage.getStudentAttendanceSummary(student.id);
+          const parentInfo = await storage.getParentUserByStudentId(student.id);
+
+          return {
+            ...student,
+            email: studentUser?.email,
+            attendanceSummary,
+            parentContact: parentInfo,
+          };
+        }));
+
+        return {
+          class: classData,
+          students: studentsWithDetails.filter(Boolean),
+          capacity: classData.maxStudents,
+          enrolled: studentAssignments.length,
+        };
+      }));
+
+      res.json(classesWithStudents);
+    } catch (error) {
+      console.error("Error fetching tutor roster:", error);
+      res.status(500).json({ message: "Failed to fetch roster" });
+    }
+  });
+
   // Administrative routes
   
   // Admin stats endpoint for dashboard
