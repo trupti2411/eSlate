@@ -97,6 +97,12 @@ export default function CompanyDashboard() {
   const [studentFilterTutor, setStudentFilterTutor] = useState<string>('all');
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
 
+  const [tutorSortBy, setTutorSortBy] = useState<'name' | 'email' | 'specialization' | 'status'>('name');
+  const [tutorSortOrder, setTutorSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [tutorFilterStatus, setTutorFilterStatus] = useState<string>('all');
+  const [tutorFilterSpecialization, setTutorFilterSpecialization] = useState<string>('all');
+  const [tutorSearchTerm, setTutorSearchTerm] = useState('');
+
   const [studentFormData, setStudentFormData] = useState({
     email: "",
     firstName: "",
@@ -397,6 +403,67 @@ export default function CompanyDashboard() {
     });
     
     return filtered;
+  };
+
+  // Sorting and filtering for tutors
+  const getFilteredAndSortedTutors = () => {
+    if (!tutors || !Array.isArray(tutors)) return [];
+    
+    let filtered = [...tutors];
+    
+    // Apply search filter
+    if (tutorSearchTerm) {
+      const term = tutorSearchTerm.toLowerCase();
+      filtered = filtered.filter((t: CompanyTutor) => 
+        t.user?.firstName?.toLowerCase().includes(term) ||
+        t.user?.lastName?.toLowerCase().includes(term) ||
+        t.user?.email?.toLowerCase().includes(term) ||
+        t.specialization?.toLowerCase().includes(term)
+      );
+    }
+    
+    // Apply status filter
+    if (tutorFilterStatus !== 'all') {
+      if (tutorFilterStatus === 'verified') {
+        filtered = filtered.filter((t: CompanyTutor) => t.isVerified);
+      } else if (tutorFilterStatus === 'pending') {
+        filtered = filtered.filter((t: CompanyTutor) => !t.isVerified);
+      }
+    }
+    
+    // Apply specialization filter
+    if (tutorFilterSpecialization !== 'all') {
+      filtered = filtered.filter((t: CompanyTutor) => t.specialization === tutorFilterSpecialization);
+    }
+    
+    // Apply sorting
+    filtered.sort((a: CompanyTutor, b: CompanyTutor) => {
+      let comparison = 0;
+      switch (tutorSortBy) {
+        case 'name':
+          comparison = `${a.user?.firstName} ${a.user?.lastName}`.localeCompare(`${b.user?.firstName} ${b.user?.lastName}`);
+          break;
+        case 'email':
+          comparison = (a.user?.email || '').localeCompare(b.user?.email || '');
+          break;
+        case 'specialization':
+          comparison = (a.specialization || 'zzz').localeCompare(b.specialization || 'zzz');
+          break;
+        case 'status':
+          comparison = (a.isVerified ? 0 : 1) - (b.isVerified ? 0 : 1);
+          break;
+      }
+      return tutorSortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return filtered;
+  };
+
+  // Get unique specializations from tutors
+  const getUniqueSpecializations = () => {
+    if (!tutors || !Array.isArray(tutors)) return [];
+    const specs = tutors.map((t: CompanyTutor) => t.specialization).filter(Boolean);
+    return [...new Set(specs)];
   };
 
   const handleAssignTutor = (e: React.FormEvent) => {
@@ -768,18 +835,87 @@ export default function CompanyDashboard() {
             </Dialog>
           </div>
 
+          {/* Filters and Sorting for Tutors */}
+          <Card className="border-2 border-black mb-6">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="md:col-span-2">
+                  <Label htmlFor="tutorSearch" className="text-xs text-gray-600">Search</Label>
+                  <Input
+                    id="tutorSearch"
+                    placeholder="Search by name, email, or specialization..."
+                    value={tutorSearchTerm}
+                    onChange={(e) => setTutorSearchTerm(e.target.value)}
+                    className="border-black"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600">Filter by Status</Label>
+                  <Select value={tutorFilterStatus} onValueChange={setTutorFilterStatus}>
+                    <SelectTrigger className="border-black">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="verified">Verified</SelectItem>
+                      <SelectItem value="pending">Pending</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600">Filter by Specialization</Label>
+                  <Select value={tutorFilterSpecialization} onValueChange={setTutorFilterSpecialization}>
+                    <SelectTrigger className="border-black">
+                      <SelectValue placeholder="All Specializations" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Specializations</SelectItem>
+                      {getUniqueSpecializations().map((spec: string) => (
+                        <SelectItem key={spec} value={spec}>{spec}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600">Sort By</Label>
+                  <div className="flex gap-1">
+                    <Select value={tutorSortBy} onValueChange={(v: any) => setTutorSortBy(v)}>
+                      <SelectTrigger className="border-black flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="specialization">Specialization</SelectItem>
+                        <SelectItem value="status">Status</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTutorSortOrder(tutorSortOrder === 'asc' ? 'desc' : 'asc')}
+                      className="border-black px-2"
+                    >
+                      {tutorSortOrder === 'asc' ? '↑' : '↓'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Tutors List */}
           <Card className="border-2 border-black">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                All Tutors ({Array.isArray(tutors) ? tutors.length : 0})
+                All Tutors ({getFilteredAndSortedTutors().length} of {Array.isArray(tutors) ? tutors.length : 0})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {tutors && Array.isArray(tutors) && tutors.length > 0 ? (
+              {getFilteredAndSortedTutors().length > 0 ? (
                 <div className="space-y-3">
-                  {tutors.map((tutor: CompanyTutor) => (
+                  {getFilteredAndSortedTutors().map((tutor: CompanyTutor) => (
                     <div key={tutor.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-black transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
@@ -793,15 +929,19 @@ export default function CompanyDashboard() {
                             </p>
                           </button>
                           <p className="text-sm text-gray-600">{tutor.user?.email}</p>
-                          <div className="flex gap-4 mt-2">
+                          <div className="flex flex-wrap gap-2 mt-2">
                             {tutor.specialization && (
-                              <span className="text-xs bg-gray-200 px-2 py-1 rounded">{tutor.specialization}</span>
+                              <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">
+                                {tutor.specialization}
+                              </Badge>
                             )}
                             {tutor.qualifications && (
-                              <span className="text-xs text-gray-500">{tutor.qualifications}</span>
+                              <Badge variant="outline" className="border-gray-400">
+                                {tutor.qualifications}
+                              </Badge>
                             )}
-                            <Badge variant={tutor.isVerified ? "default" : "secondary"} className={tutor.isVerified ? "bg-green-100 text-green-800" : ""}>
-                              {tutor.isVerified ? "Verified" : "Pending"}
+                            <Badge variant={tutor.isVerified ? "default" : "secondary"} className={tutor.isVerified ? "bg-green-100 text-green-800 border-green-500" : "border-orange-400 text-orange-600"}>
+                              {tutor.isVerified ? "Verified" : "Pending Verification"}
                             </Badge>
                           </div>
                         </div>
@@ -832,11 +972,17 @@ export default function CompanyDashboard() {
               ) : (
                 <div className="text-center py-12">
                   <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-4">No tutors added yet</p>
-                  <Button onClick={() => setIsCreateTutorOpen(true)} className="bg-black text-white hover:bg-gray-800">
-                    <UserPlus className="h-4 w-4 mr-2" />
-                    Add Your First Tutor
-                  </Button>
+                  <p className="text-gray-600 mb-4">
+                    {tutorSearchTerm || tutorFilterStatus !== 'all' || tutorFilterSpecialization !== 'all'
+                      ? "No tutors match your filters"
+                      : "No tutors added yet"}
+                  </p>
+                  {!tutorSearchTerm && tutorFilterStatus === 'all' && tutorFilterSpecialization === 'all' && (
+                    <Button onClick={() => setIsCreateTutorOpen(true)} className="bg-black text-white hover:bg-gray-800">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Your First Tutor
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
