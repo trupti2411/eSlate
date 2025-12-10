@@ -32,6 +32,13 @@ interface TutoringCompany {
   isActive: boolean;
 }
 
+interface ClassSchedule {
+  className: string;
+  dayOfWeek: string;
+  startTime: string;
+  endTime: string;
+}
+
 interface CompanyTutor {
   id: string;
   userId: string;
@@ -45,6 +52,8 @@ interface CompanyTutor {
     lastName: string;
     isActive: boolean;
   };
+  schedules?: ClassSchedule[];
+  studentCount?: number;
 }
 
 interface CompanyStudent {
@@ -943,7 +952,30 @@ export default function CompanyDashboard() {
                             <Badge variant={tutor.isVerified ? "default" : "secondary"} className={tutor.isVerified ? "bg-green-100 text-green-800 border-green-500" : "border-orange-400 text-orange-600"}>
                               {tutor.isVerified ? "Verified" : "Pending Verification"}
                             </Badge>
+                            {tutor.studentCount !== undefined && tutor.studentCount > 0 && (
+                              <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50">
+                                {tutor.studentCount} student{tutor.studentCount !== 1 ? 's' : ''}
+                              </Badge>
+                            )}
                           </div>
+                          {tutor.schedules && tutor.schedules.length > 0 && (
+                            <div className="mt-3 pt-2 border-t border-gray-200">
+                              <p className="text-xs font-medium text-gray-500 mb-1">Class Schedule:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {tutor.schedules.slice(0, 4).map((schedule, idx) => (
+                                  <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded border border-gray-300">
+                                    <span className="font-medium">{schedule.className}</span>
+                                    <span className="text-gray-500"> - {schedule.dayOfWeek} {schedule.startTime}-{schedule.endTime}</span>
+                                  </span>
+                                ))}
+                                {tutor.schedules.length > 4 && (
+                                  <span className="text-xs text-gray-500 px-2 py-1">
+                                    +{tutor.schedules.length - 4} more
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <Button

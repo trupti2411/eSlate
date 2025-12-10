@@ -867,7 +867,7 @@ export class DatabaseStorage implements IStorage {
         .map((row: any) => row.tutors.userId);
       
       const tutorUsers = tutorUserIds.length > 0 
-        ? await db.select().from(users).where(sql`${users.id} IN (${sql.join(tutorUserIds.map((id: string) => sql`${id}`), sql`, `)})`)
+        ? await db.select().from(users).where(inArray(users.id, tutorUserIds))
         : [];
 
       const tutorUserMap = new Map(tutorUsers.map((u: any) => [u.id, u]));
@@ -983,7 +983,78 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(tutors.companyId, companyId), eq(users.isDeleted, false)))
       .orderBy(users.firstName, users.lastName);
 
-      return companyTutors;
+      // Get class schedules for each tutor (upcoming sessions grouped by class/day/time)
+      const tutorIds = companyTutors.map(t => t.id);
+      
+      // Get upcoming sessions for these tutors
+      const upcomingSessions = tutorIds.length > 0 
+        ? await db.select({
+            tutorId: classSessions.tutorId,
+            className: classes.name,
+            sessionDate: classSessions.sessionDate,
+            startTime: classSessions.startTime,
+            endTime: classSessions.endTime,
+          })
+          .from(classSessions)
+          .innerJoin(classes, eq(classSessions.classId, classes.id))
+          .where(
+            and(
+              inArray(classSessions.tutorId, tutorIds),
+              sql`${classSessions.sessionDate} >= CURRENT_DATE`,
+              eq(classSessions.status, 'scheduled')
+            )
+          )
+          .orderBy(classSessions.sessionDate, classSessions.startTime)
+        : [];
+
+      // Get student counts for each tutor
+      const studentCounts = tutorIds.length > 0
+        ? await db.select({
+            tutorId: students.tutorId,
+            count: sql<number>`count(*)`.as('count')
+          })
+          .from(students)
+          .innerJoin(users, eq(students.userId, users.id))
+          .where(
+            and(
+              inArray(students.tutorId, tutorIds),
+              eq(users.isDeleted, false),
+              eq(users.isActive, true)
+            )
+          )
+          .groupBy(students.tutorId)
+        : [];
+
+      const studentCountMap = new Map(studentCounts.map((sc: any) => [sc.tutorId, Number(sc.count)]));
+
+      // Group sessions by tutor and create unique schedule entries
+      const tutorSchedulesMap = new Map<string, Set<string>>();
+      for (const session of upcomingSessions) {
+        if (!session.tutorId) continue;
+        if (!tutorSchedulesMap.has(session.tutorId)) {
+          tutorSchedulesMap.set(session.tutorId, new Set());
+        }
+        const dayOfWeek = new Date(session.sessionDate).toLocaleDateString('en-US', { weekday: 'long' });
+        const scheduleKey = `${session.className}|${dayOfWeek}|${session.startTime}|${session.endTime}`;
+        tutorSchedulesMap.get(session.tutorId)!.add(scheduleKey);
+      }
+
+      // Add schedules and student count to tutors
+      return companyTutors.map(tutor => {
+        const scheduleSet = tutorSchedulesMap.get(tutor.id);
+        const schedules = scheduleSet 
+          ? Array.from(scheduleSet).map(key => {
+              const [className, dayOfWeek, startTime, endTime] = key.split('|');
+              return { className, dayOfWeek, startTime, endTime };
+            })
+          : [];
+        
+        return {
+          ...tutor,
+          schedules,
+          studentCount: studentCountMap.get(tutor.id) || 0
+        };
+      });
     } catch (error) {
       console.error("Error fetching company tutors:", error);
       return [];
