@@ -2001,7 +2001,7 @@ trailer<</Size 5/Root 1 0 R>>
       const tempPassword = 'TempPass123!';
       const hashedPassword = await hashPassword(tempPassword);
 
-      const newUser = await storage.createUser({
+      const newUser = await storage.createUserWithRole({
         email,
         firstName,
         lastName,
