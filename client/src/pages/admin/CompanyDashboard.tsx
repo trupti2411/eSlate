@@ -669,10 +669,8 @@ export default function CompanyDashboard() {
           </Card>
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Company Info & Students */}
-          <div className="lg:col-span-2 space-y-6">
+        {/* Main Content */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Company Info */}
             {company && (
               <Card className="border-2 border-black">
@@ -737,60 +735,6 @@ export default function CompanyDashboard() {
                 )}
               </CardContent>
             </Card>
-          </div>
-
-          {/* Sidebar */}
-          <div className="space-y-6">
-            {/* Quick Links */}
-            <Card className="border-2 border-black">
-              <CardHeader>
-                <CardTitle className="text-base">Quick Links</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Link href="/company/students">
-                  <Button variant="outline" className="w-full justify-start border-black text-black hover:bg-gray-100">
-                    <Users className="h-4 w-4 mr-2" />
-                    All Students
-                  </Button>
-                </Link>
-                <Link href="/company/tutors">
-                  <Button variant="outline" className="w-full justify-start border-black text-black hover:bg-gray-100">
-                    <Users className="h-4 w-4 mr-2" />
-                    All Tutors
-                  </Button>
-                </Link>
-                <Link href="/company/homework">
-                  <Button variant="outline" className="w-full justify-start border-black text-black hover:bg-gray-100">
-                    <FileText className="h-4 w-4 mr-2" />
-                    Submissions
-                  </Button>
-                </Link>
-              </CardContent>
-            </Card>
-
-            {/* All Tutors */}
-            <Card className="border-2 border-black">
-              <CardHeader>
-                <CardTitle className="text-base">Staff Team</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {tutors && Array.isArray(tutors) && tutors.length > 0 ? (
-                  <div className="space-y-2">
-                    {tutors.slice(0, 4).map((tutor: CompanyTutor) => (
-                      <div key={tutor.id} className="p-2 bg-gray-50 rounded border border-gray-200">
-                        <p className="font-medium text-sm text-black">
-                          {tutor.user?.firstName} {tutor.user?.lastName}
-                        </p>
-                        {tutor.specialization && <p className="text-xs text-gray-600">{tutor.specialization}</p>}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-600 text-sm">No tutors yet</p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
         </div>
       </div>
       )}
