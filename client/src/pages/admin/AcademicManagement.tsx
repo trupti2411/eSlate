@@ -699,7 +699,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           </div>
 
           {/* Search, Filter, Sort Controls */}
-          <Card className="border-2 border-gray-200 dark:border-gray-700">
+          <Card className="border-2 border-black">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[200px]">
@@ -710,7 +710,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       placeholder="Search by name..."
                       value={yearSearch}
                       onChange={(e) => setYearSearch(e.target.value)}
-                      className="pl-9"
+                      className="pl-9 border-black"
                       data-testid="input-year-search"
                     />
                   </div>
@@ -718,7 +718,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 <div className="min-w-[150px]">
                   <Label className="text-sm font-medium mb-1 block">Status</Label>
                   <Select value={yearStatusFilter} onValueChange={setYearStatusFilter}>
-                    <SelectTrigger data-testid="select-year-status">
+                    <SelectTrigger className="border-black" data-testid="select-year-status">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -732,7 +732,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                   <div className="min-w-[120px]">
                     <Label className="text-sm font-medium mb-1 block">Sort By</Label>
                     <Select value={yearSortBy} onValueChange={(v) => setYearSortBy(v as 'name' | 'yearNumber')}>
-                      <SelectTrigger data-testid="select-year-sort">
+                      <SelectTrigger className="border-black" data-testid="select-year-sort">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -745,7 +745,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                     variant="outline"
                     size="sm"
                     onClick={() => setYearSortOrder(yearSortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="mt-5 px-2"
+                    className="mt-5 px-2 border-black"
                     data-testid="button-year-sort-order"
                   >
                     {yearSortOrder === 'asc' ? '↑' : '↓'}
@@ -853,7 +853,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           </div>
 
           {/* Search, Filter, Sort Controls */}
-          <Card className="border-2 border-gray-200 dark:border-gray-700">
+          <Card className="border-2 border-black">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[200px]">
@@ -864,7 +864,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       placeholder="Search by name..."
                       value={termSearch}
                       onChange={(e) => setTermSearch(e.target.value)}
-                      className="pl-9"
+                      className="pl-9 border-black"
                       data-testid="input-term-search"
                     />
                   </div>
@@ -872,7 +872,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 <div className="min-w-[150px]">
                   <Label className="text-sm font-medium mb-1 block">Status</Label>
                   <Select value={termStatusFilter} onValueChange={setTermStatusFilter}>
-                    <SelectTrigger data-testid="select-term-status">
+                    <SelectTrigger className="border-black" data-testid="select-term-status">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -886,7 +886,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                   <div className="min-w-[130px]">
                     <Label className="text-sm font-medium mb-1 block">Sort By</Label>
                     <Select value={termSortBy} onValueChange={(v) => setTermSortBy(v as 'name' | 'termNumber' | 'startDate')}>
-                      <SelectTrigger data-testid="select-term-sort">
+                      <SelectTrigger className="border-black" data-testid="select-term-sort">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -900,7 +900,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                     variant="outline"
                     size="sm"
                     onClick={() => setTermSortOrder(termSortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="mt-5 px-2"
+                    className="mt-5 px-2 border-black"
                     data-testid="button-term-sort-order"
                   >
                     {termSortOrder === 'asc' ? '↑' : '↓'}
@@ -1002,7 +1002,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           </div>
 
           {/* Search, Filter, Sort Controls */}
-          <Card className="border-2 border-gray-200 dark:border-gray-700">
+          <Card className="border-2 border-black">
             <CardContent className="pt-4">
               <div className="flex flex-wrap gap-4 items-end">
                 <div className="flex-1 min-w-[200px]">
@@ -1013,7 +1013,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       placeholder="Search by name or subject..."
                       value={classSearch}
                       onChange={(e) => setClassSearch(e.target.value)}
-                      className="pl-9"
+                      className="pl-9 border-black"
                       data-testid="input-class-search"
                     />
                   </div>
@@ -1021,7 +1021,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 <div className="min-w-[150px]">
                   <Label className="text-sm font-medium mb-1 block">Status</Label>
                   <Select value={classStatusFilter} onValueChange={setClassStatusFilter}>
-                    <SelectTrigger data-testid="select-class-status">
+                    <SelectTrigger className="border-black" data-testid="select-class-status">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1034,7 +1034,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 <div className="min-w-[150px]">
                   <Label className="text-sm font-medium mb-1 block">Day</Label>
                   <Select value={classDayFilter} onValueChange={setClassDayFilter}>
-                    <SelectTrigger data-testid="select-class-day">
+                    <SelectTrigger className="border-black" data-testid="select-class-day">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1053,7 +1053,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                   <div className="min-w-[120px]">
                     <Label className="text-sm font-medium mb-1 block">Sort By</Label>
                     <Select value={classSortBy} onValueChange={(v) => setClassSortBy(v as 'name' | 'subject' | 'dayOfWeek')}>
-                      <SelectTrigger data-testid="select-class-sort">
+                      <SelectTrigger className="border-black" data-testid="select-class-sort">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1067,7 +1067,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                     variant="outline"
                     size="sm"
                     onClick={() => setClassSortOrder(classSortOrder === 'asc' ? 'desc' : 'asc')}
-                    className="mt-5 px-2"
+                    className="mt-5 px-2 border-black"
                     data-testid="button-class-sort-order"
                   >
                     {classSortOrder === 'asc' ? '↑' : '↓'}

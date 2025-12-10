@@ -68,6 +68,10 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [selectedWorksheet, setSelectedWorksheet] = useState<Worksheet | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'draft'>('all');
+  const [subjectFilter, setSubjectFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<'title' | 'createdAt' | 'subject'>('createdAt');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [newWorksheet, setNewWorksheet] = useState({ title: '', description: '', subject: '' });
   const [assignmentData, setAssignmentData] = useState<{
     studentIds: string[];
@@ -155,10 +159,31 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
     setShowAssignDialog(true);
   };
 
-  const filteredWorksheets = worksheets.filter(w =>
-    w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    w.subject?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Get unique subjects for filter dropdown
+  const uniqueSubjects = Array.from(new Set(worksheets.map(w => w.subject).filter(Boolean))) as string[];
+
+  // Filter and sort worksheets
+  const filteredWorksheets = worksheets
+    .filter(w => {
+      const matchesSearch = w.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        w.subject?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || 
+        (statusFilter === 'published' && w.isPublished) ||
+        (statusFilter === 'draft' && !w.isPublished);
+      const matchesSubject = subjectFilter === 'all' || w.subject === subjectFilter;
+      return matchesSearch && matchesStatus && matchesSubject;
+    })
+    .sort((a, b) => {
+      let comparison = 0;
+      if (sortBy === 'title') {
+        comparison = a.title.localeCompare(b.title);
+      } else if (sortBy === 'createdAt') {
+        comparison = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      } else if (sortBy === 'subject') {
+        comparison = (a.subject || '').localeCompare(b.subject || '');
+      }
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
 
   if (editingWorksheetId) {
     return (
@@ -237,19 +262,82 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
         </Dialog>
       </div>
 
-      {/* Search */}
-      <div className="mb-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search worksheets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-            data-testid="input-search-worksheets"
-          />
-        </div>
-      </div>
+      {/* Search, Filter, Sort Controls */}
+      <Card className="border-2 border-black mb-6">
+        <CardContent className="pt-4">
+          <div className="flex flex-wrap gap-4 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <Label className="text-sm font-medium mb-1 block">Search</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search by title or subject..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 border-black"
+                  data-testid="input-search-worksheets"
+                />
+              </div>
+            </div>
+            <div className="min-w-[130px]">
+              <Label className="text-sm font-medium mb-1 block">Status</Label>
+              <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as 'all' | 'published' | 'draft')}>
+                <SelectTrigger className="border-black" data-testid="select-status-filter">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="published">Published</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {uniqueSubjects.length > 0 && (
+              <div className="min-w-[150px]">
+                <Label className="text-sm font-medium mb-1 block">Subject</Label>
+                <Select value={subjectFilter} onValueChange={setSubjectFilter}>
+                  <SelectTrigger className="border-black" data-testid="select-subject-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subjects</SelectItem>
+                    {uniqueSubjects.map(subject => (
+                      <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <div className="min-w-[120px]">
+                <Label className="text-sm font-medium mb-1 block">Sort By</Label>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'title' | 'createdAt' | 'subject')}>
+                  <SelectTrigger className="border-black" data-testid="select-sort-by">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="createdAt">Date Created</SelectItem>
+                    <SelectItem value="title">Title</SelectItem>
+                    <SelectItem value="subject">Subject</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+                className="mt-5 px-2 border-black"
+                data-testid="button-sort-order"
+              >
+                {sortOrder === 'asc' ? '↑' : '↓'}
+              </Button>
+            </div>
+          </div>
+          <p className="text-sm text-gray-500 mt-2">
+            Showing {filteredWorksheets.length} of {worksheets.length} worksheets
+          </p>
+        </CardContent>
+      </Card>
 
       {/* Worksheets Grid */}
       {isLoading ? (
@@ -270,17 +358,17 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredWorksheets.map((worksheet) => (
-            <Card key={worksheet.id} className="hover:shadow-md transition-shadow">
+            <Card key={worksheet.id} className="border-2 border-black hover:shadow-lg transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <div>
-                    <CardTitle className="text-lg">{worksheet.title}</CardTitle>
+                    <CardTitle className="text-lg text-black">{worksheet.title}</CardTitle>
                     {worksheet.subject && (
-                      <p className="text-sm text-muted-foreground">{worksheet.subject}</p>
+                      <p className="text-sm text-gray-600">{worksheet.subject}</p>
                     )}
                   </div>
-                  <div className={`px-2 py-1 rounded text-xs font-medium ${
-                    worksheet.isPublished ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
+                  <div className={`px-2 py-1 rounded text-xs font-medium border ${
+                    worksheet.isPublished ? 'bg-white border-black text-black' : 'bg-gray-100 border-gray-400 text-gray-600'
                   }`}>
                     {worksheet.isPublished ? 'Published' : 'Draft'}
                   </div>
