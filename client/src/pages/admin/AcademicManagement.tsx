@@ -25,7 +25,10 @@ import {
   MoreHorizontal,
   Edit,
   Trash2,
-  FileText
+  FileText,
+  Search,
+  Filter,
+  ArrowUpDown
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -129,6 +132,25 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [isEditClassOpen, setIsEditClassOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [assigningStudentId, setAssigningStudentId] = useState<string | null>(null);
+
+  // Search, filter, and sort states for Academic Years
+  const [yearSearch, setYearSearch] = useState('');
+  const [yearStatusFilter, setYearStatusFilter] = useState<string>('all');
+  const [yearSortBy, setYearSortBy] = useState<'name' | 'yearNumber'>('yearNumber');
+  const [yearSortOrder, setYearSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Search, filter, and sort states for Terms
+  const [termSearch, setTermSearch] = useState('');
+  const [termStatusFilter, setTermStatusFilter] = useState<string>('all');
+  const [termSortBy, setTermSortBy] = useState<'name' | 'termNumber' | 'startDate'>('termNumber');
+  const [termSortOrder, setTermSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  // Search, filter, and sort states for Classes
+  const [classSearch, setClassSearch] = useState('');
+  const [classStatusFilter, setClassStatusFilter] = useState<string>('all');
+  const [classDayFilter, setClassDayFilter] = useState<string>('all');
+  const [classSortBy, setClassSortBy] = useState<'name' | 'subject' | 'dayOfWeek'>('name');
+  const [classSortOrder, setClassSortOrder] = useState<'asc' | 'desc'>('asc');
 
   // Form instances
   const yearForm = useForm<AcademicYearFormData>({
@@ -393,6 +415,87 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     }
   };
 
+  // Filter and sort functions for Academic Years
+  const getFilteredAndSortedYears = () => {
+    if (!Array.isArray(academicYears)) return [];
+    
+    let filtered = (academicYears as AcademicYear[]).filter((year) => {
+      const matchesSearch = year.name.toLowerCase().includes(yearSearch.toLowerCase());
+      const matchesStatus = yearStatusFilter === 'all' || 
+        (yearStatusFilter === 'active' && year.isActive) ||
+        (yearStatusFilter === 'inactive' && !year.isActive);
+      return matchesSearch && matchesStatus;
+    });
+
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      if (yearSortBy === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (yearSortBy === 'yearNumber') {
+        comparison = a.yearNumber - b.yearNumber;
+      }
+      return yearSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  };
+
+  // Filter and sort functions for Terms
+  const getFilteredAndSortedTerms = () => {
+    if (!Array.isArray(academicTerms)) return [];
+    
+    let filtered = (academicTerms as AcademicTerm[]).filter((term) => {
+      const matchesSearch = term.name.toLowerCase().includes(termSearch.toLowerCase());
+      const matchesStatus = termStatusFilter === 'all' || 
+        (termStatusFilter === 'active' && term.isActive) ||
+        (termStatusFilter === 'inactive' && !term.isActive);
+      return matchesSearch && matchesStatus;
+    });
+
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      if (termSortBy === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (termSortBy === 'termNumber') {
+        comparison = a.termNumber - b.termNumber;
+      } else if (termSortBy === 'startDate') {
+        comparison = new Date(a.startDate).getTime() - new Date(b.startDate).getTime();
+      }
+      return termSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  };
+
+  // Filter and sort functions for Classes
+  const getFilteredAndSortedClasses = () => {
+    if (!Array.isArray(classes)) return [];
+    
+    let filtered = (classes as Class[]).filter((classItem) => {
+      const matchesSearch = classItem.name.toLowerCase().includes(classSearch.toLowerCase()) ||
+        classItem.subject.toLowerCase().includes(classSearch.toLowerCase());
+      const matchesStatus = classStatusFilter === 'all' || 
+        (classStatusFilter === 'active' && classItem.isActive) ||
+        (classStatusFilter === 'inactive' && !classItem.isActive);
+      const matchesDay = classDayFilter === 'all' || classItem.dayOfWeek === parseInt(classDayFilter);
+      return matchesSearch && matchesStatus && matchesDay;
+    });
+
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      if (classSortBy === 'name') {
+        comparison = a.name.localeCompare(b.name);
+      } else if (classSortBy === 'subject') {
+        comparison = a.subject.localeCompare(b.subject);
+      } else if (classSortBy === 'dayOfWeek') {
+        comparison = a.dayOfWeek - b.dayOfWeek;
+      }
+      return classSortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -595,6 +698,66 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </Dialog>
           </div>
 
+          {/* Search, Filter, Sort Controls */}
+          <Card className="border-2 border-gray-200 dark:border-gray-700">
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <Label className="text-sm font-medium mb-1 block">Search</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name..."
+                      value={yearSearch}
+                      onChange={(e) => setYearSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-year-search"
+                    />
+                  </div>
+                </div>
+                <div className="min-w-[150px]">
+                  <Label className="text-sm font-medium mb-1 block">Status</Label>
+                  <Select value={yearStatusFilter} onValueChange={setYearStatusFilter}>
+                    <SelectTrigger data-testid="select-year-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-[120px]">
+                    <Label className="text-sm font-medium mb-1 block">Sort By</Label>
+                    <Select value={yearSortBy} onValueChange={(v) => setYearSortBy(v as 'name' | 'yearNumber')}>
+                      <SelectTrigger data-testid="select-year-sort">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yearNumber">Year Number</SelectItem>
+                        <SelectItem value="name">Name</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setYearSortOrder(yearSortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="mt-5 px-2"
+                    data-testid="button-year-sort-order"
+                  >
+                    {yearSortOrder === 'asc' ? '↑' : '↓'}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Showing {getFilteredAndSortedYears().length} of {Array.isArray(academicYears) ? academicYears.length : 0} years
+              </p>
+            </CardContent>
+          </Card>
+
           {yearsLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -607,7 +770,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {(academicYears as AcademicYear[]).map((year: AcademicYear) => (
+              {getFilteredAndSortedYears().map((year: AcademicYear) => (
                 <Card key={year.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
@@ -689,13 +852,74 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </Dialog>
           </div>
 
+          {/* Search, Filter, Sort Controls */}
+          <Card className="border-2 border-gray-200 dark:border-gray-700">
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <Label className="text-sm font-medium mb-1 block">Search</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name..."
+                      value={termSearch}
+                      onChange={(e) => setTermSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-term-search"
+                    />
+                  </div>
+                </div>
+                <div className="min-w-[150px]">
+                  <Label className="text-sm font-medium mb-1 block">Status</Label>
+                  <Select value={termStatusFilter} onValueChange={setTermStatusFilter}>
+                    <SelectTrigger data-testid="select-term-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-[130px]">
+                    <Label className="text-sm font-medium mb-1 block">Sort By</Label>
+                    <Select value={termSortBy} onValueChange={(v) => setTermSortBy(v as 'name' | 'termNumber' | 'startDate')}>
+                      <SelectTrigger data-testid="select-term-sort">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="termNumber">Term Number</SelectItem>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="startDate">Start Date</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTermSortOrder(termSortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="mt-5 px-2"
+                    data-testid="button-term-sort-order"
+                  >
+                    {termSortOrder === 'asc' ? '↑' : '↓'}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Showing {getFilteredAndSortedTerms().length} of {Array.isArray(academicTerms) ? academicTerms.length : 0} terms
+              </p>
+            </CardContent>
+          </Card>
+
           {termsLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {(academicTerms as AcademicTerm[]).map((term: AcademicTerm) => (
+              {getFilteredAndSortedTerms().map((term: AcademicTerm) => (
                 <Card key={term.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
@@ -777,13 +1001,92 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             </Dialog>
           </div>
 
+          {/* Search, Filter, Sort Controls */}
+          <Card className="border-2 border-gray-200 dark:border-gray-700">
+            <CardContent className="pt-4">
+              <div className="flex flex-wrap gap-4 items-end">
+                <div className="flex-1 min-w-[200px]">
+                  <Label className="text-sm font-medium mb-1 block">Search</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name or subject..."
+                      value={classSearch}
+                      onChange={(e) => setClassSearch(e.target.value)}
+                      className="pl-9"
+                      data-testid="input-class-search"
+                    />
+                  </div>
+                </div>
+                <div className="min-w-[150px]">
+                  <Label className="text-sm font-medium mb-1 block">Status</Label>
+                  <Select value={classStatusFilter} onValueChange={setClassStatusFilter}>
+                    <SelectTrigger data-testid="select-class-status">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="inactive">Inactive</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="min-w-[150px]">
+                  <Label className="text-sm font-medium mb-1 block">Day</Label>
+                  <Select value={classDayFilter} onValueChange={setClassDayFilter}>
+                    <SelectTrigger data-testid="select-class-day">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Days</SelectItem>
+                      <SelectItem value="0">Sunday</SelectItem>
+                      <SelectItem value="1">Monday</SelectItem>
+                      <SelectItem value="2">Tuesday</SelectItem>
+                      <SelectItem value="3">Wednesday</SelectItem>
+                      <SelectItem value="4">Thursday</SelectItem>
+                      <SelectItem value="5">Friday</SelectItem>
+                      <SelectItem value="6">Saturday</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="min-w-[120px]">
+                    <Label className="text-sm font-medium mb-1 block">Sort By</Label>
+                    <Select value={classSortBy} onValueChange={(v) => setClassSortBy(v as 'name' | 'subject' | 'dayOfWeek')}>
+                      <SelectTrigger data-testid="select-class-sort">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="subject">Subject</SelectItem>
+                        <SelectItem value="dayOfWeek">Day of Week</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setClassSortOrder(classSortOrder === 'asc' ? 'desc' : 'asc')}
+                    className="mt-5 px-2"
+                    data-testid="button-class-sort-order"
+                  >
+                    {classSortOrder === 'asc' ? '↑' : '↓'}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-500 mt-2">
+                Showing {getFilteredAndSortedClasses().length} of {Array.isArray(classes) ? classes.length : 0} classes
+              </p>
+            </CardContent>
+          </Card>
+
           {classesLoading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <div className="grid gap-4">
-              {Array.isArray(classes) && classes.map((classItem: Class) => (
+              {getFilteredAndSortedClasses().map((classItem: Class) => (
                 <Card key={classItem.id} className="border border-gray-200 dark:border-gray-700">
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
