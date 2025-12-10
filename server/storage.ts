@@ -846,10 +846,12 @@ export class DatabaseStorage implements IStorage {
 
   async getCompanyStudentsByCompanyId(companyId: string): Promise<any[]> {
     try {
-      // Get students with direct company assignment
+      // Get students with direct company assignment, including class and tutor info
       const companyStudents = await db.select()
       .from(students)
       .innerJoin(users, eq(students.userId, users.id))
+      .leftJoin(classes, eq(students.classId, classes.id))
+      .leftJoin(tutors, eq(students.tutorId, tutors.id))
       .where(
         and(
           eq(students.companyId, companyId),
@@ -859,28 +861,52 @@ export class DatabaseStorage implements IStorage {
       )
       .orderBy(users.firstName, users.lastName);
 
-      // Transform the result to match expected structure
-      return companyStudents.map((row: any) => ({
-        id: row.students.id,
-        userId: row.students.userId,
-        gradeLevel: row.students.gradeLevel,
-        parentId: row.students.parentId,
-        tutorId: row.students.tutorId,
-        companyId: row.students.companyId,
-        classId: row.students.classId,
-        schoolName: row.students.schoolName,
-        dateOfBirth: row.students.dateOfBirth,
-        user: {
-          id: row.users.id,
-          email: row.users.email,
-          firstName: row.users.firstName,
-          lastName: row.users.lastName,
-          isActive: row.users.isActive,
-          createdAt: row.users.createdAt
-        }
-      }));
+      // Get tutor user info for display
+      const tutorUserIds = companyStudents
+        .filter((row: any) => row.tutors?.userId)
+        .map((row: any) => row.tutors.userId);
+      
+      const tutorUsers = tutorUserIds.length > 0 
+        ? await db.select().from(users).where(sql`${users.id} IN (${sql.join(tutorUserIds.map((id: string) => sql`${id}`), sql`, `)})`)
+        : [];
 
-      return companyStudents;
+      const tutorUserMap = new Map(tutorUsers.map((u: any) => [u.id, u]));
+
+      // Transform the result to match expected structure
+      return companyStudents.map((row: any) => {
+        const tutorUser = row.tutors?.userId ? tutorUserMap.get(row.tutors.userId) : null;
+        return {
+          id: row.students.id,
+          userId: row.students.userId,
+          gradeLevel: row.students.gradeLevel,
+          parentId: row.students.parentId,
+          tutorId: row.students.tutorId,
+          companyId: row.students.companyId,
+          classId: row.students.classId,
+          schoolName: row.students.schoolName,
+          dateOfBirth: row.students.dateOfBirth,
+          user: {
+            id: row.users.id,
+            email: row.users.email,
+            firstName: row.users.firstName,
+            lastName: row.users.lastName,
+            isActive: row.users.isActive,
+            createdAt: row.users.createdAt
+          },
+          class: row.classes ? {
+            id: row.classes.id,
+            name: row.classes.name,
+            academicYearId: row.classes.academicYearId
+          } : null,
+          tutor: row.tutors ? {
+            id: row.tutors.id,
+            user: tutorUser ? {
+              firstName: tutorUser.firstName,
+              lastName: tutorUser.lastName
+            } : null
+          } : null
+        };
+      });
     } catch (error) {
       console.error("Error fetching company students:", error);
       return [];

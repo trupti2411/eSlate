@@ -1127,7 +1127,7 @@ trailer<</Size 5/Root 1 0 R>>
       }
 
       // Clean the request body to only include allowed fields (simplified - direct class assignment)
-      const allowedFields = ['schoolName', 'classId', 'tutorId'];
+      const allowedFields = ['schoolName', 'classId', 'tutorId', 'gradeLevel'];
       const updateData: any = {};
       for (const field of allowedFields) {
         if (req.body[field] !== undefined) {
@@ -2060,6 +2060,72 @@ trailer<</Size 5/Root 1 0 R>>
     } catch (error) {
       console.error("Error updating tutor:", error);
       res.status(500).json({ message: "Failed to update tutor", error: (error as Error).message });
+    }
+  });
+
+  // Create student endpoint for company admins
+  app.post('/api/admin/create-student', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Company admin or admin access required" });
+      }
+
+      const { email, firstName, lastName, gradeLevel, schoolName, classId, tutorId, companyId } = req.body;
+
+      if (!email || !firstName || !lastName) {
+        return res.status(400).json({ message: "Email, first name, and last name are required" });
+      }
+
+      // Verify company admin has access to this company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      // Create user with student role
+      const { hashPassword } = await import('./customAuth');
+      const tempPassword = 'TempPass123!';
+      const hashedPassword = await hashPassword(tempPassword);
+
+      const newUser = await storage.createUserWithRole({
+        email,
+        firstName,
+        lastName,
+        password: hashedPassword,
+        role: 'student',
+        isActive: true,
+        isEmailVerified: true,
+      });
+
+      // Create student record with company association
+      await storage.createStudent({
+        userId: newUser.id,
+        companyId: companyId || null,
+        gradeLevel: gradeLevel || null,
+        schoolName: schoolName || null,
+        classId: classId || null,
+        tutorId: tutorId || null,
+        parentId: null,
+      });
+
+      res.json({ 
+        message: "Student created successfully", 
+        user: { ...newUser, password: undefined },
+        temporaryPassword: tempPassword
+      });
+    } catch (error) {
+      console.error("Error creating student:", error);
+      res.status(500).json({ message: "Failed to create student", error: (error as Error).message });
     }
   });
 

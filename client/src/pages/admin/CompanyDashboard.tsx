@@ -53,6 +53,8 @@ interface CompanyStudent {
   gradeLevel: string | null;
   parentId: string | null;
   tutorId: string | null;
+  classId: string | null;
+  schoolName: string | null;
   user: {
     id: string;
     email: string;
@@ -60,6 +62,18 @@ interface CompanyStudent {
     lastName: string;
     isActive: boolean;
     createdAt: string;
+  };
+  class?: {
+    id: string;
+    name: string;
+    academicYearId: string;
+  };
+  tutor?: {
+    id: string;
+    user?: {
+      firstName: string;
+      lastName: string;
+    };
   };
 }
 
@@ -71,9 +85,37 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'overview' | 'calendar' | 'tutors'>('overview');
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar' | 'tutors' | 'students'>('overview');
   const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
   const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
+  const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
+  const [isEditStudentOpen, setIsEditStudentOpen] = useState(false);
+  const [editingStudent, setEditingStudent] = useState<CompanyStudent | null>(null);
+  const [studentSortBy, setStudentSortBy] = useState<'name' | 'email' | 'class' | 'tutor'>('name');
+  const [studentSortOrder, setStudentSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [studentFilterClass, setStudentFilterClass] = useState<string>('all');
+  const [studentFilterTutor, setStudentFilterTutor] = useState<string>('all');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+
+  const [studentFormData, setStudentFormData] = useState({
+    email: "",
+    firstName: "",
+    lastName: "",
+    gradeLevel: "",
+    schoolName: "",
+    classId: "",
+    tutorId: "",
+  });
+
+  const [editStudentFormData, setEditStudentFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    gradeLevel: "",
+    schoolName: "",
+    classId: "",
+    tutorId: "",
+  });
 
   const [tutorFormData, setTutorFormData] = useState({
     email: "",
@@ -225,6 +267,138 @@ export default function CompanyDashboard() {
     }
   };
 
+  // Student CRUD mutations
+  const createStudentMutation = useMutation({
+    mutationFn: async (studentData: any) => {
+      return await apiRequest("/api/admin/create-student", "POST", studentData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/students`] });
+      setIsCreateStudentOpen(false);
+      setStudentFormData({ email: "", firstName: "", lastName: "", gradeLevel: "", schoolName: "", classId: "", tutorId: "" });
+      toast({ title: "Success", description: "Student created successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to create student", variant: "destructive" });
+    },
+  });
+
+  const updateStudentMutation = useMutation({
+    mutationFn: async ({ studentId, userId, data }: { studentId: string; userId: string; data: any }) => {
+      await apiRequest(`/api/admin/users/${userId}`, "PATCH", { firstName: data.firstName, lastName: data.lastName, email: data.email });
+      return await apiRequest(`/api/students/${studentId}`, "PATCH", { gradeLevel: data.gradeLevel, schoolName: data.schoolName, classId: data.classId || null, tutorId: data.tutorId || null });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/students`] });
+      setIsEditStudentOpen(false);
+      setEditingStudent(null);
+      toast({ title: "Success", description: "Student updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update student", variant: "destructive" });
+    },
+  });
+
+  const deleteStudentMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest(`/api/admin/users/${userId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/students`] });
+      toast({ title: "Success", description: "Student removed successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to remove student", variant: "destructive" });
+    },
+  });
+
+  const handleCreateStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    createStudentMutation.mutate({ ...studentFormData, companyId: companyAdmin?.companyId });
+  };
+
+  const handleEditStudent = (student: CompanyStudent) => {
+    setEditingStudent(student);
+    setEditStudentFormData({
+      firstName: student.user?.firstName || "",
+      lastName: student.user?.lastName || "",
+      email: student.user?.email || "",
+      gradeLevel: student.gradeLevel || "",
+      schoolName: student.schoolName || "",
+      classId: student.classId || "",
+      tutorId: student.tutorId || "",
+    });
+    setIsEditStudentOpen(true);
+  };
+
+  const handleUpdateStudent = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingStudent && editingStudent.userId) {
+      updateStudentMutation.mutate({ studentId: editingStudent.id, userId: editingStudent.userId, data: editStudentFormData });
+    }
+  };
+
+  const handleDeleteStudent = (student: CompanyStudent) => {
+    if (confirm(`Are you sure you want to remove ${student.user?.firstName} ${student.user?.lastName}?`)) {
+      deleteStudentMutation.mutate(student.userId);
+    }
+  };
+
+  // Sorting and filtering for students
+  const getFilteredAndSortedStudents = () => {
+    if (!students || !Array.isArray(students)) return [];
+    
+    let filtered = [...students];
+    
+    // Apply search filter
+    if (studentSearchTerm) {
+      const term = studentSearchTerm.toLowerCase();
+      filtered = filtered.filter((s: CompanyStudent) => 
+        s.user?.firstName?.toLowerCase().includes(term) ||
+        s.user?.lastName?.toLowerCase().includes(term) ||
+        s.user?.email?.toLowerCase().includes(term)
+      );
+    }
+    
+    // Apply class filter
+    if (studentFilterClass !== 'all') {
+      filtered = filtered.filter((s: CompanyStudent) => s.classId === studentFilterClass);
+    }
+    
+    // Apply tutor filter
+    if (studentFilterTutor !== 'all') {
+      if (studentFilterTutor === 'unassigned') {
+        filtered = filtered.filter((s: CompanyStudent) => !s.tutorId);
+      } else {
+        filtered = filtered.filter((s: CompanyStudent) => s.tutorId === studentFilterTutor);
+      }
+    }
+    
+    // Apply sorting
+    filtered.sort((a: CompanyStudent, b: CompanyStudent) => {
+      let comparison = 0;
+      switch (studentSortBy) {
+        case 'name':
+          comparison = `${a.user?.firstName} ${a.user?.lastName}`.localeCompare(`${b.user?.firstName} ${b.user?.lastName}`);
+          break;
+        case 'email':
+          comparison = (a.user?.email || '').localeCompare(b.user?.email || '');
+          break;
+        case 'class':
+          comparison = (a.class?.name || 'zzz').localeCompare(b.class?.name || 'zzz');
+          break;
+        case 'tutor':
+          const aTutor = a.tutor?.user ? `${a.tutor.user.firstName} ${a.tutor.user.lastName}` : 'zzz';
+          const bTutor = b.tutor?.user ? `${b.tutor.user.firstName} ${b.tutor.user.lastName}` : 'zzz';
+          comparison = aTutor.localeCompare(bTutor);
+          break;
+      }
+      return studentSortOrder === 'asc' ? comparison : -comparison;
+    });
+    
+    return filtered;
+  };
+
   const handleAssignTutor = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedStudentId && tutorAssignmentData.tutorId) {
@@ -311,6 +485,15 @@ export default function CompanyDashboard() {
             >
               <Users className="h-4 w-4 mr-2" />
               Manage Tutors
+            </Button>
+            <Button
+              variant={mainTab === 'students' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('students')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'students' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-students"
+            >
+              <GraduationCap className="h-4 w-4 mr-2" />
+              Manage Students
             </Button>
             <Button
               variant={mainTab === 'calendar' ? 'default' : 'ghost'}
@@ -660,6 +843,334 @@ export default function CompanyDashboard() {
           </Card>
         </div>
       )}
+
+      {mainTab === 'students' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-black">Manage Students</h2>
+              <p className="text-gray-600">Add, edit, or remove students from your organization</p>
+            </div>
+            <Dialog open={isCreateStudentOpen} onOpenChange={setIsCreateStudentOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-black text-white border-2 border-black hover:bg-gray-800" data-testid="button-add-student">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add New Student
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Student</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateStudent} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="studentFirstName">First Name</Label>
+                      <Input id="studentFirstName" value={studentFormData.firstName} onChange={(e) => setStudentFormData({ ...studentFormData, firstName: e.target.value })} required />
+                    </div>
+                    <div>
+                      <Label htmlFor="studentLastName">Last Name</Label>
+                      <Input id="studentLastName" value={studentFormData.lastName} onChange={(e) => setStudentFormData({ ...studentFormData, lastName: e.target.value })} required />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="studentEmail">Email</Label>
+                    <Input id="studentEmail" type="email" value={studentFormData.email} onChange={(e) => setStudentFormData({ ...studentFormData, email: e.target.value })} required />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="gradeLevel">Year / Grade Level</Label>
+                      <Input id="gradeLevel" value={studentFormData.gradeLevel} onChange={(e) => setStudentFormData({ ...studentFormData, gradeLevel: e.target.value })} placeholder="e.g., Year 10" />
+                    </div>
+                    <div>
+                      <Label htmlFor="schoolName">School Name</Label>
+                      <Input id="schoolName" value={studentFormData.schoolName} onChange={(e) => setStudentFormData({ ...studentFormData, schoolName: e.target.value })} placeholder="e.g., St. Mary's" />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="studentClass">Assign to Class</Label>
+                    <Select value={studentFormData.classId} onValueChange={(value) => setStudentFormData({ ...studentFormData, classId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a class (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No class</SelectItem>
+                        {Array.isArray(classes) && classes.map((cls: any) => (
+                          <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="studentTutor">Assign Tutor</Label>
+                    <Select value={studentFormData.tutorId} onValueChange={(value) => setStudentFormData({ ...studentFormData, tutorId: value })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a tutor (optional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">No tutor</SelectItem>
+                        {Array.isArray(tutors) && tutors.map((tutor: CompanyTutor) => (
+                          <SelectItem key={tutor.id} value={tutor.id}>
+                            {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : 'Unknown'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800" disabled={createStudentMutation.isPending}>
+                    {createStudentMutation.isPending ? "Creating..." : "Create Student"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Filters and Sorting */}
+          <Card className="border-2 border-black mb-6">
+            <CardContent className="pt-4">
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                <div className="md:col-span-2">
+                  <Label htmlFor="studentSearch" className="text-xs text-gray-600">Search</Label>
+                  <Input
+                    id="studentSearch"
+                    placeholder="Search by name or email..."
+                    value={studentSearchTerm}
+                    onChange={(e) => setStudentSearchTerm(e.target.value)}
+                    className="border-black"
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600">Filter by Class</Label>
+                  <Select value={studentFilterClass} onValueChange={setStudentFilterClass}>
+                    <SelectTrigger className="border-black">
+                      <SelectValue placeholder="All Classes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Classes</SelectItem>
+                      {Array.isArray(classes) && classes.map((cls: any) => (
+                        <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600">Filter by Tutor</Label>
+                  <Select value={studentFilterTutor} onValueChange={setStudentFilterTutor}>
+                    <SelectTrigger className="border-black">
+                      <SelectValue placeholder="All Tutors" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Tutors</SelectItem>
+                      <SelectItem value="unassigned">Unassigned</SelectItem>
+                      {Array.isArray(tutors) && tutors.map((tutor: CompanyTutor) => (
+                        <SelectItem key={tutor.id} value={tutor.id}>
+                          {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : 'Unknown'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-600">Sort By</Label>
+                  <div className="flex gap-1">
+                    <Select value={studentSortBy} onValueChange={(v: any) => setStudentSortBy(v)}>
+                      <SelectTrigger className="border-black flex-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="name">Name</SelectItem>
+                        <SelectItem value="email">Email</SelectItem>
+                        <SelectItem value="class">Class</SelectItem>
+                        <SelectItem value="tutor">Tutor</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setStudentSortOrder(studentSortOrder === 'asc' ? 'desc' : 'asc')}
+                      className="border-black px-2"
+                    >
+                      {studentSortOrder === 'asc' ? '↑' : '↓'}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Students List */}
+          <Card className="border-2 border-black">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5" />
+                All Students ({getFilteredAndSortedStudents().length} of {Array.isArray(students) ? students.length : 0})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {getFilteredAndSortedStudents().length > 0 ? (
+                <div className="space-y-3">
+                  {getFilteredAndSortedStudents().map((student: CompanyStudent) => (
+                    <div key={student.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-black transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <button
+                            onClick={() => handleEditStudent(student)}
+                            className="text-left hover:underline"
+                            data-testid={`student-name-${student.id}`}
+                          >
+                            <p className="font-semibold text-black text-lg">
+                              {student.user?.firstName} {student.user?.lastName}
+                            </p>
+                          </button>
+                          <p className="text-sm text-gray-600">{student.user?.email}</p>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {student.gradeLevel && (
+                              <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">
+                                {student.gradeLevel}
+                              </Badge>
+                            )}
+                            {student.schoolName && (
+                              <Badge variant="outline" className="border-gray-400">
+                                {student.schoolName}
+                              </Badge>
+                            )}
+                            {student.class?.name ? (
+                              <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
+                                {student.class.name}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-orange-400 text-orange-600">
+                                No class
+                              </Badge>
+                            )}
+                            {student.tutor?.user ? (
+                              <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50">
+                                Tutor: {student.tutor.user.firstName} {student.tutor.user.lastName}
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="border-red-400 text-red-600">
+                                No tutor
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditStudent(student)}
+                            className="border-black"
+                            data-testid={`button-edit-student-${student.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteStudent(student)}
+                            className="border-red-500 text-red-500 hover:bg-red-50"
+                            data-testid={`button-delete-student-${student.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <GraduationCap className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-4">
+                    {studentSearchTerm || studentFilterClass !== 'all' || studentFilterTutor !== 'all' 
+                      ? "No students match your filters" 
+                      : "No students added yet"}
+                  </p>
+                  {!studentSearchTerm && studentFilterClass === 'all' && studentFilterTutor === 'all' && (
+                    <Button onClick={() => setIsCreateStudentOpen(true)} className="bg-black text-white hover:bg-gray-800">
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Your First Student
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Student Dialog */}
+      <Dialog open={isEditStudentOpen} onOpenChange={setIsEditStudentOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Student Details</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateStudent} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editStudentFirstName">First Name</Label>
+                <Input id="editStudentFirstName" value={editStudentFormData.firstName} onChange={(e) => setEditStudentFormData({ ...editStudentFormData, firstName: e.target.value })} required />
+              </div>
+              <div>
+                <Label htmlFor="editStudentLastName">Last Name</Label>
+                <Input id="editStudentLastName" value={editStudentFormData.lastName} onChange={(e) => setEditStudentFormData({ ...editStudentFormData, lastName: e.target.value })} required />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="editStudentEmail">Email</Label>
+              <Input id="editStudentEmail" type="email" value={editStudentFormData.email} onChange={(e) => setEditStudentFormData({ ...editStudentFormData, email: e.target.value })} required />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editGradeLevel">Year / Grade Level</Label>
+                <Input id="editGradeLevel" value={editStudentFormData.gradeLevel} onChange={(e) => setEditStudentFormData({ ...editStudentFormData, gradeLevel: e.target.value })} placeholder="e.g., Year 10" />
+              </div>
+              <div>
+                <Label htmlFor="editSchoolName">School Name</Label>
+                <Input id="editSchoolName" value={editStudentFormData.schoolName} onChange={(e) => setEditStudentFormData({ ...editStudentFormData, schoolName: e.target.value })} placeholder="e.g., St. Mary's" />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="editStudentClass">Assign to Class</Label>
+              <Select value={editStudentFormData.classId} onValueChange={(value) => setEditStudentFormData({ ...editStudentFormData, classId: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a class (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No class</SelectItem>
+                  {Array.isArray(classes) && classes.map((cls: any) => (
+                    <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="editStudentTutor">Assign Tutor</Label>
+              <Select value={editStudentFormData.tutorId} onValueChange={(value) => setEditStudentFormData({ ...editStudentFormData, tutorId: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a tutor (optional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No tutor</SelectItem>
+                  {Array.isArray(tutors) && tutors.map((tutor: CompanyTutor) => (
+                    <SelectItem key={tutor.id} value={tutor.id}>
+                      {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : 'Unknown'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1 border-black" onClick={() => setIsEditStudentOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1 bg-black text-white hover:bg-gray-800" disabled={updateStudentMutation.isPending}>
+                {updateStudentMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Tutor Dialog */}
       <Dialog open={isEditTutorOpen} onOpenChange={setIsEditTutorOpen}>
