@@ -706,38 +706,6 @@ export default function CompanyDashboard() {
               </Card>
             )}
 
-            {/* Recent Students */}
-            <Card className="border-2 border-black">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <GraduationCap className="h-5 w-5" />
-                  Students Needing Assignment ({Array.isArray(students) ? students.filter((s: any) => !s.tutorId).length : 0})
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {students && Array.isArray(students) && students.filter((s: any) => !s.tutorId).length > 0 ? (
-                  <div className="space-y-2">
-                    {students.filter((s: any) => !s.tutorId).slice(0, 5).map((student: CompanyStudent) => (
-                      <div key={student.id} className="p-3 bg-gray-50 rounded border border-gray-200 hover:border-black transition-colors flex items-center justify-between">
-                        <div className="flex-1">
-                          <p className="font-semibold text-black">{student.user.firstName} {student.user.lastName}</p>
-                          <p className="text-xs text-gray-600">{student.user.email}</p>
-                        </div>
-                        <Button size="sm" onClick={() => openTutorAssignmentDialog(student.id)} className="bg-black text-white hover:bg-gray-800">
-                          Assign
-                          <ArrowRight className="h-3 w-3 ml-2" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-3 opacity-50" />
-                    <p className="text-gray-600">All students assigned!</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
         </div>
       </div>
       )}
