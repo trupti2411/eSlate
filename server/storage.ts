@@ -1296,9 +1296,36 @@ export class DatabaseStorage implements IStorage {
   }
 
   async permanentlyDeleteAcademicTerm(id: string): Promise<void> {
-    // First delete all classes in this term
+    // First, get all assignments for this term to delete their submissions
+    const termAssignments = await db.select().from(assignments).where(eq(assignments.termId, id));
+    
+    // Delete submissions for each assignment
+    for (const assignment of termAssignments) {
+      await db.delete(submissions).where(eq(submissions.assignmentId, assignment.id));
+    }
+    
+    // Delete all assignments for this term
+    await db.delete(assignments).where(eq(assignments.termId, id));
+    
+    // Get all classes in this term
+    const termClasses = await db.select().from(classes).where(eq(classes.termId, id));
+    
+    for (const classItem of termClasses) {
+      // Delete class sessions and attendance for each class
+      const classSess = await db.select().from(classSessions).where(eq(classSessions.classId, classItem.id));
+      for (const session of classSess) {
+        await db.delete(sessionAttendance).where(eq(sessionAttendance.sessionId, session.id));
+      }
+      await db.delete(classSessions).where(eq(classSessions.classId, classItem.id));
+      
+      // Delete student class assignments
+      await db.delete(studentClassAssignments).where(eq(studentClassAssignments.classId, classItem.id));
+    }
+    
+    // Delete all classes in this term
     await db.delete(classes).where(eq(classes.termId, id));
-    // Then delete the term itself
+    
+    // Finally delete the term itself
     await db.delete(academicTerms).where(eq(academicTerms.id, id));
   }
 
@@ -1346,8 +1373,27 @@ export class DatabaseStorage implements IStorage {
   }
 
   async permanentlyDeleteClass(id: string): Promise<void> {
-    // Delete student class assignments first
+    // First, get all assignments for this class to delete their submissions
+    const classAssignments = await db.select().from(assignments).where(eq(assignments.classId, id));
+    
+    // Delete submissions for each assignment
+    for (const assignment of classAssignments) {
+      await db.delete(submissions).where(eq(submissions.assignmentId, assignment.id));
+    }
+    
+    // Delete all assignments for this class
+    await db.delete(assignments).where(eq(assignments.classId, id));
+    
+    // Delete student class assignments
     await db.delete(studentClassAssignments).where(eq(studentClassAssignments.classId, id));
+    
+    // Delete class sessions and attendance
+    const classSess = await db.select().from(classSessions).where(eq(classSessions.classId, id));
+    for (const session of classSess) {
+      await db.delete(sessionAttendance).where(eq(sessionAttendance.sessionId, session.id));
+    }
+    await db.delete(classSessions).where(eq(classSessions.classId, id));
+    
     // Then delete the class itself
     await db.delete(classes).where(eq(classes.id, id));
   }
