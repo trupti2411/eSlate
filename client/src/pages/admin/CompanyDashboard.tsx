@@ -14,6 +14,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
+import { WorksheetManagement } from "./WorksheetManagement";
+import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
 import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X } from "lucide-react";
 
 interface CompanyAdmin {
@@ -95,7 +97,7 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'overview' | 'calendar' | 'tutors' | 'students' | 'academic'>('overview');
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'worksheets' | 'assignments'>('overview');
   const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
   const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -582,6 +584,24 @@ export default function CompanyDashboard() {
               Academic Setup
             </Button>
             <Button
+              variant={mainTab === 'worksheets' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('worksheets')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'worksheets' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-worksheets"
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Worksheets
+            </Button>
+            <Button
+              variant={mainTab === 'assignments' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('assignments')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'assignments' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-assignments"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Assignments
+            </Button>
+            <Button
               variant={mainTab === 'calendar' ? 'default' : 'ghost'}
               onClick={() => setMainTab('calendar')}
               className={`rounded-b-none border-b-2 ${mainTab === 'calendar' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
@@ -596,23 +616,6 @@ export default function CompanyDashboard() {
 
       {mainTab === 'overview' && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Actions */}
-        <div className="flex gap-4 mb-8 flex-wrap">
-          <Link href="/company/worksheets">
-            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold" data-testid="button-worksheets">
-              <BookOpen className="h-5 w-5 mr-2" />
-              Worksheets
-            </Button>
-          </Link>
-
-          <Link href="/company/assignments">
-            <Button variant="outline" className="border-2 border-black bg-white text-black hover:bg-gray-100 py-3 px-6 font-semibold">
-              <FileText className="h-5 w-5 mr-2" />
-              View Assignments
-            </Button>
-          </Link>
-        </div>
-
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
@@ -1307,10 +1310,24 @@ export default function CompanyDashboard() {
       </Dialog>
 
       {mainTab === 'academic' && companyAdmin?.companyId && company && (
-        <AcademicManagement 
-          companyId={companyAdmin.companyId} 
-          companyName={company.name}
-        />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <AcademicManagement 
+            companyId={companyAdmin.companyId} 
+            companyName={company.name}
+          />
+        </div>
+      )}
+
+      {mainTab === 'worksheets' && companyAdmin?.companyId && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <WorksheetManagement companyId={companyAdmin.companyId} />
+        </div>
+      )}
+
+      {mainTab === 'assignments' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <AssignmentManagement />
+        </div>
       )}
 
       {mainTab === 'calendar' && (
