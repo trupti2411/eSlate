@@ -1966,6 +1966,70 @@ trailer<</Size 5/Root 1 0 R>>
       res.status(500).json({ message: "Failed to fetch stats" });
     }
   });
+
+  // Create tutor endpoint for company admins
+  app.post('/api/admin/create-tutor', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Company admin or admin access required" });
+      }
+
+      const { email, firstName, lastName, specialization, qualifications, companyId } = req.body;
+
+      if (!email || !firstName || !lastName) {
+        return res.status(400).json({ message: "Email, first name, and last name are required" });
+      }
+
+      // Verify company admin has access to this company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      }
+
+      // Check if user already exists
+      const existingUser = await storage.getUserByEmail(email);
+      if (existingUser) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+
+      // Create user with tutor role
+      const { hashPassword } = await import('./customAuth');
+      const tempPassword = 'TempPass123!';
+      const hashedPassword = await hashPassword(tempPassword);
+
+      const newUser = await storage.createUser({
+        email,
+        firstName,
+        lastName,
+        password: hashedPassword,
+        role: 'tutor',
+        isActive: true,
+        isEmailVerified: true,
+      });
+
+      // Create tutor record with company association
+      await storage.createTutor({
+        userId: newUser.id,
+        companyId: companyId || null,
+        specialization: specialization || null,
+        qualifications: qualifications || null,
+        isVerified: false,
+      });
+
+      res.json({ 
+        message: "Tutor created successfully", 
+        user: { ...newUser, password: undefined },
+        temporaryPassword: tempPassword
+      });
+    } catch (error) {
+      console.error("Error creating tutor:", error);
+      res.status(500).json({ message: "Failed to create tutor", error: (error as Error).message });
+    }
+  });
   
   app.get('/api/admin/users', isAuthenticated, async (req: any, res: any) => {
     try {
