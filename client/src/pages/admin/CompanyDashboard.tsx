@@ -538,7 +538,27 @@ export default function CompanyDashboard() {
                 <p className="text-gray-500 text-sm">{company?.name || "Loading..."}</p>
               </div>
             </div>
-            <Building2 className="h-12 w-12 text-black opacity-10" />
+            {/* Company Contact Info */}
+            {company && (
+              <div className="hidden md:flex items-center gap-6 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Mail className="h-4 w-4" />
+                  <span>{company.contactEmail}</span>
+                </div>
+                {company.contactPhone && (
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-4 w-4" />
+                    <span>{company.contactPhone}</span>
+                  </div>
+                )}
+                {company.address && (
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    <span className="max-w-[200px] truncate">{company.address}</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -617,99 +637,59 @@ export default function CompanyDashboard() {
       {mainTab === 'overview' && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Tutors
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">{Array.isArray(tutors) ? tutors.length : 0}</div>
-              <p className="text-xs text-gray-600 mt-1">Active staff</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                Students
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">{Array.isArray(students) ? students.length : 0}</div>
-              <p className="text-xs text-gray-600 mt-1">Enrolled</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <CheckCircle className="h-4 w-4" />
-                Assigned
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">
-                {Array.isArray(students) ? students.filter((s: any) => s.tutorId).length : 0}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card className="border-2 border-black bg-white">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2">
+                <Users className="h-5 w-5 text-gray-600" />
+                <div>
+                  <div className="text-2xl font-bold text-black">{Array.isArray(tutors) ? tutors.length : 0}</div>
+                  <p className="text-xs text-gray-600">Tutors</p>
+                </div>
               </div>
-              <p className="text-xs text-gray-600 mt-1">With tutors</p>
             </CardContent>
           </Card>
-
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <BookOpen className="h-4 w-4" />
-                Pending
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">
-                {Array.isArray(students) ? students.filter((s: any) => !s.tutorId).length : 0}
+          <Card className="border-2 border-black bg-white">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5 text-gray-600" />
+                <div>
+                  <div className="text-2xl font-bold text-black">{Array.isArray(students) ? students.length : 0}</div>
+                  <p className="text-xs text-gray-600">Students</p>
+                </div>
               </div>
-              <p className="text-xs text-gray-600 mt-1">Need assignment</p>
+            </CardContent>
+          </Card>
+          <Card className="border-2 border-black bg-white">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-gray-600" />
+                <div>
+                  <div className="text-2xl font-bold text-black">
+                    {Array.isArray(students) ? students.filter((s: any) => s.tutorId).length : 0}
+                  </div>
+                  <p className="text-xs text-gray-600">Assigned</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border-2 border-black bg-white">
+            <CardContent className="pt-4 pb-3">
+              <div className="flex items-center gap-2">
+                <BookOpen className="h-5 w-5 text-gray-600" />
+                <div>
+                  <div className="text-2xl font-bold text-black">
+                    {Array.isArray(students) ? students.filter((s: any) => !s.tutorId).length : 0}
+                  </div>
+                  <p className="text-xs text-gray-600">Pending</p>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Company Info */}
-            {company && (
-              <Card className="border-2 border-black">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Company Information
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div>
-                    <p className="text-xs text-gray-600">Company</p>
-                    <p className="font-semibold text-black">{company.name}</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <p className="text-xs text-gray-600 flex items-center gap-1"><Mail className="h-3 w-3" /> Email</p>
-                      <p className="font-medium text-sm text-black">{company.contactEmail}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-600 flex items-center gap-1"><Phone className="h-3 w-3" /> Phone</p>
-                      <p className="font-medium text-sm text-black">{company.contactPhone || 'N/A'}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-xs text-gray-600 flex items-center gap-1"><MapPin className="h-3 w-3" /> Address</p>
-                    <p className="font-medium text-sm text-black">{company.address || 'Not provided'}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-        </div>
+        {/* Calendar with Class & Tutor Info */}
+        <CompanyCalendarDashboard />
       </div>
       )}
 
