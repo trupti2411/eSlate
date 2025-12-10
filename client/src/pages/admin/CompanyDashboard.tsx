@@ -97,7 +97,7 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'worksheets' | 'assignments'>('overview');
+  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'worksheets' | 'assignments'>('dashboard');
   const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
   const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -568,12 +568,21 @@ export default function CompanyDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1">
             <Button
+              variant={mainTab === 'dashboard' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('dashboard')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'dashboard' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-dashboard"
+            >
+              <LayoutDashboard className="h-4 w-4 mr-2" />
+              Dashboard
+            </Button>
+            <Button
               variant={mainTab === 'overview' ? 'default' : 'ghost'}
               onClick={() => setMainTab('overview')}
               className={`rounded-b-none border-b-2 ${mainTab === 'overview' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-overview"
             >
-              <LayoutDashboard className="h-4 w-4 mr-2" />
+              <Calendar className="h-4 w-4 mr-2" />
               Overview
             </Button>
             <Button
@@ -634,10 +643,11 @@ export default function CompanyDashboard() {
         </div>
       </div>
 
-      {mainTab === 'overview' && (
+      {mainTab === 'dashboard' && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h2 className="text-2xl font-bold text-black mb-6">Dashboard</h2>
         {/* Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card className="border-2 border-black bg-white">
             <CardContent className="pt-4 pb-3">
               <div className="flex items-center gap-2">
@@ -687,8 +697,12 @@ export default function CompanyDashboard() {
             </CardContent>
           </Card>
         </div>
+      </div>
+      )}
 
-        {/* Calendar with Class & Tutor Info */}
+      {mainTab === 'overview' && (
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Monthly Calendar with Class & Tutor Info */}
         <CompanyCalendarDashboard />
       </div>
       )}
