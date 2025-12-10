@@ -13,7 +13,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
@@ -71,12 +71,22 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'overview' | 'calendar'>('overview');
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar' | 'tutors'>('overview');
+  const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
+  const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
 
   const [tutorFormData, setTutorFormData] = useState({
     email: "",
     firstName: "",
     lastName: "",
+    specialization: "",
+    qualifications: "",
+  });
+
+  const [editTutorFormData, setEditTutorFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
     specialization: "",
     qualifications: "",
   });
@@ -156,10 +166,63 @@ export default function CompanyDashboard() {
     },
   });
 
+  const updateTutorMutation = useMutation({
+    mutationFn: async ({ tutorId, userId, data }: { tutorId: string; userId: string; data: any }) => {
+      await apiRequest(`/api/admin/users/${userId}`, "PATCH", { firstName: data.firstName, lastName: data.lastName, email: data.email });
+      return await apiRequest(`/api/tutors/${tutorId}`, "PATCH", { specialization: data.specialization, qualifications: data.qualifications });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/tutors`] });
+      setIsEditTutorOpen(false);
+      setEditingTutor(null);
+      toast({ title: "Success", description: "Tutor updated successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to update tutor", variant: "destructive" });
+    },
+  });
+
+  const deleteTutorMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest(`/api/admin/users/${userId}`, "DELETE");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/tutors`] });
+      toast({ title: "Success", description: "Tutor removed successfully" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error.message || "Failed to remove tutor", variant: "destructive" });
+    },
+  });
 
   const handleCreateTutor = (e: React.FormEvent) => {
     e.preventDefault();
     createTutorMutation.mutate({ ...tutorFormData, companyId: companyAdmin?.companyId });
+  };
+
+  const handleEditTutor = (tutor: CompanyTutor) => {
+    setEditingTutor(tutor);
+    setEditTutorFormData({
+      firstName: tutor.user?.firstName || "",
+      lastName: tutor.user?.lastName || "",
+      email: tutor.user?.email || "",
+      specialization: tutor.specialization || "",
+      qualifications: tutor.qualifications || "",
+    });
+    setIsEditTutorOpen(true);
+  };
+
+  const handleUpdateTutor = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingTutor && editingTutor.userId) {
+      updateTutorMutation.mutate({ tutorId: editingTutor.id, userId: editingTutor.userId, data: editTutorFormData });
+    }
+  };
+
+  const handleDeleteTutor = (tutor: CompanyTutor) => {
+    if (confirm(`Are you sure you want to remove ${tutor.user?.firstName} ${tutor.user?.lastName}?`)) {
+      deleteTutorMutation.mutate(tutor.userId);
+    }
   };
 
   const handleAssignTutor = (e: React.FormEvent) => {
@@ -241,6 +304,15 @@ export default function CompanyDashboard() {
               Overview
             </Button>
             <Button
+              variant={mainTab === 'tutors' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('tutors')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'tutors' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-tutors"
+            >
+              <Users className="h-4 w-4 mr-2" />
+              Manage Tutors
+            </Button>
+            <Button
               variant={mainTab === 'calendar' ? 'default' : 'ghost'}
               onClick={() => setMainTab('calendar')}
               className={`rounded-b-none border-b-2 ${mainTab === 'calendar' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
@@ -257,54 +329,6 @@ export default function CompanyDashboard() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Quick Actions */}
         <div className="flex gap-4 mb-8 flex-wrap">
-          <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold">
-                <UserPlus className="h-5 w-5 mr-2" />
-                Add Tutor
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Tutor</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleCreateTutor} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="firstName">First Name</Label>
-                    <Input id="firstName" value={tutorFormData.firstName} onChange={(e) => setTutorFormData({ ...tutorFormData, firstName: e.target.value })} required />
-                  </div>
-                  <div>
-                    <Label htmlFor="lastName">Last Name</Label>
-                    <Input id="lastName" value={tutorFormData.lastName} onChange={(e) => setTutorFormData({ ...tutorFormData, lastName: e.target.value })} required />
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={tutorFormData.email} onChange={(e) => setTutorFormData({ ...tutorFormData, email: e.target.value })} required />
-                </div>
-                <div>
-                  <Label htmlFor="specialization">Specialization</Label>
-                  <Input id="specialization" value={tutorFormData.specialization} onChange={(e) => setTutorFormData({ ...tutorFormData, specialization: e.target.value })} placeholder="e.g., Mathematics" />
-                </div>
-                <div>
-                  <Label htmlFor="qualifications">Qualifications</Label>
-                  <Input id="qualifications" value={tutorFormData.qualifications} onChange={(e) => setTutorFormData({ ...tutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics" />
-                </div>
-                <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800" disabled={createTutorMutation.isPending}>
-                  {createTutorMutation.isPending ? "Creating..." : "Create Tutor"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
-
-          <Link href="/company/tutors">
-            <Button variant="outline" className="border-2 border-black bg-white text-black hover:bg-gray-100 py-3 px-6 font-semibold">
-              <Users className="h-5 w-5 mr-2" />
-              Manage Tutors
-            </Button>
-          </Link>
-
           <Link href="/company/worksheets">
             <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold" data-testid="button-worksheets">
               <BookOpen className="h-5 w-5 mr-2" />
@@ -511,6 +535,172 @@ export default function CompanyDashboard() {
         </div>
       </div>
       )}
+
+      {mainTab === 'tutors' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-black">Manage Tutors</h2>
+              <p className="text-gray-600">Add, edit, or remove tutors from your organization</p>
+            </div>
+            <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-black text-white border-2 border-black hover:bg-gray-800" data-testid="button-add-tutor">
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Add New Tutor
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Tutor</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateTutor} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="firstName">First Name</Label>
+                      <Input id="firstName" value={tutorFormData.firstName} onChange={(e) => setTutorFormData({ ...tutorFormData, firstName: e.target.value })} required />
+                    </div>
+                    <div>
+                      <Label htmlFor="lastName">Last Name</Label>
+                      <Input id="lastName" value={tutorFormData.lastName} onChange={(e) => setTutorFormData({ ...tutorFormData, lastName: e.target.value })} required />
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={tutorFormData.email} onChange={(e) => setTutorFormData({ ...tutorFormData, email: e.target.value })} required />
+                  </div>
+                  <div>
+                    <Label htmlFor="specialization">Specialization</Label>
+                    <Input id="specialization" value={tutorFormData.specialization} onChange={(e) => setTutorFormData({ ...tutorFormData, specialization: e.target.value })} placeholder="e.g., Mathematics" />
+                  </div>
+                  <div>
+                    <Label htmlFor="qualifications">Qualifications</Label>
+                    <Input id="qualifications" value={tutorFormData.qualifications} onChange={(e) => setTutorFormData({ ...tutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics" />
+                  </div>
+                  <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800" disabled={createTutorMutation.isPending}>
+                    {createTutorMutation.isPending ? "Creating..." : "Create Tutor"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          {/* Tutors List */}
+          <Card className="border-2 border-black">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                All Tutors ({Array.isArray(tutors) ? tutors.length : 0})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {tutors && Array.isArray(tutors) && tutors.length > 0 ? (
+                <div className="space-y-3">
+                  {tutors.map((tutor: CompanyTutor) => (
+                    <div key={tutor.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-black transition-colors">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <button
+                            onClick={() => handleEditTutor(tutor)}
+                            className="text-left hover:underline"
+                            data-testid={`tutor-name-${tutor.id}`}
+                          >
+                            <p className="font-semibold text-black text-lg">
+                              {tutor.user?.firstName} {tutor.user?.lastName}
+                            </p>
+                          </button>
+                          <p className="text-sm text-gray-600">{tutor.user?.email}</p>
+                          <div className="flex gap-4 mt-2">
+                            {tutor.specialization && (
+                              <span className="text-xs bg-gray-200 px-2 py-1 rounded">{tutor.specialization}</span>
+                            )}
+                            {tutor.qualifications && (
+                              <span className="text-xs text-gray-500">{tutor.qualifications}</span>
+                            )}
+                            <Badge variant={tutor.isVerified ? "default" : "secondary"} className={tutor.isVerified ? "bg-green-100 text-green-800" : ""}>
+                              {tutor.isVerified ? "Verified" : "Pending"}
+                            </Badge>
+                          </div>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEditTutor(tutor)}
+                            className="border-black"
+                            data-testid={`button-edit-tutor-${tutor.id}`}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteTutor(tutor)}
+                            className="border-red-500 text-red-500 hover:bg-red-50"
+                            data-testid={`button-delete-tutor-${tutor.id}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-4">No tutors added yet</p>
+                  <Button onClick={() => setIsCreateTutorOpen(true)} className="bg-black text-white hover:bg-gray-800">
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Add Your First Tutor
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Edit Tutor Dialog */}
+      <Dialog open={isEditTutorOpen} onOpenChange={setIsEditTutorOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Tutor Details</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdateTutor} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="editFirstName">First Name</Label>
+                <Input id="editFirstName" value={editTutorFormData.firstName} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, firstName: e.target.value })} required />
+              </div>
+              <div>
+                <Label htmlFor="editLastName">Last Name</Label>
+                <Input id="editLastName" value={editTutorFormData.lastName} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, lastName: e.target.value })} required />
+              </div>
+            </div>
+            <div>
+              <Label htmlFor="editEmail">Email</Label>
+              <Input id="editEmail" type="email" value={editTutorFormData.email} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, email: e.target.value })} required />
+            </div>
+            <div>
+              <Label htmlFor="editSpecialization">Specialization</Label>
+              <Input id="editSpecialization" value={editTutorFormData.specialization} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, specialization: e.target.value })} placeholder="e.g., Mathematics" />
+            </div>
+            <div>
+              <Label htmlFor="editQualifications">Qualifications</Label>
+              <Input id="editQualifications" value={editTutorFormData.qualifications} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics" />
+            </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="outline" className="flex-1 border-black" onClick={() => setIsEditTutorOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1 bg-black text-white hover:bg-gray-800" disabled={updateTutorMutation.isPending}>
+                {updateTutorMutation.isPending ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {mainTab === 'calendar' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

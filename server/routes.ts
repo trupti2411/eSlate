@@ -2030,6 +2030,57 @@ trailer<</Size 5/Root 1 0 R>>
       res.status(500).json({ message: "Failed to create tutor", error: (error as Error).message });
     }
   });
+
+  // Update tutor endpoint
+  app.patch('/api/tutors/:tutorId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { tutorId } = req.params;
+
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Company admin or admin access required" });
+      }
+
+      const tutor = await storage.getTutor(tutorId);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      // Verify company admin has access to this tutor's company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== tutor.companyId) {
+          return res.status(403).json({ message: "Access denied to this tutor" });
+        }
+      }
+
+      const { specialization, qualifications } = req.body;
+      const updatedTutor = await storage.updateTutor(tutorId, { specialization, qualifications });
+      res.json(updatedTutor);
+    } catch (error) {
+      console.error("Error updating tutor:", error);
+      res.status(500).json({ message: "Failed to update tutor", error: (error as Error).message });
+    }
+  });
+
+  // Update user endpoint for company admins
+  app.patch('/api/admin/users/:userId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { userId } = req.params;
+
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Company admin or admin access required" });
+      }
+
+      const { firstName, lastName, email } = req.body;
+      const updatedUser = await storage.updateUser(userId, { firstName, lastName, email });
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ message: "Failed to update user", error: (error as Error).message });
+    }
+  });
   
   app.get('/api/admin/users', isAuthenticated, async (req: any, res: any) => {
     try {
