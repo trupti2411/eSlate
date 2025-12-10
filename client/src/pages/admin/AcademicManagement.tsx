@@ -13,6 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { 
@@ -28,7 +29,8 @@ import {
   FileText,
   Search,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  Archive
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -345,6 +347,104 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       toast({
         title: "Error",
         description: error.message || "Failed to update class",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // State for archive/delete confirmations
+  const [termToArchive, setTermToArchive] = useState<AcademicTerm | null>(null);
+  const [termToDelete, setTermToDelete] = useState<AcademicTerm | null>(null);
+  const [classToArchive, setClassToArchive] = useState<Class | null>(null);
+  const [classToDelete, setClassToDelete] = useState<Class | null>(null);
+
+  // Archive term mutation
+  const archiveTermMutation = useMutation({
+    mutationFn: async (termId: string) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-terms/${termId}/archive`, 'PATCH');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Term archived successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setTermToArchive(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to archive term",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete term mutation
+  const deleteTermMutation = useMutation({
+    mutationFn: async (termId: string) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-terms/${termId}`, 'DELETE');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Term deleted permanently",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setTermToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete term",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Archive class mutation
+  const archiveClassMutation = useMutation({
+    mutationFn: async (classId: string) => {
+      return await apiRequest(`/api/companies/${companyId}/classes/${classId}/archive`, 'PATCH');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Class archived successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setClassToArchive(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to archive class",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Delete class mutation
+  const deleteClassMutation = useMutation({
+    mutationFn: async (classId: string) => {
+      return await apiRequest(`/api/companies/${companyId}/classes/${classId}`, 'DELETE');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Class deleted permanently",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setClassToDelete(null);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete class",
         variant: "destructive",
       });
     },
@@ -946,9 +1046,19 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem
+                            onClick={() => setTermToArchive(term)}
+                            className="text-orange-600"
+                          >
+                            <Archive className="w-4 h-4 mr-2" />
+                            Archive
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => setTermToDelete(term)}
+                            className="text-red-600"
+                          >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
+                            Delete Permanently
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -963,7 +1073,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                         ) : 'Dates not set'}
                       </div>
                       <Badge variant={term.isActive ? "default" : "secondary"}>
-                        {term.isActive ? "Active" : "Inactive"}
+                        {term.isActive ? "Active" : "Archived"}
                       </Badge>
                     </div>
                   </CardContent>
@@ -1144,9 +1254,19 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                             <FileText className="w-4 h-4 mr-2" />
                             Create Assignment
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem
+                            onClick={() => setClassToArchive(classItem)}
+                            className="text-orange-600"
+                          >
+                            <Archive className="w-4 h-4 mr-2" />
+                            Archive
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => setClassToDelete(classItem)}
+                            className="text-red-600"
+                          >
                             <Trash2 className="w-4 h-4 mr-2" />
-                            Delete
+                            Delete Permanently
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -1854,6 +1974,94 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           </Form>
         </DialogContent>
       </Dialog>
+
+      {/* Archive Term Confirmation */}
+      <AlertDialog open={!!termToArchive} onOpenChange={() => setTermToArchive(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Term</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to archive "{termToArchive?.name}"? 
+              The term will be marked as inactive but can be restored later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => termToArchive && archiveTermMutation.mutate(termToArchive.id)}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {archiveTermMutation.isPending ? 'Archiving...' : 'Archive'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Term Confirmation */}
+      <AlertDialog open={!!termToDelete} onOpenChange={() => setTermToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Term Permanently</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete "{termToDelete?.name}"? 
+              This will also delete all classes associated with this term. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => termToDelete && deleteTermMutation.mutate(termToDelete.id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteTermMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Archive Class Confirmation */}
+      <AlertDialog open={!!classToArchive} onOpenChange={() => setClassToArchive(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Archive Class</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to archive "{classToArchive?.name}"? 
+              The class will be marked as inactive but can be restored later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => classToArchive && archiveClassMutation.mutate(classToArchive.id)}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {archiveClassMutation.isPending ? 'Archiving...' : 'Archive'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Class Confirmation */}
+      <AlertDialog open={!!classToDelete} onOpenChange={() => setClassToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Class Permanently</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete "{classToDelete?.name}"? 
+              This will also remove all student assignments. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => classToDelete && deleteClassMutation.mutate(classToDelete.id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {deleteClassMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

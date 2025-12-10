@@ -185,6 +185,7 @@ export interface IStorage {
   getAcademicTerm(id: string): Promise<AcademicTerm | undefined>;
   updateAcademicTerm(id: string, updates: Partial<InsertAcademicTerm>): Promise<AcademicTerm>;
   deleteAcademicTerm(id: string): Promise<void>;
+  permanentlyDeleteAcademicTerm(id: string): Promise<void>;
 
   // Classes
   createClass(classData: InsertClass): Promise<Class>;
@@ -194,6 +195,7 @@ export interface IStorage {
   getClass(id: string): Promise<Class | undefined>;
   updateClass(id: string, updates: Partial<InsertClass>): Promise<Class>;
   deleteClass(id: string): Promise<void>;
+  permanentlyDeleteClass(id: string): Promise<void>;
 
   // Student Class Assignments
   assignStudentToClass(assignment: InsertStudentClassAssignment): Promise<StudentClassAssignment>;
@@ -1293,6 +1295,13 @@ export class DatabaseStorage implements IStorage {
       .where(eq(academicTerms.id, id));
   }
 
+  async permanentlyDeleteAcademicTerm(id: string): Promise<void> {
+    // First delete all classes in this term
+    await db.delete(classes).where(eq(classes.termId, id));
+    // Then delete the term itself
+    await db.delete(academicTerms).where(eq(academicTerms.id, id));
+  }
+
   // Classes
   async createClass(classData: InsertClass): Promise<Class> {
     const [newClass] = await db.insert(classes).values(classData).returning();
@@ -1334,6 +1343,13 @@ export class DatabaseStorage implements IStorage {
     await db.update(classes)
       .set({ isActive: false, updatedAt: new Date() })
       .where(eq(classes.id, id));
+  }
+
+  async permanentlyDeleteClass(id: string): Promise<void> {
+    // Delete student class assignments first
+    await db.delete(studentClassAssignments).where(eq(studentClassAssignments.classId, id));
+    // Then delete the class itself
+    await db.delete(classes).where(eq(classes.id, id));
   }
 
   // Student Class Assignments

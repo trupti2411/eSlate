@@ -2625,6 +2625,106 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Archive (soft delete) a class
+  app.patch('/api/companies/:companyId/classes/:classId/archive', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, classId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      await storage.deleteClass(classId); // This sets isActive to false
+      res.json({ message: "Class archived successfully" });
+    } catch (error) {
+      console.error("Error archiving class:", error);
+      res.status(500).json({ message: "Failed to archive class" });
+    }
+  });
+
+  // Permanently delete a class
+  app.delete('/api/companies/:companyId/classes/:classId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, classId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      await storage.permanentlyDeleteClass(classId);
+      res.json({ message: "Class deleted permanently" });
+    } catch (error) {
+      console.error("Error deleting class:", error);
+      res.status(500).json({ message: "Failed to delete class" });
+    }
+  });
+
+  // Archive (soft delete) an academic term
+  app.patch('/api/companies/:companyId/academic-terms/:termId/archive', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, termId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      await storage.deleteAcademicTerm(termId); // This sets isActive to false
+      res.json({ message: "Term archived successfully" });
+    } catch (error) {
+      console.error("Error archiving term:", error);
+      res.status(500).json({ message: "Failed to archive term" });
+    }
+  });
+
+  // Permanently delete an academic term
+  app.delete('/api/companies/:companyId/academic-terms/:termId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, termId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      await storage.permanentlyDeleteAcademicTerm(termId);
+      res.json({ message: "Term deleted permanently" });
+    } catch (error) {
+      console.error("Error deleting term:", error);
+      res.status(500).json({ message: "Failed to delete term" });
+    }
+  });
+
   // Academic hierarchy route
   app.get('/api/companies/:companyId/academic-hierarchy', isAuthenticated, async (req: any, res: any) => {
     try {
