@@ -1268,6 +1268,25 @@ trailer<</Size 5/Root 1 0 R>>
 
       const sessions = await storage.getClassSessionsByCompany(companyAdmin.companyId, start, end);
       const holidays = await storage.getAcademicHolidaysByCompany(companyAdmin.companyId);
+      
+      // Get active academic term for the company
+      const academicTerms = await storage.getAcademicTermsByCompany(companyAdmin.companyId);
+      const now = new Date();
+      // First try to find a term where current date is within the range and term is active
+      let activeTerm = academicTerms.find((term: any) => {
+        const termStart = new Date(term.startDate);
+        const termEnd = new Date(term.endDate);
+        const isActive = term.isActive === true || term.isActive === 1;
+        return isActive && now >= termStart && now <= termEnd;
+      });
+      // Fallback to any active term if no current one found
+      if (!activeTerm) {
+        activeTerm = academicTerms.find((term: any) => term.isActive === true || term.isActive === 1);
+      }
+      // Final fallback: first term in the list
+      if (!activeTerm && academicTerms.length > 0) {
+        activeTerm = academicTerms[0];
+      }
 
       // Filter by additional criteria if provided
       let filteredSessions = sessions;
@@ -1281,7 +1300,16 @@ trailer<</Size 5/Root 1 0 R>>
         filteredSessions = filteredSessions.filter((s: any) => s.session.status === status);
       }
 
-      res.json({ sessions: filteredSessions, holidays });
+      res.json({ 
+        sessions: filteredSessions, 
+        holidays,
+        activeTerm: activeTerm ? {
+          id: activeTerm.id,
+          name: activeTerm.name,
+          startDate: activeTerm.startDate,
+          endDate: activeTerm.endDate
+        } : null
+      });
     } catch (error) {
       console.error("Error fetching company calendar:", error);
       res.status(500).json({ message: "Failed to fetch calendar" });
@@ -2851,6 +2879,59 @@ trailer<</Size 5/Root 1 0 R>>
     } catch (error) {
       console.error("Error fetching student enrollments:", error);
       res.status(500).json({ message: "Failed to fetch student enrollments" });
+    }
+  });
+
+  // Get all enrollments for all classes in a company
+  app.get('/api/companies/:companyId/enrollments', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin' && user.role !== 'tutor') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      }
+
+      if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor || tutor.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      }
+
+      // Get all classes for the company
+      const classes = await storage.getClassesByCompany(companyId);
+      
+      // Get all enrollments for all classes
+      const enrollmentsByClass: Record<string, any[]> = {};
+      
+      await Promise.all(
+        classes.map(async (classItem) => {
+          const enrollments = await storage.getStudentsByClass(classItem.id);
+          const enrolledStudents = await Promise.all(
+            enrollments.map(async (enrollment) => {
+              const student = await storage.getStudent(enrollment.studentId);
+              return {
+                ...enrollment,
+                student
+              };
+            })
+          );
+          enrollmentsByClass[classItem.id] = enrolledStudents;
+        })
+      );
+      
+      res.json(enrollmentsByClass);
+    } catch (error) {
+      console.error("Error fetching company enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch company enrollments" });
     }
   });
 

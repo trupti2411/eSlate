@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { format, isToday, parseISO } from "date-fns";
-import { RoleCalendar, type CalendarSession, type CalendarHoliday, type CalendarEvent } from "./RoleCalendar";
+import { RoleCalendar, type CalendarSession, type CalendarHoliday, type CalendarEvent, type TermInfo } from "./RoleCalendar";
 import { AttendanceStatusBadge, type AttendanceStatus } from "./AttendanceStatusBadge";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,6 +60,12 @@ interface CompanySession {
 interface CompanyCalendarData {
   sessions: CompanySession[];
   holidays: CalendarHoliday[];
+  activeTerm?: {
+    id: string;
+    name: string;
+    startDate: string;
+    endDate: string;
+  };
 }
 
 interface TodaySessionData {
@@ -384,6 +390,26 @@ export function CompanyCalendarDashboard() {
 
   return (
     <div className="space-y-6" data-testid="company-calendar-dashboard">
+      {/* Active Term Banner */}
+      {calendarData?.activeTerm && (
+        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+          <CardContent className="py-3 px-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CalendarDays className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                <div>
+                  <span className="font-medium text-blue-900 dark:text-blue-100">
+                    Current Term: {calendarData.activeTerm.name}
+                  </span>
+                  <span className="text-sm text-blue-600 dark:text-blue-400 ml-2">
+                    ({format(new Date(calendarData.activeTerm.startDate), 'MMM d, yyyy')} - {format(new Date(calendarData.activeTerm.endDate), 'MMM d, yyyy')})
+                  </span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <RoleCalendar
         role="company"
         sessions={calendarSessions}
@@ -392,6 +418,12 @@ export function CompanyCalendarDashboard() {
         filters={filters}
         isLoading={isCalendarLoading}
         initialView="monthly"
+        termInfo={calendarData?.activeTerm ? {
+          id: calendarData.activeTerm.id,
+          name: calendarData.activeTerm.name,
+          startDate: new Date(calendarData.activeTerm.startDate),
+          endDate: new Date(calendarData.activeTerm.endDate),
+        } : undefined}
       />
 
       <Dialog open={isAttendanceModalOpen} onOpenChange={setIsAttendanceModalOpen}>

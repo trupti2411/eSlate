@@ -303,6 +303,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/enrollments`] });
       queryClient.invalidateQueries({ queryKey: [`/api/classes/${variables.classId}/students`] });
       refetchStudents();
       setAssigningStudentId(null);
@@ -329,6 +330,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/enrollments`] });
       queryClient.invalidateQueries({ queryKey: [`/api/classes/${variables.classId}/students`] });
       refetchStudents();
     },
@@ -517,12 +519,19 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     gcTime: 0, // Don't cache
   });
 
-  // Fetch enrolled students for a specific class
+  // Fetch enrolled students for a specific class (for dialog)
   const { data: enrolledStudents = [], isLoading: enrolledStudentsLoading } = useQuery({
     queryKey: [`/api/classes/${selectedClassForViewing?.id}/students`],
     enabled: !!selectedClassForViewing?.id && isViewEnrolledStudentsOpen,
     staleTime: 0,
     gcTime: 0,
+  });
+
+  // Fetch all class enrollments for the company (for class cards)
+  const { data: allEnrollments = {}, isLoading: enrollmentsLoading } = useQuery<Record<string, any[]>>({
+    queryKey: [`/api/companies/${companyId}/enrollments`],
+    enabled: !!companyId && activeTab === 'classes',
+    staleTime: 30000, // Cache for 30 seconds
   });
 
   // Debug logs after all queries are defined
@@ -1335,40 +1344,43 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                         {classItem.isActive ? "Active" : "Inactive"}
                       </Badge>
 
-                      {/* Show assigned students */}
+                      {/* Show enrolled students */}
                       <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
                         {(() => {
-                          // Ensure activeStudents is an array and handle the filtering safely
-                          const studentsArray = Array.isArray(activeStudents) ? activeStudents : [];
-                          const assignedStudents = studentsArray.filter((student: any) => student.classId === classItem.id);
-                          console.log('Debug - Class ID:', classItem.id);
-                          console.log('Debug - All students:', studentsArray);
-                          console.log('Debug - Student data structure sample:', studentsArray[0]);
-                          console.log('Debug - Student names:', studentsArray.map(s => `${s.user?.firstName} ${s.user?.lastName} (classId: ${s.classId})`));
-                          console.log('Debug - Class IDs in students:', studentsArray.map(s => s.classId));
-                          console.log('Debug - Assigned students for this class:', assignedStudents);
+                          const classEnrollments = allEnrollments[classItem.id] || [];
+                          const getStudentName = (enrollment: any) => {
+                            const firstName = enrollment.student?.user?.firstName;
+                            const lastName = enrollment.student?.user?.lastName;
+                            const email = enrollment.student?.user?.email;
+                            const studentId = enrollment.student?.id || enrollment.studentId;
+                            if (firstName || lastName) {
+                              return `${firstName || ''} ${lastName || ''}`.trim();
+                            }
+                            if (email) {
+                              return email;
+                            }
+                            return studentId ? `Student #${studentId.slice(-6)}` : 'Student';
+                          };
                           return (
                             <>
                               <div className="flex items-center text-sm text-gray-600 dark:text-gray-300 mb-2">
                                 <Users className="w-4 h-4 mr-2" />
-                                <span>Assigned Students ({assignedStudents.length})</span>
+                                <span>Enrolled Students ({classEnrollments.length})</span>
                               </div>
                               <div className="space-y-1">
-                                {assignedStudents.slice(0, 3).map((student: any) => (
-                                  <div key={student.id} className="text-xs text-gray-500 dark:text-gray-400">
-                                    • {student.user?.firstName} {student.user?.lastName} (ID: {student.classId})
+                                {classEnrollments.slice(0, 3).map((enrollment: any) => (
+                                  <div key={enrollment.id} className="text-xs text-gray-500 dark:text-gray-400">
+                                    • {getStudentName(enrollment)}
                                   </div>
                                 ))}
-                                {assignedStudents.length > 3 && (
+                                {classEnrollments.length > 3 && (
                                   <div className="text-xs text-gray-400 dark:text-gray-500">
-                                    +{assignedStudents.length - 3} more
+                                    +{classEnrollments.length - 3} more
                                   </div>
                                 )}
-                                {assignedStudents.length === 0 && (
+                                {classEnrollments.length === 0 && (
                                   <div className="text-xs text-gray-400 dark:text-gray-500">
-                                    No students assigned (Debug: Total students: {studentsArray.length}, Class ID: {classItem.id})
-                                    <br />
-                                    <span>All students: {studentsArray.map(s => `${s.user?.firstName || 'N/A'} ${s.user?.lastName || 'N/A'} (${s.classId || 'no class'})`).join(', ')}</span>
+                                    No students enrolled yet
                                   </div>
                                 )}
                               </div>
