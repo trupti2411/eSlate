@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +17,7 @@ import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { WorksheetManagement } from "./WorksheetManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock } from "lucide-react";
 
 interface CompanyAdmin {
   id: string;
@@ -47,6 +48,9 @@ interface CompanyTutor {
   userId: string;
   specialization: string;
   qualifications: string;
+  availability?: string;
+  subjectsTeaching?: string[];
+  branch?: string;
   isVerified: boolean;
   user?: {
     id: string;
@@ -149,7 +153,11 @@ export default function CompanyDashboard() {
     email: "",
     specialization: "",
     qualifications: "",
+    availability: "",
+    subjectsTeaching: [] as string[],
+    branch: "",
   });
+  const [newTutorSubject, setNewTutorSubject] = useState("");
 
   const [tutorAssignmentData, setTutorAssignmentData] = useState({
     tutorId: "",
@@ -229,7 +237,13 @@ export default function CompanyDashboard() {
   const updateTutorMutation = useMutation({
     mutationFn: async ({ tutorId, userId, data }: { tutorId: string; userId: string; data: any }) => {
       await apiRequest(`/api/admin/users/${userId}`, "PATCH", { firstName: data.firstName, lastName: data.lastName, email: data.email });
-      return await apiRequest(`/api/tutors/${tutorId}`, "PATCH", { specialization: data.specialization, qualifications: data.qualifications });
+      return await apiRequest(`/api/tutors/${tutorId}`, "PATCH", { 
+        specialization: data.specialization, 
+        qualifications: data.qualifications,
+        availability: data.availability,
+        subjectsTeaching: data.subjectsTeaching,
+        branch: data.branch
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/tutors`] });
@@ -268,6 +282,9 @@ export default function CompanyDashboard() {
       email: tutor.user?.email || "",
       specialization: tutor.specialization || "",
       qualifications: tutor.qualifications || "",
+      availability: tutor.availability || "",
+      subjectsTeaching: tutor.subjectsTeaching || [],
+      branch: tutor.branch || "",
     });
     setIsEditTutorOpen(true);
   };
@@ -283,6 +300,23 @@ export default function CompanyDashboard() {
     if (confirm(`Are you sure you want to remove ${tutor.user?.firstName} ${tutor.user?.lastName}?`)) {
       deleteTutorMutation.mutate(tutor.userId);
     }
+  };
+
+  const handleAddTutorSubject = () => {
+    if (newTutorSubject.trim() && !editTutorFormData.subjectsTeaching.includes(newTutorSubject.trim())) {
+      setEditTutorFormData(prev => ({
+        ...prev,
+        subjectsTeaching: [...prev.subjectsTeaching, newTutorSubject.trim()]
+      }));
+      setNewTutorSubject("");
+    }
+  };
+
+  const handleRemoveTutorSubject = (subject: string) => {
+    setEditTutorFormData(prev => ({
+      ...prev,
+      subjectsTeaching: prev.subjectsTeaching.filter(s => s !== subject)
+    }));
   };
 
   // Student CRUD mutations
@@ -1264,7 +1298,7 @@ export default function CompanyDashboard() {
 
       {/* Edit Tutor Dialog */}
       <Dialog open={isEditTutorOpen} onOpenChange={setIsEditTutorOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Tutor Details</DialogTitle>
           </DialogHeader>
@@ -1291,6 +1325,70 @@ export default function CompanyDashboard() {
               <Label htmlFor="editQualifications">Qualifications</Label>
               <Input id="editQualifications" value={editTutorFormData.qualifications} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics" />
             </div>
+            
+            {/* New Fields */}
+            <div>
+              <Label htmlFor="editAvailability" className="flex items-center gap-1">
+                <Clock className="h-4 w-4" />
+                Availability
+              </Label>
+              <Textarea 
+                id="editAvailability" 
+                value={editTutorFormData.availability} 
+                onChange={(e) => setEditTutorFormData({ ...editTutorFormData, availability: e.target.value })} 
+                placeholder="e.g., Mon-Fri 9am-5pm, Weekends 10am-2pm"
+                className="mt-1"
+              />
+            </div>
+            
+            <div>
+              <Label className="flex items-center gap-1">
+                <BookOpen className="h-4 w-4" />
+                Subjects Teaching
+              </Label>
+              <div className="mt-1 space-y-2">
+                <div className="flex gap-2">
+                  <Input
+                    value={newTutorSubject}
+                    onChange={(e) => setNewTutorSubject(e.target.value)}
+                    placeholder="Add a subject..."
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTutorSubject())}
+                  />
+                  <Button type="button" onClick={handleAddTutorSubject} variant="outline">
+                    <Plus className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {editTutorFormData.subjectsTeaching.map((subject, index) => (
+                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                      {subject}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTutorSubject(subject)}
+                        className="ml-1 hover:text-red-500"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="editBranch" className="flex items-center gap-1">
+                <MapPin className="h-4 w-4" />
+                Branch / Location
+              </Label>
+              <Input 
+                id="editBranch" 
+                value={editTutorFormData.branch} 
+                onChange={(e) => setEditTutorFormData({ ...editTutorFormData, branch: e.target.value })} 
+                placeholder="e.g., Downtown Center, North Campus"
+                className="mt-1"
+              />
+            </div>
+            
             <div className="flex gap-2">
               <Button type="button" variant="outline" className="flex-1 border-black" onClick={() => setIsEditTutorOpen(false)}>
                 Cancel
