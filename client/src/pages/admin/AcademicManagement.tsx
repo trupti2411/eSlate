@@ -136,12 +136,6 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [assigningStudentId, setAssigningStudentId] = useState<string | null>(null);
   const [isViewEnrolledStudentsOpen, setIsViewEnrolledStudentsOpen] = useState(false);
   const [selectedClassForViewing, setSelectedClassForViewing] = useState<Class | null>(null);
-  const [isScheduleSessionsOpen, setIsScheduleSessionsOpen] = useState(false);
-  const [selectedClassForSessions, setSelectedClassForSessions] = useState<Class | null>(null);
-  const [sessionStartDate, setSessionStartDate] = useState('');
-  const [sessionEndDate, setSessionEndDate] = useState('');
-  const [sessionDeliveryMode, setSessionDeliveryMode] = useState('in_person');
-  const [sessionLocationUrl, setSessionLocationUrl] = useState('');
 
   // Search, filter, and sort states for Academic Years
   const [yearSearch, setYearSearch] = useState('');
@@ -388,85 +382,6 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [termToDelete, setTermToDelete] = useState<AcademicTerm | null>(null);
   const [classToArchive, setClassToArchive] = useState<Class | null>(null);
   const [classToDelete, setClassToDelete] = useState<Class | null>(null);
-
-  // Create sessions mutation - generates sessions for a class within a date range
-  const createSessionsMutation = useMutation({
-    mutationFn: async ({ classItem, startDate, endDate, deliveryMode, locationUrl }: {
-      classItem: Class;
-      startDate: string;
-      endDate: string;
-      deliveryMode: string;
-      locationUrl: string;
-    }) => {
-      // Parse dates without timezone issues by splitting the string
-      const [startYear, startMonth, startDay] = startDate.split('-').map(Number);
-      const [endYear, endMonth, endDay] = endDate.split('-').map(Number);
-      const start = new Date(startYear, startMonth - 1, startDay);
-      const end = new Date(endYear, endMonth - 1, endDay);
-      const sessions: any[] = [];
-      
-      // Calculate duration in minutes
-      const [startHour, startMin] = classItem.startTime.split(':').map(Number);
-      const [endHour, endMin] = classItem.endTime.split(':').map(Number);
-      const durationMinutes = (endHour * 60 + endMin) - (startHour * 60 + startMin);
-      
-      // Generate sessions for each matching day of week
-      const current = new Date(start);
-      while (current <= end) {
-        if (current.getDay() === classItem.dayOfWeek) {
-          // Create date string in YYYY-MM-DD format to avoid timezone issues
-          const year = current.getFullYear();
-          const month = String(current.getMonth() + 1).padStart(2, '0');
-          const day = String(current.getDate()).padStart(2, '0');
-          const sessionDateStr = `${year}-${month}-${day}T${classItem.startTime}:00`;
-          
-          sessions.push({
-            classId: classItem.id,
-            tutorId: classItem.tutorId,
-            sessionDate: sessionDateStr,
-            startTime: classItem.startTime,
-            endTime: classItem.endTime,
-            durationMinutes,
-            status: 'scheduled',
-            deliveryMode,
-            locationUrl: locationUrl || null,
-          });
-        }
-        current.setDate(current.getDate() + 1);
-      }
-      
-      // Create all sessions via API
-      const results = await Promise.all(
-        sessions.map(session => apiRequest('/api/sessions', 'POST', session))
-      );
-      return results;
-    },
-    onSuccess: (results) => {
-      toast({
-        title: "Success",
-        description: `Created ${results.length} class session(s) on the calendar`,
-      });
-      // Invalidate all calendar-related queries
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar/company'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar/tutor'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar/student'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/calendar/parent'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/sessions'] });
-      setIsScheduleSessionsOpen(false);
-      setSelectedClassForSessions(null);
-      setSessionStartDate('');
-      setSessionEndDate('');
-      setSessionDeliveryMode('in_person');
-      setSessionLocationUrl('');
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create sessions",
-        variant: "destructive",
-      });
-    },
-  });
 
   // Archive term mutation
   const archiveTermMutation = useMutation({
@@ -1379,22 +1294,6 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           >
                             <FileText className="w-4 h-4 mr-2" />
                             Create Assignment
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setSelectedClassForSessions(classItem);
-                              // Get term dates as default range
-                              const term = academicTerms?.find((t: AcademicTerm) => t.id === classItem.termId);
-                              if (term) {
-                                setSessionStartDate(term.startDate.split('T')[0]);
-                                setSessionEndDate(term.endDate.split('T')[0]);
-                              }
-                              setIsScheduleSessionsOpen(true);
-                            }}
-                            data-testid={`btn-schedule-sessions-${classItem.id}`}
-                          >
-                            <Calendar className="w-4 h-4 mr-2" />
-                            Schedule Sessions
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setClassToArchive(classItem)}
@@ -2313,124 +2212,6 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
         </DialogContent>
       </Dialog>
 
-      {/* Schedule Sessions Dialog */}
-      <Dialog open={isScheduleSessionsOpen} onOpenChange={setIsScheduleSessionsOpen}>
-        <DialogContent className="sm:max-w-[500px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5" />
-              Schedule Sessions for {selectedClassForSessions?.name}
-            </DialogTitle>
-            <DialogDescription>
-              Generate class sessions within a date range. Sessions will be created for each {selectedClassForSessions ? getDayName(selectedClassForSessions.dayOfWeek) : ''} between the start and end dates.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="sessionStartDate">Start Date</Label>
-                <Input
-                  id="sessionStartDate"
-                  type="date"
-                  value={sessionStartDate}
-                  onChange={(e) => setSessionStartDate(e.target.value)}
-                  data-testid="input-session-start-date"
-                />
-              </div>
-              <div>
-                <Label htmlFor="sessionEndDate">End Date</Label>
-                <Input
-                  id="sessionEndDate"
-                  type="date"
-                  value={sessionEndDate}
-                  onChange={(e) => setSessionEndDate(e.target.value)}
-                  data-testid="input-session-end-date"
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="sessionDeliveryMode">Delivery Mode</Label>
-              <Select value={sessionDeliveryMode} onValueChange={setSessionDeliveryMode}>
-                <SelectTrigger data-testid="select-delivery-mode">
-                  <SelectValue placeholder="Select delivery mode" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="in_person">In Person</SelectItem>
-                  <SelectItem value="online">Online</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {(sessionDeliveryMode === 'online' || sessionDeliveryMode === 'hybrid') && (
-              <div>
-                <Label htmlFor="sessionLocationUrl">Meeting Link (Optional)</Label>
-                <Input
-                  id="sessionLocationUrl"
-                  type="url"
-                  placeholder="https://zoom.us/j/..."
-                  value={sessionLocationUrl}
-                  onChange={(e) => setSessionLocationUrl(e.target.value)}
-                  data-testid="input-session-location-url"
-                />
-              </div>
-            )}
-            {selectedClassForSessions && sessionStartDate && sessionEndDate && (
-              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg text-sm">
-                <div className="font-medium text-blue-900 dark:text-blue-100">Session Preview:</div>
-                <div className="text-blue-700 dark:text-blue-300">
-                  {(() => {
-                    const start = new Date(sessionStartDate);
-                    const end = new Date(sessionEndDate);
-                    let count = 0;
-                    const current = new Date(start);
-                    while (current <= end) {
-                      if (current.getDay() === selectedClassForSessions.dayOfWeek) count++;
-                      current.setDate(current.getDate() + 1);
-                    }
-                    return `${count} session(s) will be created on ${getDayName(selectedClassForSessions.dayOfWeek)}s from ${format(start, 'MMM d, yyyy')} to ${format(end, 'MMM d, yyyy')}`;
-                  })()}
-                </div>
-                <div className="text-blue-600 dark:text-blue-400 text-xs mt-1">
-                  Time: {formatTime(selectedClassForSessions.startTime)} - {formatTime(selectedClassForSessions.endTime)}
-                </div>
-              </div>
-            )}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setIsScheduleSessionsOpen(false);
-                  setSelectedClassForSessions(null);
-                  setSessionStartDate('');
-                  setSessionEndDate('');
-                  setSessionDeliveryMode('in_person');
-                  setSessionLocationUrl('');
-                }}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={() => {
-                  if (selectedClassForSessions && sessionStartDate && sessionEndDate) {
-                    createSessionsMutation.mutate({
-                      classItem: selectedClassForSessions,
-                      startDate: sessionStartDate,
-                      endDate: sessionEndDate,
-                      deliveryMode: sessionDeliveryMode,
-                      locationUrl: sessionLocationUrl,
-                    });
-                  }
-                }}
-                disabled={!sessionStartDate || !sessionEndDate || createSessionsMutation.isPending}
-                className="bg-blue-600 hover:bg-blue-700"
-                data-testid="btn-create-sessions"
-              >
-                {createSessionsMutation.isPending ? 'Creating...' : 'Create Sessions'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
