@@ -1126,19 +1126,44 @@ trailer<</Size 5/Root 1 0 R>>
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Clean the request body to only include allowed fields (simplified - direct class assignment)
-      const allowedFields = ['schoolName', 'classId', 'tutorId', 'gradeLevel'];
-      const updateData: any = {};
-      for (const field of allowedFields) {
+      // Separate user fields from student fields
+      const userFields = ['firstName', 'lastName', 'email'];
+      const studentFields = ['schoolName', 'classId', 'tutorId', 'gradeLevel'];
+      
+      const userUpdateData: any = {};
+      const studentUpdateData: any = {};
+      
+      for (const field of userFields) {
+        if (req.body[field] !== undefined && req.body[field] !== '') {
+          userUpdateData[field] = req.body[field];
+        }
+      }
+      
+      for (const field of studentFields) {
         if (req.body[field] !== undefined) {
-          updateData[field] = req.body[field] === "" ? null : req.body[field];
+          studentUpdateData[field] = req.body[field] === "" ? null : req.body[field];
         }
       }
 
-      console.log("Cleaned update data:", updateData);
-      const updatedStudent = await storage.updateStudent(studentId, updateData);
-      console.log("Student updated successfully:", updatedStudent.id);
-      res.json(updatedStudent);
+      console.log("User update data:", userUpdateData);
+      console.log("Student update data:", studentUpdateData);
+      
+      // Update user record if there are user fields to update
+      if (Object.keys(userUpdateData).length > 0 && student.userId) {
+        await storage.updateUser(student.userId, userUpdateData);
+        console.log("User updated successfully");
+      }
+      
+      // Update student record if there are student fields to update
+      let updatedStudent = student;
+      if (Object.keys(studentUpdateData).length > 0) {
+        updatedStudent = await storage.updateStudent(studentId, studentUpdateData);
+        console.log("Student updated successfully:", updatedStudent.id);
+      }
+      
+      // Re-fetch full student data to return updated info
+      const refreshedStudent = await storage.getStudent(studentId);
+      res.json(refreshedStudent);
     } catch (error) {
       console.error("Error updating student:", error);
       res.status(500).json({ message: "Internal server error", error: error instanceof Error ? error.message : 'Unknown error' });
@@ -2714,6 +2739,118 @@ trailer<</Size 5/Root 1 0 R>>
     } catch (error) {
       console.error("Error deleting class:", error);
       res.status(500).json({ message: "Failed to delete class" });
+    }
+  });
+
+  // Class Enrollment Management Routes
+  
+  // Get students enrolled in a class
+  app.get('/api/classes/:classId/students', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin' && user.role !== 'tutor') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const enrollments = await storage.getStudentsByClass(classId);
+      
+      // Fetch full student details for each enrollment
+      const enrolledStudents = await Promise.all(
+        enrollments.map(async (enrollment) => {
+          const student = await storage.getStudent(enrollment.studentId);
+          return {
+            ...enrollment,
+            student
+          };
+        })
+      );
+      
+      res.json(enrolledStudents);
+    } catch (error) {
+      console.error("Error fetching class students:", error);
+      res.status(500).json({ message: "Failed to fetch class students" });
+    }
+  });
+
+  // Enroll a student in a class
+  app.post('/api/classes/:classId/students', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const { studentId } = req.body;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (!studentId) {
+        return res.status(400).json({ message: "Student ID is required" });
+      }
+
+      // Check if student is already enrolled
+      const existingEnrollments = await storage.getClassesByStudent(studentId);
+      const alreadyEnrolled = existingEnrollments.some(e => e.classId === classId && e.isActive);
+      
+      if (alreadyEnrolled) {
+        return res.status(400).json({ message: "Student is already enrolled in this class" });
+      }
+
+      const enrollment = await storage.assignStudentToClass({
+        studentId,
+        classId,
+        isActive: true
+      });
+      
+      res.json(enrollment);
+    } catch (error) {
+      console.error("Error enrolling student:", error);
+      res.status(500).json({ message: "Failed to enroll student" });
+    }
+  });
+
+  // Remove a student from a class
+  app.delete('/api/classes/:classId/students/:studentId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId, studentId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      await storage.removeStudentFromClass(studentId, classId);
+      res.json({ message: "Student removed from class successfully" });
+    } catch (error) {
+      console.error("Error removing student from class:", error);
+      res.status(500).json({ message: "Failed to remove student from class" });
+    }
+  });
+
+  // Get classes a student is enrolled in
+  app.get('/api/students/:studentId/enrollments', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin' && user.role !== 'tutor') {
+        // If student, only allow viewing own enrollments
+        if (user.role === 'student') {
+          const student = await storage.getStudentByUserId(user.id);
+          if (!student || student.id !== studentId) {
+            return res.status(403).json({ message: "Access denied" });
+          }
+        } else {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const enrollments = await storage.getClassesByStudent(studentId);
+      res.json(enrollments);
+    } catch (error) {
+      console.error("Error fetching student enrollments:", error);
+      res.status(500).json({ message: "Failed to fetch student enrollments" });
     }
   });
 

@@ -134,6 +134,8 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [isEditClassOpen, setIsEditClassOpen] = useState(false);
   const [editingClass, setEditingClass] = useState<Class | null>(null);
   const [assigningStudentId, setAssigningStudentId] = useState<string | null>(null);
+  const [isViewEnrolledStudentsOpen, setIsViewEnrolledStudentsOpen] = useState(false);
+  const [selectedClassForViewing, setSelectedClassForViewing] = useState<Class | null>(null);
 
   // Search, filter, and sort states for Academic Years
   const [yearSearch, setYearSearch] = useState('');
@@ -286,35 +288,56 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     },
   });
 
-  // Assign student to class mutation
+  // Assign student to class mutation (uses new enrollment API)
   const assignStudentToClassMutation = useMutation({
     mutationFn: async ({ studentId, classId }: { studentId: string; classId: string }) => {
       setAssigningStudentId(studentId);
-      return await apiRequest(`/api/students/${studentId}`, 'PATCH', {
-        classId,
+      return await apiRequest(`/api/classes/${classId}/students`, 'POST', {
+        studentId,
       });
     },
     onSuccess: (_, variables) => {
       toast({
         title: "Success",
-        description: "Student assigned to class successfully",
+        description: "Student enrolled in class successfully",
       });
-      // Force refetch of students data to show updated assignments
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
-      // Force a fresh refetch
+      queryClient.invalidateQueries({ queryKey: [`/api/classes/${variables.classId}/students`] });
       refetchStudents();
       setAssigningStudentId(null);
-      setIsAddStudentToClassOpen(false);
-      setSelectedClassForStudents(null);
     },
     onError: (error: Error) => {
       toast({
         title: "Error",
-        description: error.message || "Failed to assign student to class",
+        description: error.message || "Failed to enroll student in class",
         variant: "destructive",
       });
       setAssigningStudentId(null);
+    },
+  });
+
+  // Remove student from class mutation
+  const removeStudentFromClassMutation = useMutation({
+    mutationFn: async ({ studentId, classId }: { studentId: string; classId: string }) => {
+      return await apiRequest(`/api/classes/${classId}/students/${studentId}`, 'DELETE');
+    },
+    onSuccess: (_, variables) => {
+      toast({
+        title: "Success",
+        description: "Student removed from class successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/classes`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/classes/${variables.classId}/students`] });
+      refetchStudents();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to remove student from class",
+        variant: "destructive",
+      });
     },
   });
 
@@ -492,6 +515,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     enabled: !!companyId,  // Enable for all tabs so student assignments are always visible
     staleTime: 0, // Always refetch fresh data
     gcTime: 0, // Don't cache
+  });
+
+  // Fetch enrolled students for a specific class
+  const { data: enrolledStudents = [], isLoading: enrolledStudentsLoading } = useQuery({
+    queryKey: [`/api/classes/${selectedClassForViewing?.id}/students`],
+    enabled: !!selectedClassForViewing?.id && isViewEnrolledStudentsOpen,
+    staleTime: 0,
+    gcTime: 0,
   });
 
   // Debug logs after all queries are defined
@@ -1238,12 +1269,13 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => {
-                              setSelectedClassForStudents(classItem.id);
-                              setIsAddStudentToClassOpen(true);
+                              setSelectedClassForViewing(classItem);
+                              setIsViewEnrolledStudentsOpen(true);
                             }}
+                            data-testid={`btn-manage-students-${classItem.id}`}
                           >
                             <Users className="w-4 h-4 mr-2" />
-                            Add Student
+                            Manage Students
                           </DropdownMenuItem>
                           <DropdownMenuItem 
                             onClick={() => {
@@ -2062,6 +2094,111 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* View Enrolled Students Dialog */}
+      <Dialog open={isViewEnrolledStudentsOpen} onOpenChange={setIsViewEnrolledStudentsOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Students in {selectedClassForViewing?.name}
+            </DialogTitle>
+            <DialogDescription>
+              View and manage students enrolled in this class.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {enrolledStudentsLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : !Array.isArray(enrolledStudents) || enrolledStudents.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="w-12 h-12 mx-auto text-gray-300 mb-3" />
+                <p className="text-gray-500">No students enrolled in this class yet.</p>
+                <Button
+                  className="mt-4 bg-blue-600 hover:bg-blue-700"
+                  onClick={() => {
+                    if (selectedClassForViewing) {
+                      setSelectedClassForStudents(selectedClassForViewing.id);
+                      setIsViewEnrolledStudentsOpen(false);
+                      setIsAddStudentToClassOpen(true);
+                    }
+                  }}
+                  data-testid="btn-add-first-student"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Students
+                </Button>
+              </div>
+            ) : (
+              <div className="max-h-96 overflow-y-auto space-y-2">
+                {enrolledStudents.map((enrollment: any) => (
+                  <div 
+                    key={enrollment.id} 
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800"
+                    data-testid={`enrolled-student-${enrollment.student?.id}`}
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {enrollment.student?.user?.firstName} {enrollment.student?.user?.lastName}
+                      </div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {enrollment.student?.user?.email}
+                      </div>
+                      {enrollment.student?.gradeLevel && (
+                        <Badge variant="secondary" className="mt-1 text-xs">
+                          Grade {enrollment.student.gradeLevel}
+                        </Badge>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => {
+                        if (selectedClassForViewing) {
+                          removeStudentFromClassMutation.mutate({
+                            studentId: enrollment.studentId,
+                            classId: selectedClassForViewing.id,
+                          });
+                        }
+                      }}
+                      disabled={removeStudentFromClassMutation.isPending}
+                      data-testid={`btn-remove-student-${enrollment.student?.id}`}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-between pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (selectedClassForViewing) {
+                    setSelectedClassForStudents(selectedClassForViewing.id);
+                    setIsAddStudentToClassOpen(true);
+                  }
+                }}
+                data-testid="btn-add-more-students"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Students
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsViewEnrolledStudentsOpen(false);
+                  setSelectedClassForViewing(null);
+                }}
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
