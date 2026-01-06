@@ -2564,7 +2564,9 @@ trailer<</Size 5/Root 1 0 R>>
 
       const validatedData = insertAcademicTermSchema.parse({
         ...req.body,
-        companyId
+        companyId,
+        startDate: new Date(req.body.startDate),
+        endDate: new Date(req.body.endDate)
       });
 
       const term = await storage.createAcademicTerm(validatedData);
