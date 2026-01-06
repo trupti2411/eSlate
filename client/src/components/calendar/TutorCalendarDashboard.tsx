@@ -13,6 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import {
   Users,
@@ -92,10 +93,46 @@ interface ClassRoster {
   enrolled: number;
 }
 
+interface EnrolledStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gradeLevel?: string;
+}
+
+interface SessionDetailsData {
+  session: {
+    id: string;
+    classId: string;
+    tutorId?: string;
+    startTime: string;
+    endTime: string;
+    status: SessionStatus;
+    notes?: string;
+  };
+  class: {
+    id: string;
+    name: string;
+    subject: string;
+    maxStudents?: number;
+    location?: string;
+  };
+  tutor?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    specialization?: string;
+  };
+  enrolledCount: number;
+  enrolledStudents: EnrolledStudent[];
+}
+
 export function TutorCalendarDashboard() {
   const { toast } = useToast();
   const [selectedSession, setSelectedSession] = useState<TutorSession | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [isBatchDetailsModalOpen, setIsBatchDetailsModalOpen] = useState(false);
   const [isRosterModalOpen, setIsRosterModalOpen] = useState(false);
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const [isParentContactModalOpen, setIsParentContactModalOpen] = useState(false);
@@ -116,6 +153,11 @@ export function TutorCalendarDashboard() {
   const { data: sessionAttendance, isLoading: isAttendanceLoading, refetch: refetchAttendance } = useQuery<AttendanceRecord[]>({
     queryKey: ['/api/sessions', selectedSession?.id, 'attendance'],
     enabled: !!selectedSession?.id && isAttendanceModalOpen,
+  });
+
+  const { data: sessionDetails, isLoading: isSessionDetailsLoading } = useQuery<SessionDetailsData>({
+    queryKey: ['/api/sessions', selectedSessionId],
+    enabled: !!selectedSessionId && isBatchDetailsModalOpen,
   });
 
   const bulkMarkAttendanceMutation = useMutation({
@@ -206,12 +248,8 @@ export function TutorCalendarDashboard() {
   const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'session') {
       const sessionData = event.data as CalendarSession;
-      const fullSession = calendarData?.sessions.find((s) => s.id === sessionData.id);
-      if (fullSession) {
-        setSelectedSession(fullSession);
-        setAttendanceChanges({});
-        setIsAttendanceModalOpen(true);
-      }
+      setSelectedSessionId(sessionData.id);
+      setIsBatchDetailsModalOpen(true);
     }
   };
 
@@ -395,6 +433,7 @@ export function TutorCalendarDashboard() {
         onEventClick={handleEventClick}
         filters={filters}
         isLoading={isCalendarLoading}
+        initialView="monthly"
       />
 
       <Card className="border-2 border-black dark:border-white" data-testid="class-roster-card">
@@ -721,6 +760,149 @@ export function TutorCalendarDashboard() {
           <DialogFooter>
             <Button onClick={() => setIsParentContactModalOpen(false)} data-testid="btn-close-parent-contact">
               Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Details Modal */}
+      <Dialog open={isBatchDetailsModalOpen} onOpenChange={setIsBatchDetailsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]" data-testid="batch-details-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5" />
+              Batch Details
+            </DialogTitle>
+            {sessionDetails && (
+              <DialogDescription>
+                {sessionDetails.class.name} - {sessionDetails.class.subject}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {isSessionDetailsLoading ? (
+            <div className="space-y-4 py-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : sessionDetails ? (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Time</p>
+                  <p className="flex items-center gap-2" data-testid="batch-time">
+                    <Clock className="w-4 h-4" />
+                    {format(parseISO(sessionDetails.session.startTime), 'h:mm a')} - {format(parseISO(sessionDetails.session.endTime), 'h:mm a')}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Date</p>
+                  <p data-testid="batch-date">
+                    {format(parseISO(sessionDetails.session.startTime), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Subject</p>
+                  <p data-testid="batch-subject">{sessionDetails.class.subject}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Tutor</p>
+                  <p data-testid="batch-tutor">
+                    {sessionDetails.tutor 
+                      ? `${sessionDetails.tutor.firstName || ''} ${sessionDetails.tutor.lastName || ''}`.trim()
+                      : 'Not assigned'}
+                  </p>
+                </div>
+              </div>
+
+              {sessionDetails.class.location && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Location</p>
+                  <p data-testid="batch-location">{sessionDetails.class.location}</p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Enrolled Students
+                  </p>
+                  <Badge variant="outline" data-testid="batch-enrolled-count">
+                    {sessionDetails.enrolledCount} students
+                  </Badge>
+                </div>
+                
+                <ScrollArea className="h-[200px] pr-4">
+                  {sessionDetails.enrolledStudents.length === 0 ? (
+                    <div className="py-4 text-center text-muted-foreground text-sm">
+                      No students enrolled in this batch.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {sessionDetails.enrolledStudents.map((student, index) => (
+                        <div
+                          key={student.id}
+                          className="flex items-center justify-between p-2 border rounded-lg"
+                          data-testid={`enrolled-student-${student.id}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-muted-foreground w-6">
+                              {index + 1}.
+                            </span>
+                            <span className="font-medium">
+                              {student.firstName} {student.lastName}
+                            </span>
+                          </div>
+                          {student.gradeLevel && (
+                            <Badge variant="secondary" className="text-xs">
+                              Grade {student.gradeLevel}
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
+              <p className="text-muted-foreground">Failed to load session details.</p>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsBatchDetailsModalOpen(false)}
+              data-testid="btn-close-batch-details"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                const fullSession = calendarData?.sessions.find(s => s.id === selectedSessionId);
+                if (fullSession) {
+                  setSelectedSession(fullSession);
+                  setAttendanceChanges({});
+                  setIsBatchDetailsModalOpen(false);
+                  setIsAttendanceModalOpen(true);
+                }
+              }}
+              data-testid="btn-take-attendance"
+            >
+              <UserCheck className="w-4 h-4 mr-2" />
+              Take Attendance
             </Button>
           </DialogFooter>
         </DialogContent>

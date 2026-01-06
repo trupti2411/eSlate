@@ -1492,12 +1492,42 @@ trailer<</Size 5/Root 1 0 R>>
       const classData = await storage.getClass(session.classId);
       const attendance = await storage.getAttendanceBySession(sessionId);
       const studentAssignments = await storage.getStudentsByClass(session.classId);
+      
+      // Get tutor info if available
+      let tutorInfo = null;
+      if (session.tutorId) {
+        const tutor = await storage.getTutor(session.tutorId);
+        if (tutor) {
+          const tutorUser = await storage.getUser(tutor.userId);
+          tutorInfo = {
+            id: tutor.id,
+            firstName: tutorUser?.firstName,
+            lastName: tutorUser?.lastName,
+            specialization: tutor.specialization,
+          };
+        }
+      }
+      
+      // Get enrolled students with their details
+      const enrolledStudents = await Promise.all(studentAssignments.map(async (assignment: any) => {
+        const student = await storage.getStudent(assignment.studentId);
+        if (!student) return null;
+        const studentUser = await storage.getUser(student.userId);
+        return {
+          id: student.id,
+          firstName: studentUser?.firstName || '',
+          lastName: studentUser?.lastName || '',
+          gradeLevel: student.gradeLevel,
+        };
+      }));
 
       res.json({
         session,
         class: classData,
+        tutor: tutorInfo,
         attendance,
         enrolledCount: studentAssignments.length,
+        enrolledStudents: enrolledStudents.filter(Boolean),
       });
     } catch (error) {
       console.error("Error fetching session:", error);

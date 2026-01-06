@@ -120,10 +120,46 @@ interface TutorInfo {
   lastName?: string;
 }
 
+interface EnrolledStudent {
+  id: string;
+  firstName: string;
+  lastName: string;
+  gradeLevel?: string;
+}
+
+interface SessionDetailsData {
+  session: {
+    id: string;
+    classId: string;
+    tutorId?: string;
+    startTime: string;
+    endTime: string;
+    status: SessionStatus;
+    notes?: string;
+  };
+  class: {
+    id: string;
+    name: string;
+    subject: string;
+    maxStudents?: number;
+    location?: string;
+  };
+  tutor?: {
+    id: string;
+    firstName?: string;
+    lastName?: string;
+    specialization?: string;
+  };
+  enrolledCount: number;
+  enrolledStudents: EnrolledStudent[];
+}
+
 export function CompanyCalendarDashboard() {
   const { toast } = useToast();
   const [selectedSession, setSelectedSession] = useState<TodaySessionData | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
+  const [isBatchDetailsModalOpen, setIsBatchDetailsModalOpen] = useState(false);
   const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
   const [selectedAttendance, setSelectedAttendance] = useState<AttendanceRecord | null>(null);
   const [overrideStatus, setOverrideStatus] = useState<AttendanceStatus>("present");
@@ -143,6 +179,11 @@ export function CompanyCalendarDashboard() {
   const { data: sessionAttendance, isLoading: isAttendanceLoading, refetch: refetchAttendance } = useQuery<AttendanceRecord[]>({
     queryKey: ['/api/sessions', selectedSession?.session.id, 'attendance'],
     enabled: !!selectedSession?.session.id && isAttendanceModalOpen,
+  });
+
+  const { data: sessionDetails, isLoading: isSessionDetailsLoading } = useQuery<SessionDetailsData>({
+    queryKey: ['/api/sessions', selectedSessionId],
+    enabled: !!selectedSessionId && isBatchDetailsModalOpen,
   });
 
   const overrideAttendanceMutation = useMutation({
@@ -232,11 +273,8 @@ export function CompanyCalendarDashboard() {
   const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'session') {
       const sessionData = event.data as CalendarSession;
-      const fullSession = todaySessions?.find((s) => s.session.id === sessionData.id);
-      if (fullSession) {
-        setSelectedSession(fullSession);
-        setIsAttendanceModalOpen(true);
-      }
+      setSelectedSessionId(sessionData.id);
+      setIsBatchDetailsModalOpen(true);
     }
   };
 
@@ -353,6 +391,7 @@ export function CompanyCalendarDashboard() {
         onEventClick={handleEventClick}
         filters={filters}
         isLoading={isCalendarLoading}
+        initialView="monthly"
       />
 
       <Dialog open={isAttendanceModalOpen} onOpenChange={setIsAttendanceModalOpen}>
@@ -532,6 +571,149 @@ export function CompanyCalendarDashboard() {
                   Confirm Override
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Batch Details Modal */}
+      <Dialog open={isBatchDetailsModalOpen} onOpenChange={setIsBatchDetailsModalOpen}>
+        <DialogContent className="max-w-2xl max-h-[80vh]" data-testid="batch-details-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5" />
+              Batch Details
+            </DialogTitle>
+            {sessionDetails && (
+              <DialogDescription>
+                {sessionDetails.class.name} - {sessionDetails.class.subject}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          {isSessionDetailsLoading ? (
+            <div className="space-y-4 py-4">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-3/4" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : sessionDetails ? (
+            <div className="space-y-4 py-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Time</p>
+                  <p className="flex items-center gap-2" data-testid="batch-time">
+                    <Clock className="w-4 h-4" />
+                    {format(parseISO(sessionDetails.session.startTime), 'h:mm a')} - {format(parseISO(sessionDetails.session.endTime), 'h:mm a')}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Date</p>
+                  <p data-testid="batch-date">
+                    {format(parseISO(sessionDetails.session.startTime), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Subject</p>
+                  <p data-testid="batch-subject">{sessionDetails.class.subject}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Tutor</p>
+                  <p data-testid="batch-tutor">
+                    {sessionDetails.tutor 
+                      ? `${sessionDetails.tutor.firstName || ''} ${sessionDetails.tutor.lastName || ''}`.trim()
+                      : 'Not assigned'}
+                  </p>
+                </div>
+              </div>
+
+              {sessionDetails.class.location && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Location</p>
+                  <p data-testid="batch-location">{sessionDetails.class.location}</p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Enrolled Students
+                  </p>
+                  <Badge variant="outline" data-testid="batch-enrolled-count">
+                    {sessionDetails.enrolledCount} students
+                  </Badge>
+                </div>
+                
+                <ScrollArea className="h-[200px] pr-4">
+                  {sessionDetails.enrolledStudents.length === 0 ? (
+                    <div className="py-4 text-center text-muted-foreground text-sm">
+                      No students enrolled in this batch.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {sessionDetails.enrolledStudents.map((student, index) => (
+                        <div
+                          key={student.id}
+                          className="flex items-center justify-between p-2 border rounded-lg"
+                          data-testid={`enrolled-student-${student.id}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-muted-foreground w-6">
+                              {index + 1}.
+                            </span>
+                            <span className="font-medium">
+                              {student.firstName} {student.lastName}
+                            </span>
+                          </div>
+                          {student.gradeLevel && (
+                            <Badge variant="secondary" className="text-xs">
+                              Grade {student.gradeLevel}
+                            </Badge>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <AlertCircle className="w-12 h-12 mx-auto text-muted-foreground mb-2" />
+              <p className="text-muted-foreground">Failed to load session details.</p>
+            </div>
+          )}
+
+          <DialogFooter className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsBatchDetailsModalOpen(false)}
+              data-testid="btn-close-batch-details"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => {
+                const todaySession = todaySessions?.find(s => s.session.id === selectedSessionId);
+                if (todaySession) {
+                  setSelectedSession(todaySession);
+                  setIsBatchDetailsModalOpen(false);
+                  setIsAttendanceModalOpen(true);
+                }
+              }}
+              disabled={!todaySessions?.find(s => s.session.id === selectedSessionId)}
+              data-testid="btn-view-attendance"
+            >
+              <UserCheck className="w-4 h-4 mr-2" />
+              View Attendance
             </Button>
           </DialogFooter>
         </DialogContent>
