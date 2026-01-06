@@ -17,6 +17,7 @@ import { ObjectUploader } from "@/components/ObjectUploader";
 import { TutorCalendarDashboard } from "@/components/calendar";
 import { 
   Users, 
+  User,
   GraduationCap, 
   BookOpen, 
   Clock, 
@@ -30,7 +31,9 @@ import {
   Download,
   Edit,
   Plus,
-  Upload
+  Upload,
+  MapPin,
+  X
 } from "lucide-react";
 
 interface Assignment {
@@ -68,6 +71,11 @@ interface Submission {
 
 interface Tutor {
   id: string;
+  specialization?: string;
+  qualifications?: string;
+  availability?: string;
+  subjectsTeaching?: string[];
+  branch?: string;
   user: {
     firstName: string;
     lastName: string;
@@ -111,7 +119,15 @@ export default function TutorDashboard() {
   });
 
   // Always call both hooks unconditionally, use enabled flag to control execution
-  const { data: tutorProfile } = useQuery<{ companyId?: string }>({
+  const { data: tutorProfile, refetch: refetchTutorProfile } = useQuery<{ 
+    id: string;
+    companyId?: string;
+    specialization?: string;
+    qualifications?: string;
+    availability?: string;
+    subjectsTeaching?: string[];
+    branch?: string;
+  }>({
     queryKey: [`/api/tutors/${user?.id}`],
     enabled: !!user && user.role === 'tutor',
   });
@@ -138,7 +154,18 @@ export default function TutorDashboard() {
   });
 
   // Main tab navigation state
-  const [mainTab, setMainTab] = useState<'overview' | 'calendar'>('overview');
+  const [mainTab, setMainTab] = useState<'overview' | 'calendar' | 'profile'>('overview');
+  
+  // Profile editing state
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    availability: '',
+    subjectsTeaching: [] as string[],
+    branch: '',
+    specialization: '',
+    qualifications: ''
+  });
+  const [newSubject, setNewSubject] = useState('');
 
   // State and mutations for editing tutors
   const [selectedTutor, setSelectedTutor] = useState<any>(null);
@@ -181,6 +208,64 @@ export default function TutorDashboard() {
       });
     },
   });
+
+  // Mutation for updating own profile
+  const updateProfileMutation = useMutation({
+    mutationFn: async (profileData: any) => {
+      if (!tutorProfile?.id) return;
+      const response = await apiRequest(`/api/tutors/${tutorProfile.id}`, "PATCH", profileData);
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Profile updated successfully",
+      });
+      refetchTutorProfile();
+      setIsEditingProfile(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update profile",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Initialize profile form when tutorProfile loads
+  useEffect(() => {
+    if (tutorProfile) {
+      setProfileForm({
+        availability: tutorProfile.availability || '',
+        subjectsTeaching: tutorProfile.subjectsTeaching || [],
+        branch: tutorProfile.branch || '',
+        specialization: tutorProfile.specialization || '',
+        qualifications: tutorProfile.qualifications || ''
+      });
+    }
+  }, [tutorProfile]);
+
+  const handleAddSubject = () => {
+    if (newSubject.trim() && !profileForm.subjectsTeaching.includes(newSubject.trim())) {
+      setProfileForm(prev => ({
+        ...prev,
+        subjectsTeaching: [...prev.subjectsTeaching, newSubject.trim()]
+      }));
+      setNewSubject('');
+    }
+  };
+
+  const handleRemoveSubject = (subject: string) => {
+    setProfileForm(prev => ({
+      ...prev,
+      subjectsTeaching: prev.subjectsTeaching.filter(s => s !== subject)
+    }));
+  };
+
+  const handleSaveProfile = () => {
+    updateProfileMutation.mutate(profileForm);
+  };
 
   // File upload handlers
   const handleGetUploadParameters = async () => {
@@ -347,11 +432,214 @@ export default function TutorDashboard() {
             <Calendar className="h-4 w-4 mr-2" />
             Calendar
           </Button>
+          {user?.role === 'tutor' && (
+            <Button
+              variant={mainTab === 'profile' ? 'default' : 'outline'}
+              onClick={() => setMainTab('profile')}
+              data-testid="tab-profile"
+            >
+              <User className="h-4 w-4 mr-2" />
+              My Profile
+            </Button>
+          )}
         </div>
 
         {/* Calendar Tab */}
         {mainTab === 'calendar' && (
           <TutorCalendarDashboard />
+        )}
+
+        {/* Profile Tab */}
+        {mainTab === 'profile' && user?.role === 'tutor' && (
+          <div className="max-w-3xl">
+            <Card className="eink-card border-2 border-black">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  My Profile
+                </CardTitle>
+                {!isEditingProfile ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditingProfile(true)}
+                    data-testid="button-edit-profile"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    Edit Profile
+                  </Button>
+                ) : (
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setIsEditingProfile(false);
+                        if (tutorProfile) {
+                          setProfileForm({
+                            availability: tutorProfile.availability || '',
+                            subjectsTeaching: tutorProfile.subjectsTeaching || [],
+                            branch: tutorProfile.branch || '',
+                            specialization: tutorProfile.specialization || '',
+                            qualifications: tutorProfile.qualifications || ''
+                          });
+                        }
+                      }}
+                      data-testid="button-cancel-edit"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveProfile}
+                      disabled={updateProfileMutation.isPending}
+                      data-testid="button-save-profile"
+                    >
+                      {updateProfileMutation.isPending ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Basic Info */}
+                <div className="grid grid-cols-2 gap-4 pb-4 border-b border-gray-200">
+                  <div>
+                    <Label className="text-gray-500 text-sm">Name</Label>
+                    <p className="font-medium">{user?.firstName} {user?.lastName}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500 text-sm">Email</Label>
+                    <p className="font-medium">{user?.email}</p>
+                  </div>
+                </div>
+
+                {/* Availability */}
+                <div>
+                  <Label className="text-gray-500 text-sm flex items-center gap-1">
+                    <Clock className="h-4 w-4" />
+                    Availability
+                  </Label>
+                  {isEditingProfile ? (
+                    <Textarea
+                      value={profileForm.availability}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, availability: e.target.value }))}
+                      placeholder="e.g., Mon-Fri 9am-5pm, Weekends 10am-2pm"
+                      className="mt-1"
+                      data-testid="input-availability"
+                    />
+                  ) : (
+                    <p className="font-medium mt-1">{tutorProfile?.availability || 'Not set'}</p>
+                  )}
+                </div>
+
+                {/* Subjects Teaching */}
+                <div>
+                  <Label className="text-gray-500 text-sm flex items-center gap-1">
+                    <BookOpen className="h-4 w-4" />
+                    Subjects Teaching
+                  </Label>
+                  {isEditingProfile ? (
+                    <div className="mt-1 space-y-2">
+                      <div className="flex gap-2">
+                        <Input
+                          value={newSubject}
+                          onChange={(e) => setNewSubject(e.target.value)}
+                          placeholder="Add a subject..."
+                          onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddSubject())}
+                          data-testid="input-new-subject"
+                        />
+                        <Button type="button" onClick={handleAddSubject} variant="outline" data-testid="button-add-subject">
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {profileForm.subjectsTeaching.map((subject, index) => (
+                          <Badge key={index} variant="secondary" className="flex items-center gap-1">
+                            {subject}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSubject(subject)}
+                              className="ml-1 hover:text-red-500"
+                              data-testid={`button-remove-subject-${index}`}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {tutorProfile?.subjectsTeaching && tutorProfile.subjectsTeaching.length > 0 ? (
+                        tutorProfile.subjectsTeaching.map((subject, index) => (
+                          <Badge key={index} variant="secondary">{subject}</Badge>
+                        ))
+                      ) : (
+                        <p className="text-gray-500">No subjects set</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Branch */}
+                <div>
+                  <Label className="text-gray-500 text-sm flex items-center gap-1">
+                    <MapPin className="h-4 w-4" />
+                    Branch / Location
+                  </Label>
+                  {isEditingProfile ? (
+                    <Input
+                      value={profileForm.branch}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, branch: e.target.value }))}
+                      placeholder="e.g., Downtown Center, North Campus"
+                      className="mt-1"
+                      data-testid="input-branch"
+                    />
+                  ) : (
+                    <p className="font-medium mt-1">{tutorProfile?.branch || 'Not set'}</p>
+                  )}
+                </div>
+
+                {/* Specialization */}
+                <div>
+                  <Label className="text-gray-500 text-sm flex items-center gap-1">
+                    <Star className="h-4 w-4" />
+                    Specialization
+                  </Label>
+                  {isEditingProfile ? (
+                    <Input
+                      value={profileForm.specialization}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, specialization: e.target.value }))}
+                      placeholder="e.g., Advanced Mathematics, SAT Prep"
+                      className="mt-1"
+                      data-testid="input-specialization"
+                    />
+                  ) : (
+                    <p className="font-medium mt-1">{tutorProfile?.specialization || 'Not set'}</p>
+                  )}
+                </div>
+
+                {/* Qualifications */}
+                <div>
+                  <Label className="text-gray-500 text-sm flex items-center gap-1">
+                    <GraduationCap className="h-4 w-4" />
+                    Qualifications
+                  </Label>
+                  {isEditingProfile ? (
+                    <Textarea
+                      value={profileForm.qualifications}
+                      onChange={(e) => setProfileForm(prev => ({ ...prev, qualifications: e.target.value }))}
+                      placeholder="e.g., PhD in Mathematics, 10+ years teaching experience"
+                      className="mt-1"
+                      data-testid="input-qualifications"
+                    />
+                  ) : (
+                    <p className="font-medium mt-1">{tutorProfile?.qualifications || 'Not set'}</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         )}
 
         {/* Overview Tab - Stats Overview */}
