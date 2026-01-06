@@ -113,6 +113,9 @@ export const tutors = pgTable("tutors", {
   companyId: varchar("company_id").references(() => tutoringCompanies.id), // Associate tutor with company
   specialization: text("specialization"),
   qualifications: text("qualifications"),
+  availability: text("availability"), // e.g., "Mon-Fri 9am-5pm", "Weekends only"
+  subjectsTeaching: text("subjects_teaching").array().default([]), // Array of subjects
+  branch: varchar("branch", { length: 255 }), // Branch/location of the tutor
   isVerified: boolean("is_verified").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
