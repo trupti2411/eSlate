@@ -29,36 +29,24 @@ import {
 
 type SessionStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
 
-interface CompanySession {
-  session: {
-    id: string;
-    classId: string;
-    tutorId?: string;
-    startTime: string;
-    endTime: string;
-    status: SessionStatus;
-    notes?: string;
-    attendanceLocked?: boolean;
-  };
-  class: {
-    id: string;
-    name: string;
-    subject: string;
-    maxStudents?: number;
-    location?: string;
-  };
-  tutor?: {
-    id: string;
-    firstName?: string;
-    lastName?: string;
-  };
-  attendance?: AttendanceRecord[];
-  enrolledCount?: number;
-  attendedCount?: number;
+interface ClassEvent {
+  id: string;
+  classId: string;
+  className: string;
+  subject: string;
+  tutorId?: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  location?: string;
+  dayOfWeek: number;
+  termId: string;
+  termName: string;
+  type: 'class';
 }
 
 interface CompanyCalendarData {
-  sessions: CompanySession[];
+  classes: ClassEvent[];
   holidays: CalendarHoliday[];
   activeTerm?: {
     id: string;
@@ -210,47 +198,42 @@ export function CompanyCalendarDashboard() {
   });
 
   const uniqueClasses = useMemo(() => {
-    if (!calendarData?.sessions) return [];
+    if (!calendarData?.classes) return [];
     const classMap = new Map<string, ClassInfo>();
-    calendarData.sessions.forEach((s) => {
-      if (s.class && !classMap.has(s.class.id)) {
-        classMap.set(s.class.id, {
-          id: s.class.id,
-          name: s.class.name,
-          subject: s.class.subject,
-          maxStudents: s.class.maxStudents,
-          tutorId: s.session.tutorId,
-          tutorName: s.tutor ? `${s.tutor.firstName || ''} ${s.tutor.lastName || ''}`.trim() : undefined,
+    calendarData.classes.forEach((c) => {
+      if (!classMap.has(c.classId)) {
+        classMap.set(c.classId, {
+          id: c.classId,
+          name: c.className,
+          subject: c.subject,
+          tutorId: c.tutorId,
         });
       }
     });
     return Array.from(classMap.values());
-  }, [calendarData?.sessions]);
+  }, [calendarData?.classes]);
 
   const uniqueTutors = useMemo(() => {
-    if (!calendarData?.sessions) return [];
+    if (!calendarData?.classes) return [];
     const tutorMap = new Map<string, TutorInfo>();
-    calendarData.sessions.forEach((s) => {
-      if (s.tutor && !tutorMap.has(s.tutor.id)) {
-        tutorMap.set(s.tutor.id, {
-          id: s.tutor.id,
-          firstName: s.tutor.firstName,
-          lastName: s.tutor.lastName,
+    calendarData.classes.forEach((c) => {
+      if (c.tutorId && !tutorMap.has(c.tutorId)) {
+        tutorMap.set(c.tutorId, {
+          id: c.tutorId,
         });
       }
     });
     return Array.from(tutorMap.values());
-  }, [calendarData?.sessions]);
+  }, [calendarData?.classes]);
 
-  const filteredSessions = useMemo(() => {
-    if (!calendarData?.sessions) return [];
-    return calendarData.sessions.filter((s) => {
-      const matchesClass = classFilter === "all" || s.class.id === classFilter;
-      const matchesTutor = tutorFilter === "all" || s.session.tutorId === tutorFilter;
-      const matchesStatus = statusFilter === "all" || s.session.status === statusFilter;
-      return matchesClass && matchesTutor && matchesStatus;
+  const filteredClasses = useMemo(() => {
+    if (!calendarData?.classes) return [];
+    return calendarData.classes.filter((c) => {
+      const matchesClass = classFilter === "all" || c.classId === classFilter;
+      const matchesTutor = tutorFilter === "all" || c.tutorId === tutorFilter;
+      return matchesClass && matchesTutor;
     });
-  }, [calendarData?.sessions, classFilter, tutorFilter, statusFilter]);
+  }, [calendarData?.classes, classFilter, tutorFilter]);
 
   const filteredTodaySessions = useMemo(() => {
     if (!todaySessions) return [];
@@ -263,24 +246,25 @@ export function CompanyCalendarDashboard() {
   }, [todaySessions, classFilter, tutorFilter, statusFilter]);
 
   const calendarSessions: CalendarSession[] = useMemo(() => {
-    return filteredSessions.map((s) => ({
-      id: s.session.id,
-      subject: s.class.subject,
-      className: s.class.name,
-      startTime: s.session.startTime,
-      endTime: s.session.endTime,
-      status: s.session.status,
-      tutorName: s.tutor ? `${s.tutor.firstName || ''} ${s.tutor.lastName || ''}`.trim() : undefined,
-      location: s.class.location,
-      notes: s.session.notes,
+    return filteredClasses.map((c) => ({
+      id: c.id,
+      subject: c.subject,
+      className: c.className,
+      startTime: c.startTime,
+      endTime: c.endTime,
+      status: 'scheduled' as SessionStatus,
+      location: c.location,
+      date: c.date,
     }));
-  }, [filteredSessions]);
+  }, [filteredClasses]);
 
   const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'session') {
       const sessionData = event.data as CalendarSession;
-      setSelectedSessionId(sessionData.id);
-      setIsBatchDetailsModalOpen(true);
+      toast({
+        title: sessionData.className,
+        description: `${sessionData.subject} - ${sessionData.startTime} to ${sessionData.endTime}`,
+      });
     }
   };
 

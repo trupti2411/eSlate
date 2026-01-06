@@ -1249,6 +1249,59 @@ trailer<</Size 5/Root 1 0 R>>
   // CALENDAR & ATTENDANCE SYSTEM ROUTES
   // ==========================================
 
+  // Helper function to generate class events from classes based on their term dates
+  function generateClassEvents(classes: any[], terms: any[], viewStart?: Date, viewEnd?: Date): any[] {
+    const events: any[] = [];
+    
+    for (const classItem of classes) {
+      if (!classItem.isActive) continue;
+      
+      // Find the term for this class
+      const term = terms.find((t: any) => t.id === classItem.termId);
+      if (!term) continue;
+      
+      const termStart = new Date(term.startDate);
+      const termEnd = new Date(term.endDate);
+      
+      // Determine the range to generate events for
+      const rangeStart = viewStart && viewStart > termStart ? viewStart : termStart;
+      const rangeEnd = viewEnd && viewEnd < termEnd ? viewEnd : termEnd;
+      
+      // Generate events for each occurrence of the class's dayOfWeek within the range
+      const current = new Date(rangeStart);
+      // Move to the first occurrence of the dayOfWeek
+      while (current.getDay() !== classItem.dayOfWeek && current <= rangeEnd) {
+        current.setDate(current.getDate() + 1);
+      }
+      
+      while (current <= rangeEnd) {
+        const year = current.getFullYear();
+        const month = String(current.getMonth() + 1).padStart(2, '0');
+        const day = String(current.getDate()).padStart(2, '0');
+        
+        events.push({
+          id: `class-${classItem.id}-${year}-${month}-${day}`,
+          classId: classItem.id,
+          className: classItem.name,
+          subject: classItem.subject,
+          tutorId: classItem.tutorId,
+          date: `${year}-${month}-${day}`,
+          startTime: `${year}-${month}-${day}T${classItem.startTime}:00`,
+          endTime: `${year}-${month}-${day}T${classItem.endTime}:00`,
+          location: classItem.location,
+          dayOfWeek: classItem.dayOfWeek,
+          termId: term.id,
+          termName: term.name,
+          type: 'class'
+        });
+        
+        current.setDate(current.getDate() + 7); // Move to next week
+      }
+    }
+    
+    return events;
+  }
+
   // Get calendar data for company admin
   app.get('/api/calendar/company', isAuthenticated, async (req: any, res: any) => {
     try {
@@ -1262,46 +1315,44 @@ trailer<</Size 5/Root 1 0 R>>
         return res.status(404).json({ message: "Company admin not found" });
       }
 
-      const { startDate, endDate, classId, tutorId, status } = req.query;
+      const { startDate, endDate, classId, tutorId } = req.query;
       const start = startDate ? new Date(startDate as string) : undefined;
       const end = endDate ? new Date(endDate as string) : undefined;
 
-      const sessions = await storage.getClassSessionsByCompany(companyAdmin.companyId, start, end);
+      // Get classes and terms for this company
+      const classes = await storage.getClassesByCompany(companyAdmin.companyId);
+      const academicTerms = await storage.getAcademicTermsByCompany(companyAdmin.companyId);
       const holidays = await storage.getAcademicHolidaysByCompany(companyAdmin.companyId);
       
-      // Get active academic term for the company
-      const academicTerms = await storage.getAcademicTermsByCompany(companyAdmin.companyId);
+      // Generate class events from classes based on term dates
+      let classEvents = generateClassEvents(classes, academicTerms, start, end);
+      
+      // Filter by classId if provided
+      if (classId) {
+        classEvents = classEvents.filter((e: any) => e.classId === classId);
+      }
+      // Filter by tutorId if provided
+      if (tutorId) {
+        classEvents = classEvents.filter((e: any) => e.tutorId === tutorId);
+      }
+      
+      // Find active term
       const now = new Date();
-      // First try to find a term where current date is within the range and term is active
       let activeTerm = academicTerms.find((term: any) => {
         const termStart = new Date(term.startDate);
         const termEnd = new Date(term.endDate);
         const isActive = term.isActive === true || term.isActive === 1;
         return isActive && now >= termStart && now <= termEnd;
       });
-      // Fallback to any active term if no current one found
       if (!activeTerm) {
         activeTerm = academicTerms.find((term: any) => term.isActive === true || term.isActive === 1);
       }
-      // Final fallback: first term in the list
       if (!activeTerm && academicTerms.length > 0) {
         activeTerm = academicTerms[0];
       }
 
-      // Filter by additional criteria if provided
-      let filteredSessions = sessions;
-      if (classId) {
-        filteredSessions = filteredSessions.filter((s: any) => s.session.classId === classId);
-      }
-      if (tutorId) {
-        filteredSessions = filteredSessions.filter((s: any) => s.session.tutorId === tutorId);
-      }
-      if (status) {
-        filteredSessions = filteredSessions.filter((s: any) => s.session.status === status);
-      }
-
       res.json({ 
-        sessions: filteredSessions, 
+        classes: classEvents, 
         holidays,
         activeTerm: activeTerm ? {
           id: activeTerm.id,
