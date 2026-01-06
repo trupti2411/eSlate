@@ -302,6 +302,7 @@ export interface IStorage {
     bySubject: { subject: string; minutes: number }[];
     byWeek: { week: string; minutes: number }[];
   }>;
+  getClassAttendanceHistory(classId: string, limit?: number): Promise<any[]>;
 
   // Academic Holiday operations
   createAcademicHoliday(holidayData: InsertAcademicHoliday): Promise<AcademicHoliday>;
@@ -2081,6 +2082,49 @@ export class DatabaseStorage implements IStorage {
       .orderBy(classSessions.sessionDate);
   }
 
+  async getOrCreateSessionForDate(classId: string, date: Date, tutorId?: string): Promise<ClassSession> {
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const [existingSession] = await db.select().from(classSessions)
+      .where(and(
+        eq(classSessions.classId, classId),
+        sql`${classSessions.sessionDate} >= ${startOfDay}`,
+        sql`${classSessions.sessionDate} <= ${endOfDay}`
+      ));
+
+    if (existingSession) {
+      return existingSession;
+    }
+
+    const classInfo = await this.getClass(classId);
+    if (!classInfo) {
+      throw new Error("Class not found");
+    }
+
+    const startTime = classInfo.startTime || "09:00";
+    const endTime = classInfo.endTime || "10:00";
+    const [startH, startM] = startTime.split(':').map(Number);
+    const [endH, endM] = endTime.split(':').map(Number);
+    const durationMinutes = ((endH * 60 + endM) - (startH * 60 + startM)) || 60;
+
+    const sessionData: InsertClassSession = {
+      classId,
+      tutorId: tutorId || classInfo.tutorId || undefined,
+      sessionDate: date,
+      startTime,
+      endTime,
+      durationMinutes,
+      status: "scheduled",
+      deliveryMode: "in_person",
+    };
+
+    const [newSession] = await db.insert(classSessions).values(sessionData).returning();
+    return newSession;
+  }
+
   async getClassSessionsByTutor(tutorId: string, startDate?: Date, endDate?: Date): Promise<ClassSession[]> {
     let query = db.select().from(classSessions).where(eq(classSessions.tutorId, tutorId));
     
@@ -2537,6 +2581,51 @@ export class DatabaseStorage implements IStorage {
       bySubject: Object.entries(subjectMinutes).map(([subject, minutes]) => ({ subject, minutes })),
       byWeek: Object.entries(weekMinutes).map(([week, minutes]) => ({ week, minutes })).sort((a, b) => a.week.localeCompare(b.week)),
     };
+  }
+
+  async getClassAttendanceHistory(classId: string, limit: number = 10): Promise<any[]> {
+    const sessions = await db.select({
+      session: classSessions,
+    })
+    .from(classSessions)
+    .where(eq(classSessions.classId, classId))
+    .orderBy(sql`${classSessions.sessionDate} DESC`)
+    .limit(limit);
+
+    const result = [];
+    for (const { session } of sessions) {
+      const attendance = await db.select({
+        attendance: sessionAttendance,
+        student: students,
+        user: users,
+      })
+      .from(sessionAttendance)
+      .innerJoin(students, eq(sessionAttendance.studentId, students.id))
+      .innerJoin(users, eq(students.userId, users.id))
+      .where(eq(sessionAttendance.sessionId, session.id));
+
+      const presentCount = attendance.filter((a: any) => 
+        a.attendance.status === 'present' || a.attendance.status === 'late'
+      ).length;
+
+      result.push({
+        session,
+        attendance: attendance.map((a: any) => ({
+          id: a.attendance.id,
+          studentId: a.attendance.studentId,
+          status: a.attendance.status,
+          notes: a.attendance.notes,
+          studentName: `${a.user.firstName || ''} ${a.user.lastName || ''}`.trim() || a.user.email,
+        })),
+        summary: {
+          total: attendance.length,
+          present: presentCount,
+          absent: attendance.length - presentCount,
+        },
+      });
+    }
+
+    return result;
   }
 
   // ==========================================

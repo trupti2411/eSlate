@@ -168,6 +168,12 @@ export function CompanyCalendarDashboard() {
   const [isClassDetailsModalOpen, setIsClassDetailsModalOpen] = useState(false);
   const [selectedClassEvent, setSelectedClassEvent] = useState<ClassEvent | null>(null);
   const [tempStudentToAdd, setTempStudentToAdd] = useState<string>("");
+  const [isRollCallMode, setIsRollCallMode] = useState(false);
+  const [rollCallSession, setRollCallSession] = useState<{ id: string; date: string } | null>(null);
+  const [rollCallAttendance, setRollCallAttendance] = useState<Record<string, AttendanceStatus>>({});
+  const [rollCallNotes, setRollCallNotes] = useState<Record<string, string>>({});
+  const [isLoadingRollCall, setIsLoadingRollCall] = useState(false);
+  const [showAttendanceHistory, setShowAttendanceHistory] = useState(false);
 
   const { data: calendarData, isLoading: isCalendarLoading } = useQuery<CompanyCalendarData>({
     queryKey: ['/api/calendar/company'],
@@ -206,6 +212,17 @@ export function CompanyCalendarDashboard() {
   const { data: companyTutors } = useQuery<{ id: string; userId: string; user?: { firstName?: string; lastName?: string; email?: string } }[]>({
     queryKey: ['/api/companies', companyId, 'tutors'],
     enabled: !!companyId && isClassDetailsModalOpen,
+  });
+
+  interface AttendanceHistorySession {
+    session: { id: string; sessionDate: string; startTime: string; endTime: string };
+    attendance: Array<{ id: string; studentId: string; status: AttendanceStatus; notes?: string; studentName: string }>;
+    summary: { total: number; present: number; absent: number };
+  }
+
+  const { data: attendanceHistory, isLoading: isHistoryLoading } = useQuery<AttendanceHistorySession[]>({
+    queryKey: ['/api/classes', selectedClassEvent?.classId, 'attendance-history'],
+    enabled: !!selectedClassEvent?.classId && showAttendanceHistory,
   });
 
   const updateTutorMutation = useMutation({
@@ -292,6 +309,52 @@ export function CompanyCalendarDashboard() {
       queryClient.invalidateQueries({ queryKey: ['/api/calendar/company'] });
       setIsOverrideModalOpen(false);
       refetchAttendance();
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const startRollCallMutation = useMutation({
+    mutationFn: async ({ classId, date, tutorId }: { classId: string; date: string; tutorId?: string }) => {
+      return apiRequest(`/api/classes/${classId}/session-for-date`, "POST", { date, tutorId });
+    },
+    onSuccess: (data: { session: { id: string }; attendance: Array<{ studentId: string; status: AttendanceStatus }> }) => {
+      setRollCallSession({ id: data.session.id, date: selectedClassEvent?.date || format(new Date(), 'yyyy-MM-dd') });
+      const existingAttendance: Record<string, AttendanceStatus> = {};
+      data.attendance.forEach((a) => {
+        existingAttendance[a.studentId] = a.status;
+      });
+      if (classStudents) {
+        classStudents.forEach((s) => {
+          const studentId = s.student?.id || s.studentId;
+          if (!existingAttendance[studentId]) {
+            existingAttendance[studentId] = "absent";
+          }
+        });
+      }
+      setRollCallAttendance(existingAttendance);
+      setRollCallNotes({});
+      setIsRollCallMode(true);
+      setIsLoadingRollCall(false);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+      setIsLoadingRollCall(false);
+    },
+  });
+
+  const saveRollCallMutation = useMutation({
+    mutationFn: async ({ sessionId, attendanceList }: { sessionId: string; attendanceList: Array<{ studentId: string; status: AttendanceStatus; notes?: string }> }) => {
+      return apiRequest(`/api/sessions/${sessionId}/attendance/bulk`, "POST", { attendanceList });
+    },
+    onSuccess: () => {
+      toast({ title: "Attendance saved", description: "Roll call has been recorded successfully." });
+      setIsRollCallMode(false);
+      setRollCallSession(null);
+      setRollCallAttendance({});
+      setRollCallNotes({});
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions/today'] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -1052,32 +1115,230 @@ export function CompanyCalendarDashboard() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <ClipboardCheck className="w-4 h-4" />
-                Roll Call
+                Roll Call {isRollCallMode && rollCallSession && `- ${rollCallSession.date}`}
               </p>
               {classStudents && classStudents.length > 0 ? (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    Take attendance for today's class session. This will create or update attendance records.
-                  </p>
-                  <Button
-                    className="w-full"
-                    variant="outline"
-                    onClick={() => {
-                      toast({
-                        title: "Roll Call",
-                        description: `Starting roll call for ${classStudents.length} students in ${selectedClassEvent?.className}`,
-                      });
-                    }}
-                    data-testid="btn-start-roll-call"
-                  >
-                    <ClipboardCheck className="w-4 h-4 mr-2" />
-                    Start Roll Call ({classStudents.length} students)
-                  </Button>
+                <div className="space-y-3">
+                  {!isRollCallMode ? (
+                    <>
+                      <p className="text-xs text-muted-foreground">
+                        Take attendance for this class session. This will create or update attendance records.
+                      </p>
+                      <Button
+                        className="w-full"
+                        variant="outline"
+                        disabled={isLoadingRollCall || startRollCallMutation.isPending}
+                        onClick={() => {
+                          if (selectedClassEvent) {
+                            setIsLoadingRollCall(true);
+                            startRollCallMutation.mutate({
+                              classId: selectedClassEvent.classId,
+                              date: selectedClassEvent.date,
+                              tutorId: selectedClassEvent.tutorId,
+                            });
+                          }
+                        }}
+                        data-testid="btn-start-roll-call"
+                      >
+                        {isLoadingRollCall ? (
+                          <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <ClipboardCheck className="w-4 h-4 mr-2" />
+                        )}
+                        Start Roll Call ({classStudents.length} students)
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex gap-2 text-xs">
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                          Present: {Object.values(rollCallAttendance).filter(s => s === 'present').length}
+                        </Badge>
+                        <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                          Absent: {Object.values(rollCallAttendance).filter(s => s === 'absent').length}
+                        </Badge>
+                        <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                          Late: {Object.values(rollCallAttendance).filter(s => s === 'late').length}
+                        </Badge>
+                      </div>
+                      
+                      <ScrollArea className="h-[200px] border rounded-md p-2">
+                        <div className="space-y-2">
+                          {classStudents.map((enrollment) => {
+                            const studentId = enrollment.student?.id || enrollment.studentId;
+                            const firstName = enrollment.student?.user?.firstName || '';
+                            const lastName = enrollment.student?.user?.lastName || '';
+                            return (
+                              <div key={studentId} className="flex items-center justify-between p-2 border rounded-md bg-muted/30">
+                                <span className="text-sm font-medium">
+                                  {firstName} {lastName}
+                                </span>
+                                <div className="flex gap-1">
+                                  <Button
+                                    size="sm"
+                                    variant={rollCallAttendance[studentId] === 'present' ? 'default' : 'outline'}
+                                    className={rollCallAttendance[studentId] === 'present' ? 'bg-green-600 hover:bg-green-700' : ''}
+                                    onClick={() => setRollCallAttendance(prev => ({ ...prev, [studentId]: 'present' }))}
+                                    data-testid={`btn-present-${studentId}`}
+                                  >
+                                    <CheckCircle2 className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={rollCallAttendance[studentId] === 'late' ? 'default' : 'outline'}
+                                    className={rollCallAttendance[studentId] === 'late' ? 'bg-yellow-600 hover:bg-yellow-700' : ''}
+                                    onClick={() => setRollCallAttendance(prev => ({ ...prev, [studentId]: 'late' }))}
+                                    data-testid={`btn-late-${studentId}`}
+                                  >
+                                    <Clock className="w-4 h-4" />
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant={rollCallAttendance[studentId] === 'absent' ? 'default' : 'outline'}
+                                    className={rollCallAttendance[studentId] === 'absent' ? 'bg-red-600 hover:bg-red-700' : ''}
+                                    onClick={() => setRollCallAttendance(prev => ({ ...prev, [studentId]: 'absent' }))}
+                                    data-testid={`btn-absent-${studentId}`}
+                                  >
+                                    <UserX className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const allPresent: Record<string, AttendanceStatus> = {};
+                            classStudents.forEach(s => { 
+                              const sid = s.student?.id || s.studentId;
+                              allPresent[sid] = 'present'; 
+                            });
+                            setRollCallAttendance(allPresent);
+                          }}
+                          data-testid="btn-mark-all-present"
+                        >
+                          <UserCheck className="w-4 h-4 mr-1" />
+                          All Present
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setIsRollCallMode(false);
+                            setRollCallSession(null);
+                            setRollCallAttendance({});
+                          }}
+                          data-testid="btn-cancel-roll-call"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={saveRollCallMutation.isPending}
+                          onClick={() => {
+                            if (rollCallSession) {
+                              const attendanceList = Object.entries(rollCallAttendance).map(([studentId, status]) => ({
+                                studentId,
+                                status,
+                                notes: rollCallNotes[studentId],
+                              }));
+                              saveRollCallMutation.mutate({
+                                sessionId: rollCallSession.id,
+                                attendanceList,
+                              });
+                            }
+                          }}
+                          data-testid="btn-save-roll-call"
+                        >
+                          {saveRollCallMutation.isPending ? (
+                            <RefreshCw className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                          )}
+                          Save Attendance
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-muted-foreground py-2">
                   No students enrolled. Add students to enable roll call.
                 </p>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <CalendarDays className="w-4 h-4" />
+                  Attendance History
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowAttendanceHistory(!showAttendanceHistory)}
+                  data-testid="btn-toggle-history"
+                >
+                  {showAttendanceHistory ? 'Hide' : 'View History'}
+                </Button>
+              </div>
+              
+              {showAttendanceHistory && (
+                <div className="space-y-2">
+                  {isHistoryLoading ? (
+                    <div className="flex items-center justify-center py-4">
+                      <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                      <span className="text-sm text-muted-foreground">Loading history...</span>
+                    </div>
+                  ) : attendanceHistory && attendanceHistory.length > 0 ? (
+                    <ScrollArea className="h-[200px] border rounded-md p-2">
+                      <div className="space-y-3">
+                        {attendanceHistory.map((record) => (
+                          <div key={record.session.id} className="p-2 border rounded-md bg-muted/20">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm font-medium">
+                                {format(new Date(record.session.sessionDate), 'MMM d, yyyy')}
+                              </span>
+                              <div className="flex gap-1 text-xs">
+                                <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                                  {record.summary.present} present
+                                </Badge>
+                                <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200">
+                                  {record.summary.absent} absent
+                                </Badge>
+                              </div>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {record.session.startTime} - {record.session.endTime}
+                            </div>
+                            {record.attendance.length > 0 && (
+                              <div className="mt-2 grid grid-cols-2 gap-1 text-xs">
+                                {record.attendance.map((a) => (
+                                  <div key={a.id} className="flex items-center gap-1">
+                                    <AttendanceStatusBadge status={a.status} />
+                                    <span className="truncate">{a.studentName}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  ) : (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No attendance records yet. Start a roll call to record attendance.
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -1089,6 +1350,10 @@ export function CompanyCalendarDashboard() {
                 setIsClassDetailsModalOpen(false);
                 setSelectedClassEvent(null);
                 setTempStudentToAdd("");
+                setIsRollCallMode(false);
+                setRollCallSession(null);
+                setRollCallAttendance({});
+                setShowAttendanceHistory(false);
               }}
               data-testid="btn-close-class-details"
             >

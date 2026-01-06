@@ -1698,6 +1698,43 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Get or create session for a class on a specific date (for roll call)
+  app.post('/api/classes/:classId/session-for-date', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { classId } = req.params;
+      const { date, tutorId } = req.body;
+
+      const session = await storage.getOrCreateSessionForDate(classId, new Date(date), tutorId);
+      
+      // Get attendance records for this session
+      const attendance = await storage.getAttendanceBySession(session.id);
+      
+      res.json({ session, attendance });
+    } catch (error) {
+      console.error("Error getting/creating session:", error);
+      res.status(500).json({ message: "Failed to get or create session" });
+    }
+  });
+
+  // Get attendance history for a class
+  app.get('/api/classes/:classId/attendance-history', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const limit = parseInt(req.query.limit as string) || 10;
+      
+      const history = await storage.getClassAttendanceHistory(classId, limit);
+      res.json(history);
+    } catch (error) {
+      console.error("Error fetching attendance history:", error);
+      res.status(500).json({ message: "Failed to fetch attendance history" });
+    }
+  });
+
   // ==========================================
   // ATTENDANCE ROUTES
   // ==========================================
