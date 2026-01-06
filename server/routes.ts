@@ -2037,13 +2037,17 @@ trailer<</Size 5/Root 1 0 R>>
       const user = req.user!;
       const { tutorId } = req.params;
 
-      if (user.role !== 'company_admin' && user.role !== 'admin') {
-        return res.status(403).json({ message: "Company admin or admin access required" });
-      }
-
       const tutor = await storage.getTutor(tutorId);
       if (!tutor) {
         return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      // Allow tutors to update their own profile, or company admins/admins to update any tutor
+      const isSelfUpdate = user.role === 'tutor' && tutor.userId === user.id;
+      const isAdminUpdate = user.role === 'company_admin' || user.role === 'admin';
+      
+      if (!isSelfUpdate && !isAdminUpdate) {
+        return res.status(403).json({ message: "Access denied" });
       }
 
       // Verify company admin has access to this tutor's company
@@ -2054,8 +2058,14 @@ trailer<</Size 5/Root 1 0 R>>
         }
       }
 
-      const { specialization, qualifications } = req.body;
-      const updatedTutor = await storage.updateTutor(tutorId, { specialization, qualifications });
+      const { specialization, qualifications, availability, subjectsTeaching, branch } = req.body;
+      const updatedTutor = await storage.updateTutor(tutorId, { 
+        specialization, 
+        qualifications,
+        availability,
+        subjectsTeaching,
+        branch
+      });
       res.json(updatedTutor);
     } catch (error) {
       console.error("Error updating tutor:", error);
