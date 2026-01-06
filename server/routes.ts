@@ -2814,6 +2814,72 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Update class tutor
+  app.patch('/api/classes/:classId/tutor', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const { tutorId } = req.body;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      // Get the class to verify ownership
+      const classData = await storage.getClass(classId);
+      if (!classData) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+
+      // Verify company admin has access to this class's company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin) {
+          return res.status(403).json({ message: "Company admin not found" });
+        }
+        // Get the term to check company ownership
+        const term = await storage.getAcademicTerm(classData.termId);
+        if (!term) {
+          return res.status(404).json({ message: "Term not found" });
+        }
+        const year = await storage.getAcademicYear(term.academicYearId);
+        if (!year || year.companyId !== companyAdmin.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Get class's company through term -> year chain
+      const term = await storage.getAcademicTerm(classData.termId);
+      if (!term) {
+        return res.status(404).json({ message: "Term not found" });
+      }
+      const year = await storage.getAcademicYear(term.academicYearId);
+      if (!year) {
+        return res.status(404).json({ message: "Academic year not found" });
+      }
+      const classCompanyId = year.companyId;
+
+      // If tutorId is provided, verify tutor exists and belongs to same company
+      if (tutorId) {
+        const tutor = await storage.getTutor(tutorId);
+        if (!tutor) {
+          return res.status(404).json({ message: "Tutor not found" });
+        }
+        // Verify tutor belongs to the same company as the class
+        if (tutor.companyId !== classCompanyId) {
+          return res.status(400).json({ message: "Tutor must belong to the same company as the class" });
+        }
+      }
+
+      // Update the class with the new tutor
+      const updatedClass = await storage.updateClass(classId, { tutorId: tutorId || null });
+      res.json(updatedClass);
+    } catch (error) {
+      console.error("Error updating class tutor:", error);
+      res.status(500).json({ message: "Failed to update class tutor" });
+    }
+  });
+
   // Permanently delete a class
   app.delete('/api/companies/:companyId/classes/:classId', isAuthenticated, async (req: any, res: any) => {
     try {

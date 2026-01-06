@@ -194,6 +194,33 @@ export function CompanyCalendarDashboard() {
     enabled: isClassDetailsModalOpen,
   });
 
+  // Get company ID from user context for tutor fetching
+  const { data: authUser } = useQuery<{ companyAdminProfile?: { companyId: string } }>({
+    queryKey: ['/api/auth/user'],
+  });
+  const companyId = authUser?.companyAdminProfile?.companyId;
+
+  const { data: companyTutors } = useQuery<{ id: string; userId: string; user?: { firstName?: string; lastName?: string; email?: string } }[]>({
+    queryKey: ['/api/companies', companyId, 'tutors'],
+    enabled: !!companyId && isClassDetailsModalOpen,
+  });
+
+  const updateTutorMutation = useMutation({
+    mutationFn: async ({ classId, tutorId }: { classId: string; tutorId: string | null }) => {
+      return apiRequest(`/api/classes/${classId}/tutor`, "PATCH", { tutorId });
+    },
+    onSuccess: () => {
+      toast({ title: "Tutor updated", description: "The class tutor has been changed successfully." });
+      queryClient.invalidateQueries({ queryKey: ['/api/calendar/company'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/sessions/today'] });
+      setIsClassDetailsModalOpen(false);
+      setSelectedClassEvent(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
   const overrideAttendanceMutation = useMutation({
     mutationFn: async ({ attendanceId, status, notes }: { attendanceId: string; status: string; notes?: string }) => {
       return apiRequest(`/api/attendance/${attendanceId}/override`, "POST", { status, notes });
@@ -785,9 +812,30 @@ export function CompanyCalendarDashboard() {
               </div>
               <div className="space-y-1">
                 <p className="text-sm font-medium text-muted-foreground">Tutor</p>
-                <p data-testid="class-tutor" className="font-medium">
-                  {selectedClassEvent?.tutorName || 'Unassigned'}
-                </p>
+                <Select 
+                  value={selectedClassEvent?.tutorId || "__unassigned__"} 
+                  onValueChange={(value) => {
+                    if (selectedClassEvent?.classId) {
+                      updateTutorMutation.mutate({ 
+                        classId: selectedClassEvent.classId, 
+                        tutorId: value === "__unassigned__" ? null : value 
+                      });
+                    }
+                  }}
+                  disabled={updateTutorMutation.isPending}
+                >
+                  <SelectTrigger className="w-full" data-testid="select-class-tutor">
+                    <SelectValue placeholder="Select tutor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__unassigned__">Unassigned</SelectItem>
+                    {companyTutors?.map((tutor) => (
+                      <SelectItem key={tutor.id} value={tutor.id}>
+                        {tutor.user?.firstName || ''} {tutor.user?.lastName || tutor.user?.email || 'Unknown'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
