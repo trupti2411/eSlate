@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import Layout from "@/components/Layout";
 import { 
   BookOpen, 
   Clock, 
@@ -197,15 +198,16 @@ export default function HomeworkManagement() {
   });
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Homework Management</h1>
-          <p className="text-gray-600 mt-1">Create, manage, and grade homework assignments</p>
-        </div>
+    <Layout>
+      <div className="p-6 space-y-6" data-testid="homework-management-page">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-black">Homework Management</h1>
+            <p className="text-muted-foreground mt-1">Create, manage, and grade homework assignments</p>
+          </div>
         <Dialog open={isCreateAssignmentOpen} onOpenChange={setIsCreateAssignmentOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800">
               <BookOpen className="w-4 h-4 mr-2" />
               Create Assignment
             </Button>
@@ -341,10 +343,10 @@ export default function HomeworkManagement() {
       </div>
 
       <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-        <TabsList>
-          <TabsTrigger value="assignments">All Assignments</TabsTrigger>
-          <TabsTrigger value="submissions">Submissions to Grade</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+        <TabsList className="border-2 border-black">
+          <TabsTrigger value="assignments" data-testid="tab-assignments">All Assignments</TabsTrigger>
+          <TabsTrigger value="submissions" data-testid="tab-submissions">Submissions to Grade</TabsTrigger>
+          <TabsTrigger value="analytics" data-testid="tab-analytics">Analytics</TabsTrigger>
         </TabsList>
 
         <TabsContent value="assignments" className="space-y-4">
@@ -366,16 +368,16 @@ export default function HomeworkManagement() {
             {assignmentsLoading ? (
               <div className="text-center py-8">Loading assignments...</div>
             ) : filteredAssignments.length === 0 ? (
-              <Card>
+              <Card className="border-2 border-black">
                 <CardContent className="text-center py-8">
-                  <BookOpen className="w-12 h-12 mx-auto text-gray-400 mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No assignments found</h3>
-                  <p className="text-gray-600">Create your first assignment to get started.</p>
+                  <BookOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-medium text-black mb-2">No assignments found</h3>
+                  <p className="text-muted-foreground">Create your first assignment to get started.</p>
                 </CardContent>
               </Card>
             ) : (
               filteredAssignments.map((assignment) => (
-                <Card key={assignment.id} className="hover:shadow-md transition-shadow">
+                <Card key={assignment.id} className="border-2 border-black hover:shadow-lg transition-shadow">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
@@ -465,13 +467,13 @@ export default function HomeworkManagement() {
         </TabsContent>
 
         <TabsContent value="submissions">
-          <Card>
+          <Card className="border-2 border-black">
             <CardHeader>
               <CardTitle>Submissions Requiring Grading</CardTitle>
               <CardDescription>Review and grade student submissions</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="text-center py-8 text-gray-600">
+              <div className="text-center py-8 text-muted-foreground">
                 No submissions requiring grading at this time.
               </div>
             </CardContent>
@@ -480,42 +482,43 @@ export default function HomeworkManagement() {
 
         <TabsContent value="analytics">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
+            <Card className="border-2 border-black">
               <CardHeader>
                 <CardTitle>Total Assignments</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">{assignments.length}</div>
-                <p className="text-gray-600 text-sm">Active assignments</p>
+                <div className="text-3xl font-bold text-black">{assignments.length}</div>
+                <p className="text-muted-foreground text-sm">Active assignments</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-2 border-black">
               <CardHeader>
                 <CardTitle>Pending Submissions</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">
+                <div className="text-3xl font-bold text-black">
                   {assignments.reduce((acc, assignment) => 
                     acc + assignment.submissions.filter(s => s.status === 'submitted').length, 0
                   )}
                 </div>
-                <p className="text-gray-600 text-sm">Awaiting review</p>
+                <p className="text-muted-foreground text-sm">Awaiting review</p>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="border-2 border-black">
               <CardHeader>
                 <CardTitle>Average Score</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold">--</div>
-                <p className="text-gray-600 text-sm">Across all assignments</p>
+                <div className="text-3xl font-bold text-black">--</div>
+                <p className="text-muted-foreground text-sm">Across all assignments</p>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </Layout>
   );
 }
