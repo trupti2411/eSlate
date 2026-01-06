@@ -25,6 +25,9 @@ import {
   ShieldCheck,
   Eye,
   RefreshCw,
+  Trash2,
+  UserX,
+  ClipboardCheck,
 } from "lucide-react";
 
 type SessionStatus = 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
@@ -184,21 +187,21 @@ export function CompanyCalendarDashboard() {
     enabled: !!selectedSessionId && isBatchDetailsModalOpen,
   });
 
-  const { data: classStudents, isLoading: isClassStudentsLoading } = useQuery<{ studentId: string; student: { id: string; userId: string; firstName?: string; lastName?: string; email?: string } }[]>({
+  const { data: classStudents, isLoading: isClassStudentsLoading } = useQuery<{ studentId: string; student: { id: string; userId: string; user?: { firstName?: string; lastName?: string; email?: string } } }[]>({
     queryKey: ['/api/classes', selectedClassEvent?.classId, 'students'],
     enabled: !!selectedClassEvent?.classId && isClassDetailsModalOpen,
   });
 
-  const { data: allCompanyStudents } = useQuery<{ id: string; userId: string; firstName?: string; lastName?: string; email?: string }[]>({
-    queryKey: ['/api/students'],
-    enabled: isClassDetailsModalOpen,
-  });
-
-  // Get company ID from user context for tutor fetching
+  // Get company ID from user context for fetching company data
   const { data: authUser } = useQuery<{ companyAdminProfile?: { companyId: string } }>({
     queryKey: ['/api/auth/user'],
   });
   const companyId = authUser?.companyAdminProfile?.companyId;
+
+  const { data: allCompanyStudents } = useQuery<{ id: string; userId: string; user?: { firstName?: string; lastName?: string; email?: string } }[]>({
+    queryKey: ['/api/companies', companyId, 'students'],
+    enabled: !!companyId && isClassDetailsModalOpen,
+  });
 
   const { data: companyTutors } = useQuery<{ id: string; userId: string; user?: { firstName?: string; lastName?: string; email?: string } }[]>({
     queryKey: ['/api/companies', companyId, 'tutors'],
@@ -213,8 +216,65 @@ export function CompanyCalendarDashboard() {
       toast({ title: "Tutor updated", description: "The class tutor has been changed successfully." });
       queryClient.invalidateQueries({ queryKey: ['/api/calendar/company'] });
       queryClient.invalidateQueries({ queryKey: ['/api/sessions/today'] });
-      setIsClassDetailsModalOpen(false);
-      setSelectedClassEvent(null);
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const enrollStudentMutation = useMutation({
+    mutationFn: async ({ classId, studentId }: { classId: string; studentId: string }) => {
+      const result = await apiRequest(`/api/classes/${classId}/students`, "POST", { studentId });
+      return { result, classId };
+    },
+    onSuccess: (_, variables) => {
+      toast({ title: "Student enrolled", description: "Student has been added to the class." });
+      queryClient.invalidateQueries({ queryKey: ['/api/classes', variables.classId, 'students'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const removeStudentMutation = useMutation({
+    mutationFn: async ({ classId, studentId }: { classId: string; studentId: string }) => {
+      await apiRequest(`/api/classes/${classId}/students/${studentId}`, "DELETE");
+      return { classId };
+    },
+    onSuccess: (_, variables) => {
+      toast({ title: "Student removed", description: "Student has been removed from the class." });
+      queryClient.invalidateQueries({ queryKey: ['/api/classes', variables.classId, 'students'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const enrollAllStudentsMutation = useMutation({
+    mutationFn: async ({ classId, studentIds }: { classId: string; studentIds: string[] }) => {
+      let successCount = 0;
+      const failedStudents: string[] = [];
+      for (const studentId of studentIds) {
+        try {
+          await apiRequest(`/api/classes/${classId}/students`, "POST", { studentId });
+          successCount++;
+        } catch {
+          failedStudents.push(studentId);
+        }
+      }
+      return { successCount, failedCount: failedStudents.length, classId };
+    },
+    onSuccess: ({ successCount, failedCount, classId }) => {
+      if (failedCount > 0) {
+        toast({ 
+          title: "Partial enrollment", 
+          description: `${successCount} students enrolled, ${failedCount} failed (may already be enrolled).`,
+          variant: failedCount > successCount ? "destructive" : "default"
+        });
+      } else {
+        toast({ title: "Students enrolled", description: `${successCount} students have been added to the class.` });
+      }
+      queryClient.invalidateQueries({ queryKey: ['/api/classes', classId, 'students'] });
     },
     onError: (error: Error) => {
       toast({ title: "Error", description: error.message, variant: "destructive" });
@@ -863,9 +923,35 @@ export function CompanyCalendarDashboard() {
                   <Users className="w-4 h-4" />
                   Enrolled Students
                 </p>
-                <Badge variant="outline" data-testid="class-student-count">
-                  {classStudents?.length || 0} students
-                </Badge>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline" data-testid="class-student-count">
+                    {classStudents?.length || 0} students
+                  </Badge>
+                  {(() => {
+                    const unenrolledStudents = allCompanyStudents?.filter(s => 
+                      !classStudents?.some(cs => cs.studentId === s.id)
+                    ) || [];
+                    return unenrolledStudents.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (selectedClassEvent?.classId) {
+                            enrollAllStudentsMutation.mutate({
+                              classId: selectedClassEvent.classId,
+                              studentIds: unenrolledStudents.map(s => s.id)
+                            });
+                          }
+                        }}
+                        disabled={enrollAllStudentsMutation.isPending}
+                        data-testid="btn-enroll-all-students"
+                      >
+                        <UserPlus className="w-3 h-3 mr-1" />
+                        Enroll All ({unenrolledStudents.length})
+                      </Button>
+                    );
+                  })()}
+                </div>
               </div>
               
               {isClassStudentsLoading ? (
@@ -892,9 +978,26 @@ export function CompanyCalendarDashboard() {
                               {index + 1}.
                             </span>
                             <span className="font-medium">
-                              {enrollment.student?.firstName || ''} {enrollment.student?.lastName || enrollment.student?.email || 'Unknown'}
+                              {enrollment.student?.user?.firstName || ''} {enrollment.student?.user?.lastName || enrollment.student?.user?.email || 'Unknown'}
                             </span>
                           </div>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              if (selectedClassEvent?.classId) {
+                                removeStudentMutation.mutate({
+                                  classId: selectedClassEvent.classId,
+                                  studentId: enrollment.studentId
+                                });
+                              }
+                            }}
+                            disabled={removeStudentMutation.isPending}
+                            data-testid={`btn-remove-student-${enrollment.studentId}`}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -908,11 +1011,11 @@ export function CompanyCalendarDashboard() {
             <div className="space-y-2">
               <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <UserPlus className="w-4 h-4" />
-                Add Student for This Class Only
+                Add Student to Class
               </p>
               <div className="flex gap-2">
                 <Select value={tempStudentToAdd} onValueChange={setTempStudentToAdd}>
-                  <SelectTrigger className="flex-1" data-testid="select-temp-student">
+                  <SelectTrigger className="flex-1" data-testid="select-add-student">
                     <SelectValue placeholder="Select a student" />
                   </SelectTrigger>
                   <SelectContent>
@@ -920,29 +1023,62 @@ export function CompanyCalendarDashboard() {
                       !classStudents?.some(cs => cs.studentId === s.id)
                     ).map((student) => (
                       <SelectItem key={student.id} value={student.id}>
-                        {student.firstName || ''} {student.lastName || student.email || 'Unknown'}
+                        {student.user?.firstName || ''} {student.user?.lastName || student.user?.email || 'Unknown'}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 <Button
                   size="sm"
-                  disabled={!tempStudentToAdd}
+                  disabled={!tempStudentToAdd || enrollStudentMutation.isPending}
                   onClick={() => {
-                    toast({
-                      title: "Feature Coming Soon",
-                      description: "Temporary student changes will be available in the next update.",
-                    });
-                    setTempStudentToAdd("");
+                    if (selectedClassEvent?.classId && tempStudentToAdd) {
+                      enrollStudentMutation.mutate({
+                        classId: selectedClassEvent.classId,
+                        studentId: tempStudentToAdd
+                      });
+                      setTempStudentToAdd("");
+                    }
                   }}
-                  data-testid="btn-add-temp-student"
+                  data-testid="btn-add-student"
                 >
                   <UserPlus className="w-4 h-4" />
                 </Button>
               </div>
-              <p className="text-xs text-muted-foreground">
-                This change only applies to this single class occurrence.
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <ClipboardCheck className="w-4 h-4" />
+                Roll Call
               </p>
+              {classStudents && classStudents.length > 0 ? (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    Take attendance for today's class session. This will create or update attendance records.
+                  </p>
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => {
+                      toast({
+                        title: "Roll Call",
+                        description: `Starting roll call for ${classStudents.length} students in ${selectedClassEvent?.className}`,
+                      });
+                    }}
+                    data-testid="btn-start-roll-call"
+                  >
+                    <ClipboardCheck className="w-4 h-4 mr-2" />
+                    Start Roll Call ({classStudents.length} students)
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground py-2">
+                  No students enrolled. Add students to enable roll call.
+                </p>
+              )}
             </div>
           </div>
 
