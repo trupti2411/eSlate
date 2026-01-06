@@ -366,7 +366,13 @@ export default function CompanyDashboard() {
 
   const handleCreateStudent = (e: React.FormEvent) => {
     e.preventDefault();
-    createStudentMutation.mutate({ ...studentFormData, companyId: companyAdmin?.companyId });
+    const formData = {
+      ...studentFormData,
+      companyId: companyAdmin?.companyId,
+      classId: studentFormData.classId === "__none__" ? "" : studentFormData.classId,
+      tutorId: studentFormData.tutorId === "__none__" ? "" : studentFormData.tutorId,
+    };
+    createStudentMutation.mutate(formData);
   };
 
   const handleEditStudent = (student: CompanyStudent) => {
@@ -377,8 +383,8 @@ export default function CompanyDashboard() {
       email: student.user?.email || "",
       gradeLevel: student.gradeLevel || "",
       schoolName: student.schoolName || "",
-      classId: student.classId || "",
-      tutorId: student.tutorId || "",
+      classId: student.classId || "__none__",
+      tutorId: student.tutorId || "__none__",
     });
     setIsEditStudentOpen(true);
   };
@@ -386,7 +392,12 @@ export default function CompanyDashboard() {
   const handleUpdateStudent = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingStudent && editingStudent.userId) {
-      updateStudentMutation.mutate({ studentId: editingStudent.id, userId: editingStudent.userId, data: editStudentFormData });
+      const formData = {
+        ...editStudentFormData,
+        classId: editStudentFormData.classId === "__none__" ? "" : editStudentFormData.classId,
+        tutorId: editStudentFormData.tutorId === "__none__" ? "" : editStudentFormData.tutorId,
+      };
+      updateStudentMutation.mutate({ studentId: editingStudent.id, userId: editingStudent.userId, data: formData });
     }
   };
 
@@ -1018,7 +1029,7 @@ export default function CompanyDashboard() {
                         <SelectValue placeholder="Select a class (optional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No class</SelectItem>
+                        <SelectItem value="__none__">No class</SelectItem>
                         {Array.isArray(classes) && classes.map((cls: any) => (
                           <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                         ))}
@@ -1032,7 +1043,7 @@ export default function CompanyDashboard() {
                         <SelectValue placeholder="Select a tutor (optional)" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">No tutor</SelectItem>
+                        <SelectItem value="__none__">No tutor</SelectItem>
                         {Array.isArray(tutors) && tutors.map((tutor: CompanyTutor) => (
                           <SelectItem key={tutor.id} value={tutor.id}>
                             {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : 'Unknown'}
@@ -1261,7 +1272,7 @@ export default function CompanyDashboard() {
                   <SelectValue placeholder="Select a class (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No class</SelectItem>
+                  <SelectItem value="__none__">No class</SelectItem>
                   {Array.isArray(classes) && classes.map((cls: any) => (
                     <SelectItem key={cls.id} value={cls.id}>{cls.name}</SelectItem>
                   ))}
@@ -1275,7 +1286,7 @@ export default function CompanyDashboard() {
                   <SelectValue placeholder="Select a tutor (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No tutor</SelectItem>
+                  <SelectItem value="__none__">No tutor</SelectItem>
                   {Array.isArray(tutors) && tutors.map((tutor: CompanyTutor) => (
                     <SelectItem key={tutor.id} value={tutor.id}>
                       {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : 'Unknown'}

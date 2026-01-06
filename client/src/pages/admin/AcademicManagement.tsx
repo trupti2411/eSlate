@@ -1596,7 +1596,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       </FormControl>
                       <SelectContent>
                         {termsLoading ? (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="__loading__" disabled>
                             Loading terms...
                           </SelectItem>
                         ) : Array.isArray(academicTerms) && academicTerms.length > 0 ? (
@@ -1606,7 +1606,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                             </SelectItem>
                           ))
                         ) : (
-                          <SelectItem value="" disabled>
+                          <SelectItem value="__none__" disabled>
                             No terms available - Please create an academic term first
                           </SelectItem>
                         )}
