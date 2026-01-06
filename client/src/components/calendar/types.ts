@@ -15,6 +15,8 @@ export interface CalendarSession {
   location?: string;
   notes?: string;
   attendanceStatus?: AttendanceStatus;
+  classId?: string;
+  date?: string;
 }
 
 export interface CalendarHoliday {

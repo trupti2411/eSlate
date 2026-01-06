@@ -35,6 +35,7 @@ interface ClassEvent {
   className: string;
   subject: string;
   tutorId?: string;
+  tutorName?: string;
   date: string;
   startTime: string;
   endTime: string;
@@ -161,6 +162,9 @@ export function CompanyCalendarDashboard() {
   const [classFilter, setClassFilter] = useState<string>("all");
   const [tutorFilter, setTutorFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [isClassDetailsModalOpen, setIsClassDetailsModalOpen] = useState(false);
+  const [selectedClassEvent, setSelectedClassEvent] = useState<ClassEvent | null>(null);
+  const [tempStudentToAdd, setTempStudentToAdd] = useState<string>("");
 
   const { data: calendarData, isLoading: isCalendarLoading } = useQuery<CompanyCalendarData>({
     queryKey: ['/api/calendar/company'],
@@ -178,6 +182,16 @@ export function CompanyCalendarDashboard() {
   const { data: sessionDetails, isLoading: isSessionDetailsLoading } = useQuery<SessionDetailsData>({
     queryKey: ['/api/sessions', selectedSessionId],
     enabled: !!selectedSessionId && isBatchDetailsModalOpen,
+  });
+
+  const { data: classStudents, isLoading: isClassStudentsLoading } = useQuery<{ studentId: string; student: { id: string; userId: string; firstName?: string; lastName?: string; email?: string } }[]>({
+    queryKey: ['/api/classes', selectedClassEvent?.classId, 'students'],
+    enabled: !!selectedClassEvent?.classId && isClassDetailsModalOpen,
+  });
+
+  const { data: allCompanyStudents } = useQuery<{ id: string; userId: string; firstName?: string; lastName?: string; email?: string }[]>({
+    queryKey: ['/api/students'],
+    enabled: isClassDetailsModalOpen,
   });
 
   const overrideAttendanceMutation = useMutation({
@@ -215,11 +229,14 @@ export function CompanyCalendarDashboard() {
 
   const uniqueTutors = useMemo(() => {
     if (!calendarData?.classes) return [];
-    const tutorMap = new Map<string, TutorInfo>();
+    const tutorMap = new Map<string, TutorInfo & { tutorName?: string }>();
     calendarData.classes.forEach((c) => {
       if (c.tutorId && !tutorMap.has(c.tutorId)) {
+        const nameParts = c.tutorName?.split(' ') || [];
         tutorMap.set(c.tutorId, {
           id: c.tutorId,
+          firstName: nameParts[0] || c.tutorName || 'Unknown',
+          lastName: nameParts.slice(1).join(' ') || '',
         });
       }
     });
@@ -255,16 +272,28 @@ export function CompanyCalendarDashboard() {
       status: 'scheduled' as SessionStatus,
       location: c.location,
       date: c.date,
+      tutorName: c.tutorName,
+      classId: c.classId,
     }));
   }, [filteredClasses]);
 
   const handleEventClick = (event: CalendarEvent) => {
     if (event.type === 'session') {
-      const sessionData = event.data as CalendarSession;
-      toast({
-        title: sessionData.className,
-        description: `${sessionData.subject} - ${sessionData.startTime} to ${sessionData.endTime}`,
-      });
+      const sessionData = event.data as CalendarSession & { classId?: string; date?: string; tutorName?: string };
+      // Find the corresponding class event from calendar data
+      let matchingEvent = calendarData?.classes.find(c => c.id === sessionData.id);
+      
+      // Fallback: try to find by classId and date
+      if (!matchingEvent && sessionData.classId && sessionData.date) {
+        matchingEvent = calendarData?.classes.find(
+          c => c.classId === sessionData.classId && c.date === sessionData.date
+        );
+      }
+      
+      if (matchingEvent) {
+        setSelectedClassEvent(matchingEvent);
+        setIsClassDetailsModalOpen(true);
+      }
     }
   };
 
@@ -730,6 +759,156 @@ export function CompanyCalendarDashboard() {
             >
               <UserCheck className="w-4 h-4 mr-2" />
               View Attendance
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Class Details Modal */}
+      <Dialog open={isClassDetailsModalOpen} onOpenChange={setIsClassDetailsModalOpen}>
+        <DialogContent className="max-w-md" data-testid="class-details-modal">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="w-5 h-5" />
+              {selectedClassEvent?.className}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedClassEvent?.date && format(new Date(selectedClassEvent.date), 'EEEE, MMMM d, yyyy')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">Subject</p>
+                <p data-testid="class-subject">{selectedClassEvent?.subject}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">Tutor</p>
+                <p data-testid="class-tutor" className="font-medium">
+                  {selectedClassEvent?.tutorName || 'Unassigned'}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-muted-foreground">Time</p>
+                <p data-testid="class-time" className="flex items-center gap-1">
+                  <Clock className="w-4 h-4" />
+                  {selectedClassEvent?.startTime && format(new Date(selectedClassEvent.startTime), 'h:mm a')} - {selectedClassEvent?.endTime && format(new Date(selectedClassEvent.endTime), 'h:mm a')}
+                </p>
+              </div>
+              {selectedClassEvent?.location && (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Location</p>
+                  <p data-testid="class-location">{selectedClassEvent.location}</p>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Users className="w-4 h-4" />
+                  Enrolled Students
+                </p>
+                <Badge variant="outline" data-testid="class-student-count">
+                  {classStudents?.length || 0} students
+                </Badge>
+              </div>
+              
+              {isClassStudentsLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-10 w-full" />
+                  <Skeleton className="h-10 w-full" />
+                </div>
+              ) : (
+                <ScrollArea className="h-[150px] pr-4">
+                  {!classStudents || classStudents.length === 0 ? (
+                    <div className="py-4 text-center text-muted-foreground text-sm">
+                      No students enrolled in this class.
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {classStudents.map((enrollment, index) => (
+                        <div
+                          key={enrollment.studentId}
+                          className="flex items-center justify-between p-2 border rounded-lg"
+                          data-testid={`class-student-${enrollment.studentId}`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-muted-foreground w-6">
+                              {index + 1}.
+                            </span>
+                            <span className="font-medium">
+                              {enrollment.student?.firstName || ''} {enrollment.student?.lastName || enrollment.student?.email || 'Unknown'}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              )}
+            </div>
+
+            <Separator />
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <UserPlus className="w-4 h-4" />
+                Add Student for This Class Only
+              </p>
+              <div className="flex gap-2">
+                <Select value={tempStudentToAdd} onValueChange={setTempStudentToAdd}>
+                  <SelectTrigger className="flex-1" data-testid="select-temp-student">
+                    <SelectValue placeholder="Select a student" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {allCompanyStudents?.filter(s => 
+                      !classStudents?.some(cs => cs.studentId === s.id)
+                    ).map((student) => (
+                      <SelectItem key={student.id} value={student.id}>
+                        {student.firstName || ''} {student.lastName || student.email || 'Unknown'}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button
+                  size="sm"
+                  disabled={!tempStudentToAdd}
+                  onClick={() => {
+                    toast({
+                      title: "Feature Coming Soon",
+                      description: "Temporary student changes will be available in the next update.",
+                    });
+                    setTempStudentToAdd("");
+                  }}
+                  data-testid="btn-add-temp-student"
+                >
+                  <UserPlus className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                This change only applies to this single class occurrence.
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setIsClassDetailsModalOpen(false);
+                setSelectedClassEvent(null);
+                setTempStudentToAdd("");
+              }}
+              data-testid="btn-close-class-details"
+            >
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

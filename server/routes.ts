@@ -1285,6 +1285,7 @@ trailer<</Size 5/Root 1 0 R>>
           className: classItem.name,
           subject: classItem.subject,
           tutorId: classItem.tutorId,
+          tutorName: classItem.tutorName || 'Unassigned',
           date: `${year}-${month}-${day}`,
           startTime: `${year}-${month}-${day}T${classItem.startTime}:00`,
           endTime: `${year}-${month}-${day}T${classItem.endTime}:00`,
@@ -1324,8 +1325,25 @@ trailer<</Size 5/Root 1 0 R>>
       const academicTerms = await storage.getAcademicTermsByCompany(companyAdmin.companyId);
       const holidays = await storage.getAcademicHolidaysByCompany(companyAdmin.companyId);
       
+      // Build tutor name lookup
+      const tutorIds = [...new Set(classes.filter(c => c.tutorId).map(c => c.tutorId as string))];
+      const tutorMap: Record<string, string> = {};
+      for (const tid of tutorIds) {
+        const tutor = await storage.getTutor(tid);
+        if (tutor) {
+          const tutorUser = await storage.getUser(tutor.userId);
+          tutorMap[tid] = tutorUser ? `${tutorUser.firstName || ''} ${tutorUser.lastName || ''}`.trim() || tutorUser.email : 'Unknown';
+        }
+      }
+      
+      // Add tutor names to classes
+      const classesWithTutors = classes.map(c => ({
+        ...c,
+        tutorName: c.tutorId ? tutorMap[c.tutorId] || 'Unassigned' : 'Unassigned'
+      }));
+      
       // Generate class events from classes based on term dates
-      let classEvents = generateClassEvents(classes, academicTerms, start, end);
+      let classEvents = generateClassEvents(classesWithTutors, academicTerms, start, end);
       
       // Filter by classId if provided
       if (classId) {
