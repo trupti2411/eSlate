@@ -184,16 +184,16 @@ export default function SubmittedHomework() {
 
   return (
     <Layout>
-      <div className="space-y-8 p-6">
+      <div className="p-6 space-y-6" data-testid="submitted-homework-page">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-black">Submitted Homework</h1>
-            <p className="text-gray-600 mt-1">Review and grade student submissions</p>
+            <h1 className="text-2xl font-bold text-black">Submitted Homework</h1>
+            <p className="text-muted-foreground mt-1">Review and grade student submissions</p>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-black">{submissions.length}</div>
-            <div className="text-sm text-gray-600">Total Submissions</div>
+            <div className="text-sm text-muted-foreground">Total Submissions</div>
           </div>
         </div>
 

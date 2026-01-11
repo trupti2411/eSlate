@@ -160,7 +160,7 @@ function AssignmentHierarchy({
             Object.entries(termGroup).map(([subject, subjectGroup]) => (
               Object.entries(subjectGroup).map(([week, weekAssignments]) => (
                 weekAssignments.map((assignment: Assignment) => (
-                  <Card key={assignment.id} className="hover:shadow-md transition-shadow">
+                  <Card key={assignment.id} className="border-2 border-black hover:shadow-lg transition-shadow">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="space-y-2">
@@ -471,15 +471,15 @@ export function AssignmentManagement() {
 
   return (
     <Layout>
-      <div className="space-y-6">
+      <div className="p-6 space-y-6" data-testid="assignment-management-page">
         <div className="flex items-center justify-between">
           <div>
             <Link href="/company">
-              <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
+              <Button variant="outline" size="sm" className="mb-3 border-2 border-black text-black hover:bg-gray-100">
                 ← Back to Company
               </Button>
             </Link>
-            <h1 className="text-3xl font-bold">Assignment Management</h1>
+            <h1 className="text-2xl font-bold text-black">Assignment Management</h1>
             <p className="text-muted-foreground">Create and manage assignments for your classes</p>
           </div>
         <Dialog open={isCreateDialogOpen || !!editingAssignment} onOpenChange={(open) => {
@@ -489,7 +489,7 @@ export function AssignmentManagement() {
           }
         }}>
           <DialogTrigger asChild>
-            <Button onClick={() => setIsCreateDialogOpen(true)}>
+            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800" onClick={() => setIsCreateDialogOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               Create Assignment
             </Button>
@@ -967,14 +967,17 @@ export function AssignmentManagement() {
 
       {isLoadingAssignments ? (
         <div className="flex items-center justify-center h-64">
-          <p>Loading assignments...</p>
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading assignments...</p>
+          </div>
         </div>
       ) : assignments.length === 0 ? (
-        <Card>
+        <Card className="border-2 border-black">
           <CardContent className="pt-6">
             <div className="text-center space-y-2">
               <FileText className="w-12 h-12 mx-auto text-muted-foreground" />
-              <h3 className="text-lg font-medium">No assignments yet</h3>
+              <h3 className="text-lg font-medium text-black">No assignments yet</h3>
               <p className="text-muted-foreground">Create your first assignment to get started</p>
             </div>
           </CardContent>
