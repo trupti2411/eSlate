@@ -57,9 +57,9 @@ function SubmittedFilesSection({ submission, eInkStyles }: { submission: Submiss
         Submitted Files ({fileUrls.length})
       </h3>
       {isLoadingMetadata ? (
-        <div className="text-center py-4">
-          <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-sm text-gray-600 mt-2">Loading file information...</p>
+        <div className="flex justify-center items-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          <p className="text-sm text-gray-600 dark:text-gray-300 ml-3">Loading file information...</p>
         </div>
       ) : (
         <div className="space-y-2">
@@ -152,9 +152,9 @@ export default function SubmittedHomework() {
   });
 
   const eInkStyles = {
-    card: "bg-white border-2 border-black rounded shadow-sm",
-    button: "bg-white border-2 border-black text-black hover:bg-gray-100 font-medium",
-    primaryButton: "bg-black border-2 border-black text-white hover:bg-gray-800 font-medium",
+    card: "bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm",
+    button: "border border-gray-300 dark:border-gray-600 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-gray-700 font-medium",
+    primaryButton: "bg-primary text-primary-foreground hover:bg-primary/90 font-medium",
   };
 
   const getStatusColor = (submission: SubmissionWithDetails) => {
@@ -172,11 +172,9 @@ export default function SubmittedHomework() {
   if (isLoading) {
     return (
       <Layout>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p>Loading submitted homework...</p>
-          </div>
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="ml-4 text-gray-600 dark:text-gray-300">Loading submitted homework...</p>
         </div>
       </Layout>
     );
@@ -188,12 +186,12 @@ export default function SubmittedHomework() {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-black">Submitted Homework</h1>
-            <p className="text-muted-foreground mt-1">Review and grade student submissions</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Submitted Homework</h1>
+            <p className="text-gray-600 dark:text-gray-300 mt-1">Review and grade student submissions</p>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-black">{submissions.length}</div>
-            <div className="text-sm text-muted-foreground">Total Submissions</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{submissions.length}</div>
+            <div className="text-sm text-gray-600 dark:text-gray-300">Total Submissions</div>
           </div>
         </div>
 
@@ -202,10 +200,10 @@ export default function SubmittedHomework() {
           <Card className={eInkStyles.card}>
             <CardContent className="p-4">
               <div className="flex items-center">
-                <FileText className="h-8 w-8 text-gray-600" />
+                <FileText className="h-8 w-8 text-gray-600 dark:text-gray-400" />
                 <div className="ml-3">
-                  <p className="text-2xl font-bold">{submissions.length}</p>
-                  <p className="text-gray-600 text-sm">Total Submissions</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{submissions.length}</p>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">Total Submissions</p>
                 </div>
               </div>
             </CardContent>
@@ -216,10 +214,10 @@ export default function SubmittedHomework() {
               <div className="flex items-center">
                 <Clock className="h-8 w-8 text-orange-600" />
                 <div className="ml-3">
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {submissions.filter(s => s.status === "submitted").length}
                   </p>
-                  <p className="text-gray-600 text-sm">Submitted</p>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">Submitted</p>
                 </div>
               </div>
             </CardContent>
@@ -230,11 +228,11 @@ export default function SubmittedHomework() {
               <div className="flex items-center">
                 <GraduationCap className="h-8 w-8 text-blue-600" />
                 <div className="ml-3">
-                  <p className="text-2xl font-bold">
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
                     {submissions.length > 0 ? 
                       Math.round((submissions.filter(s => s.status === "submitted").length / submissions.length) * 100) : 0}%
                   </p>
-                  <p className="text-gray-600 text-sm">Submission Rate</p>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">Submission Rate</p>
                 </div>
               </div>
             </CardContent>
@@ -250,13 +248,13 @@ export default function SubmittedHomework() {
                 placeholder="Search by student name or assignment..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 border-2 border-black"
+                className="pl-10"
               />
             </div>
           </div>
           <div className="sm:w-48">
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="border-2 border-black">
+              <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -273,9 +271,9 @@ export default function SubmittedHomework() {
           {filteredSubmissions.length === 0 ? (
             <Card className={eInkStyles.card}>
               <CardContent className="p-8 text-center">
-                <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No submissions found</h3>
-                <p className="text-gray-600">
+                <FileText className="h-12 w-12 text-gray-400 dark:text-gray-500 mx-auto mb-4 opacity-50" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No submissions found</h3>
+                <p className="text-gray-600 dark:text-gray-300">
                   {submissions.length === 0 
                     ? "No homework has been submitted yet."
                     : "No submissions match your current filters."
@@ -290,7 +288,7 @@ export default function SubmittedHomework() {
                   <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div className="flex-1 space-y-2">
                       <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-semibold text-black">
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
                           {submission.assignment.title}
                         </h3>
                         <Badge className={getStatusColor(submission)}>
@@ -298,7 +296,7 @@ export default function SubmittedHomework() {
                         </Badge>
                       </div>
                       
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-300">
                         <div className="flex items-center gap-1">
                           <User className="h-4 w-4" />
                           <span>{submission.student.user.firstName} {submission.student.user.lastName}</span>
@@ -314,7 +312,7 @@ export default function SubmittedHomework() {
                       </div>
 
                       {submission.assignment.description && (
-                        <p className="text-gray-700 text-sm line-clamp-2">
+                        <p className="text-gray-700 dark:text-gray-300 text-sm line-clamp-2">
                           {submission.assignment.description}
                         </p>
                       )}

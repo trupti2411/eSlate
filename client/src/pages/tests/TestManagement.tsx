@@ -341,11 +341,9 @@ export default function TestManagement() {
   if (authLoading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen" data-testid="loading-auth">
-          <div className="text-center">
-            <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading...</p>
-          </div>
+        <div className="flex justify-center items-center h-64" data-testid="loading-auth">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="ml-4 text-gray-600">Loading...</p>
         </div>
       </Layout>
     );
@@ -367,36 +365,33 @@ export default function TestManagement() {
       <div className="p-6 space-y-6" data-testid="test-management-page">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-black" data-testid="page-title">Tests & Exams</h1>
-            <p className="text-muted-foreground">Create and manage assessments for your students</p>
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="page-title">Tests & Exams</h1>
+            <p className="text-gray-600 dark:text-gray-300">Create and manage assessments for your students</p>
           </div>
-          <Button className="bg-black text-white border-2 border-black hover:bg-gray-800" onClick={() => handleOpenTestDialog()} data-testid="button-create-test">
+          <Button onClick={() => handleOpenTestDialog()} data-testid="button-create-test">
             <Plus className="mr-2 h-4 w-4" /> Create Test
           </Button>
         </div>
         
         {testsLoading ? (
-          <div className="flex items-center justify-center py-12" data-testid="loading-tests">
-            <div className="text-center">
-              <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-muted-foreground">Loading tests...</p>
-            </div>
+          <div className="flex justify-center py-8" data-testid="loading-tests">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           </div>
         ) : tests.length === 0 ? (
-          <Card className="border-2 border-black" data-testid="no-tests">
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <FileQuestion className="h-12 w-12 text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold text-black mb-2">No Tests Yet</h3>
-              <p className="text-muted-foreground mb-4">Create your first test to get started</p>
-              <Button className="bg-black text-white border-2 border-black hover:bg-gray-800" onClick={() => handleOpenTestDialog()} data-testid="button-create-first-test">
+          <Card className="p-8 text-center" data-testid="no-tests">
+            <div className="text-gray-500 dark:text-gray-400">
+              <FileQuestion className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <h3 className="text-lg font-medium mb-2">No Tests Yet</h3>
+              <p className="text-sm mb-4">Create your first test to get started</p>
+              <Button onClick={() => handleOpenTestDialog()} data-testid="button-create-first-test">
                 <Plus className="mr-2 h-4 w-4" /> Create Test
               </Button>
-            </CardContent>
+            </div>
           </Card>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {tests.map((test) => (
-              <Card key={test.id} className="border-2 border-black cursor-pointer hover:shadow-lg transition-all" data-testid={`card-test-${test.id}`}>
+              <Card key={test.id} className="cursor-pointer hover:shadow-md transition-shadow" data-testid={`card-test-${test.id}`}>
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <CardTitle className="text-lg">{test.title}</CardTitle>
