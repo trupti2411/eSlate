@@ -195,6 +195,12 @@ export default function CompanyDashboard() {
     lastName: "",
     specialization: "",
     qualifications: "",
+    address: "",
+    phoneNumber: "",
+    availabilityDays: [] as string[],
+    availabilityHours: "",
+    employmentType: "",
+    position: "",
   });
 
   const [editTutorFormData, setEditTutorFormData] = useState({
@@ -206,6 +212,12 @@ export default function CompanyDashboard() {
     availability: "",
     subjectsTeaching: [] as string[],
     branch: "",
+    address: "",
+    phoneNumber: "",
+    availabilityDays: [] as string[],
+    availabilityHours: "",
+    employmentType: "",
+    position: "",
   });
   const [newTutorSubject, setNewTutorSubject] = useState("");
 
@@ -313,7 +325,7 @@ export default function CompanyDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/tutors`] });
       setIsCreateTutorOpen(false);
-      setTutorFormData({ email: "", firstName: "", lastName: "", specialization: "", qualifications: "" });
+      setTutorFormData({ email: "", firstName: "", lastName: "", specialization: "", qualifications: "", address: "", phoneNumber: "", availabilityDays: [], availabilityHours: "", employmentType: "", position: "" });
       toast({ title: "Success", description: "Tutor created successfully" });
     },
     onError: (error: any) => {
@@ -388,6 +400,12 @@ export default function CompanyDashboard() {
       availability: tutor.availability || "",
       subjectsTeaching: tutor.subjectsTeaching || [],
       branch: tutor.branch || "",
+      address: (tutor as any).address || "",
+      phoneNumber: (tutor as any).phoneNumber || "",
+      availabilityDays: (tutor as any).availabilityDays || [],
+      availabilityHours: (tutor as any).availabilityHours || "",
+      employmentType: (tutor as any).employmentType || "",
+      position: (tutor as any).position || "",
     });
     setIsEditTutorOpen(true);
   };
@@ -740,7 +758,7 @@ export default function CompanyDashboard() {
               data-testid="tab-tutors"
             >
               <Users className="h-4 w-4 mr-2" />
-              Manage Tutors
+              Manage Staff
             </Button>
             <Button
               variant={mainTab === 'students' ? 'default' : 'ghost'}
@@ -1335,72 +1353,205 @@ export default function CompanyDashboard() {
       )}
 
       {mainTab === 'tutors' && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-black">Manage Tutors</h2>
-              <p className="text-gray-600">Add, edit, or remove tutors from your organization</p>
-            </div>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          {/* Header */}
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Manage Staff</h2>
+            <p className="text-gray-600 dark:text-gray-300">Add, edit, or remove team members from your organization</p>
+          </div>
+
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
+              <CardContent className="pt-4 pb-4 pl-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Total Staff</p>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{Array.isArray(tutors) ? tutors.length : 0}</div>
+                  </div>
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-xl group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                    <Users className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+              <CardContent className="pt-4 pb-4 pl-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Verified</p>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{Array.isArray(tutors) ? tutors.filter((t: CompanyTutor) => t.isVerified).length : 0}</div>
+                  </div>
+                  <div className="bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-xl group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/50 transition-colors">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500"></div>
+              <CardContent className="pt-4 pb-4 pl-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Pending</p>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{Array.isArray(tutors) ? tutors.filter((t: CompanyTutor) => !t.isVerified).length : 0}</div>
+                  </div>
+                  <div className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-xl group-hover:bg-amber-100 dark:group-hover:bg-amber-900/50 transition-colors">
+                    <Clock className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-500"></div>
+              <CardContent className="pt-4 pb-4 pl-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Specializations</p>
+                    <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{getUniqueSpecializations().length}</div>
+                  </div>
+                  <div className="bg-violet-50 dark:bg-violet-900/30 p-3 rounded-xl group-hover:bg-violet-100 dark:group-hover:bg-violet-900/50 transition-colors">
+                    <BookOpen className="h-5 w-5 text-violet-500 dark:text-violet-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Add New Team Member Button */}
+          <div className="flex justify-end">
             <Dialog open={isCreateTutorOpen} onOpenChange={setIsCreateTutorOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-black text-white border-2 border-black hover:bg-gray-800" data-testid="button-add-tutor">
+                <Button className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-md hover:shadow-lg transition-all" data-testid="button-add-tutor">
                   <UserPlus className="h-4 w-4 mr-2" />
-                  Add New Tutor
+                  Add New Team Member
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
-                  <DialogTitle>Create New Tutor</DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
+                    <div className="bg-blue-100 dark:bg-blue-900/40 p-2 rounded-lg">
+                      <UserPlus className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    Add New Team Member
+                  </DialogTitle>
                 </DialogHeader>
-                <form onSubmit={handleCreateTutor} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" value={tutorFormData.firstName} onChange={(e) => setTutorFormData({ ...tutorFormData, firstName: e.target.value })} required />
+                <form onSubmit={handleCreateTutor} className="space-y-6 mt-4">
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Personal Information</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="firstName" className="text-sm font-medium">First Name *</Label>
+                        <Input id="firstName" value={tutorFormData.firstName} onChange={(e) => setTutorFormData({ ...tutorFormData, firstName: e.target.value })} required className="mt-1" />
+                      </div>
+                      <div>
+                        <Label htmlFor="lastName" className="text-sm font-medium">Last Name *</Label>
+                        <Input id="lastName" value={tutorFormData.lastName} onChange={(e) => setTutorFormData({ ...tutorFormData, lastName: e.target.value })} required className="mt-1" />
+                      </div>
                     </div>
                     <div>
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" value={tutorFormData.lastName} onChange={(e) => setTutorFormData({ ...tutorFormData, lastName: e.target.value })} required />
+                      <Label htmlFor="email" className="text-sm font-medium">Email *</Label>
+                      <Input id="email" type="email" value={tutorFormData.email} onChange={(e) => setTutorFormData({ ...tutorFormData, email: e.target.value })} required className="mt-1" />
+                    </div>
+                    <div>
+                      <Label htmlFor="phoneNumber" className="text-sm font-medium">Phone Number</Label>
+                      <Input id="phoneNumber" type="tel" value={tutorFormData.phoneNumber} onChange={(e) => setTutorFormData({ ...tutorFormData, phoneNumber: e.target.value })} placeholder="e.g., +1 234 567 8900" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label htmlFor="address" className="text-sm font-medium">Address</Label>
+                      <Textarea id="address" value={tutorFormData.address} onChange={(e) => setTutorFormData({ ...tutorFormData, address: e.target.value })} placeholder="Full address" className="mt-1" rows={2} />
                     </div>
                   </div>
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={tutorFormData.email} onChange={(e) => setTutorFormData({ ...tutorFormData, email: e.target.value })} required />
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Employment Details</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor="position" className="text-sm font-medium">Position</Label>
+                        <Input id="position" value={tutorFormData.position} onChange={(e) => setTutorFormData({ ...tutorFormData, position: e.target.value })} placeholder="e.g., Senior Tutor" className="mt-1" />
+                      </div>
+                      <div>
+                        <Label htmlFor="employmentType" className="text-sm font-medium">Employment Type</Label>
+                        <Select value={tutorFormData.employmentType} onValueChange={(v) => setTutorFormData({ ...tutorFormData, employmentType: v })}>
+                          <SelectTrigger className="mt-1">
+                            <SelectValue placeholder="Select type" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="casual">Casual</SelectItem>
+                            <SelectItem value="parttime">Part-time</SelectItem>
+                            <SelectItem value="fulltime">Full-time</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="specialization" className="text-sm font-medium">Specialization</Label>
+                      <Input id="specialization" value={tutorFormData.specialization} onChange={(e) => setTutorFormData({ ...tutorFormData, specialization: e.target.value })} placeholder="e.g., Mathematics" className="mt-1" />
+                    </div>
+                    <div>
+                      <Label htmlFor="qualifications" className="text-sm font-medium">Qualifications</Label>
+                      <Input id="qualifications" value={tutorFormData.qualifications} onChange={(e) => setTutorFormData({ ...tutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics, M.Ed." className="mt-1" />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="specialization">Specialization</Label>
-                    <Input id="specialization" value={tutorFormData.specialization} onChange={(e) => setTutorFormData({ ...tutorFormData, specialization: e.target.value })} placeholder="e.g., Mathematics" />
+
+                  <div className="space-y-4">
+                    <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Availability</h3>
+                    <div>
+                      <Label className="text-sm font-medium">Available Days</Label>
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                          <Button
+                            key={day}
+                            type="button"
+                            variant={tutorFormData.availabilityDays.includes(day) ? 'default' : 'outline'}
+                            size="sm"
+                            className={tutorFormData.availabilityDays.includes(day) ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                            onClick={() => {
+                              const days = tutorFormData.availabilityDays.includes(day)
+                                ? tutorFormData.availabilityDays.filter(d => d !== day)
+                                : [...tutorFormData.availabilityDays, day];
+                              setTutorFormData({ ...tutorFormData, availabilityDays: days });
+                            }}
+                          >
+                            {day.slice(0, 3)}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <Label htmlFor="availabilityHours" className="text-sm font-medium">Available Hours</Label>
+                      <Input id="availabilityHours" value={tutorFormData.availabilityHours} onChange={(e) => setTutorFormData({ ...tutorFormData, availabilityHours: e.target.value })} placeholder="e.g., 9:00 AM - 5:00 PM" className="mt-1" />
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="qualifications">Qualifications</Label>
-                    <Input id="qualifications" value={tutorFormData.qualifications} onChange={(e) => setTutorFormData({ ...tutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics" />
-                  </div>
-                  <Button type="submit" className="w-full bg-black text-white hover:bg-gray-800" disabled={createTutorMutation.isPending}>
-                    {createTutorMutation.isPending ? "Creating..." : "Create Tutor"}
+
+                  <Button type="submit" className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white" disabled={createTutorMutation.isPending}>
+                    {createTutorMutation.isPending ? "Creating..." : "Add Team Member"}
                   </Button>
                 </form>
               </DialogContent>
             </Dialog>
           </div>
 
-          {/* Filters and Sorting for Tutors */}
-          <Card className="border-2 border-black mb-6">
+          {/* Filters and Sorting */}
+          <Card className="border-0 shadow-md bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
             <CardContent className="pt-4">
               <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                 <div className="md:col-span-2">
-                  <Label htmlFor="tutorSearch" className="text-xs text-gray-600">Search</Label>
+                  <Label htmlFor="tutorSearch" className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Search</Label>
                   <Input
                     id="tutorSearch"
                     placeholder="Search by name, email, or specialization..."
                     value={tutorSearchTerm}
                     onChange={(e) => setTutorSearchTerm(e.target.value)}
-                    className="border-black"
+                    className="mt-1 border-gray-200 dark:border-gray-600"
                   />
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-600">Filter by Status</Label>
+                  <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Status</Label>
                   <Select value={tutorFilterStatus} onValueChange={setTutorFilterStatus}>
-                    <SelectTrigger className="border-black">
+                    <SelectTrigger className="mt-1 border-gray-200 dark:border-gray-600">
                       <SelectValue placeholder="All Statuses" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1411,10 +1562,10 @@ export default function CompanyDashboard() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-600">Filter by Specialization</Label>
+                  <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Specialization</Label>
                   <Select value={tutorFilterSpecialization} onValueChange={setTutorFilterSpecialization}>
-                    <SelectTrigger className="border-black">
-                      <SelectValue placeholder="All Specializations" />
+                    <SelectTrigger className="mt-1 border-gray-200 dark:border-gray-600">
+                      <SelectValue placeholder="All" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Specializations</SelectItem>
@@ -1425,10 +1576,10 @@ export default function CompanyDashboard() {
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-600">Sort By</Label>
-                  <div className="flex gap-1">
+                  <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Sort By</Label>
+                  <div className="flex gap-1 mt-1">
                     <Select value={tutorSortBy} onValueChange={(v: any) => setTutorSortBy(v)}>
-                      <SelectTrigger className="border-black flex-1">
+                      <SelectTrigger className="flex-1 border-gray-200 dark:border-gray-600">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1442,7 +1593,7 @@ export default function CompanyDashboard() {
                       variant="outline"
                       size="sm"
                       onClick={() => setTutorSortOrder(tutorSortOrder === 'asc' ? 'desc' : 'asc')}
-                      className="border-black px-2"
+                      className="border-gray-200 dark:border-gray-600 px-2"
                     >
                       {tutorSortOrder === 'asc' ? '↑' : '↓'}
                     </Button>
@@ -1452,63 +1603,80 @@ export default function CompanyDashboard() {
             </CardContent>
           </Card>
 
-          {/* Tutors List */}
-          <Card className="border-2 border-black">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                All Tutors ({getFilteredAndSortedTutors().length} of {Array.isArray(tutors) ? tutors.length : 0})
+          {/* Staff List */}
+          <Card className="border-0 shadow-md bg-white dark:bg-gray-800 rounded-xl overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-gray-850 border-b border-gray-100 dark:border-gray-700">
+              <CardTitle className="flex items-center gap-3">
+                <div className="bg-blue-100 dark:bg-blue-900/40 p-2 rounded-lg">
+                  <Users className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <span className="text-gray-900 dark:text-white">All Staff Members</span>
+                <Badge variant="secondary" className="ml-2">{getFilteredAndSortedTutors().length} of {Array.isArray(tutors) ? tutors.length : 0}</Badge>
               </CardTitle>
             </CardHeader>
-            <CardContent>
+            <CardContent className="p-4">
               {getFilteredAndSortedTutors().length > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {getFilteredAndSortedTutors().map((tutor: CompanyTutor) => (
-                    <div key={tutor.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-black transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <button
-                            onClick={() => handleEditTutor(tutor)}
-                            className="text-left hover:underline"
-                            data-testid={`tutor-name-${tutor.id}`}
-                          >
-                            <p className="font-semibold text-black text-lg">
-                              {tutor.user?.firstName} {tutor.user?.lastName}
-                            </p>
-                          </button>
-                          <p className="text-sm text-gray-600">{tutor.user?.email}</p>
-                          <div className="flex flex-wrap gap-2 mt-2">
+                    <div key={tutor.id} className="relative overflow-hidden p-5 bg-white dark:bg-gray-850 rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700 transition-all duration-300 group">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 group-hover:bg-blue-600 transition-colors"></div>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 pl-3">
+                          <div className="flex items-center gap-3">
+                            <div className="bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 w-12 h-12 rounded-full flex items-center justify-center">
+                              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                {tutor.user?.firstName?.charAt(0) || ''}{tutor.user?.lastName?.charAt(0) || ''}
+                              </span>
+                            </div>
+                            <div>
+                              <button
+                                onClick={() => handleEditTutor(tutor)}
+                                className="text-left hover:underline"
+                                data-testid={`tutor-name-${tutor.id}`}
+                              >
+                                <p className="font-bold text-gray-900 dark:text-white text-lg">
+                                  {tutor.user?.firstName} {tutor.user?.lastName}
+                                </p>
+                              </button>
+                              <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
+                                <Mail className="h-3.5 w-3.5" />
+                                {tutor.user?.email}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-3 ml-15">
                             {tutor.specialization && (
-                              <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">
+                              <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
                                 {tutor.specialization}
                               </Badge>
                             )}
                             {tutor.qualifications && (
-                              <Badge variant="outline" className="border-gray-400">
+                              <Badge variant="outline" className="border-gray-300 text-gray-600 dark:text-gray-400 dark:border-gray-600">
                                 {tutor.qualifications}
                               </Badge>
                             )}
-                            <Badge variant={tutor.isVerified ? "default" : "secondary"} className={tutor.isVerified ? "bg-green-100 text-green-800 border-green-500" : "border-orange-400 text-orange-600"}>
-                              {tutor.isVerified ? "Verified" : "Pending Verification"}
+                            <Badge className={tutor.isVerified ? "bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700" : "bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700"}>
+                              {tutor.isVerified ? "Verified" : "Pending"}
                             </Badge>
                             {tutor.studentCount !== undefined && tutor.studentCount > 0 && (
-                              <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50">
+                              <Badge variant="outline" className="border-violet-300 text-violet-700 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700">
+                                <Users className="h-3 w-3 mr-1" />
                                 {tutor.studentCount} student{tutor.studentCount !== 1 ? 's' : ''}
                               </Badge>
                             )}
                           </div>
                           {tutor.schedules && tutor.schedules.length > 0 && (
-                            <div className="mt-3 pt-2 border-t border-gray-200">
-                              <p className="text-xs font-medium text-gray-500 mb-1">Class Schedule:</p>
+                            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 ml-15">
+                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Class Schedule</p>
                               <div className="flex flex-wrap gap-2">
                                 {tutor.schedules.slice(0, 4).map((schedule, idx) => (
-                                  <span key={idx} className="text-xs bg-gray-100 px-2 py-1 rounded border border-gray-300">
-                                    <span className="font-medium">{schedule.className}</span>
-                                    <span className="text-gray-500"> - {schedule.dayOfWeek} {schedule.startTime}-{schedule.endTime}</span>
+                                  <span key={idx} className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
+                                    <span className="font-semibold text-gray-800 dark:text-gray-200">{schedule.className}</span>
+                                    <span className="text-gray-500 dark:text-gray-400"> - {schedule.dayOfWeek} {schedule.startTime}-{schedule.endTime}</span>
                                   </span>
                                 ))}
                                 {tutor.schedules.length > 4 && (
-                                  <span className="text-xs text-gray-500 px-2 py-1">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                     +{tutor.schedules.length - 4} more
                                   </span>
                                 )}
@@ -1521,7 +1689,7 @@ export default function CompanyDashboard() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleEditTutor(tutor)}
-                            className="border-black"
+                            className="border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
                             data-testid={`button-edit-tutor-${tutor.id}`}
                           >
                             <Edit className="h-4 w-4" />
@@ -1541,17 +1709,24 @@ export default function CompanyDashboard() {
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-12">
-                  <Users className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-                  <p className="text-gray-600 mb-4">
+                <div className="text-center py-16">
+                  <div className="bg-gray-100 dark:bg-gray-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Users className="h-8 w-8 text-gray-400 dark:text-gray-500" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
                     {tutorSearchTerm || tutorFilterStatus !== 'all' || tutorFilterSpecialization !== 'all'
-                      ? "No tutors match your filters"
-                      : "No tutors added yet"}
+                      ? "No staff match your filters"
+                      : "No staff members yet"}
+                  </h3>
+                  <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-sm mx-auto">
+                    {tutorSearchTerm || tutorFilterStatus !== 'all' || tutorFilterSpecialization !== 'all'
+                      ? "Try adjusting your filters or search term"
+                      : "Get started by adding your first team member"}
                   </p>
                   {!tutorSearchTerm && tutorFilterStatus === 'all' && tutorFilterSpecialization === 'all' && (
-                    <Button onClick={() => setIsCreateTutorOpen(true)} className="bg-black text-white hover:bg-gray-800">
+                    <Button onClick={() => setIsCreateTutorOpen(true)} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white">
                       <UserPlus className="h-4 w-4 mr-2" />
-                      Add Your First Tutor
+                      Add Your First Team Member
                     </Button>
                   )}
                 </div>
@@ -1889,104 +2064,168 @@ export default function CompanyDashboard() {
         </DialogContent>
       </Dialog>
 
-      {/* Edit Tutor Dialog */}
+      {/* Edit Staff Member Dialog */}
       <Dialog open={isEditTutorOpen} onOpenChange={setIsEditTutorOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Tutor Details</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="bg-blue-100 dark:bg-blue-900/40 p-2 rounded-lg">
+                <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              Edit Staff Member
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleUpdateTutor} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="editFirstName">First Name</Label>
-                <Input id="editFirstName" value={editTutorFormData.firstName} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, firstName: e.target.value })} required />
-              </div>
-              <div>
-                <Label htmlFor="editLastName">Last Name</Label>
-                <Input id="editLastName" value={editTutorFormData.lastName} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, lastName: e.target.value })} required />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="editEmail">Email</Label>
-              <Input id="editEmail" type="email" value={editTutorFormData.email} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, email: e.target.value })} required />
-            </div>
-            <div>
-              <Label htmlFor="editSpecialization">Specialization</Label>
-              <Input id="editSpecialization" value={editTutorFormData.specialization} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, specialization: e.target.value })} placeholder="e.g., Mathematics" />
-            </div>
-            <div>
-              <Label htmlFor="editQualifications">Qualifications</Label>
-              <Input id="editQualifications" value={editTutorFormData.qualifications} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics" />
-            </div>
-            
-            {/* New Fields */}
-            <div>
-              <Label htmlFor="editAvailability" className="flex items-center gap-1">
-                <Clock className="h-4 w-4" />
-                Availability
-              </Label>
-              <Textarea 
-                id="editAvailability" 
-                value={editTutorFormData.availability} 
-                onChange={(e) => setEditTutorFormData({ ...editTutorFormData, availability: e.target.value })} 
-                placeholder="e.g., Mon-Fri 9am-5pm, Weekends 10am-2pm"
-                className="mt-1"
-              />
-            </div>
-            
-            <div>
-              <Label className="flex items-center gap-1">
-                <BookOpen className="h-4 w-4" />
-                Subjects Teaching
-              </Label>
-              <div className="mt-1 space-y-2">
-                <div className="flex gap-2">
-                  <Input
-                    value={newTutorSubject}
-                    onChange={(e) => setNewTutorSubject(e.target.value)}
-                    placeholder="Add a subject..."
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTutorSubject())}
-                  />
-                  <Button type="button" onClick={handleAddTutorSubject} variant="outline">
-                    <Plus className="h-4 w-4" />
-                  </Button>
+          <form onSubmit={handleUpdateTutor} className="space-y-6 mt-4">
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Personal Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editFirstName" className="text-sm font-medium">First Name *</Label>
+                  <Input id="editFirstName" value={editTutorFormData.firstName} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, firstName: e.target.value })} required className="mt-1" />
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {editTutorFormData.subjectsTeaching.map((subject, index) => (
-                    <Badge key={index} variant="secondary" className="flex items-center gap-1">
-                      {subject}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTutorSubject(subject)}
-                        className="ml-1 hover:text-red-500"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
+                <div>
+                  <Label htmlFor="editLastName" className="text-sm font-medium">Last Name *</Label>
+                  <Input id="editLastName" value={editTutorFormData.lastName} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, lastName: e.target.value })} required className="mt-1" />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="editEmail" className="text-sm font-medium">Email *</Label>
+                <Input id="editEmail" type="email" value={editTutorFormData.email} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, email: e.target.value })} required className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="editPhoneNumber" className="text-sm font-medium">Phone Number</Label>
+                <Input id="editPhoneNumber" type="tel" value={editTutorFormData.phoneNumber} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, phoneNumber: e.target.value })} placeholder="e.g., +1 234 567 8900" className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="editAddress" className="text-sm font-medium">Address</Label>
+                <Textarea id="editAddress" value={editTutorFormData.address} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, address: e.target.value })} placeholder="Full address" className="mt-1" rows={2} />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Employment Details</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="editPosition" className="text-sm font-medium">Position</Label>
+                  <Input id="editPosition" value={editTutorFormData.position} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, position: e.target.value })} placeholder="e.g., Senior Tutor" className="mt-1" />
+                </div>
+                <div>
+                  <Label htmlFor="editEmploymentType" className="text-sm font-medium">Employment Type</Label>
+                  <Select value={editTutorFormData.employmentType} onValueChange={(v) => setEditTutorFormData({ ...editTutorFormData, employmentType: v })}>
+                    <SelectTrigger className="mt-1">
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="casual">Casual</SelectItem>
+                      <SelectItem value="parttime">Part-time</SelectItem>
+                      <SelectItem value="fulltime">Full-time</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="editSpecialization" className="text-sm font-medium">Specialization</Label>
+                <Input id="editSpecialization" value={editTutorFormData.specialization} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, specialization: e.target.value })} placeholder="e.g., Mathematics" className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="editQualifications" className="text-sm font-medium">Qualifications</Label>
+                <Input id="editQualifications" value={editTutorFormData.qualifications} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, qualifications: e.target.value })} placeholder="e.g., B.Sc. Mathematics" className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="editBranch" className="text-sm font-medium flex items-center gap-1">
+                  <MapPin className="h-4 w-4" />
+                  Branch / Location
+                </Label>
+                <Input id="editBranch" value={editTutorFormData.branch} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, branch: e.target.value })} placeholder="e.g., Downtown Center" className="mt-1" />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Availability</h3>
+              <div>
+                <Label className="text-sm font-medium">Available Days</Label>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
+                    <Button
+                      key={day}
+                      type="button"
+                      variant={editTutorFormData.availabilityDays.includes(day) ? 'default' : 'outline'}
+                      size="sm"
+                      className={editTutorFormData.availabilityDays.includes(day) ? 'bg-blue-600 hover:bg-blue-700' : ''}
+                      onClick={() => {
+                        const days = editTutorFormData.availabilityDays.includes(day)
+                          ? editTutorFormData.availabilityDays.filter(d => d !== day)
+                          : [...editTutorFormData.availabilityDays, day];
+                        setEditTutorFormData({ ...editTutorFormData, availabilityDays: days });
+                      }}
+                    >
+                      {day.slice(0, 3)}
+                    </Button>
                   ))}
                 </div>
               </div>
+              <div>
+                <Label htmlFor="editAvailabilityHours" className="text-sm font-medium">Available Hours</Label>
+                <Input id="editAvailabilityHours" value={editTutorFormData.availabilityHours} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, availabilityHours: e.target.value })} placeholder="e.g., 9:00 AM - 5:00 PM" className="mt-1" />
+              </div>
+              <div>
+                <Label htmlFor="editAvailability" className="text-sm font-medium flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  Availability Notes
+                </Label>
+                <Textarea 
+                  id="editAvailability" 
+                  value={editTutorFormData.availability} 
+                  onChange={(e) => setEditTutorFormData({ ...editTutorFormData, availability: e.target.value })} 
+                  placeholder="Any additional availability notes..."
+                  className="mt-1"
+                  rows={2}
+                />
+              </div>
             </div>
             
-            <div>
-              <Label htmlFor="editBranch" className="flex items-center gap-1">
-                <MapPin className="h-4 w-4" />
-                Branch / Location
-              </Label>
-              <Input 
-                id="editBranch" 
-                value={editTutorFormData.branch} 
-                onChange={(e) => setEditTutorFormData({ ...editTutorFormData, branch: e.target.value })} 
-                placeholder="e.g., Downtown Center, North Campus"
-                className="mt-1"
-              />
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Subjects</h3>
+              <div>
+                <Label className="text-sm font-medium flex items-center gap-1">
+                  <BookOpen className="h-4 w-4" />
+                  Subjects Teaching
+                </Label>
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-2">
+                    <Input
+                      value={newTutorSubject}
+                      onChange={(e) => setNewTutorSubject(e.target.value)}
+                      placeholder="Add a subject..."
+                      onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAddTutorSubject())}
+                    />
+                    <Button type="button" onClick={handleAddTutorSubject} variant="outline">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {editTutorFormData.subjectsTeaching.map((subject, index) => (
+                      <Badge key={index} variant="secondary" className="flex items-center gap-1 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">
+                        {subject}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveTutorSubject(subject)}
+                          className="ml-1 hover:text-red-500"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
             
-            <div className="flex gap-2">
-              <Button type="button" variant="outline" className="flex-1 border-black" onClick={() => setIsEditTutorOpen(false)}>
+            <div className="flex gap-3 pt-4 border-t">
+              <Button type="button" variant="outline" className="flex-1 border-gray-300 dark:border-gray-600" onClick={() => setIsEditTutorOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1 bg-black text-white hover:bg-gray-800" disabled={updateTutorMutation.isPending}>
+              <Button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white" disabled={updateTutorMutation.isPending}>
                 {updateTutorMutation.isPending ? "Saving..." : "Save Changes"}
               </Button>
             </div>
