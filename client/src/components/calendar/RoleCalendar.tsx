@@ -168,19 +168,21 @@ export function RoleCalendar({
   }, [dateRange.days]);
 
   return (
-    <Card className="w-full bg-white dark:bg-black border-2 border-black dark:border-white" data-testid="role-calendar">
-      <CardHeader className="pb-2">
+    <Card className="w-full bg-white dark:bg-gray-900 border-0 shadow-md rounded-xl overflow-hidden" data-testid="role-calendar">
+      <CardHeader className="pb-3 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-gray-850 border-b border-gray-100 dark:border-gray-700">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2">
-            <CalendarIcon className="w-5 h-5" />
-            <CardTitle className="text-lg" data-testid="calendar-title">Calendar</CardTitle>
+          <div className="flex items-center gap-3">
+            <div className="bg-blue-100 dark:bg-blue-900/40 p-2 rounded-lg">
+              <CalendarIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <CardTitle className="text-lg font-bold text-gray-900 dark:text-white" data-testid="calendar-title">Calendar</CardTitle>
           </div>
 
           <Tabs value={view} onValueChange={(v) => handleViewChange(v as CalendarView)}>
-            <TabsList data-testid="view-switcher">
-              <TabsTrigger value="weekly" data-testid="view-weekly">Week</TabsTrigger>
-              <TabsTrigger value="monthly" data-testid="view-monthly">Month</TabsTrigger>
-              <TabsTrigger value="term" disabled={!termInfo} data-testid="view-term">Term</TabsTrigger>
+            <TabsList className="bg-gray-100 dark:bg-gray-700" data-testid="view-switcher">
+              <TabsTrigger value="weekly" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-600 data-[state=active]:shadow-sm" data-testid="view-weekly">Week</TabsTrigger>
+              <TabsTrigger value="monthly" className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-600 data-[state=active]:shadow-sm" data-testid="view-monthly">Month</TabsTrigger>
+              <TabsTrigger value="term" disabled={!termInfo} className="data-[state=active]:bg-white dark:data-[state=active]:bg-gray-600 data-[state=active]:shadow-sm" data-testid="view-term">Term</TabsTrigger>
             </TabsList>
           </Tabs>
         </div>
@@ -191,6 +193,7 @@ export function RoleCalendar({
               variant="outline"
               size="icon"
               onClick={navigatePrevious}
+              className="border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
               data-testid="navigate-previous"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -199,6 +202,7 @@ export function RoleCalendar({
               variant="outline"
               size="sm"
               onClick={goToToday}
+              className="border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-300 dark:hover:border-blue-700"
               data-testid="navigate-today"
             >
               Today
@@ -207,11 +211,12 @@ export function RoleCalendar({
               variant="outline"
               size="icon"
               onClick={navigateNext}
+              className="border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
               data-testid="navigate-next"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <span className="font-medium ml-2" data-testid="date-range-header">
+            <span className="font-bold text-gray-900 dark:text-white ml-3" data-testid="date-range-header">
               {getHeaderText()}
             </span>
           </div>
@@ -224,54 +229,60 @@ export function RoleCalendar({
         </div>
 
         {showAttendanceLegend && (
-          <div className="mt-3 pt-3 border-t border-border">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-2">
               <span>Attendance Legend:</span>
             </div>
             <AttendanceStatusLegend />
           </div>
         )}
 
-        <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-blue-500" />
-            <span>Scheduled</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-yellow-500" />
-            <span>In Progress</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-green-500" />
-            <span>Completed</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-gray-400" />
-            <span>Cancelled</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-orange-500" />
-            <span>Homework</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded-full bg-red-500" />
-            <span>Holiday</span>
+        <div className="mt-4 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-100 dark:border-gray-700">
+          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Legend</p>
+          <div className="flex flex-wrap gap-4 text-xs">
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-blue-500 shadow-sm" />
+              <span className="text-gray-700 dark:text-gray-300">Scheduled</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-yellow-500 shadow-sm" />
+              <span className="text-gray-700 dark:text-gray-300">In Progress</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-green-500 shadow-sm" />
+              <span className="text-gray-700 dark:text-gray-300">Completed</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-gray-400 shadow-sm" />
+              <span className="text-gray-700 dark:text-gray-300">Cancelled</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-orange-500 shadow-sm" />
+              <span className="text-gray-700 dark:text-gray-300">Homework</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-3 h-3 rounded-full bg-red-500 shadow-sm" />
+              <span className="text-gray-700 dark:text-gray-300">Holiday</span>
+            </div>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent>
+      <CardContent className="p-4">
         {isLoading ? (
           <div className="h-96 flex items-center justify-center" data-testid="calendar-loading">
-            <div className="animate-pulse text-muted-foreground">Loading calendar...</div>
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <span className="text-gray-500 dark:text-gray-400">Loading calendar...</span>
+            </div>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <div className={cn("grid grid-cols-7 gap-px bg-border", view === 'term' && "text-xs")}>
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className={cn("grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700", view === 'term' && "text-xs")}>
               {DAYS_OF_WEEK.map((day) => (
                 <div
                   key={day}
-                  className="bg-muted dark:bg-gray-900 p-2 text-center text-sm font-medium"
+                  className="bg-gray-100 dark:bg-gray-800 p-3 text-center text-sm font-semibold text-gray-700 dark:text-gray-300"
                   data-testid={`day-header-${day.toLowerCase()}`}
                 >
                   {day}
@@ -279,7 +290,7 @@ export function RoleCalendar({
               ))}
             </div>
 
-            <div className="grid grid-cols-7 gap-px bg-border" data-testid="calendar-grid">
+            <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-700" data-testid="calendar-grid">
               {weeks.map((week, weekIndex) => (
                 week.map((day) => (
                   <CalendarDayCell

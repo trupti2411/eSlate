@@ -551,24 +551,103 @@ export function CompanyCalendarDashboard() {
     );
   }
 
+  const totalClassesCount = calendarData?.classes?.length || 0;
+  const totalHolidaysCount = calendarData?.holidays?.length || 0;
+  const totalTutorsCount = uniqueTutors.length;
+  const todaySessionsCount = todaySessions?.length || 0;
+
   return (
     <div className="space-y-6" data-testid="company-calendar-dashboard">
+      {/* Header */}
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Calendar & Scheduling</h2>
+        <p className="text-gray-600 dark:text-gray-300">Manage class schedules, attendance, and sessions</p>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
+          <CardContent className="pt-4 pb-4 pl-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Today's Sessions</p>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{todaySessionsCount}</div>
+              </div>
+              <div className="bg-blue-50 dark:bg-blue-900/30 p-3 rounded-xl group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                <Clock className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+          <CardContent className="pt-4 pb-4 pl-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Active Tutors</p>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{totalTutorsCount}</div>
+              </div>
+              <div className="bg-emerald-50 dark:bg-emerald-900/30 p-3 rounded-xl group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/50 transition-colors">
+                <Users className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-500"></div>
+          <CardContent className="pt-4 pb-4 pl-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Total Classes</p>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{uniqueClasses.length}</div>
+              </div>
+              <div className="bg-violet-50 dark:bg-violet-900/30 p-3 rounded-xl group-hover:bg-violet-100 dark:group-hover:bg-violet-900/50 transition-colors">
+                <Building2 className="h-5 w-5 text-violet-500 dark:text-violet-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+          <div className="absolute left-0 top-0 bottom-0 w-1 bg-amber-500"></div>
+          <CardContent className="pt-4 pb-4 pl-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-gray-500 dark:text-gray-400 text-xs font-medium uppercase tracking-wide">Holidays</p>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white mt-0.5">{totalHolidaysCount}</div>
+              </div>
+              <div className="bg-amber-50 dark:bg-amber-900/30 p-3 rounded-xl group-hover:bg-amber-100 dark:group-hover:bg-amber-900/50 transition-colors">
+                <CalendarDays className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Active Term Banner */}
       {calendarData?.activeTerm && (
-        <Card className="border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
-          <CardContent className="py-3 px-4">
+        <Card className="relative overflow-hidden border-0 shadow-md bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/50 dark:to-indigo-950/50">
+          <div className="absolute left-0 top-0 bottom-0 w-1.5 bg-gradient-to-b from-blue-500 to-indigo-500"></div>
+          <CardContent className="py-4 px-5">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <CalendarDays className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="flex items-center gap-4">
+                <div className="bg-white dark:bg-gray-800 p-3 rounded-xl shadow-sm">
+                  <CalendarDays className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                </div>
                 <div>
-                  <span className="font-medium text-blue-900 dark:text-blue-100">
-                    Current Term: {calendarData.activeTerm.name}
-                  </span>
-                  <span className="text-sm text-blue-600 dark:text-blue-400 ml-2">
-                    ({format(new Date(calendarData.activeTerm.startDate), 'MMM d, yyyy')} - {format(new Date(calendarData.activeTerm.endDate), 'MMM d, yyyy')})
-                  </span>
+                  <p className="text-xs font-medium uppercase tracking-wide text-blue-600 dark:text-blue-400">Current Term</p>
+                  <p className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
+                    {calendarData.activeTerm.name}
+                  </p>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center mt-1">
+                    <Clock className="h-3.5 w-3.5 mr-1.5" />
+                    {format(new Date(calendarData.activeTerm.startDate), 'MMM d, yyyy')} - {format(new Date(calendarData.activeTerm.endDate), 'MMM d, yyyy')}
+                  </p>
                 </div>
               </div>
+              <Badge className="bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800 px-3 py-1">
+                Active
+              </Badge>
             </div>
           </CardContent>
         </Card>
