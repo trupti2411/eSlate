@@ -2851,11 +2851,77 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Helper function to check for time overlap
+  function timeRangesOverlap(start1: string, end1: string, start2: string, end2: string): boolean {
+    const toMinutes = (time: string) => {
+      const [h, m] = time.split(':').map(Number);
+      return h * 60 + m;
+    };
+    const s1 = toMinutes(start1), e1 = toMinutes(end1);
+    const s2 = toMinutes(start2), e2 = toMinutes(end2);
+    return s1 < e2 && s2 < e1;
+  }
+
+  // Check tutor schedule conflicts
+  app.get('/api/classes/:classId/tutor-conflicts', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const { tutorId } = req.query;
+      
+      if (!tutorId) {
+        return res.json({ conflicts: [] });
+      }
+
+      const targetClass = await storage.getClass(classId);
+      if (!targetClass) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+
+      // Get all classes assigned to this tutor
+      const tutorClasses = await storage.getClassesByTutor(tutorId);
+      const conflicts: any[] = [];
+
+      for (const existingClass of tutorClasses) {
+        if (existingClass.id === classId || !existingClass.isActive) continue;
+
+        // Check for day overlap
+        const targetDays = targetClass.daysOfWeek || (targetClass.dayOfWeek !== null ? [targetClass.dayOfWeek] : []);
+        const existingDays = existingClass.daysOfWeek || (existingClass.dayOfWeek !== null ? [existingClass.dayOfWeek] : []);
+        
+        const overlappingDays = targetDays.filter(d => existingDays.includes(d));
+        
+        if (overlappingDays.length > 0) {
+          // Check for time overlap
+          if (timeRangesOverlap(targetClass.startTime, targetClass.endTime, existingClass.startTime, existingClass.endTime)) {
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            conflicts.push({
+              type: 'schedule_conflict',
+              severity: 'warning',
+              message: `Tutor is already teaching "${existingClass.name}" on ${overlappingDays.map(d => dayNames[d]).join(', ')} at ${existingClass.startTime}-${existingClass.endTime}`,
+              conflictingClass: {
+                id: existingClass.id,
+                name: existingClass.name,
+                subject: existingClass.subject,
+                days: overlappingDays.map(d => dayNames[d]),
+                time: `${existingClass.startTime}-${existingClass.endTime}`
+              }
+            });
+          }
+        }
+      }
+
+      res.json({ conflicts });
+    } catch (error) {
+      console.error("Error checking tutor conflicts:", error);
+      res.status(500).json({ message: "Failed to check tutor conflicts" });
+    }
+  });
+
   // Update class tutor
   app.patch('/api/classes/:classId/tutor', isAuthenticated, async (req: any, res: any) => {
     try {
       const { classId } = req.params;
-      const { tutorId } = req.body;
+      const { tutorId, ignoreConflicts } = req.body;
       const user = req.user!;
 
       if (user.role !== 'admin' && user.role !== 'company_admin') {
@@ -2905,6 +2971,34 @@ trailer<</Size 5/Root 1 0 R>>
         // Verify tutor belongs to the same company as the class
         if (tutor.companyId !== classCompanyId) {
           return res.status(400).json({ message: "Tutor must belong to the same company as the class" });
+        }
+
+        // Check for schedule conflicts unless explicitly ignored
+        if (!ignoreConflicts) {
+          const tutorClasses = await storage.getClassesByTutor(tutorId);
+          const conflicts: string[] = [];
+
+          for (const existingClass of tutorClasses) {
+            if (existingClass.id === classId || !existingClass.isActive) continue;
+
+            const targetDays = classData.daysOfWeek || (classData.dayOfWeek !== null ? [classData.dayOfWeek] : []);
+            const existingDays = existingClass.daysOfWeek || (existingClass.dayOfWeek !== null ? [existingClass.dayOfWeek] : []);
+            
+            const overlappingDays = targetDays.filter(d => existingDays.includes(d));
+            
+            if (overlappingDays.length > 0 && timeRangesOverlap(classData.startTime, classData.endTime, existingClass.startTime, existingClass.endTime)) {
+              const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+              conflicts.push(`${existingClass.name} on ${overlappingDays.map(d => dayNames[d]).join(', ')} at ${existingClass.startTime}-${existingClass.endTime}`);
+            }
+          }
+
+          if (conflicts.length > 0) {
+            return res.status(409).json({ 
+              message: "Schedule conflict detected",
+              conflicts,
+              requiresConfirmation: true
+            });
+          }
         }
       }
 
@@ -2974,11 +3068,105 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Check student enrollment conflicts
+  app.get('/api/classes/:classId/enrollment-conflicts', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const { studentId } = req.query;
+      
+      const classData = await storage.getClass(classId);
+      if (!classData) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+
+      const conflicts: any[] = [];
+
+      // Check class capacity
+      const currentEnrollments = await storage.getStudentsByClass(classId);
+      const activeEnrollments = currentEnrollments.filter(e => e.isActive);
+      const maxStudents = classData.maxStudents || 20;
+
+      if (activeEnrollments.length >= maxStudents) {
+        conflicts.push({
+          type: 'capacity_exceeded',
+          severity: 'error',
+          message: `Class is at full capacity (${activeEnrollments.length}/${maxStudents} students)`,
+          current: activeEnrollments.length,
+          max: maxStudents
+        });
+      } else if (activeEnrollments.length >= maxStudents - 2) {
+        conflicts.push({
+          type: 'capacity_warning',
+          severity: 'warning',
+          message: `Class is nearly full (${activeEnrollments.length}/${maxStudents} students)`,
+          current: activeEnrollments.length,
+          max: maxStudents
+        });
+      }
+
+      // Check if student is already enrolled
+      if (studentId) {
+        const existingEnrollments = await storage.getClassesByStudent(studentId as string);
+        const alreadyEnrolled = existingEnrollments.some(e => e.classId === classId && e.isActive);
+        
+        if (alreadyEnrolled) {
+          conflicts.push({
+            type: 'duplicate_enrollment',
+            severity: 'error',
+            message: 'Student is already enrolled in this class'
+          });
+        }
+
+        // Check for schedule conflicts with student's other classes
+        const studentClasses = await Promise.all(
+          existingEnrollments.filter(e => e.isActive && e.classId !== classId).map(async (e) => {
+            return storage.getClass(e.classId);
+          })
+        );
+
+        for (const existingClass of studentClasses) {
+          if (!existingClass || !existingClass.isActive) continue;
+
+          const targetDays = classData.daysOfWeek || (classData.dayOfWeek !== null ? [classData.dayOfWeek] : []);
+          const existingDays = existingClass.daysOfWeek || (existingClass.dayOfWeek !== null ? [existingClass.dayOfWeek] : []);
+          
+          const overlappingDays = targetDays.filter(d => existingDays.includes(d));
+          
+          if (overlappingDays.length > 0 && timeRangesOverlap(classData.startTime, classData.endTime, existingClass.startTime, existingClass.endTime)) {
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            conflicts.push({
+              type: 'schedule_conflict',
+              severity: 'warning',
+              message: `Student has "${existingClass.name}" on ${overlappingDays.map(d => dayNames[d]).join(', ')} at ${existingClass.startTime}-${existingClass.endTime}`,
+              conflictingClass: {
+                id: existingClass.id,
+                name: existingClass.name,
+                subject: existingClass.subject
+              }
+            });
+          }
+        }
+      }
+
+      res.json({ 
+        conflicts,
+        capacity: {
+          current: activeEnrollments.length,
+          max: maxStudents,
+          available: maxStudents - activeEnrollments.length
+        }
+      });
+    } catch (error) {
+      console.error("Error checking enrollment conflicts:", error);
+      res.status(500).json({ message: "Failed to check enrollment conflicts" });
+    }
+  });
+
   // Enroll a student in a class
   app.post('/api/classes/:classId/students', isAuthenticated, async (req: any, res: any) => {
     try {
       const { classId } = req.params;
-      const { studentId } = req.body;
+      const { studentId, ignoreConflicts } = req.body;
       const user = req.user!;
 
       if (user.role !== 'admin' && user.role !== 'company_admin') {
@@ -2994,7 +3182,62 @@ trailer<</Size 5/Root 1 0 R>>
       const alreadyEnrolled = existingEnrollments.some(e => e.classId === classId && e.isActive);
       
       if (alreadyEnrolled) {
-        return res.status(400).json({ message: "Student is already enrolled in this class" });
+        return res.status(400).json({ message: "Student is already enrolled in this class", conflictType: 'duplicate_enrollment' });
+      }
+
+      // Check class capacity
+      const classData = await storage.getClass(classId);
+      if (!classData) {
+        return res.status(404).json({ message: "Class not found" });
+      }
+
+      const currentEnrollments = await storage.getStudentsByClass(classId);
+      const activeEnrollments = currentEnrollments.filter(e => e.isActive);
+      const maxStudents = classData.maxStudents || 20;
+
+      if (activeEnrollments.length >= maxStudents && !ignoreConflicts) {
+        return res.status(409).json({ 
+          message: `Class is at full capacity (${activeEnrollments.length}/${maxStudents} students)`,
+          conflictType: 'capacity_exceeded',
+          requiresConfirmation: true,
+          capacity: {
+            current: activeEnrollments.length,
+            max: maxStudents
+          }
+        });
+      }
+
+      // Check for schedule conflicts
+      if (!ignoreConflicts) {
+        const studentClasses = await Promise.all(
+          existingEnrollments.filter(e => e.isActive).map(async (e) => {
+            return storage.getClass(e.classId);
+          })
+        );
+
+        const scheduleConflicts: string[] = [];
+        for (const existingClass of studentClasses) {
+          if (!existingClass || !existingClass.isActive) continue;
+
+          const targetDays = classData.daysOfWeek || (classData.dayOfWeek !== null ? [classData.dayOfWeek] : []);
+          const existingDays = existingClass.daysOfWeek || (existingClass.dayOfWeek !== null ? [existingClass.dayOfWeek] : []);
+          
+          const overlappingDays = targetDays.filter(d => existingDays.includes(d));
+          
+          if (overlappingDays.length > 0 && timeRangesOverlap(classData.startTime, classData.endTime, existingClass.startTime, existingClass.endTime)) {
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            scheduleConflicts.push(`${existingClass.name} on ${overlappingDays.map(d => dayNames[d]).join(', ')} at ${existingClass.startTime}-${existingClass.endTime}`);
+          }
+        }
+
+        if (scheduleConflicts.length > 0) {
+          return res.status(409).json({ 
+            message: "Schedule conflict detected",
+            conflictType: 'schedule_conflict',
+            conflicts: scheduleConflicts,
+            requiresConfirmation: true
+          });
+        }
       }
 
       const enrollment = await storage.assignStudentToClass({
