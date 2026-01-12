@@ -17,6 +17,8 @@ import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { WorksheetManagement } from "./WorksheetManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
+import TestManagement from "@/pages/tests/TestManagement";
+import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock } from "lucide-react";
 
 interface CompanyAdmin {
@@ -101,7 +103,7 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'worksheets' | 'assignments'>('dashboard');
+  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'worksheets' | 'assignments' | 'tests' | 'homework'>('dashboard');
   const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
   const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -674,6 +676,24 @@ export default function CompanyDashboard() {
             >
               <FileText className="h-4 w-4 mr-2" />
               Assignments
+            </Button>
+            <Button
+              variant={mainTab === 'tests' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('tests')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'tests' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-tests"
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Tests & Exams
+            </Button>
+            <Button
+              variant={mainTab === 'homework' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('homework')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'homework' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-homework"
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Submitted Homework
             </Button>
             <Button
               variant={mainTab === 'calendar' ? 'default' : 'ghost'}
@@ -1430,6 +1450,18 @@ export default function CompanyDashboard() {
       {mainTab === 'assignments' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <AssignmentManagement />
+        </div>
+      )}
+
+      {mainTab === 'tests' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <TestManagement />
+        </div>
+      )}
+
+      {mainTab === 'homework' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <SubmittedHomework />
         </div>
       )}
 
