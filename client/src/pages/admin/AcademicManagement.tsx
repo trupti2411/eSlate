@@ -136,6 +136,12 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [assigningStudentId, setAssigningStudentId] = useState<string | null>(null);
   const [isViewEnrolledStudentsOpen, setIsViewEnrolledStudentsOpen] = useState(false);
   const [selectedClassForViewing, setSelectedClassForViewing] = useState<Class | null>(null);
+  const [enrollmentConflict, setEnrollmentConflict] = useState<{
+    studentId: string;
+    classId: string;
+    message: string;
+    conflicts: string[];
+  } | null>(null);
 
   // Search, filter, and sort states for Academic Years
   const [yearSearch, setYearSearch] = useState('');
@@ -290,11 +296,22 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
 
   // Assign student to class mutation (uses new enrollment API)
   const assignStudentToClassMutation = useMutation({
-    mutationFn: async ({ studentId, classId }: { studentId: string; classId: string }) => {
+    mutationFn: async ({ studentId, classId, ignoreConflicts }: { studentId: string; classId: string; ignoreConflicts?: boolean }) => {
       setAssigningStudentId(studentId);
-      return await apiRequest(`/api/classes/${classId}/students`, 'POST', {
-        studentId,
+      const response = await fetch(`/api/classes/${classId}/students`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ studentId, ignoreConflicts }),
       });
+      const data = await response.json();
+      if (!response.ok) {
+        if (response.status === 409 && data.requiresConfirmation) {
+          throw { isConflict: true, studentId, classId, ...data };
+        }
+        throw new Error(data.message || 'Failed to enroll student');
+      }
+      return data;
     },
     onSuccess: (_, variables) => {
       toast({
@@ -307,16 +324,37 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
       queryClient.invalidateQueries({ queryKey: [`/api/classes/${variables.classId}/students`] });
       refetchStudents();
       setAssigningStudentId(null);
+      setEnrollmentConflict(null);
+      setIsAddStudentToClassOpen(false);
     },
-    onError: (error: Error) => {
+    onError: (error: any) => {
+      setAssigningStudentId(null);
+      if (error.isConflict) {
+        setEnrollmentConflict({
+          studentId: error.studentId,
+          classId: error.classId,
+          message: error.message,
+          conflicts: error.conflicts || [],
+        });
+        return;
+      }
       toast({
         title: "Error",
         description: error.message || "Failed to enroll student in class",
         variant: "destructive",
       });
-      setAssigningStudentId(null);
     },
   });
+
+  const handleEnrollWithConflictOverride = () => {
+    if (enrollmentConflict) {
+      assignStudentToClassMutation.mutate({
+        studentId: enrollmentConflict.studentId,
+        classId: enrollmentConflict.classId,
+        ignoreConflicts: true,
+      });
+    }
+  };
 
   // Remove student from class mutation
   const removeStudentFromClassMutation = useMutation({
@@ -2102,6 +2140,40 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               className="bg-red-600 hover:bg-red-700"
             >
               {deleteClassMutation.isPending ? 'Deleting...' : 'Delete Permanently'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Enrollment Conflict Warning */}
+      <AlertDialog open={!!enrollmentConflict} onOpenChange={() => setEnrollmentConflict(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-orange-600">Schedule Conflict Detected</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>{enrollmentConflict?.message}</p>
+              {enrollmentConflict?.conflicts && enrollmentConflict.conflicts.length > 0 && (
+                <div className="bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg p-3 mt-2">
+                  <p className="font-medium text-orange-800 dark:text-orange-200 mb-2">Conflicting classes:</p>
+                  <ul className="list-disc list-inside text-sm text-orange-700 dark:text-orange-300">
+                    {enrollmentConflict.conflicts.map((conflict, i) => (
+                      <li key={i}>{conflict}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Do you want to proceed with enrollment anyway?
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setEnrollmentConflict(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleEnrollWithConflictOverride}
+              className="bg-orange-600 hover:bg-orange-700"
+            >
+              {assignStudentToClassMutation.isPending ? 'Enrolling...' : 'Proceed Anyway'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
