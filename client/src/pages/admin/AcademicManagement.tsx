@@ -759,102 +759,69 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                   </div>
                 </Card>
               ) : (
-                academicHierarchy.map((year) => (
-                  <Card key={year.id} className="border-2 border-blue-100 dark:border-blue-900">
-                    <CardHeader className="bg-blue-50 dark:bg-blue-950">
-                      <div className="flex items-center justify-between">
+                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                {academicHierarchy.map((year) => (
+                  <Card key={year.id} className="border border-blue-200 dark:border-blue-800 hover:shadow-md transition-shadow">
+                    <CardHeader className="pb-2 pt-3 px-3 bg-blue-50 dark:bg-blue-950">
+                      <div className="flex items-start justify-between gap-1">
                         <div 
-                          className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 p-2 rounded-md transition-colors"
+                          className="cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900 rounded-md transition-colors flex-1 min-w-0"
                           onClick={() => handleYearClick(year.id, year.name)}
                           title="Click to view terms for this year"
                         >
-                          <CardTitle className="text-xl text-blue-900 dark:text-blue-100 flex items-center">
-                            <Calendar className="w-5 h-5 mr-2" />
+                          <CardTitle className="text-sm font-semibold text-blue-900 dark:text-blue-100 flex items-center truncate">
+                            <Calendar className="w-3 h-3 mr-1 flex-shrink-0" />
                             {year.name}
                           </CardTitle>
-                          <CardDescription className="text-blue-700 dark:text-blue-200">
-                            Year {year.yearNumber} • {year.terms?.length || 0} Terms • Click to view terms
+                          <CardDescription className="text-xs text-blue-700 dark:text-blue-200">
+                            Year {year.yearNumber} • {year.terms?.length || 0} Terms
                           </CardDescription>
                         </div>
-                        <Badge variant={year.isActive ? "default" : "secondary"}>
+                        <Badge variant={year.isActive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
                           {year.isActive ? "Active" : "Inactive"}
                         </Badge>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-6">
+                    <CardContent className="px-3 pb-3 pt-2">
                       {year.terms && year.terms.length > 0 ? (
-                        <div className="space-y-4">
-                          {year.terms.map((term) => (
-                            <Card key={term.id} className="border border-gray-200 dark:border-gray-700">
-                              <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                  <div 
-                                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors flex-1"
-                                    onClick={() => handleTermClick(term.id, term.name)}
-                                    title="Click to view classes for this term"
-                                  >
-                                    <CardTitle className="text-lg text-gray-900 dark:text-white flex items-center">
-                                      <Clock className="w-4 h-4 mr-2" />
-                                      {term.name}
-                                    </CardTitle>
-                                    <CardDescription>
-                                      {term.startDate && term.endDate ? (
-                                        `${format(new Date(term.startDate), 'MMM dd, yyyy')} - ${format(new Date(term.endDate), 'MMM dd, yyyy')}`
-                                      ) : 'Dates not set'} • {term.classes?.length || 0} Classes • Click to view classes
-                                    </CardDescription>
-                                  </div>
-                                  <Badge variant={term.isActive ? "default" : "secondary"}>
-                                    {term.isActive ? "Active" : "Inactive"}
-                                  </Badge>
+                        <div className="space-y-2">
+                          {year.terms.slice(0, 3).map((term) => (
+                            <div key={term.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-2 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                              <div className="flex items-start justify-between gap-1">
+                                <div 
+                                  className="cursor-pointer flex-1 min-w-0"
+                                  onClick={() => handleTermClick(term.id, term.name)}
+                                  title="Click to view classes for this term"
+                                >
+                                  <p className="text-xs font-medium text-gray-900 dark:text-white flex items-center truncate">
+                                    <Clock className="w-3 h-3 mr-1 flex-shrink-0" />
+                                    {term.name}
+                                  </p>
+                                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {term.classes?.length || 0} classes
+                                  </p>
                                 </div>
-                              </CardHeader>
-                              {term.classes && term.classes.length > 0 && (
-                                <CardContent className="pt-0">
-                                  <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                                    {term.classes.map((cls) => (
-                                      <Card key={cls.id} className="border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-900">
-                                        <CardContent className="p-4">
-                                          <div className="flex items-start justify-between">
-                                            <div className="min-w-0 flex-1">
-                                              <h4 className="font-medium text-gray-900 dark:text-white text-sm flex items-center">
-                                                <BookOpen className="w-3 h-3 mr-1 flex-shrink-0" />
-                                                {cls.name}
-                                              </h4>
-                                              <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">
-                                                {cls.subject}
-                                              </p>
-                                              <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                                <Clock className="w-3 h-3 mr-1" />
-                                                {formatTime(cls.startTime)} - {formatTime(cls.endTime)}
-                                              </div>
-                                              <div className="flex flex-wrap gap-1 mt-2">
-                                                <Badge variant="outline" className="text-xs px-1 py-0">
-                                                  {getDayName(cls.dayOfWeek)}
-                                                </Badge>
-                                              </div>
-                                            </div>
-                                            <Badge variant={cls.isActive ? "default" : "secondary"} className="text-xs">
-                                              {cls.isActive ? "Active" : "Inactive"}
-                                            </Badge>
-                                          </div>
-                                        </CardContent>
-                                      </Card>
-                                    ))}
-                                  </div>
-                                </CardContent>
-                              )}
-                            </Card>
+                                <Badge variant={term.isActive ? "default" : "secondary"} className="text-[10px] px-1 py-0">
+                                  {term.isActive ? "Active" : "Off"}
+                                </Badge>
+                              </div>
+                            </div>
                           ))}
+                          {year.terms.length > 3 && (
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 text-center">
+                              +{year.terms.length - 3} more terms
+                            </p>
+                          )}
                         </div>
                       ) : (
-                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                          <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                          <p className="text-sm">No terms found for this academic year</p>
+                        <div className="text-center py-2 text-gray-500 dark:text-gray-400">
+                          <p className="text-[10px]">No terms</p>
                         </div>
                       )}
                     </CardContent>
                   </Card>
-                ))
+                ))}
+              </div>
               )}
             </div>
           )}
