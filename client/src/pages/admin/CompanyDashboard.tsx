@@ -17,7 +17,8 @@ import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { WorksheetManagement } from "./WorksheetManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award } from "lucide-react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
 
 interface CompanyAdmin {
   id: string;
@@ -689,59 +690,314 @@ export default function CompanyDashboard() {
       </div>
 
       {mainTab === 'dashboard' && (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h2 className="text-2xl font-bold text-black mb-6">Dashboard</h2>
-        {/* Stats Grid */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
+            <p className="text-gray-600 dark:text-gray-300">Welcome back! Here's what's happening with your organization.</p>
+          </div>
+          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 px-3 py-1">
+            <Activity className="h-3 w-3 mr-1 inline" />
+            Live
+          </Badge>
+        </div>
+
+        {/* Vibrant Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="border-2 border-black bg-white">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-gray-600" />
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-black">{Array.isArray(tutors) ? tutors.length : 0}</div>
-                  <p className="text-xs text-gray-600">Tutors</p>
+                  <p className="text-blue-100 text-sm font-medium">Total Tutors</p>
+                  <div className="text-3xl font-bold">{Array.isArray(tutors) ? tutors.length : 0}</div>
+                  <p className="text-blue-100 text-xs mt-1 flex items-center">
+                    <TrendingUp className="h-3 w-3 mr-1" />
+                    Active educators
+                  </p>
+                </div>
+                <div className="bg-blue-400/30 p-3 rounded-full">
+                  <Users className="h-6 w-6" />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-2 border-black bg-white">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2">
-                <GraduationCap className="h-5 w-5 text-gray-600" />
+
+          <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-black">{Array.isArray(students) ? students.length : 0}</div>
-                  <p className="text-xs text-gray-600">Students</p>
+                  <p className="text-purple-100 text-sm font-medium">Total Students</p>
+                  <div className="text-3xl font-bold">{Array.isArray(students) ? students.length : 0}</div>
+                  <p className="text-purple-100 text-xs mt-1 flex items-center">
+                    <GraduationCap className="h-3 w-3 mr-1" />
+                    Enrolled learners
+                  </p>
+                </div>
+                <div className="bg-purple-400/30 p-3 rounded-full">
+                  <GraduationCap className="h-6 w-6" />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-2 border-black bg-white">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-gray-600" />
+
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-black">
+                  <p className="text-green-100 text-sm font-medium">Assigned</p>
+                  <div className="text-3xl font-bold">
                     {Array.isArray(students) ? students.filter((s: any) => s.tutorId).length : 0}
                   </div>
-                  <p className="text-xs text-gray-600">Assigned</p>
+                  <p className="text-green-100 text-xs mt-1 flex items-center">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    With tutors
+                  </p>
+                </div>
+                <div className="bg-green-400/30 p-3 rounded-full">
+                  <Target className="h-6 w-6" />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-2 border-black bg-white">
-            <CardContent className="pt-4 pb-3">
-              <div className="flex items-center gap-2">
-                <BookOpen className="h-5 w-5 text-gray-600" />
+
+          <Card className="bg-gradient-to-br from-orange-500 to-orange-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-black">
+                  <p className="text-orange-100 text-sm font-medium">Pending</p>
+                  <div className="text-3xl font-bold">
                     {Array.isArray(students) ? students.filter((s: any) => !s.tutorId).length : 0}
                   </div>
-                  <p className="text-xs text-gray-600">Pending</p>
+                  <p className="text-orange-100 text-xs mt-1 flex items-center">
+                    <Clock className="h-3 w-3 mr-1" />
+                    Awaiting assignment
+                  </p>
+                </div>
+                <div className="bg-orange-400/30 p-3 rounded-full">
+                  <Award className="h-6 w-6" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Student Distribution Chart */}
+          <Card className="border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <Activity className="h-5 w-5 mr-2 text-blue-500" />
+                Student Distribution
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Assigned', value: Array.isArray(students) ? students.filter((s: any) => s.tutorId).length : 0, color: '#22c55e' },
+                        { name: 'Pending', value: Array.isArray(students) ? students.filter((s: any) => !s.tutorId).length : 0, color: '#f97316' },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                    >
+                      {[
+                        { name: 'Assigned', value: Array.isArray(students) ? students.filter((s: any) => s.tutorId).length : 0, color: '#22c55e' },
+                        { name: 'Pending', value: Array.isArray(students) ? students.filter((s: any) => !s.tutorId).length : 0, color: '#f97316' },
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Weekly Activity Chart */}
+          <Card className="border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <TrendingUp className="h-5 w-5 mr-2 text-green-500" />
+                Weekly Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart
+                    data={[
+                      { day: 'Mon', students: 12, assignments: 8 },
+                      { day: 'Tue', students: 19, assignments: 12 },
+                      { day: 'Wed', students: 15, assignments: 10 },
+                      { day: 'Thu', students: 22, assignments: 15 },
+                      { day: 'Fri', students: 25, assignments: 18 },
+                      { day: 'Sat', students: 8, assignments: 5 },
+                      { day: 'Sun', students: 5, assignments: 3 },
+                    ]}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
+                    <defs>
+                      <linearGradient id="colorStudents" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorAssignments" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="day" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip />
+                    <Area type="monotone" dataKey="students" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorStudents)" name="Active Students" />
+                    <Area type="monotone" dataKey="assignments" stroke="#3b82f6" fillOpacity={1} fill="url(#colorAssignments)" name="Assignments" />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Performance & Activity Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Performance Bar Chart */}
+          <Card className="lg:col-span-2 border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <Target className="h-5 w-5 mr-2 text-purple-500" />
+                Subject Performance
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={[
+                      { subject: 'Math', score: 85, avg: 72 },
+                      { subject: 'English', score: 78, avg: 68 },
+                      { subject: 'Science', score: 92, avg: 75 },
+                      { subject: 'History', score: 70, avg: 65 },
+                      { subject: 'Art', score: 88, avg: 80 },
+                    ]}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                    <XAxis dataKey="subject" className="text-xs" />
+                    <YAxis className="text-xs" />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="score" name="Your Students" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="avg" name="Platform Average" fill="#e5e7eb" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Stats */}
+          <Card className="border border-gray-200 dark:border-gray-700 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+                <Award className="h-5 w-5 mr-2 text-yellow-500" />
+                Quick Stats
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                <div className="flex items-center">
+                  <div className="bg-blue-500 p-2 rounded-full mr-3">
+                    <FileText className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Assignments</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">This week</p>
+                  </div>
+                </div>
+                <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">24</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                <div className="flex items-center">
+                  <div className="bg-green-500 p-2 rounded-full mr-3">
+                    <CheckCircle className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Completed</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Submissions</p>
+                  </div>
+                </div>
+                <span className="text-2xl font-bold text-green-600 dark:text-green-400">89%</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg">
+                <div className="flex items-center">
+                  <div className="bg-purple-500 p-2 rounded-full mr-3">
+                    <TrendingUp className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Growth</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">This month</p>
+                  </div>
+                </div>
+                <span className="text-2xl font-bold text-purple-600 dark:text-purple-400">+12%</span>
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg">
+                <div className="flex items-center">
+                  <div className="bg-orange-500 p-2 rounded-full mr-3">
+                    <Clock className="h-4 w-4 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">Avg. Time</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Per session</p>
+                  </div>
+                </div>
+                <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">45m</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Activity Feed */}
+        <Card className="border border-gray-200 dark:border-gray-700 shadow-sm">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
+              <Activity className="h-5 w-5 mr-2 text-blue-500" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {[
+                { icon: GraduationCap, color: 'bg-purple-500', text: 'New student enrolled: Sarah Johnson', time: '2 minutes ago' },
+                { icon: FileText, color: 'bg-blue-500', text: 'Assignment "Math Quiz Week 5" was submitted', time: '15 minutes ago' },
+                { icon: Users, color: 'bg-green-500', text: 'Tutor Michael assigned to 3 new students', time: '1 hour ago' },
+                { icon: CheckCircle, color: 'bg-yellow-500', text: 'All assignments for Term 1 have been graded', time: '3 hours ago' },
+                { icon: Calendar, color: 'bg-pink-500', text: 'New class session scheduled for Monday', time: '5 hours ago' },
+              ].map((activity, index) => (
+                <div key={index} className="flex items-center space-x-4 p-3 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg transition-colors">
+                  <div className={`${activity.color} p-2 rounded-full`}>
+                    <activity.icon className="h-4 w-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">{activity.text}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">{activity.time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
       </div>
       )}
 
