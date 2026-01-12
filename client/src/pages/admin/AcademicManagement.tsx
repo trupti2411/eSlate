@@ -947,26 +947,26 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               </p>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {getFilteredAndSortedYears().map((year: AcademicYear) => (
-                <Card key={year.id} className="border border-gray-200 dark:border-gray-700">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
+                <Card key={year.id} className="border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2 pt-3 px-3">
+                    <div className="flex justify-between items-start gap-1">
                       <div 
-                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors flex-1"
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors flex-1 min-w-0"
                         onClick={() => handleYearClick(year.id, year.name)}
                         title="Click to view terms for this year"
                       >
-                        <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
+                        <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                           {year.name}
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-xs">
                           Year {year.yearNumber} • Click to view terms
                         </CardDescription>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -983,15 +983,15 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       </DropdownMenu>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                        <Calendar className="w-4 h-4 mr-2" />
+                  <CardContent className="px-3 pb-3 pt-0">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center text-xs text-gray-600 dark:text-gray-300">
+                        <Calendar className="w-3 h-3 mr-1" />
                         {year.startDate && year.endDate ? (
-                          `${format(new Date(year.startDate), 'MMM dd, yyyy')} - ${format(new Date(year.endDate), 'MMM dd, yyyy')}`
+                          `${format(new Date(year.startDate), 'MMM d')} - ${format(new Date(year.endDate), 'MMM d, yyyy')}`
                         ) : 'Dates not set'}
                       </div>
-                      <Badge variant={year.isActive ? "default" : "secondary"}>
+                      <Badge variant={year.isActive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
                         {year.isActive ? "Active" : "Inactive"}
                       </Badge>
                     </div>
@@ -1096,26 +1096,26 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
           ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
               {getFilteredAndSortedTerms().map((term: AcademicTerm) => (
-                <Card key={term.id} className="border border-gray-200 dark:border-gray-700">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
+                <Card key={term.id} className="border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-2 pt-3 px-3">
+                    <div className="flex justify-between items-start gap-1">
                       <div 
-                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-md transition-colors flex-1"
+                        className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors flex-1 min-w-0"
                         onClick={() => handleTermClick(term.id, term.name)}
                         title="Click to view classes for this term"
                       >
-                        <CardTitle className="text-lg font-medium text-gray-900 dark:text-white">
+                        <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                           {term.name}
                         </CardTitle>
-                        <CardDescription>
+                        <CardDescription className="text-xs">
                           Term {term.termNumber} • Click to view classes
                         </CardDescription>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
                             <MoreHorizontal className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -1142,15 +1142,15 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       </DropdownMenu>
                     </div>
                   </CardHeader>
-                  <CardContent>
-                    <div className="space-y-2">
-                      <div className="flex items-center text-sm text-gray-600 dark:text-gray-300">
-                        <Calendar className="w-4 h-4 mr-2" />
+                  <CardContent className="px-3 pb-3 pt-0">
+                    <div className="space-y-1.5">
+                      <div className="flex items-center text-xs text-gray-600 dark:text-gray-300">
+                        <Calendar className="w-3 h-3 mr-1" />
                         {term.startDate && term.endDate ? (
-                          `${format(new Date(term.startDate), 'MMM dd')} - ${format(new Date(term.endDate), 'MMM dd, yyyy')}`
+                          `${format(new Date(term.startDate), 'MMM d')} - ${format(new Date(term.endDate), 'MMM d, yyyy')}`
                         ) : 'Dates not set'}
                       </div>
-                      <Badge variant={term.isActive ? "default" : "secondary"}>
+                      <Badge variant={term.isActive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
                         {term.isActive ? "Active" : "Archived"}
                       </Badge>
                     </div>
