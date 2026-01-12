@@ -992,3 +992,53 @@ export const insertAcademicHolidaySchema = createInsertSchema(academicHolidays).
 export type InsertClassSession = z.infer<typeof insertClassSessionSchema>;
 export type InsertSessionAttendance = z.infer<typeof insertSessionAttendanceSchema>;
 export type InsertAcademicHoliday = z.infer<typeof insertAcademicHolidaySchema>;
+
+// Notification Preferences table
+export const notificationPreferences = pgTable("notification_preferences", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  
+  // Email notification preferences
+  emailEnabled: boolean("email_enabled").notNull().default(true),
+  emailNewAssignment: boolean("email_new_assignment").notNull().default(true),
+  emailSubmissionGraded: boolean("email_submission_graded").notNull().default(true),
+  emailNewMessage: boolean("email_new_message").notNull().default(true),
+  emailAttendanceMarked: boolean("email_attendance_marked").notNull().default(true),
+  emailScheduleChanges: boolean("email_schedule_changes").notNull().default(true),
+  emailWeeklyDigest: boolean("email_weekly_digest").notNull().default(false),
+  
+  // In-app notification preferences
+  inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+  inAppNewAssignment: boolean("in_app_new_assignment").notNull().default(true),
+  inAppSubmissionGraded: boolean("in_app_submission_graded").notNull().default(true),
+  inAppNewMessage: boolean("in_app_new_message").notNull().default(true),
+  inAppAttendanceMarked: boolean("in_app_attendance_marked").notNull().default(true),
+  inAppScheduleChanges: boolean("in_app_schedule_changes").notNull().default(true),
+  
+  // Staff/Admin specific preferences
+  staffNewStudentEnrollment: boolean("staff_new_student_enrollment").notNull().default(true),
+  staffSubmissionReceived: boolean("staff_submission_received").notNull().default(true),
+  staffLowAttendanceAlert: boolean("staff_low_attendance_alert").notNull().default(true),
+  adminSystemAlerts: boolean("admin_system_alerts").notNull().default(true),
+  adminNewStaffRegistration: boolean("admin_new_staff_registration").notNull().default(true),
+  
+  // Quiet hours
+  quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(false),
+  quietHoursStart: varchar("quiet_hours_start").default("22:00"),
+  quietHoursEnd: varchar("quiet_hours_end").default("07:00"),
+  
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Type exports for notification preferences
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+
+// Insert schema for notification preferences
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
