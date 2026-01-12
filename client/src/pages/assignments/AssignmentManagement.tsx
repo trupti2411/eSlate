@@ -15,13 +15,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { insertAssignmentSchema, type Assignment, type Class } from "@shared/schema";
-import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload, FileQuestion, BookOpen, HelpCircle, CheckCircle } from "lucide-react";
+import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload, FileQuestion, BookOpen, HelpCircle, CheckCircle, ClipboardList, GraduationCap } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { WorksheetEditor } from "@/components/WorksheetEditor";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
+import TestManagement from "@/pages/tests/TestManagement";
+import SubmittedHomework from "@/pages/company/SubmittedHomework";
 
 const assignmentFormSchema = insertAssignmentSchema.extend({
   submissionDate: z.string(),
@@ -229,6 +231,7 @@ export function AssignmentManagement() {
   const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
   const [showWorksheetEditor, setShowWorksheetEditor] = useState(false);
   const [editingWorksheetId, setEditingWorksheetId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'assignments' | 'tests' | 'homework'>('assignments');
 
   // Get user's company ID from roleData
   const companyId = (user as any)?.roleData?.companyId;
@@ -470,15 +473,70 @@ export function AssignmentManagement() {
 
   return (
     <div className="p-6 space-y-6" data-testid="assignment-management-page">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Assignment Management</h1>
+          <p className="text-gray-600 dark:text-gray-300">
+            Manage assignments, tests, and submitted homework
+          </p>
+        </div>
+      </div>
+
+      {/* Navigation Tabs */}
+      <div className="flex space-x-1 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+        <button
+          onClick={() => setActiveTab('assignments')}
+          className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'assignments'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <FileText className="w-4 h-4 mr-2" />
+          Assignments
+        </button>
+        <button
+          onClick={() => setActiveTab('tests')}
+          className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'tests'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <ClipboardList className="w-4 h-4 mr-2" />
+          Tests & Exams
+        </button>
+        <button
+          onClick={() => setActiveTab('homework')}
+          className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'homework'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <GraduationCap className="w-4 h-4 mr-2" />
+          Submitted Homework
+        </button>
+      </div>
+
+      {/* Tests & Exams Tab */}
+      {activeTab === 'tests' && (
+        <TestManagement />
+      )}
+
+      {/* Submitted Homework Tab */}
+      {activeTab === 'homework' && (
+        <SubmittedHomework />
+      )}
+
+      {/* Assignments Tab */}
+      {activeTab === 'assignments' && (
+        <>
         <div className="flex items-center justify-between">
           <div>
-            <Link href="/company">
-              <Button variant="outline" size="sm" className="mb-3">
-                ← Back to Company
-              </Button>
-            </Link>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Assignment Management</h1>
-            <p className="text-gray-600 dark:text-gray-300">Create and manage assignments for your classes</p>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Create and Manage Assignments</h2>
+            <p className="text-gray-600 dark:text-gray-300 text-sm">Create and manage assignments for your classes</p>
           </div>
         <Dialog open={isCreateDialogOpen || !!editingAssignment} onOpenChange={(open) => {
           if (!open) {
@@ -983,6 +1041,8 @@ export function AssignmentManagement() {
           onEdit={handleEdit}
           onDelete={handleDelete}
         />
+      )}
+      </>
       )}
 
       {/* Delete Confirmation Dialog */}
