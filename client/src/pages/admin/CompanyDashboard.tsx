@@ -1102,42 +1102,48 @@ export default function CompanyDashboard() {
         </div>
 
         {/* Summary Metrics */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-            <CardContent className="pt-6 pb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500"></div>
+            <CardContent className="pt-6 pb-5 pl-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Academic Years</p>
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalYears}</div>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide">Academic Years</p>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mt-1">{totalYears}</div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">configured periods</p>
                 </div>
-                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full">
-                  <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+                <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-2xl group-hover:bg-blue-100 dark:group-hover:bg-blue-900/50 transition-colors">
+                  <Calendar className="h-8 w-8 text-blue-500 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-            <CardContent className="pt-6 pb-4">
+          <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500"></div>
+            <CardContent className="pt-6 pb-5 pl-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Terms</p>
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalTerms}</div>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide">Total Terms</p>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mt-1">{totalTerms}</div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">across all years</p>
                 </div>
-                <div className="bg-green-100 dark:bg-green-900 p-3 rounded-full">
-                  <Layers className="h-6 w-6 text-green-600 dark:text-green-300" />
+                <div className="bg-emerald-50 dark:bg-emerald-900/30 p-4 rounded-2xl group-hover:bg-emerald-100 dark:group-hover:bg-emerald-900/50 transition-colors">
+                  <Layers className="h-8 w-8 text-emerald-500 dark:text-emerald-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
-            <CardContent className="pt-6 pb-4">
+          <Card className="relative overflow-hidden border-0 bg-white dark:bg-gray-800 shadow-md hover:shadow-lg transition-all duration-300 group">
+            <div className="absolute left-0 top-0 bottom-0 w-1 bg-violet-500"></div>
+            <CardContent className="pt-6 pb-5 pl-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Classes</p>
-                  <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalClasses}</div>
+                  <p className="text-gray-500 dark:text-gray-400 text-sm font-medium uppercase tracking-wide">Total Classes</p>
+                  <div className="text-4xl font-bold text-gray-900 dark:text-white mt-1">{totalClasses}</div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">active sessions</p>
                 </div>
-                <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-full">
-                  <BookOpen className="h-6 w-6 text-purple-600 dark:text-purple-300" />
+                <div className="bg-violet-50 dark:bg-violet-900/30 p-4 rounded-2xl group-hover:bg-violet-100 dark:group-hover:bg-violet-900/50 transition-colors">
+                  <BookOpen className="h-8 w-8 text-violet-500 dark:text-violet-400" />
                 </div>
               </div>
             </CardContent>
@@ -1164,121 +1170,150 @@ export default function CompanyDashboard() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-5">
             {academicHierarchy.map((year) => (
-              <Card key={year.id} className="border border-gray-200 dark:border-gray-700 overflow-hidden">
+              <Card key={year.id} className="border-0 shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden rounded-xl">
                 <button
                   onClick={() => toggleYear(year.id)}
                   aria-expanded={expandedYears[year.id] || false}
-                  className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                  className="w-full flex items-center justify-between p-5 bg-gradient-to-r from-slate-50 to-gray-50 dark:from-gray-800 dark:to-gray-850 hover:from-slate-100 hover:to-gray-100 dark:hover:from-gray-750 dark:hover:to-gray-800 transition-all text-left group"
                 >
-                  <div className="flex items-center space-x-3">
-                    {expandedYears[year.id] ? (
-                      <ChevronDown className="h-5 w-5 text-gray-500" />
-                    ) : (
-                      <ChevronRight className="h-5 w-5 text-gray-500" />
-                    )}
+                  <div className="flex items-center space-x-4">
+                    <div className={`p-2 rounded-lg transition-colors ${expandedYears[year.id] ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-gray-100 dark:bg-gray-700 group-hover:bg-blue-50 dark:group-hover:bg-blue-900/20'}`}>
+                      {expandedYears[year.id] ? (
+                        <ChevronDown className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                      ) : (
+                        <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-blue-500 transition-colors" />
+                      )}
+                    </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{year.name}</h3>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Year {year.yearNumber} • {formatDate(year.startDate)} - {formatDate(year.endDate)}
+                      <h3 className="text-lg font-bold text-gray-900 dark:text-white">{year.name}</h3>
+                      <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center mt-0.5">
+                        <Calendar className="h-3.5 w-3.5 mr-1.5" />
+                        {formatDate(year.startDate)} - {formatDate(year.endDate)}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
-                    <Badge className={year.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}>
+                  <div className="flex items-center space-x-3">
+                    <Badge className={`px-3 py-1 font-medium ${year.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 border border-gray-200 dark:border-gray-600'}`}>
                       {year.isActive ? 'Active' : 'Inactive'}
                     </Badge>
-                    <span className="text-sm text-gray-500 dark:text-gray-400">
-                      {year.terms?.length || 0} terms
-                    </span>
+                    <div className="bg-gray-100 dark:bg-gray-700 px-3 py-1 rounded-full">
+                      <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                        {year.terms?.length || 0} terms
+                      </span>
+                    </div>
                   </div>
                 </button>
 
                 {expandedYears[year.id] && (
-                  <div className="border-t border-gray-200 dark:border-gray-700">
+                  <div className="border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-850">
                     {!year.terms || year.terms.length === 0 ? (
-                      <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-                        No terms in this academic year
+                      <div className="p-8 text-center">
+                        <Layers className="h-10 w-10 mx-auto text-gray-300 dark:text-gray-600 mb-3" />
+                        <p className="text-gray-500 dark:text-gray-400">No terms in this academic year</p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                      <div className="p-4 space-y-3">
                         {year.terms.map((term) => (
-                          <div key={term.id}>
+                          <div key={term.id} className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden bg-gray-50 dark:bg-gray-800">
                             <button
                               onClick={() => toggleTerm(term.id)}
                               aria-expanded={expandedTerms[term.id] || false}
-                              className="w-full flex items-center justify-between p-4 pl-10 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                              className="w-full flex items-center justify-between p-4 hover:bg-gray-100 dark:hover:bg-gray-750 transition-colors text-left group"
                             >
                               <div className="flex items-center space-x-3">
-                                {expandedTerms[term.id] ? (
-                                  <ChevronDown className="h-4 w-4 text-gray-500" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4 text-gray-500" />
-                                )}
+                                <div className={`p-1.5 rounded-md transition-colors ${expandedTerms[term.id] ? 'bg-emerald-100 dark:bg-emerald-900/40' : 'bg-gray-200 dark:bg-gray-600 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20'}`}>
+                                  {expandedTerms[term.id] ? (
+                                    <ChevronDown className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-gray-500 group-hover:text-emerald-500 transition-colors" />
+                                  )}
+                                </div>
                                 <div>
-                                  <h4 className="font-medium text-gray-900 dark:text-white">{term.name}</h4>
-                                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                                  <h4 className="font-semibold text-gray-900 dark:text-white">{term.name}</h4>
+                                  <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center mt-0.5">
+                                    <Clock className="h-3 w-3 mr-1" />
                                     {formatDate(term.startDate, 'MMM d')} - {formatDate(term.endDate)}
                                   </p>
                                 </div>
                               </div>
-                              <div className="flex items-center space-x-4">
-                                <Badge className={term.isActive ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}>
+                              <div className="flex items-center space-x-3">
+                                <Badge className={`px-2.5 py-0.5 text-xs font-medium ${term.isActive ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300 border border-blue-200 dark:border-blue-800' : 'bg-gray-200 text-gray-600 dark:bg-gray-600 dark:text-gray-400'}`}>
                                   {term.isActive ? 'Current' : 'Ended'}
                                 </Badge>
-                                <span className="text-sm text-gray-500 dark:text-gray-400">
-                                  {term.classes?.length || 0} classes
-                                </span>
+                                <div className="bg-white dark:bg-gray-700 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-600">
+                                  <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+                                    {term.classes?.length || 0} classes
+                                  </span>
+                                </div>
                               </div>
                             </button>
 
                             {expandedTerms[term.id] && (
-                              <div className="bg-gray-50 dark:bg-gray-900 p-4 pl-16">
+                              <div className="bg-white dark:bg-gray-900 p-4 border-t border-gray-100 dark:border-gray-700">
                                 {!term.classes || term.classes.length === 0 ? (
-                                  <div className="text-center text-gray-500 dark:text-gray-400 py-4">
-                                    No classes in this term
+                                  <div className="text-center py-6">
+                                    <BookOpen className="h-8 w-8 mx-auto text-gray-300 dark:text-gray-600 mb-2" />
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm">No classes in this term</p>
                                   </div>
                                 ) : (
                                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {term.classes.map((classItem) => (
-                                      <Card key={classItem.id} className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
-                                        <CardContent className="p-4">
-                                          <div className="flex items-start justify-between mb-3">
-                                            <div>
-                                              <h5 className="font-semibold text-gray-900 dark:text-white">{classItem.name}</h5>
-                                              <p className="text-sm text-gray-600 dark:text-gray-300">{classItem.subject}</p>
+                                      <Card key={classItem.id} className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 hover:border-blue-300 dark:hover:border-blue-700 hover:shadow-md transition-all duration-200 group rounded-lg overflow-hidden">
+                                        <CardContent className="p-0">
+                                          <div className="p-4 pb-3">
+                                            <div className="flex items-start justify-between mb-2">
+                                              <div className="flex-1">
+                                                <h5 className="font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{classItem.name}</h5>
+                                                <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">{classItem.subject}</p>
+                                              </div>
+                                              <Badge className={`text-xs ${classItem.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400'}`}>
+                                                {classItem.isActive ? 'Active' : 'Inactive'}
+                                              </Badge>
                                             </div>
-                                            <Badge className={classItem.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}>
-                                              {classItem.isActive ? 'Active' : 'Inactive'}
-                                            </Badge>
+                                            <div className="space-y-2 text-sm mt-3">
+                                              <div className="flex items-center">
+                                                <div className="w-6 h-6 rounded-full bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center mr-2">
+                                                  <Users className="h-3 w-3 text-violet-600 dark:text-violet-400" />
+                                                </div>
+                                                <span className="text-gray-700 dark:text-gray-300">
+                                                  {classItem.tutor?.user 
+                                                    ? `${classItem.tutor.user.firstName} ${classItem.tutor.user.lastName}`
+                                                    : <span className="italic text-gray-400">No tutor assigned</span>
+                                                  }
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center">
+                                                <div className="w-6 h-6 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mr-2">
+                                                  <Clock className="h-3 w-3 text-amber-600 dark:text-amber-400" />
+                                                </div>
+                                                <span className="text-gray-700 dark:text-gray-300">
+                                                  {getDayName(classItem.dayOfWeek)} • {formatTime(classItem.startTime)} - {formatTime(classItem.endTime)}
+                                                </span>
+                                              </div>
+                                              <div className="flex items-center">
+                                                <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mr-2">
+                                                  <GraduationCap className="h-3 w-3 text-blue-600 dark:text-blue-400" />
+                                                </div>
+                                                <span className="text-gray-700 dark:text-gray-300">
+                                                  Max {classItem.maxStudents} students
+                                                </span>
+                                              </div>
+                                            </div>
                                           </div>
-                                          <div className="space-y-2 text-sm">
-                                            <div className="flex items-center text-gray-600 dark:text-gray-300">
-                                              <Users className="h-4 w-4 mr-2 text-gray-400" />
-                                              {classItem.tutor?.user 
-                                                ? `${classItem.tutor.user.firstName} ${classItem.tutor.user.lastName}`
-                                                : <span className="italic text-gray-400">No tutor assigned</span>
-                                              }
-                                            </div>
-                                            <div className="flex items-center text-gray-600 dark:text-gray-300">
-                                              <Clock className="h-4 w-4 mr-2 text-gray-400" />
-                                              {getDayName(classItem.dayOfWeek)} • {formatTime(classItem.startTime)} - {formatTime(classItem.endTime)}
-                                            </div>
-                                            <div className="flex items-center text-gray-600 dark:text-gray-300">
-                                              <GraduationCap className="h-4 w-4 mr-2 text-gray-400" />
-                                              Max {classItem.maxStudents} students
-                                            </div>
+                                          <div className="px-4 py-3 bg-gray-50 dark:bg-gray-750 border-t border-gray-100 dark:border-gray-700">
+                                            <Button 
+                                              variant="ghost" 
+                                              size="sm" 
+                                              className="w-full text-gray-600 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                                              onClick={() => setMainTab('academic')}
+                                            >
+                                              <Eye className="h-4 w-4 mr-2" />
+                                              View Details
+                                              <ArrowRight className="h-4 w-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </Button>
                                           </div>
-                                          <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            className="w-full mt-3 border-gray-300 dark:border-gray-600"
-                                            onClick={() => setMainTab('academic')}
-                                          >
-                                            <Eye className="h-4 w-4 mr-2" />
-                                            View Details
-                                          </Button>
                                         </CardContent>
                                       </Card>
                                     ))}
