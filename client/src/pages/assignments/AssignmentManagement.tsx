@@ -22,7 +22,6 @@ import { ObjectUploader } from "@/components/ObjectUploader";
 import { useMultipleFileMetadata, getDisplayFilename } from "@/hooks/useFileMetadata";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import Layout from "@/components/Layout";
 
 const assignmentFormSchema = insertAssignmentSchema.extend({
   submissionDate: z.string(),
@@ -470,8 +469,7 @@ export function AssignmentManagement() {
   }
 
   return (
-    <Layout>
-      <div className="p-6 space-y-6" data-testid="assignment-management-page">
+    <div className="p-6 space-y-6" data-testid="assignment-management-page">
         <div className="flex items-center justify-between">
           <div>
             <Link href="/company">
@@ -1044,7 +1042,6 @@ export function AssignmentManagement() {
           />
         </DialogContent>
       </Dialog>
-      </div>
-    </Layout>
+    </div>
   );
 }

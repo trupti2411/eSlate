@@ -18,7 +18,6 @@ import { Plus, FileQuestion, Edit, Trash2, Users, Clock, Target, CheckCircle, Al
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
-import Layout from "@/components/Layout";
 import type { Test, TestQuestion, Class, Student } from "@shared/schema";
 
 const testFormSchema = z.object({
@@ -340,29 +339,24 @@ export default function TestManagement() {
   
   if (authLoading) {
     return (
-      <Layout>
-        <div className="flex justify-center items-center h-64" data-testid="loading-auth">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="ml-4 text-gray-600">Loading...</p>
-        </div>
-      </Layout>
+      <div className="flex justify-center items-center h-64" data-testid="loading-auth">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="ml-4 text-gray-600">Loading...</p>
+      </div>
     );
   }
   
   if (!isAuthenticated || (user?.role !== "tutor" && user?.role !== "company_admin")) {
     return (
-      <Layout>
-        <div className="p-6" data-testid="unauthorized">
-          <h1 className="text-2xl font-bold mb-4">Unauthorized</h1>
-          <p>You must be a tutor or company admin to access this page.</p>
-        </div>
-      </Layout>
+      <div className="p-6" data-testid="unauthorized">
+        <h1 className="text-2xl font-bold mb-4">Unauthorized</h1>
+        <p>You must be a tutor or company admin to access this page.</p>
+      </div>
     );
   }
   
   return (
-    <Layout>
-      <div className="p-6 space-y-6" data-testid="test-management-page">
+    <div className="p-6 space-y-6" data-testid="test-management-page">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white" data-testid="page-title">Tests & Exams</h1>
@@ -909,8 +903,7 @@ export default function TestManagement() {
           }}
           isPending={assignTestMutation.isPending}
         />
-      </div>
-    </Layout>
+    </div>
   );
 }
 

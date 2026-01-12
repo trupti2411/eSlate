@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import Layout from "@/components/Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -171,18 +170,15 @@ export default function SubmittedHomework() {
 
   if (isLoading) {
     return (
-      <Layout>
-        <div className="flex justify-center items-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          <p className="ml-4 text-gray-600 dark:text-gray-300">Loading submitted homework...</p>
-        </div>
-      </Layout>
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="ml-4 text-gray-600 dark:text-gray-300">Loading submitted homework...</p>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="p-6 space-y-6" data-testid="submitted-homework-page">
+    <div className="p-6 space-y-6" data-testid="submitted-homework-page">
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -374,7 +370,6 @@ export default function SubmittedHomework() {
             ))
           )}
         </div>
-      </div>
-    </Layout>
+    </div>
   );
 }
