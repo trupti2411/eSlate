@@ -15,7 +15,6 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
-import { WorksheetManagement } from "./WorksheetManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
 import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
@@ -102,7 +101,7 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'worksheets' | 'assignments'>('dashboard');
+  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'assignments'>('dashboard');
   const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
   const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -657,15 +656,6 @@ export default function CompanyDashboard() {
             >
               <BookOpen className="h-4 w-4 mr-2" />
               Academic Setup
-            </Button>
-            <Button
-              variant={mainTab === 'worksheets' ? 'default' : 'ghost'}
-              onClick={() => setMainTab('worksheets')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'worksheets' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
-              data-testid="tab-worksheets"
-            >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Worksheets
             </Button>
             <Button
               variant={mainTab === 'assignments' ? 'default' : 'ghost'}
@@ -1674,12 +1664,6 @@ export default function CompanyDashboard() {
             companyId={companyAdmin.companyId} 
             companyName={company.name}
           />
-        </div>
-      )}
-
-      {mainTab === 'worksheets' && companyAdmin?.companyId && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <WorksheetManagement companyId={companyAdmin.companyId} />
         </div>
       )}
 

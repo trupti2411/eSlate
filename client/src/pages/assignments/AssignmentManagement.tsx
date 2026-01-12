@@ -24,6 +24,7 @@ import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import TestManagement from "@/pages/tests/TestManagement";
 import SubmittedHomework from "@/pages/company/SubmittedHomework";
+import { WorksheetManagement } from "@/pages/admin/WorksheetManagement";
 
 const assignmentFormSchema = insertAssignmentSchema.extend({
   submissionDate: z.string(),
@@ -231,7 +232,7 @@ export function AssignmentManagement() {
   const [assignmentToDelete, setAssignmentToDelete] = useState<Assignment | null>(null);
   const [showWorksheetEditor, setShowWorksheetEditor] = useState(false);
   const [editingWorksheetId, setEditingWorksheetId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'assignments' | 'tests' | 'homework'>('assignments');
+  const [activeTab, setActiveTab] = useState<'assignments' | 'worksheets' | 'tests' | 'homework'>('assignments');
 
   // Get user's company ID from roleData
   const companyId = (user as any)?.roleData?.companyId;
@@ -478,7 +479,7 @@ export function AssignmentManagement() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Assignment Management</h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Manage assignments, tests, and submitted homework
+            Manage worksheets, assignments, tests, and submitted homework
           </p>
         </div>
       </div>
@@ -518,7 +519,23 @@ export function AssignmentManagement() {
           <GraduationCap className="w-4 h-4 mr-2" />
           Submitted Homework
         </button>
+        <button
+          onClick={() => setActiveTab('worksheets')}
+          className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+            activeTab === 'worksheets'
+              ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+              : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+          }`}
+        >
+          <BookOpen className="w-4 h-4 mr-2" />
+          Worksheets
+        </button>
       </div>
+
+      {/* Worksheets Tab */}
+      {activeTab === 'worksheets' && companyId && (
+        <WorksheetManagement companyId={companyId} />
+      )}
 
       {/* Tests & Exams Tab */}
       {activeTab === 'tests' && (
