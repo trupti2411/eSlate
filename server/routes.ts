@@ -5001,6 +5001,61 @@ Good luck with your assignment!"
     }
   });
 
+  // ==========================================
+  // NOTIFICATION PREFERENCES ROUTES
+  // ==========================================
+
+  // Get notification preferences for current user
+  app.get('/api/notification-preferences', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      let prefs = await storage.getNotificationPreferences(user.id);
+      
+      // If no preferences exist, create default ones
+      if (!prefs) {
+        prefs = await storage.createNotificationPreferences({
+          userId: user.id
+        });
+      }
+
+      res.json(prefs);
+    } catch (error: any) {
+      console.error('Error getting notification preferences:', error);
+      res.status(500).json({ error: error.message || 'Failed to get notification preferences' });
+    }
+  });
+
+  // Update notification preferences
+  app.patch('/api/notification-preferences', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      if (!user) {
+        return res.status(401).json({ error: 'Not authenticated' });
+      }
+
+      let prefs = await storage.getNotificationPreferences(user.id);
+      
+      // If no preferences exist, create them first
+      if (!prefs) {
+        prefs = await storage.createNotificationPreferences({
+          userId: user.id,
+          ...req.body
+        });
+      } else {
+        prefs = await storage.updateNotificationPreferences(user.id, req.body);
+      }
+
+      res.json(prefs);
+    } catch (error: any) {
+      console.error('Error updating notification preferences:', error);
+      res.status(500).json({ error: error.message || 'Failed to update notification preferences' });
+    }
+  });
+
   // Create HTTP server without WebSocket conflicts
   const httpServer = createServer(app);
 

@@ -27,6 +27,7 @@ import {
   classSessions,
   sessionAttendance,
   academicHolidays,
+  notificationPreferences,
   type User,
   type Student,
   type InsertStudent,
@@ -81,6 +82,8 @@ import {
   type InsertSessionAttendance,
   type AcademicHoliday,
   type InsertAcademicHoliday,
+  type NotificationPreferences,
+  type InsertNotificationPreferences,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains, inArray } from "drizzle-orm";
@@ -311,6 +314,11 @@ export interface IStorage {
   getPublicHolidays(startDate?: Date, endDate?: Date): Promise<AcademicHoliday[]>;
   updateAcademicHoliday(id: string, updates: Partial<InsertAcademicHoliday>): Promise<AcademicHoliday>;
   deleteAcademicHoliday(id: string): Promise<void>;
+
+  // Notification Preferences operations
+  getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined>;
+  createNotificationPreferences(data: Partial<InsertNotificationPreferences> & { userId: string }): Promise<NotificationPreferences>;
+  updateNotificationPreferences(userId: string, updates: Partial<InsertNotificationPreferences>): Promise<NotificationPreferences>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2677,6 +2685,29 @@ export class DatabaseStorage implements IStorage {
 
   async deleteAcademicHoliday(id: string): Promise<void> {
     await db.delete(academicHolidays).where(eq(academicHolidays.id, id));
+  }
+
+  // ==========================================
+  // NOTIFICATION PREFERENCES OPERATIONS
+  // ==========================================
+
+  async getNotificationPreferences(userId: string): Promise<NotificationPreferences | undefined> {
+    const [prefs] = await db.select().from(notificationPreferences)
+      .where(eq(notificationPreferences.userId, userId));
+    return prefs;
+  }
+
+  async createNotificationPreferences(data: Partial<InsertNotificationPreferences> & { userId: string }): Promise<NotificationPreferences> {
+    const [prefs] = await db.insert(notificationPreferences).values(data).returning();
+    return prefs;
+  }
+
+  async updateNotificationPreferences(userId: string, updates: Partial<InsertNotificationPreferences>): Promise<NotificationPreferences> {
+    const [prefs] = await db.update(notificationPreferences)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(notificationPreferences.userId, userId))
+      .returning();
+    return prefs;
   }
 }
 
