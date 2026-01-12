@@ -289,6 +289,17 @@ export default function CompanyDashboard() {
     }
   };
 
+  const formatDate = (dateStr: string | null | undefined, formatStr: string = 'MMM d, yyyy'): string => {
+    if (!dateStr) return 'N/A';
+    try {
+      const date = new Date(dateStr);
+      if (isNaN(date.getTime())) return 'N/A';
+      return format(date, formatStr);
+    } catch {
+      return 'N/A';
+    }
+  };
+
   const totalYears = academicHierarchy.length;
   const totalTerms = academicHierarchy.reduce((sum, year) => sum + (year.terms?.length || 0), 0);
   const totalClasses = academicHierarchy.reduce((sum, year) => 
@@ -1170,7 +1181,7 @@ export default function CompanyDashboard() {
                     <div>
                       <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{year.name}</h3>
                       <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Year {year.yearNumber} • {format(new Date(year.startDate), 'MMM d, yyyy')} - {format(new Date(year.endDate), 'MMM d, yyyy')}
+                        Year {year.yearNumber} • {formatDate(year.startDate)} - {formatDate(year.endDate)}
                       </p>
                     </div>
                   </div>
@@ -1208,7 +1219,7 @@ export default function CompanyDashboard() {
                                 <div>
                                   <h4 className="font-medium text-gray-900 dark:text-white">{term.name}</h4>
                                   <p className="text-sm text-gray-600 dark:text-gray-300">
-                                    {format(new Date(term.startDate), 'MMM d')} - {format(new Date(term.endDate), 'MMM d, yyyy')}
+                                    {formatDate(term.startDate, 'MMM d')} - {formatDate(term.endDate)}
                                   </p>
                                 </div>
                               </div>
