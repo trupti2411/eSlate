@@ -1498,31 +1498,51 @@ export default function CompanyDashboard() {
 
                   <div className="space-y-4">
                     <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Availability</h3>
-                    <div>
-                      <Label className="text-sm font-medium">Available Days</Label>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                          <Button
-                            key={day}
-                            type="button"
-                            variant={tutorFormData.availabilityDays.includes(day) ? 'default' : 'outline'}
-                            size="sm"
-                            className={tutorFormData.availabilityDays.includes(day) ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                            onClick={() => {
-                              const days = tutorFormData.availabilityDays.includes(day)
-                                ? tutorFormData.availabilityDays.filter(d => d !== day)
-                                : [...tutorFormData.availabilityDays, day];
-                              setTutorFormData({ ...tutorFormData, availabilityDays: days });
-                            }}
-                          >
-                            {day.slice(0, 3)}
-                          </Button>
-                        ))}
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">Select Available Days & Times</Label>
+                      <div className="grid gap-2">
+                        {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                          const isSelected = tutorFormData.availabilityDays.includes(day);
+                          return (
+                            <div key={day} className={`flex items-center gap-3 p-2 rounded-lg border transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : 'border-gray-200 dark:border-gray-700'}`}>
+                              <Button
+                                type="button"
+                                variant={isSelected ? 'default' : 'outline'}
+                                size="sm"
+                                className={`w-20 ${isSelected ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                                onClick={() => {
+                                  const days = isSelected
+                                    ? tutorFormData.availabilityDays.filter(d => d !== day)
+                                    : [...tutorFormData.availabilityDays, day];
+                                  setTutorFormData({ ...tutorFormData, availabilityDays: days });
+                                }}
+                              >
+                                {day.slice(0, 3)}
+                              </Button>
+                              {isSelected && (
+                                <div className="flex items-center gap-2 flex-1">
+                                  <Input
+                                    type="time"
+                                    className="w-28 text-sm"
+                                    placeholder="Start"
+                                    defaultValue="09:00"
+                                  />
+                                  <span className="text-gray-500 text-sm">to</span>
+                                  <Input
+                                    type="time"
+                                    className="w-28 text-sm"
+                                    placeholder="End"
+                                    defaultValue="17:00"
+                                  />
+                                </div>
+                              )}
+                              {!isSelected && (
+                                <span className="text-xs text-gray-400 dark:text-gray-500">Click to add</span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="availabilityHours" className="text-sm font-medium">Available Hours</Label>
-                      <Input id="availabilityHours" value={tutorFormData.availabilityHours} onChange={(e) => setTutorFormData({ ...tutorFormData, availabilityHours: e.target.value })} placeholder="e.g., 9:00 AM - 5:00 PM" className="mt-1" />
                     </div>
                   </div>
 
@@ -1616,93 +1636,77 @@ export default function CompanyDashboard() {
             </CardHeader>
             <CardContent className="p-4">
               {getFilteredAndSortedTutors().length > 0 ? (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {getFilteredAndSortedTutors().map((tutor: CompanyTutor) => (
-                    <div key={tutor.id} className="relative overflow-hidden p-5 bg-white dark:bg-gray-850 rounded-xl border border-gray-100 dark:border-gray-700 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700 transition-all duration-300 group">
-                      <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 group-hover:bg-blue-600 transition-colors"></div>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 pl-3">
-                          <div className="flex items-center gap-3">
-                            <div className="bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 w-12 h-12 rounded-full flex items-center justify-center">
-                              <span className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                    <div key={tutor.id} className="relative bg-white dark:bg-gray-850 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 group">
+                      <div className="absolute left-0 top-0 bottom-0 w-1 rounded-l-lg bg-blue-500"></div>
+                      <div className="p-4 pl-5">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0">
+                              <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
                                 {tutor.user?.firstName?.charAt(0) || ''}{tutor.user?.lastName?.charAt(0) || ''}
                               </span>
                             </div>
-                            <div>
+                            <div className="min-w-0">
                               <button
                                 onClick={() => handleEditTutor(tutor)}
-                                className="text-left hover:underline"
+                                className="text-left hover:underline block w-full"
                                 data-testid={`tutor-name-${tutor.id}`}
                               >
-                                <p className="font-bold text-gray-900 dark:text-white text-lg">
+                                <p className="font-semibold text-gray-900 dark:text-white text-sm truncate">
                                   {tutor.user?.firstName} {tutor.user?.lastName}
                                 </p>
                               </button>
-                              <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1">
-                                <Mail className="h-3.5 w-3.5" />
+                              <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                 {tutor.user?.email}
                               </p>
                             </div>
                           </div>
-                          <div className="flex flex-wrap gap-2 mt-3 ml-15">
-                            {tutor.specialization && (
-                              <Badge variant="outline" className="border-blue-300 text-blue-700 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300 dark:border-blue-700">
-                                {tutor.specialization}
-                              </Badge>
-                            )}
-                            {tutor.qualifications && (
-                              <Badge variant="outline" className="border-gray-300 text-gray-600 dark:text-gray-400 dark:border-gray-600">
-                                {tutor.qualifications}
-                              </Badge>
-                            )}
-                            <Badge className={tutor.isVerified ? "bg-emerald-100 text-emerald-700 border border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-700" : "bg-amber-100 text-amber-700 border border-amber-300 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-700"}>
-                              {tutor.isVerified ? "Verified" : "Pending"}
+                          <Badge className={`text-xs flex-shrink-0 ${tutor.isVerified ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" : "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"}`}>
+                            {tutor.isVerified ? "Verified" : "Pending"}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {tutor.specialization && (
+                            <Badge variant="outline" className="text-xs border-blue-200 text-blue-600 bg-blue-50/50 dark:bg-blue-900/20 dark:text-blue-300 dark:border-blue-700">
+                              {tutor.specialization}
                             </Badge>
-                            {tutor.studentCount !== undefined && tutor.studentCount > 0 && (
-                              <Badge variant="outline" className="border-violet-300 text-violet-700 bg-violet-50 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-700">
-                                <Users className="h-3 w-3 mr-1" />
-                                {tutor.studentCount} student{tutor.studentCount !== 1 ? 's' : ''}
-                              </Badge>
-                            )}
-                          </div>
-                          {tutor.schedules && tutor.schedules.length > 0 && (
-                            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 ml-15">
-                              <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Class Schedule</p>
-                              <div className="flex flex-wrap gap-2">
-                                {tutor.schedules.slice(0, 4).map((schedule, idx) => (
-                                  <span key={idx} className="text-xs bg-gray-100 dark:bg-gray-700 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-600">
-                                    <span className="font-semibold text-gray-800 dark:text-gray-200">{schedule.className}</span>
-                                    <span className="text-gray-500 dark:text-gray-400"> - {schedule.dayOfWeek} {schedule.startTime}-{schedule.endTime}</span>
-                                  </span>
-                                ))}
-                                {tutor.schedules.length > 4 && (
-                                  <span className="text-xs text-gray-500 dark:text-gray-400 px-3 py-1.5 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                    +{tutor.schedules.length - 4} more
-                                  </span>
-                                )}
-                              </div>
-                            </div>
+                          )}
+                          {tutor.studentCount !== undefined && tutor.studentCount > 0 && (
+                            <Badge variant="outline" className="text-xs border-violet-200 text-violet-600 dark:text-violet-400 dark:border-violet-700">
+                              {tutor.studentCount} students
+                            </Badge>
                           )}
                         </div>
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditTutor(tutor)}
-                            className="border-gray-200 dark:border-gray-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-600 dark:hover:text-blue-400"
-                            data-testid={`button-edit-tutor-${tutor.id}`}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleDeleteTutor(tutor)}
-                            className="border-red-500 text-red-500 hover:bg-red-50"
-                            data-testid={`button-delete-tutor-${tutor.id}`}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-gray-700">
+                          <div className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
+                            {tutor.schedules && tutor.schedules.length > 0 ? (
+                              <span>{tutor.schedules.length} classes</span>
+                            ) : (
+                              <span>No classes</span>
+                            )}
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditTutor(tutor)}
+                              className="h-7 w-7 p-0 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:text-blue-600"
+                              data-testid={`button-edit-tutor-${tutor.id}`}
+                            >
+                              <Edit className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteTutor(tutor)}
+                              className="h-7 w-7 p-0 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-500"
+                              data-testid={`button-delete-tutor-${tutor.id}`}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -2142,31 +2146,51 @@ export default function CompanyDashboard() {
 
             <div className="space-y-4">
               <h3 className="text-sm font-semibold text-gray-700 dark:text-gray-300 border-b pb-2">Availability</h3>
-              <div>
-                <Label className="text-sm font-medium">Available Days</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => (
-                    <Button
-                      key={day}
-                      type="button"
-                      variant={editTutorFormData.availabilityDays.includes(day) ? 'default' : 'outline'}
-                      size="sm"
-                      className={editTutorFormData.availabilityDays.includes(day) ? 'bg-blue-600 hover:bg-blue-700' : ''}
-                      onClick={() => {
-                        const days = editTutorFormData.availabilityDays.includes(day)
-                          ? editTutorFormData.availabilityDays.filter(d => d !== day)
-                          : [...editTutorFormData.availabilityDays, day];
-                        setEditTutorFormData({ ...editTutorFormData, availabilityDays: days });
-                      }}
-                    >
-                      {day.slice(0, 3)}
-                    </Button>
-                  ))}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">Select Available Days & Times</Label>
+                <div className="grid gap-2">
+                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => {
+                    const isSelected = editTutorFormData.availabilityDays.includes(day);
+                    return (
+                      <div key={day} className={`flex items-center gap-3 p-2 rounded-lg border transition-colors ${isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' : 'border-gray-200 dark:border-gray-700'}`}>
+                        <Button
+                          type="button"
+                          variant={isSelected ? 'default' : 'outline'}
+                          size="sm"
+                          className={`w-20 ${isSelected ? 'bg-blue-600 hover:bg-blue-700' : ''}`}
+                          onClick={() => {
+                            const days = isSelected
+                              ? editTutorFormData.availabilityDays.filter(d => d !== day)
+                              : [...editTutorFormData.availabilityDays, day];
+                            setEditTutorFormData({ ...editTutorFormData, availabilityDays: days });
+                          }}
+                        >
+                          {day.slice(0, 3)}
+                        </Button>
+                        {isSelected && (
+                          <div className="flex items-center gap-2 flex-1">
+                            <Input
+                              type="time"
+                              className="w-28 text-sm"
+                              placeholder="Start"
+                              defaultValue="09:00"
+                            />
+                            <span className="text-gray-500 text-sm">to</span>
+                            <Input
+                              type="time"
+                              className="w-28 text-sm"
+                              placeholder="End"
+                              defaultValue="17:00"
+                            />
+                          </div>
+                        )}
+                        {!isSelected && (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">Click to add</span>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              </div>
-              <div>
-                <Label htmlFor="editAvailabilityHours" className="text-sm font-medium">Available Hours</Label>
-                <Input id="editAvailabilityHours" value={editTutorFormData.availabilityHours} onChange={(e) => setEditTutorFormData({ ...editTutorFormData, availabilityHours: e.target.value })} placeholder="e.g., 9:00 AM - 5:00 PM" className="mt-1" />
               </div>
               <div>
                 <Label htmlFor="editAvailability" className="text-sm font-medium flex items-center gap-1">
@@ -2177,7 +2201,7 @@ export default function CompanyDashboard() {
                   id="editAvailability" 
                   value={editTutorFormData.availability} 
                   onChange={(e) => setEditTutorFormData({ ...editTutorFormData, availability: e.target.value })} 
-                  placeholder="Any additional availability notes..."
+                  placeholder="Any additional notes about availability..."
                   className="mt-1"
                   rows={2}
                 />
