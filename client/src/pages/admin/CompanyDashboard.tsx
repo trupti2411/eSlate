@@ -16,7 +16,8 @@ import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers } from "lucide-react";
+import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
 
 interface CompanyAdmin {
@@ -93,6 +94,53 @@ interface CompanyStudent {
   };
 }
 
+interface OverviewClass {
+  id: string;
+  companyId: string;
+  termId: string;
+  tutorId: string | null;
+  name: string;
+  subject: string;
+  description: string | null;
+  maxStudents: number;
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  location: string | null;
+  isActive: boolean;
+  tutor?: {
+    id: string;
+    user?: {
+      firstName: string;
+      lastName: string;
+    };
+  };
+  enrolledCount?: number;
+}
+
+interface OverviewTerm {
+  id: string;
+  academicYearId: string;
+  companyId: string;
+  name: string;
+  termNumber: number;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  classes: OverviewClass[];
+}
+
+interface OverviewYear {
+  id: string;
+  companyId: string;
+  yearNumber: number;
+  name: string;
+  startDate: string;
+  endDate: string;
+  isActive: boolean;
+  terms: OverviewTerm[];
+}
+
 export default function CompanyDashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -118,6 +166,8 @@ export default function CompanyDashboard() {
   const [tutorFilterStatus, setTutorFilterStatus] = useState<string>('all');
   const [tutorFilterSpecialization, setTutorFilterSpecialization] = useState<string>('all');
   const [tutorSearchTerm, setTutorSearchTerm] = useState('');
+  const [expandedYears, setExpandedYears] = useState<Record<string, boolean>>({});
+  const [expandedTerms, setExpandedTerms] = useState<Record<string, boolean>>({});
 
   const [studentFormData, setStudentFormData] = useState({
     email: "",
@@ -202,6 +252,48 @@ export default function CompanyDashboard() {
     queryKey: [`/api/companies/${companyAdmin?.companyId}/classes`],
     enabled: !!companyAdmin?.companyId,
   });
+
+  const { data: academicHierarchy = [], isLoading: hierarchyLoading } = useQuery<OverviewYear[]>({
+    queryKey: [`/api/companies/${companyAdmin?.companyId}/academic-hierarchy`],
+    enabled: !!companyAdmin?.companyId && mainTab === 'overview',
+  });
+
+  const toggleYear = (yearId: string) => {
+    setExpandedYears(prev => ({
+      ...prev,
+      [yearId]: !prev[yearId]
+    }));
+  };
+
+  const toggleTerm = (termId: string) => {
+    setExpandedTerms(prev => ({
+      ...prev,
+      [termId]: !prev[termId]
+    }));
+  };
+
+  const getDayName = (day: number): string => {
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    return days[day] || 'Unknown';
+  };
+
+  const formatTime = (time: string): string => {
+    try {
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const hour12 = hour % 12 || 12;
+      return `${hour12}:${minutes} ${ampm}`;
+    } catch {
+      return time;
+    }
+  };
+
+  const totalYears = academicHierarchy.length;
+  const totalTerms = academicHierarchy.reduce((sum, year) => sum + (year.terms?.length || 0), 0);
+  const totalClasses = academicHierarchy.reduce((sum, year) => 
+    sum + (year.terms?.reduce((termSum, term) => termSum + (term.classes?.length || 0), 0) || 0), 0
+  );
 
   const createTutorMutation = useMutation({
     mutationFn: async (tutorData: any) => {
@@ -520,7 +612,7 @@ export default function CompanyDashboard() {
   const getUniqueSpecializations = () => {
     if (!tutors || !Array.isArray(tutors)) return [];
     const specs = tutors.map((t: CompanyTutor) => t.specialization).filter(Boolean);
-    return [...new Set(specs)];
+    return specs.filter((value, index, self) => self.indexOf(value) === index);
   };
 
   const handleAssignTutor = (e: React.FormEvent) => {
@@ -992,9 +1084,207 @@ export default function CompanyDashboard() {
       )}
 
       {mainTab === 'overview' && (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Monthly Calendar with Class & Tutor Info */}
-        <CompanyCalendarDashboard />
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Academic Overview</h2>
+          <p className="text-gray-600 dark:text-gray-300">View all terms and classes organized by academic year</p>
+        </div>
+
+        {/* Summary Metrics */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Academic Years</p>
+                  <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalYears}</div>
+                </div>
+                <div className="bg-blue-100 dark:bg-blue-900 p-3 rounded-full">
+                  <Calendar className="h-6 w-6 text-blue-600 dark:text-blue-300" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Terms</p>
+                  <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalTerms}</div>
+                </div>
+                <div className="bg-green-100 dark:bg-green-900 p-3 rounded-full">
+                  <Layers className="h-6 w-6 text-green-600 dark:text-green-300" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm">
+            <CardContent className="pt-6 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-600 dark:text-gray-400 text-sm font-medium">Total Classes</p>
+                  <div className="text-3xl font-bold text-gray-900 dark:text-white">{totalClasses}</div>
+                </div>
+                <div className="bg-purple-100 dark:bg-purple-900 p-3 rounded-full">
+                  <BookOpen className="h-6 w-6 text-purple-600 dark:text-purple-300" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Academic Hierarchy */}
+        {hierarchyLoading ? (
+          <div className="flex items-center justify-center h-64">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
+        ) : academicHierarchy.length === 0 ? (
+          <Card className="border border-gray-200 dark:border-gray-700">
+            <CardContent className="py-12 text-center">
+              <Calendar className="h-12 w-12 mx-auto text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No Academic Years Found</h3>
+              <p className="text-gray-600 dark:text-gray-300">Create academic years, terms, and classes in the Academic Setup tab.</p>
+              <Button 
+                className="mt-4 bg-black text-white hover:bg-gray-800"
+                onClick={() => setMainTab('academic')}
+              >
+                Go to Academic Setup
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-4">
+            {academicHierarchy.map((year) => (
+              <Card key={year.id} className="border border-gray-200 dark:border-gray-700 overflow-hidden">
+                <button
+                  onClick={() => toggleYear(year.id)}
+                  aria-expanded={expandedYears[year.id] || false}
+                  className="w-full flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-left"
+                >
+                  <div className="flex items-center space-x-3">
+                    {expandedYears[year.id] ? (
+                      <ChevronDown className="h-5 w-5 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5 text-gray-500" />
+                    )}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{year.name}</h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-300">
+                        Year {year.yearNumber} • {format(new Date(year.startDate), 'MMM d, yyyy')} - {format(new Date(year.endDate), 'MMM d, yyyy')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <Badge className={year.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}>
+                      {year.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                    <span className="text-sm text-gray-500 dark:text-gray-400">
+                      {year.terms?.length || 0} terms
+                    </span>
+                  </div>
+                </button>
+
+                {expandedYears[year.id] && (
+                  <div className="border-t border-gray-200 dark:border-gray-700">
+                    {!year.terms || year.terms.length === 0 ? (
+                      <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+                        No terms in this academic year
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-100 dark:divide-gray-700">
+                        {year.terms.map((term) => (
+                          <div key={term.id}>
+                            <button
+                              onClick={() => toggleTerm(term.id)}
+                              aria-expanded={expandedTerms[term.id] || false}
+                              className="w-full flex items-center justify-between p-4 pl-10 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                            >
+                              <div className="flex items-center space-x-3">
+                                {expandedTerms[term.id] ? (
+                                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4 text-gray-500" />
+                                )}
+                                <div>
+                                  <h4 className="font-medium text-gray-900 dark:text-white">{term.name}</h4>
+                                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                                    {format(new Date(term.startDate), 'MMM d')} - {format(new Date(term.endDate), 'MMM d, yyyy')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex items-center space-x-4">
+                                <Badge className={term.isActive ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}>
+                                  {term.isActive ? 'Current' : 'Ended'}
+                                </Badge>
+                                <span className="text-sm text-gray-500 dark:text-gray-400">
+                                  {term.classes?.length || 0} classes
+                                </span>
+                              </div>
+                            </button>
+
+                            {expandedTerms[term.id] && (
+                              <div className="bg-gray-50 dark:bg-gray-900 p-4 pl-16">
+                                {!term.classes || term.classes.length === 0 ? (
+                                  <div className="text-center text-gray-500 dark:text-gray-400 py-4">
+                                    No classes in this term
+                                  </div>
+                                ) : (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {term.classes.map((classItem) => (
+                                      <Card key={classItem.id} className="border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800">
+                                        <CardContent className="p-4">
+                                          <div className="flex items-start justify-between mb-3">
+                                            <div>
+                                              <h5 className="font-semibold text-gray-900 dark:text-white">{classItem.name}</h5>
+                                              <p className="text-sm text-gray-600 dark:text-gray-300">{classItem.subject}</p>
+                                            </div>
+                                            <Badge className={classItem.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}>
+                                              {classItem.isActive ? 'Active' : 'Inactive'}
+                                            </Badge>
+                                          </div>
+                                          <div className="space-y-2 text-sm">
+                                            <div className="flex items-center text-gray-600 dark:text-gray-300">
+                                              <Users className="h-4 w-4 mr-2 text-gray-400" />
+                                              {classItem.tutor?.user 
+                                                ? `${classItem.tutor.user.firstName} ${classItem.tutor.user.lastName}`
+                                                : <span className="italic text-gray-400">No tutor assigned</span>
+                                              }
+                                            </div>
+                                            <div className="flex items-center text-gray-600 dark:text-gray-300">
+                                              <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                                              {getDayName(classItem.dayOfWeek)} • {formatTime(classItem.startTime)} - {formatTime(classItem.endTime)}
+                                            </div>
+                                            <div className="flex items-center text-gray-600 dark:text-gray-300">
+                                              <GraduationCap className="h-4 w-4 mr-2 text-gray-400" />
+                                              Max {classItem.maxStudents} students
+                                            </div>
+                                          </div>
+                                          <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="w-full mt-3 border-gray-300 dark:border-gray-600"
+                                            onClick={() => setMainTab('academic')}
+                                          >
+                                            <Eye className="h-4 w-4 mr-2" />
+                                            View Details
+                                          </Button>
+                                        </CardContent>
+                                      </Card>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
       </div>
       )}
 
