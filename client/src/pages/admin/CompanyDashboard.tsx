@@ -1906,81 +1906,79 @@ export default function CompanyDashboard() {
 
           {/* Students List */}
           <Card className="border-2 border-black">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <GraduationCap className="h-5 w-5" />
                 All Students ({getFilteredAndSortedStudents().length} of {Array.isArray(students) ? students.length : 0})
               </CardTitle>
             </CardHeader>
             <CardContent>
               {getFilteredAndSortedStudents().length > 0 ? (
-                <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                   {getFilteredAndSortedStudents().map((student: CompanyStudent) => (
-                    <div key={student.id} className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-black transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
+                    <div key={student.id} className="p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-black dark:hover:border-gray-500 hover:shadow-md transition-all">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
                           <button
                             onClick={() => handleEditStudent(student)}
-                            className="text-left hover:underline"
+                            className="text-left hover:underline w-full"
                             data-testid={`student-name-${student.id}`}
                           >
-                            <p className="font-semibold text-black text-lg">
+                            <p className="font-semibold text-black dark:text-white text-sm truncate">
                               {student.user?.firstName} {student.user?.lastName}
                             </p>
                           </button>
-                          <p className="text-sm text-gray-600">{student.user?.email}</p>
-                          <div className="flex flex-wrap gap-2 mt-2">
-                            {student.gradeLevel && (
-                              <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">
-                                {student.gradeLevel}
-                              </Badge>
-                            )}
-                            {student.schoolName && (
-                              <Badge variant="outline" className="border-gray-400">
-                                {student.schoolName}
-                              </Badge>
-                            )}
-                            {student.class?.name ? (
-                              <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
-                                {student.class.name}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="border-orange-400 text-orange-600">
-                                No class
-                              </Badge>
-                            )}
-                            {student.tutor?.user ? (
-                              <Badge variant="outline" className="border-purple-500 text-purple-700 bg-purple-50">
-                                Tutor: {student.tutor.user.firstName} {student.tutor.user.lastName}
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="border-red-400 text-red-600">
-                                No tutor
-                              </Badge>
-                            )}
-                          </div>
+                          <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{student.user?.email}</p>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex gap-1 flex-shrink-0">
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleEditStudent(student)}
-                            className="border-black"
+                            className="h-7 w-7 p-0"
                             data-testid={`button-edit-student-${student.id}`}
                           >
-                            <Edit className="h-4 w-4" />
+                            <Edit className="h-3.5 w-3.5" />
                           </Button>
                           <Button
-                            variant="outline"
+                            variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteStudent(student)}
-                            className="border-red-500 text-red-500 hover:bg-red-50"
+                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
                             data-testid={`button-delete-student-${student.id}`}
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </div>
                       </div>
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {student.gradeLevel && (
+                          <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50 dark:bg-blue-900/30 dark:text-blue-300 text-[10px] px-1.5 py-0">
+                            {student.gradeLevel}
+                          </Badge>
+                        )}
+                        {student.schoolName && (
+                          <Badge variant="outline" className="border-gray-400 text-[10px] px-1.5 py-0 truncate max-w-[80px]" title={student.schoolName}>
+                            {student.schoolName}
+                          </Badge>
+                        )}
+                        {student.class?.name ? (
+                          <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50 dark:bg-green-900/30 dark:text-green-300 text-[10px] px-1.5 py-0">
+                            {student.class.name}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="border-orange-400 text-orange-600 text-[10px] px-1.5 py-0">
+                            No class
+                          </Badge>
+                        )}
+                      </div>
+                      {student.tutor?.user ? (
+                        <p className="text-[10px] text-purple-600 dark:text-purple-400 mt-1 truncate">
+                          Tutor: {student.tutor.user.firstName} {student.tutor.user.lastName}
+                        </p>
+                      ) : (
+                        <p className="text-[10px] text-red-500 mt-1">No tutor assigned</p>
+                      )}
                     </div>
                   ))}
                 </div>
