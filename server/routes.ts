@@ -1652,25 +1652,27 @@ trailer<</Size 5/Root 1 0 R>>
               ? classInfo.daysOfWeek 
               : [classInfo.dayOfWeek || 1];
             
-            // Loop through date range
+            // Loop through date range - use UTC methods consistently to avoid timezone issues
             const currentDate = new Date(start);
             while (currentDate <= end) {
-              const dayOfWeek = currentDate.getDay() === 0 ? 7 : currentDate.getDay(); // Convert Sun=0 to Sun=7
+              // Use getUTCDay() since date strings are parsed as UTC
+              const utcDayOfWeek = currentDate.getUTCDay(); // 0=Sunday, 1=Monday, etc.
+              const dayOfWeek = utcDayOfWeek === 0 ? 7 : utcDayOfWeek; // Convert Sun=0 to Sun=7
               
               if (daysOfWeek.includes(dayOfWeek)) {
-                // Use local date components to avoid timezone shifts
-                const year = currentDate.getFullYear();
-                const month = currentDate.getMonth();
-                const day = currentDate.getDate();
+                // Use UTC date components consistently
+                const year = currentDate.getUTCFullYear();
+                const month = currentDate.getUTCMonth();
+                const day = currentDate.getUTCDate();
                 
                 const [startHour, startMin] = classInfo.startTime.split(':').map(Number);
                 const [endHour, endMin] = classInfo.endTime.split(':').map(Number);
                 
-                // Create dates using UTC to avoid timezone issues
+                // Create dates using UTC
                 const sessionStart = new Date(Date.UTC(year, month, day, startHour, startMin, 0, 0));
                 const sessionEnd = new Date(Date.UTC(year, month, day, endHour, endMin, 0, 0));
                 
-                // Format date string manually to avoid timezone shifts
+                // Format date string manually
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
                 virtualSessions.push({
@@ -1685,7 +1687,8 @@ trailer<</Size 5/Root 1 0 R>>
                   tutorName: classInfo.tutorName,
                 });
               }
-              currentDate.setDate(currentDate.getDate() + 1);
+              // Use setUTCDate to increment by one day in UTC
+              currentDate.setUTCDate(currentDate.getUTCDate() + 1);
             }
           }
         }
