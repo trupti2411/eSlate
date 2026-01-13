@@ -74,7 +74,7 @@ export default function Reports() {
   const [selectedReport, setSelectedReport] = useState<ReportRun | null>(null);
 
   const { data: user } = useQuery<any>({
-    queryKey: ['/api/user'],
+    queryKey: ['/api/auth/user'],
   });
 
   const { data: companyAdmin } = useQuery<any>({
