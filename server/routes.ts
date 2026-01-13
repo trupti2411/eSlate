@@ -1658,18 +1658,23 @@ trailer<</Size 5/Root 1 0 R>>
               const dayOfWeek = currentDate.getDay() === 0 ? 7 : currentDate.getDay(); // Convert Sun=0 to Sun=7
               
               if (daysOfWeek.includes(dayOfWeek)) {
-                const sessionDate = new Date(currentDate);
+                // Use local date components to avoid timezone shifts
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const day = currentDate.getDate();
+                
                 const [startHour, startMin] = classInfo.startTime.split(':').map(Number);
                 const [endHour, endMin] = classInfo.endTime.split(':').map(Number);
                 
-                const sessionStart = new Date(sessionDate);
-                sessionStart.setHours(startHour, startMin, 0, 0);
+                // Create dates using UTC to avoid timezone issues
+                const sessionStart = new Date(Date.UTC(year, month, day, startHour, startMin, 0, 0));
+                const sessionEnd = new Date(Date.UTC(year, month, day, endHour, endMin, 0, 0));
                 
-                const sessionEnd = new Date(sessionDate);
-                sessionEnd.setHours(endHour, endMin, 0, 0);
+                // Format date string manually to avoid timezone shifts
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 
                 virtualSessions.push({
-                  id: `virtual-${classInfo.id}-${sessionDate.toISOString().split('T')[0]}`,
+                  id: `virtual-${classInfo.id}-${dateStr}`,
                   classId: classInfo.id,
                   className: classInfo.name,
                   subject: classInfo.subject,
