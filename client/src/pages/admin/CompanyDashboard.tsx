@@ -142,6 +142,325 @@ interface OverviewYear {
   terms: OverviewTerm[];
 }
 
+interface ReportType {
+  id: string;
+  name: string;
+  description: string;
+}
+
+interface ReportRun {
+  id: string;
+  companyId: string;
+  reportType: string;
+  name: string;
+  parameters: any;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  resultData: any;
+  rowCount: number;
+  errorMessage?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+const reportIcons: Record<string, any> = {
+  student_performance: Users,
+  attendance_summary: Calendar,
+  class_utilization: BookOpen,
+  assignment_completion: FileText,
+  tutor_workload: Users,
+  enrollment_trends: TrendingUp,
+};
+
+function ReportsSection({ companyId }: { companyId: string }) {
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState<'builder' | 'history'>('builder');
+  const [selectedReportType, setSelectedReportType] = useState<string>('');
+  const [reportName, setReportName] = useState('');
+  const [selectedReport, setSelectedReport] = useState<ReportRun | null>(null);
+
+  const { data: reportTypes = [] } = useQuery<ReportType[]>({
+    queryKey: ['/api/reports/types'],
+  });
+
+  const { data: reportHistory = [], isLoading: historyLoading, refetch: refetchHistory } = useQuery<ReportRun[]>({
+    queryKey: ['/api/reports/history', companyId],
+    enabled: !!companyId,
+  });
+
+  const runReportMutation = useMutation({
+    mutationFn: async (data: { companyId: string; reportType: string; name: string; parameters?: any }) => {
+      const response = await apiRequest('POST', '/api/reports/run', data);
+      return response.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: 'Report generated successfully' });
+      setSelectedReport(data);
+      queryClient.invalidateQueries({ queryKey: ['/api/reports/history', companyId] });
+      setActiveTab('history');
+    },
+    onError: (error: any) => {
+      toast({ title: 'Failed to generate report', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const handleRunReport = () => {
+    if (!selectedReportType || !companyId) {
+      toast({ title: 'Please select a report type', variant: 'destructive' });
+      return;
+    }
+
+    const reportType = reportTypes.find(rt => rt.id === selectedReportType);
+    runReportMutation.mutate({
+      companyId,
+      reportType: selectedReportType,
+      name: reportName || reportType?.name || 'Report',
+      parameters: {},
+    });
+  };
+
+  const handleExportCSV = (reportRunId: string) => {
+    window.open(`/api/reports/export/${reportRunId}/csv`, '_blank');
+  };
+
+  const getStatusBadge = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"><CheckCircle className="w-3 h-3 mr-1" />Completed</Badge>;
+      case 'processing':
+        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"><Clock className="w-3 h-3 mr-1 animate-spin" />Processing</Badge>;
+      case 'failed':
+        return <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"><X className="w-3 h-3 mr-1" />Failed</Badge>;
+      default:
+        return <Badge className="bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"><Clock className="w-3 h-3 mr-1" />Pending</Badge>;
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Reports</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">Generate and export business reports</p>
+        </div>
+        <Button variant="outline" onClick={() => refetchHistory()} className="flex items-center gap-2">
+          <Clock className="w-4 h-4" />
+          Refresh
+        </Button>
+      </div>
+
+      <div className="flex gap-2 border-b">
+        <Button
+          variant={activeTab === 'builder' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('builder')}
+          className={`rounded-b-none border-b-2 ${activeTab === 'builder' ? 'border-black bg-black text-white' : 'border-transparent'}`}
+        >
+          <BarChart3 className="w-4 h-4 mr-2" />
+          Report Builder
+        </Button>
+        <Button
+          variant={activeTab === 'history' ? 'default' : 'ghost'}
+          onClick={() => setActiveTab('history')}
+          className={`rounded-b-none border-b-2 ${activeTab === 'history' ? 'border-black bg-black text-white' : 'border-transparent'}`}
+        >
+          <Clock className="w-4 h-4 mr-2" />
+          Report History
+        </Button>
+      </div>
+
+      {activeTab === 'builder' && (
+        <div className="space-y-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {reportTypes.map((rt) => {
+              const Icon = reportIcons[rt.id] || FileText;
+              return (
+                <Card
+                  key={rt.id}
+                  className={`cursor-pointer transition-all hover:shadow-md ${selectedReportType === rt.id ? 'ring-2 ring-black dark:ring-white' : ''}`}
+                  onClick={() => setSelectedReportType(rt.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                        <Icon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-gray-900 dark:text-white">{rt.name}</h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400">{rt.description}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
+          {selectedReportType && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Generate Report</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="reportName">Report Name (Optional)</Label>
+                    <Input
+                      id="reportName"
+                      placeholder="Enter a custom name for this report"
+                      value={reportName}
+                      onChange={(e) => setReportName(e.target.value)}
+                      className="mt-1"
+                    />
+                  </div>
+                  <div>
+                    <Label>Report Type</Label>
+                    <Select value={selectedReportType} onValueChange={setSelectedReportType}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {reportTypes.map((rt) => (
+                          <SelectItem key={rt.id} value={rt.id}>{rt.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex justify-end">
+                  <Button onClick={handleRunReport} disabled={runReportMutation.isPending} className="bg-black hover:bg-gray-800 text-white">
+                    {runReportMutation.isPending ? (
+                      <><Clock className="w-4 h-4 mr-2 animate-spin" />Generating...</>
+                    ) : (
+                      <><BarChart3 className="w-4 h-4 mr-2" />Generate Report</>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'history' && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Report History</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {historyLoading ? (
+                <div className="flex justify-center py-8">
+                  <Clock className="w-8 h-8 animate-spin text-gray-400" />
+                </div>
+              ) : reportHistory.length === 0 ? (
+                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                  <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                  <p>No reports generated yet</p>
+                  <p className="text-sm">Use the Report Builder tab to create your first report</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left py-2 px-3 font-medium">Report Name</th>
+                        <th className="text-left py-2 px-3 font-medium">Type</th>
+                        <th className="text-left py-2 px-3 font-medium">Status</th>
+                        <th className="text-left py-2 px-3 font-medium">Rows</th>
+                        <th className="text-left py-2 px-3 font-medium">Generated</th>
+                        <th className="text-left py-2 px-3 font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportHistory.map((report) => (
+                        <tr key={report.id} className="border-b hover:bg-gray-50 dark:hover:bg-gray-800">
+                          <td className="py-2 px-3 font-medium">{report.name}</td>
+                          <td className="py-2 px-3">
+                            <Badge variant="outline" className="capitalize">{report.reportType.replace('_', ' ')}</Badge>
+                          </td>
+                          <td className="py-2 px-3">{getStatusBadge(report.status)}</td>
+                          <td className="py-2 px-3">{report.rowCount || '-'}</td>
+                          <td className="py-2 px-3">{report.createdAt ? format(new Date(report.createdAt), 'MMM d, yyyy HH:mm') : '-'}</td>
+                          <td className="py-2 px-3">
+                            <div className="flex items-center gap-2">
+                              {report.status === 'completed' && (
+                                <>
+                                  <Button variant="outline" size="sm" onClick={() => setSelectedReport(report)}>View</Button>
+                                  <Button variant="outline" size="sm" onClick={() => handleExportCSV(report.id)}>CSV</Button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {selectedReport && selectedReport.status === 'completed' && selectedReport.resultData && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>{selectedReport.name}</CardTitle>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {selectedReport.resultData.title} - Generated {selectedReport.createdAt ? format(new Date(selectedReport.createdAt), 'MMM d, yyyy HH:mm') : ''}
+                    </p>
+                  </div>
+                  <Button variant="outline" onClick={() => handleExportCSV(selectedReport.id)}>Export CSV</Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {selectedReport.resultData.summary && (
+                  <div className="grid gap-4 md:grid-cols-3 mb-6">
+                    {Object.entries(selectedReport.resultData.summary).map(([key, value]) => (
+                      <Card key={key} className="bg-gray-50 dark:bg-gray-800">
+                        <CardContent className="p-4">
+                          <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+                          <p className="text-2xl font-bold text-gray-900 dark:text-white">{String(value)}</p>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+                {selectedReport.resultData.data && selectedReport.resultData.data.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          {Object.keys(selectedReport.resultData.data[0]).map((key) => (
+                            <th key={key} className="text-left py-2 px-3 font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {selectedReport.resultData.data.slice(0, 50).map((row: any, idx: number) => (
+                          <tr key={idx} className="border-b">
+                            {Object.values(row).map((value: any, cellIdx) => (
+                              <td key={cellIdx} className="py-2 px-3">{String(value)}</td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {selectedReport.resultData.data.length > 50 && (
+                      <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-4">
+                        Showing first 50 of {selectedReport.resultData.data.length} rows. Export to CSV for full data.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CompanyDashboard() {
   const { toast } = useToast();
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -150,7 +469,7 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'assignments' | 'settings'>('dashboard');
+  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'assignments' | 'settings' | 'reports'>('dashboard');
   const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
   const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -807,9 +1126,9 @@ export default function CompanyDashboard() {
               Settings
             </Button>
             <Button
-              variant="ghost"
-              onClick={() => window.location.href = '/company/reports'}
-              className="rounded-b-none border-b-2 border-transparent hover:bg-gray-100"
+              variant={mainTab === 'reports' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('reports')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'reports' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-reports"
             >
               <BarChart3 className="h-4 w-4 mr-2" />
@@ -2298,6 +2617,12 @@ export default function CompanyDashboard() {
       {mainTab === 'settings' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <NotificationSettings userRole="company_admin" />
+        </div>
+      )}
+
+      {mainTab === 'reports' && companyAdmin?.companyId && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <ReportsSection companyId={companyAdmin.companyId} />
         </div>
       )}
 
