@@ -128,7 +128,7 @@ export function StudentCalendarDashboard() {
   }, [calendarData?.homeworkDeadlines]);
 
   const calendarSessions: CalendarSession[] = useMemo(() => {
-    return (calendarData?.sessions || []).map((session) => ({
+    return (calendarData?.sessions || []).map((session: any) => ({
       id: session.id,
       subject: session.subject,
       className: session.className,
@@ -139,6 +139,7 @@ export function StudentCalendarDashboard() {
       location: session.location,
       notes: session.notes,
       attendanceStatus: session.attendanceStatus,
+      sessionDate: session.sessionDate, // Pass through to avoid timezone issues
     }));
   }, [calendarData?.sessions]);
 
