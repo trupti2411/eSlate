@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Building2, Users, Phone, Mail, MapPin, Power, PowerOff, Settings, TrendingUp, ArrowLeft, ChevronRight } from "lucide-react";
+import { Plus, Building2, Users, Phone, Mail, MapPin, Power, PowerOff, Settings, TrendingUp, ArrowLeft, ChevronRight, Search, Filter, CheckCircle, XCircle, GraduationCap } from "lucide-react";
 import { Link } from "wouter";
 
 interface TutoringCompany {
@@ -23,18 +23,11 @@ interface TutoringCompany {
   createdAt: string;
 }
 
-interface CompanyTutor {
-  id: string;
-  userId: string;
-  specialization: string;
-  qualifications: string;
-  isVerified: boolean;
-}
-
 export default function Companies() {
   const { toast } = useToast();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
   const [formData, setFormData] = useState({
     name: "",
@@ -46,11 +39,6 @@ export default function Companies() {
 
   const { data: companies, isLoading: loadingCompanies } = useQuery<TutoringCompany[]>({
     queryKey: ["/api/companies"],
-  });
-
-  const { data: companyTutors, isLoading: loadingTutors } = useQuery<CompanyTutor[]>({
-    queryKey: ["/api/companies", selectedCompany, "tutors"],
-    enabled: !!selectedCompany,
   });
 
   const createCompanyMutation = useMutation({
@@ -110,6 +98,21 @@ export default function Companies() {
     createCompanyMutation.mutate(formData);
   };
 
+  // Filter companies
+  const filteredCompanies = companies?.filter(company => {
+    const matchesSearch = company.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      company.contactEmail?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = filterStatus === 'all' || 
+      (filterStatus === 'active' && company.isActive) ||
+      (filterStatus === 'inactive' && !company.isActive);
+    return matchesSearch && matchesFilter;
+  });
+
+  // Stats
+  const totalCompanies = companies?.length || 0;
+  const activeCompanies = companies?.filter(c => c.isActive).length || 0;
+  const inactiveCompanies = totalCompanies - activeCompanies;
+
   if (loadingCompanies) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -123,7 +126,7 @@ export default function Companies() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Light Header */}
+      {/* Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
@@ -145,112 +148,197 @@ export default function Companies() {
                 </div>
               </div>
             </div>
-            <Badge className="bg-gray-100 text-gray-700 border-gray-200 px-3 py-1">
-              <TrendingUp className="h-3 w-3 mr-1" />
-              {companies?.length || 0} Companies
-            </Badge>
+            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gray-800 hover:bg-gray-900 text-white shadow-sm">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Company
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create New Tutoring Company</DialogTitle>
+                  <DialogDescription>Add a new tutoring company to the platform.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="name">Company Name <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => handleInputChange("name", e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="contactEmail">Contact Email <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="contactEmail"
+                        type="email"
+                        value={formData.contactEmail}
+                        onChange={(e) => handleInputChange("contactEmail", e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="description">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => handleInputChange("description", e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="contactPhone">Contact Phone <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="contactPhone"
+                        value={formData.contactPhone}
+                        onChange={(e) => handleInputChange("contactPhone", e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => handleInputChange("address", e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-2 pt-4">
+                    <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={createCompanyMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
+                      {createCompanyMutation.isPending ? "Creating..." : "Create Company"}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Action Bar */}
-        <div className="flex justify-end">
-          <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gray-800 hover:bg-gray-900 text-white shadow-sm">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Company
+        {/* Analytics Strip */}
+        <div className="grid grid-cols-3 gap-4">
+          <Card className="bg-white border border-gray-200 shadow-sm">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Total Companies</p>
+                  <div className="text-3xl font-bold text-gray-900">{totalCompanies}</div>
+                </div>
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <Building2 className="h-6 w-6 text-gray-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border border-gray-200 shadow-sm">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Active</p>
+                  <div className="text-3xl font-bold text-green-600">{activeCompanies}</div>
+                </div>
+                <div className="p-3 bg-green-50 rounded-xl">
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white border border-gray-200 shadow-sm">
+            <CardContent className="pt-5 pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-gray-500 text-sm font-medium">Inactive</p>
+                  <div className="text-3xl font-bold text-gray-400">{inactiveCompanies}</div>
+                </div>
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <XCircle className="h-6 w-6 text-gray-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search and Filter Bar */}
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search companies..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 border-gray-200"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <div className="flex gap-1">
+              <Button
+                size="sm"
+                variant={filterStatus === 'all' ? 'default' : 'outline'}
+                onClick={() => setFilterStatus('all')}
+                className={filterStatus === 'all' ? 'bg-gray-800 text-white' : 'border-gray-200'}
+              >
+                All
               </Button>
-            </DialogTrigger>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Create New Tutoring Company</DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Company Name <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => handleInputChange("name", e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="contactEmail">Contact Email <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="contactEmail"
-                    type="email"
-                    value={formData.contactEmail}
-                    onChange={(e) => handleInputChange("contactEmail", e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => handleInputChange("description", e.target.value)}
-                  rows={3}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="contactPhone">Contact Phone <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="contactPhone"
-                    value={formData.contactPhone}
-                    onChange={(e) => handleInputChange("contactPhone", e.target.value)}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => handleInputChange("address", e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end space-x-2">
-                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={createCompanyMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
-                  {createCompanyMutation.isPending ? "Creating..." : "Create Company"}
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+              <Button
+                size="sm"
+                variant={filterStatus === 'active' ? 'default' : 'outline'}
+                onClick={() => setFilterStatus('active')}
+                className={filterStatus === 'active' ? 'bg-green-600 text-white' : 'border-gray-200'}
+              >
+                Active
+              </Button>
+              <Button
+                size="sm"
+                variant={filterStatus === 'inactive' ? 'default' : 'outline'}
+                onClick={() => setFilterStatus('inactive')}
+                className={filterStatus === 'inactive' ? 'bg-gray-500 text-white' : 'border-gray-200'}
+              >
+                Inactive
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Companies Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {companies?.map((company) => (
-            <Card key={company.id} className="bg-white border border-gray-200 shadow-sm hover:shadow transition-all">
-              <CardHeader className="pb-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredCompanies?.map((company) => (
+            <Card key={company.id} className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all group">
+              <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gray-100 rounded-lg">
+                    <div className="p-2 bg-gray-100 rounded-lg group-hover:bg-gray-200 transition-colors">
                       <Building2 className="w-5 h-5 text-gray-600" />
                     </div>
-                    <CardTitle className="text-lg text-gray-900">{company.name}</CardTitle>
+                    <div>
+                      <CardTitle className="text-lg text-gray-900">{company.name}</CardTitle>
+                      {company.description && (
+                        <p className="text-gray-500 text-xs mt-0.5 line-clamp-1">{company.description}</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center gap-1">
                     <Badge 
                       className={company.isActive 
-                        ? "bg-green-50 text-green-700 border-green-200" 
-                        : "bg-gray-100 text-gray-600 border-gray-200"
+                        ? "bg-green-50 text-green-700 border-green-200 text-[10px]" 
+                        : "bg-gray-100 text-gray-600 border-gray-200 text-[10px]"
                       }
                     >
                       {company.isActive ? "Active" : "Inactive"}
@@ -263,47 +351,34 @@ export default function Companies() {
                         isActive: !company.isActive
                       })}
                       disabled={toggleCompanyStatusMutation.isPending}
-                      className="p-1 h-8 w-8 hover:bg-gray-100"
+                      className="p-1 h-7 w-7 hover:bg-gray-100"
                     >
                       {company.isActive ? (
-                        <PowerOff className="w-4 h-4 text-red-500" />
+                        <PowerOff className="w-3.5 h-3.5 text-red-500" />
                       ) : (
-                        <Power className="w-4 h-4 text-green-500" />
+                        <Power className="w-3.5 h-3.5 text-green-500" />
                       )}
                     </Button>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3 pt-0">
-                {company.description && (
-                  <p className="text-gray-600 text-sm line-clamp-2">{company.description}</p>
-                )}
-                
-                <div className="space-y-2 text-sm">
+                <div className="space-y-1.5 text-sm">
                   <div className="flex items-center space-x-2 text-gray-600">
-                    <Mail className="w-4 h-4 text-gray-400" />
-                    <span>{company.contactEmail || <span className="text-red-500 text-xs">Not set</span>}</span>
+                    <Mail className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span className="truncate text-xs">{company.contactEmail || <span className="text-red-400">Not set</span>}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-600">
-                    <Phone className="w-4 h-4 text-gray-400" />
-                    <span>{company.contactPhone || <span className="text-red-500 text-xs">Not set</span>}</span>
+                    <Phone className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span className="text-xs">{company.contactPhone || <span className="text-red-400">Not set</span>}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-600">
-                    <MapPin className="w-4 h-4 text-gray-400" />
-                    <span className="line-clamp-1">{company.address || <span className="text-red-500 text-xs">Not set</span>}</span>
+                    <MapPin className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
+                    <span className="line-clamp-1 text-xs">{company.address || <span className="text-red-400">Not set</span>}</span>
                   </div>
                 </div>
                 
-                <div className="pt-3 space-y-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedCompany(company.id)}
-                    className="w-full border-gray-200 text-gray-700 hover:bg-gray-50"
-                  >
-                    <Users className="w-4 h-4 mr-2" />
-                    View Tutors
-                  </Button>
+                <div className="pt-2">
                   <Link href={`/admin/companies/${company.id}`}>
                     <Button
                       size="sm"
@@ -320,80 +395,29 @@ export default function Companies() {
           ))}
         </div>
 
-        {/* Selected Company Details */}
-        {selectedCompany && (
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardHeader className="border-b border-gray-100">
-              <CardTitle className="flex items-center space-x-2 text-gray-800">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Users className="w-5 h-5 text-gray-600" />
-                </div>
-                <span>Company Tutors</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              {loadingTutors ? (
-                <p className="text-gray-600">Loading tutors...</p>
-              ) : companyTutors && companyTutors.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {companyTutors.map((tutor) => (
-                    <Card key={tutor.id} className="border border-gray-200">
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-semibold text-gray-900">Tutor #{tutor.id.slice(-6)}</h4>
-                          <Badge 
-                            className={tutor.isVerified 
-                              ? "bg-green-50 text-green-700 border-green-200"
-                              : "bg-gray-100 text-gray-600 border-gray-200"
-                            }
-                          >
-                            {tutor.isVerified ? "Verified" : "Pending"}
-                          </Badge>
-                        </div>
-                        {tutor.specialization && (
-                          <p className="text-sm text-gray-600 mb-1">
-                            <strong>Specialization:</strong> {tutor.specialization}
-                          </p>
-                        )}
-                        {tutor.qualifications && (
-                          <p className="text-sm text-gray-600">
-                            <strong>Qualifications:</strong> {tutor.qualifications}
-                          </p>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-500">No tutors found for this company.</p>
-              )}
-              
-              <Button 
-                variant="outline" 
-                className="mt-4 border-gray-200 text-gray-700 hover:bg-gray-50"
-                onClick={() => setSelectedCompany(null)}
-              >
-                Close Details
-              </Button>
-            </CardContent>
-          </Card>
-        )}
-
-        {companies?.length === 0 && (
+        {filteredCompanies?.length === 0 && (
           <Card className="bg-white border border-gray-200 shadow-sm">
             <CardContent className="text-center py-12">
               <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <Building2 className="w-8 h-8 text-gray-600" />
+                <Building2 className="w-8 h-8 text-gray-500" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">No Companies Yet</h3>
-              <p className="text-gray-500 mb-4">Create your first tutoring company to get started.</p>
-              <Button 
-                onClick={() => setIsCreateDialogOpen(true)}
-                className="bg-gray-800 hover:bg-gray-900 text-white"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Add First Company
-              </Button>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                {searchQuery || filterStatus !== 'all' ? 'No Companies Found' : 'No Companies Yet'}
+              </h3>
+              <p className="text-gray-500 mb-4">
+                {searchQuery || filterStatus !== 'all' 
+                  ? 'Try adjusting your search or filter criteria.'
+                  : 'Create your first tutoring company to get started.'}
+              </p>
+              {!searchQuery && filterStatus === 'all' && (
+                <Button 
+                  onClick={() => setIsCreateDialogOpen(true)}
+                  className="bg-gray-800 hover:bg-gray-900 text-white"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add First Company
+                </Button>
+              )}
             </CardContent>
           </Card>
         )}

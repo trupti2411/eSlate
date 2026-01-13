@@ -572,10 +572,6 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     staleTime: 30000, // Cache for 30 seconds
   });
 
-  // Debug logs after all queries are defined
-  console.log('AcademicManagement component loaded with:', { companyId, companyName });
-  console.log('Academic terms data:', { academicTerms, termsLoading, isArray: Array.isArray(academicTerms) });
-
   const getDayName = (dayNumber: number) => {
     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
     return days[dayNumber] || 'Unknown';

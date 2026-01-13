@@ -7,12 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin, Trash2, Pencil } from "lucide-react";
+import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin, Trash2, Pencil, GraduationCap, BookOpen, Settings, CheckCircle, Search } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
 
@@ -54,6 +54,8 @@ export default function CompanyManagement() {
   const { toast } = useToast();
   const params = useParams();
   const companyId = params.id;
+  const [activeTab, setActiveTab] = useState("overview");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
@@ -81,7 +83,7 @@ export default function CompanyManagement() {
   });
 
   // Fetch company tutors
-  const { data: tutors, isLoading: tutorsLoading, error: tutorsError } = useQuery<CompanyTutor[]>({
+  const { data: tutors, isLoading: tutorsLoading } = useQuery<CompanyTutor[]>({
     queryKey: [`/api/companies/${companyId}/tutors`],
     enabled: !!companyId,
   });
@@ -89,6 +91,12 @@ export default function CompanyManagement() {
   // Fetch all users within company
   const { data: companyUsers, isLoading: usersLoading } = useQuery<User[]>({
     queryKey: [`/api/companies/${companyId}/users`],
+    enabled: !!companyId,
+  });
+
+  // Fetch students for the company (dedicated endpoint)
+  const { data: companyStudents = [], isLoading: studentsLoading } = useQuery<any[]>({
+    queryKey: [`/api/companies/${companyId}/students`],
     enabled: !!companyId,
   });
 
@@ -102,6 +110,31 @@ export default function CompanyManagement() {
   const { data: currentUser } = useQuery<{ id: string; role: string }>({
     queryKey: ["/api/auth/user"],
   });
+
+  // Transform students data to User format
+  const students: User[] = companyStudents.map((s: any) => ({
+    id: s.user?.id || s.userId,
+    email: s.user?.email || '',
+    firstName: s.user?.firstName || '',
+    lastName: s.user?.lastName || '',
+    role: 'student',
+    isActive: s.user?.isActive ?? true,
+  }));
+  
+  // Derived data from companyUsers
+  const tutorUsers = companyUsers?.filter(u => u.role === 'tutor') || [];
+  const admins = companyUsers?.filter(u => u.role === 'company_admin') || [];
+  const parents = companyUsers?.filter(u => u.role === 'parent') || [];
+
+  // Filter users by search
+  const filterUsers = (users: User[]) => {
+    if (!searchQuery) return users;
+    return users.filter(u => 
+      u.firstName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.lastName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
 
   // Toggle company status
   const toggleCompanyStatus = useMutation({
@@ -152,7 +185,7 @@ export default function CompanyManagement() {
     mutationFn: async (userData: typeof newUserData) => {
       return await apiRequest("/api/admin/create-user", "POST", {
         ...userData,
-        companyId: userData.role === 'tutor' || userData.role === 'company_admin' ? companyId : undefined,
+        companyId: userData.role === 'tutor' || userData.role === 'company_admin' || userData.role === 'student' ? companyId : undefined,
       });
     },
     onSuccess: () => {
@@ -162,6 +195,7 @@ export default function CompanyManagement() {
       });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       setIsCreateUserDialogOpen(false);
       setNewUserData({ email: "", firstName: "", lastName: "", role: "", roles: [] });
     },
@@ -174,7 +208,6 @@ export default function CompanyManagement() {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
       toast({
         title: "Error",
         description: errorMessage,
@@ -183,35 +216,10 @@ export default function CompanyManagement() {
     },
   });
 
-  // Delete user mutation (Master Admin only)
-  const deleteUserMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      return await apiRequest(`/api/admin/users/${userId}`, "DELETE");
-    },
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "User deleted successfully",
-      });
-      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to delete user",
-        variant: "destructive",
-      });
-    },
-  });
-
-
-
-  // Update user mutation  
+  // Update user mutation
   const updateUserMutation = useMutation({
-    mutationFn: async (userData: { id: string; firstName: string; lastName: string; email: string; role: string; roles?: string[]; isActive: boolean }) => {
-      return await apiRequest(`/api/admin/users/${userData.id}`, "PATCH", userData);
+    mutationFn: async ({ userId, data }: { userId: string; data: Partial<User> }) => {
+      return await apiRequest(`/api/admin/users/${userId}`, "PATCH", data);
     },
     onSuccess: () => {
       toast({
@@ -219,8 +227,7 @@ export default function CompanyManagement() {
         description: "User updated successfully",
       });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       setIsEditUserDialogOpen(false);
       setEditingUser(null);
     },
@@ -233,10 +240,33 @@ export default function CompanyManagement() {
     },
   });
 
+  // Delete user mutation
+  const deleteUserMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return await apiRequest(`/api/admin/users/${userId}`, "DELETE");
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "User deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete user",
+        variant: "destructive",
+      });
+    },
+  });
+
   // Update company mutation
   const updateCompanyMutation = useMutation({
-    mutationFn: async (companyData: typeof editCompanyData) => {
-      return await apiRequest(`/api/companies/${companyId}`, "PATCH", companyData);
+    mutationFn: async (data: typeof editCompanyData) => {
+      return await apiRequest(`/api/companies/${companyId}`, "PATCH", data);
     },
     onSuccess: () => {
       toast({
@@ -255,6 +285,43 @@ export default function CompanyManagement() {
     },
   });
 
+  const handleCreateUser = (e: React.FormEvent) => {
+    e.preventDefault();
+    createUserMutation.mutate(newUserData);
+  };
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user);
+    setIsEditUserDialogOpen(true);
+  };
+
+  const handleEditUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
+    
+    const selectedRole = formData.get('editRole') as string;
+    
+    updateUserMutation.mutate({
+      userId: editingUser.id,
+      data: {
+        firstName: formData.get('editFirstName') as string,
+        lastName: formData.get('editLastName') as string,
+        email: formData.get('editEmail') as string,
+        role: selectedRole || editingUser.role,
+        isActive: (form.elements.namedItem('editIsActive') as HTMLInputElement)?.checked,
+      },
+    });
+  };
+
+  const handleDeleteUser = (userId: string, userName: string) => {
+    if (confirm(`Are you sure you want to delete "${userName}"? This action cannot be undone.`)) {
+      deleteUserMutation.mutate(userId);
+    }
+  };
+
   const handleEditCompany = () => {
     if (company) {
       setEditCompanyData({
@@ -270,83 +337,17 @@ export default function CompanyManagement() {
 
   const handleEditCompanySubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editCompanyData.name.trim()) {
-      toast({ title: "Error", description: "Company name is required", variant: "destructive" });
-      return;
-    }
-    if (!editCompanyData.contactEmail.trim()) {
-      toast({ title: "Error", description: "Contact email is required", variant: "destructive" });
-      return;
-    }
-    if (!editCompanyData.contactPhone.trim()) {
-      toast({ title: "Error", description: "Contact phone is required", variant: "destructive" });
-      return;
-    }
-    if (!editCompanyData.address.trim()) {
-      toast({ title: "Error", description: "Address is required", variant: "destructive" });
-      return;
-    }
     updateCompanyMutation.mutate(editCompanyData);
-  };
-
-  const handleDeleteUser = (userId: string, userName: string) => {
-    if (window.confirm(`Are you sure you want to permanently delete user "${userName}"? This action cannot be undone.`)) {
-      deleteUserMutation.mutate(userId);
-    }
-  };
-
-  const handleEditUser = (user: User) => {
-    setEditingUser(user);
-    setIsEditUserDialogOpen(true);
-  };
-
-  const handleEditUserSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingUser) return;
-
-    const formData = new FormData(e.target as HTMLFormElement);
-    const updatedUser = {
-      id: editingUser.id,
-      firstName: formData.get('editFirstName') as string,
-      lastName: formData.get('editLastName') as string,
-      email: formData.get('editEmail') as string,
-      role: formData.get('editRole') as string,
-      isActive: formData.get('editIsActive') === 'on',
-    };
-
-    updateUserMutation.mutate(updatedUser);
-  };
-
-  const handleCreateUser = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newUserData.email || !newUserData.firstName || !newUserData.role) {
-      toast({
-        title: "Error",
-        description: "Please fill in all required fields (Email, First Name, and Role are required)",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(newUserData.email)) {
-      toast({
-        title: "Error",
-        description: "Please enter a valid email address",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    createUserMutation.mutate(newUserData);
   };
 
   if (companyLoading) {
     return (
       <Layout>
-        <div className="container py-8">
-          <div className="text-center">Loading company details...</div>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="w-10 h-10 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600 font-medium">Loading company details...</p>
+          </div>
         </div>
       </Layout>
     );
@@ -355,310 +356,690 @@ export default function CompanyManagement() {
   if (!company) {
     return (
       <Layout>
-        <div className="container py-8">
-          <div className="text-center">Company not found</div>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <Card className="border border-gray-200">
+            <CardContent className="pt-6 text-center">
+              <h1 className="text-2xl font-bold mb-4 text-gray-900">Company Not Found</h1>
+              <p className="text-gray-600 mb-4">The company you're looking for doesn't exist.</p>
+              <Link href="/admin/companies">
+                <Button variant="outline">Back to Companies</Button>
+              </Link>
+            </CardContent>
+          </Card>
         </div>
       </Layout>
     );
   }
 
-  const usersByRole = companyUsers?.reduce((acc: Record<string, User[]>, user) => {
-    if (!acc[user.role]) {
-      acc[user.role] = [];
-    }
-    acc[user.role].push(user);
-    return acc;
-  }, {}) || {};
+  // User card component for reuse
+  const UserCard = ({ user, showDelete = false }: { user: User; showDelete?: boolean }) => (
+    <Card className="border border-gray-200 bg-white hover:shadow-sm transition-shadow">
+      <CardContent className="p-4">
+        <div className="flex justify-between items-start">
+          <div className="flex-1 min-w-0">
+            <h4 className="font-semibold text-gray-900 truncate">
+              {user.firstName} {user.lastName}
+            </h4>
+            <p className="text-sm text-gray-500 truncate">{user.email}</p>
+          </div>
+          <div className="flex items-center gap-2 ml-2">
+            <Badge className={user.isActive ? "bg-green-50 text-green-700 border-green-200 text-[10px]" : "bg-gray-100 text-gray-500 border-gray-200 text-[10px]"}>
+              {user.isActive ? "Active" : "Inactive"}
+            </Badge>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-3">
+          <Button size="sm" variant="outline" onClick={() => handleEditUser(user)} className="flex-1 text-xs border-gray-200">
+            <Pencil className="w-3 h-3 mr-1" />
+            Edit
+          </Button>
+          {showDelete && currentUser?.role === 'admin' && user.role !== 'admin' && user.id !== currentUser?.id && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleDeleteUser(user.id, `${user.firstName} ${user.lastName}`)}
+              disabled={deleteUserMutation.isPending}
+              className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
 
   return (
     <Layout>
-      <div className="container py-8 space-y-8 bg-gray-50 min-h-screen">
+      <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-4">
-            <Link href="/admin/companies">
-              <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Companies
-              </Button>
-            </Link>
-            <div>
-              <h1 className="text-2xl font-bold flex items-center space-x-3 text-gray-900">
-                <Building2 className="w-8 h-8 text-gray-600" />
-                <span>{company.name}</span>
-                <Badge className={company.isActive ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
-                  {company.isActive ? "Active" : "Inactive"}
-                </Badge>
-              </h1>
-              <p className="text-gray-500">Business Management Dashboard</p>
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create User
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New User for {company.name}</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleCreateUser} className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input
-                        id="firstName"
-                        value={newUserData.firstName}
-                        onChange={(e) => setNewUserData(prev => ({ ...prev, firstName: e.target.value }))}
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input
-                        id="lastName"
-                        value={newUserData.lastName}
-                        onChange={(e) => setNewUserData(prev => ({ ...prev, lastName: e.target.value }))}
-                      />
-                    </div>
+        <div className="bg-white border-b border-gray-200 shadow-sm">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <Link href="/admin/companies">
+                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 hover:bg-gray-100">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back
+                  </Button>
+                </Link>
+                <div className="h-6 w-px bg-gray-200" />
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 bg-gray-100 rounded-xl">
+                    <Building2 className="w-6 h-6 text-gray-600" />
                   </div>
-                  
                   <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={newUserData.email}
-                      onChange={(e) => setNewUserData(prev => ({ ...prev, email: e.target.value }))}
-                      placeholder="user@example.com"
-                      autoComplete="email"
-                      required
-                    />
+                    <div className="flex items-center gap-2">
+                      <h1 className="text-xl font-bold text-gray-900">{company.name}</h1>
+                      <Badge className={company.isActive ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}>
+                        {company.isActive ? "Active" : "Inactive"}
+                      </Badge>
+                    </div>
+                    <p className="text-gray-500 text-sm">Company Management</p>
                   </div>
-
-                  <div className="space-y-3">
-                    <Label>User Roles</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      {[
-                        { value: 'student', label: 'Student' },
-                        { value: 'parent', label: 'Parent' },
-                        { value: 'tutor', label: 'Tutor' },
-                        { value: 'company_admin', label: 'Business Admin' }
-                      ].map((role) => (
-                        <div key={role.value} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={`create-role-${role.value}`}
-                            checked={newUserData.role === role.value}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setNewUserData(prev => ({ ...prev, role: role.value }));
-                              } else {
-                                setNewUserData(prev => ({ ...prev, role: '' }));
-                              }
-                            }}
-                            className="rounded border-gray-300 h-4 w-4"
-                          />
-                          <label
-                            htmlFor={`create-role-${role.value}`}
-                            className="text-sm font-medium leading-none cursor-pointer"
-                          >
-                            {role.label}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                    <p className="text-xs text-gray-500">
-                      Select the primary role for this user. Only one role can be selected at a time.
-                    </p>
-                  </div>
-
-
-
-                  <div className="flex justify-end space-x-2">
-                    <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={createUserMutation.isPending}>
-                      {createUserMutation.isPending ? "Creating..." : "Create User"}
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-
-            {/* Edit User Dialog */}
-            <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
-              <DialogContent className="max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Edit User: {editingUser?.firstName} {editingUser?.lastName}</DialogTitle>
-                </DialogHeader>
-                {editingUser && (
-                  <form onSubmit={handleEditUserSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="editFirstName">First Name</Label>
-                        <Input
-                          id="editFirstName"
-                          name="editFirstName"
-                          defaultValue={editingUser.firstName}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="editLastName">Last Name</Label>
-                        <Input
-                          id="editLastName"
-                          name="editLastName"
-                          defaultValue={editingUser.lastName}
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <Label htmlFor="editEmail">Email</Label>
-                      <Input
-                        id="editEmail"
-                        name="editEmail"
-                        type="email"
-                        defaultValue={editingUser.email}
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-3">
-                      <Label>User Roles</Label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {[
-                          { value: 'student', label: 'Student' },
-                          { value: 'parent', label: 'Parent' },
-                          { value: 'tutor', label: 'Tutor' },
-                          { value: 'company_admin', label: 'Business Admin' },
-                          ...(currentUser?.role === 'admin' ? [{ value: 'admin', label: 'System Admin' }] : [])
-                        ].map((roleOption) => (
-                          <div key={roleOption.value} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              id={`edit-role-${roleOption.value}`}
-                              name="editRole"
-                              value={roleOption.value}
-                              defaultChecked={editingUser.role === roleOption.value}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  // Uncheck other role checkboxes
-                                  const roleCheckboxes = document.querySelectorAll('input[name="editRole"]') as NodeListOf<HTMLInputElement>;
-                                  roleCheckboxes.forEach(checkbox => {
-                                    if (checkbox !== e.target) checkbox.checked = false;
-                                  });
-                                }
-                              }}
-                              className="rounded border-gray-300 h-4 w-4"
-                            />
-                            <label
-                              htmlFor={`edit-role-${roleOption.value}`}
-                              className="text-sm font-medium leading-none cursor-pointer"
-                            >
-                              {roleOption.label}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        Select the primary role for this user. Only one role can be selected at a time.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="editIsActive"
-                        name="editIsActive"
-                        defaultChecked={editingUser.isActive}
-                      />
-                      <Label htmlFor="editIsActive">Active User</Label>
-                    </div>
-
-                    <div className="flex justify-end space-x-2">
-                      <Button type="button" variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" disabled={updateUserMutation.isPending}>
-                        {updateUserMutation.isPending ? "Updating..." : "Update User"}
-                      </Button>
-                    </div>
-                  </form>
-                )}
-              </DialogContent>
-            </Dialog>
-
-            <Button
-              variant="outline"
-              onClick={() => toggleCompanyStatus.mutate(!company.isActive)}
-              disabled={toggleCompanyStatus.isPending}
-            >
-              {company.isActive ? (
-                <>
-                  <PowerOff className="w-4 h-4 mr-2 text-red-600" />
-                  Deactivate
-                </>
-              ) : (
-                <>
-                  <Power className="w-4 h-4 mr-2 text-green-600" />
-                  Activate
-                </>
-              )}
-            </Button>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleEditCompany}
+                  className="border-gray-200"
+                >
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit Details
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => toggleCompanyStatus.mutate(!company.isActive)}
+                  disabled={toggleCompanyStatus.isPending}
+                  className="border-gray-200"
+                >
+                  {company.isActive ? (
+                    <>
+                      <PowerOff className="w-4 h-4 mr-2 text-red-500" />
+                      Deactivate
+                    </>
+                  ) : (
+                    <>
+                      <Power className="w-4 h-4 mr-2 text-green-500" />
+                      Activate
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Company Details */}
-        <Card className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800">
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">Company Information</CardTitle>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleEditCompany}
-              className="border-black dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-            >
-              <Pencil className="w-4 h-4 mr-2" />
-              Edit Details
-            </Button>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1">Description</h3>
-                <p className="text-gray-900 dark:text-gray-200">{company.description || "No description provided"}</p>
+        {/* Tabs Navigation */}
+        <div className="bg-white border-b border-gray-200">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+              <TabsList className="h-12 bg-transparent border-0 p-0 w-full justify-start gap-1">
+                <TabsTrigger 
+                  value="overview" 
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="tutors" 
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Tutors ({tutors?.length || 0})
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="students" 
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                >
+                  <GraduationCap className="w-4 h-4 mr-2" />
+                  Students ({students.length})
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="all-users" 
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  All Users ({companyUsers?.length || 0})
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {/* Overview Tab */}
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="bg-white border border-gray-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-500 text-sm">Tutors</p>
+                        <div className="text-2xl font-bold text-gray-900">{tutors?.length || 0}</div>
+                      </div>
+                      <div className="p-2.5 bg-blue-50 rounded-lg">
+                        <Users className="h-5 w-5 text-blue-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white border border-gray-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-500 text-sm">Students</p>
+                        <div className="text-2xl font-bold text-gray-900">{students.length}</div>
+                      </div>
+                      <div className="p-2.5 bg-green-50 rounded-lg">
+                        <GraduationCap className="h-5 w-5 text-green-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white border border-gray-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-500 text-sm">Parents</p>
+                        <div className="text-2xl font-bold text-gray-900">{parents.length}</div>
+                      </div>
+                      <div className="p-2.5 bg-purple-50 rounded-lg">
+                        <Users className="h-5 w-5 text-purple-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="bg-white border border-gray-200">
+                  <CardContent className="pt-5 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-500 text-sm">Admins</p>
+                        <div className="text-2xl font-bold text-gray-900">{admins.length}</div>
+                      </div>
+                      <div className="p-2.5 bg-amber-50 rounded-lg">
+                        <Settings className="h-5 w-5 text-amber-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-2">
-                  <Mail className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-gray-900 dark:text-gray-200">{company.contactEmail || <span className="text-red-500">Not set (required)</span>}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Phone className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-gray-900 dark:text-gray-200">{company.contactPhone || <span className="text-red-500">Not set (required)</span>}</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                  <span className="text-gray-900 dark:text-gray-200">{company.address || <span className="text-red-500">Not set (required)</span>}</span>
-                </div>
-              </div>
+
+              {/* Company Info */}
+              <Card className="bg-white border border-gray-200">
+                <CardHeader className="border-b border-gray-100 pb-4">
+                  <CardTitle className="text-lg text-gray-900">Company Information</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <h3 className="font-medium text-sm text-gray-500 mb-1">Description</h3>
+                      <p className="text-gray-900">{company.description || "No description provided"}</p>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <Mail className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-900">{company.contactEmail || <span className="text-red-500 text-sm">Not set</span>}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Phone className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-900">{company.contactPhone || <span className="text-red-500 text-sm">Not set</span>}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-900">{company.address || <span className="text-red-500 text-sm">Not set</span>}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Actions */}
+              <Card className="bg-white border border-gray-200">
+                <CardHeader className="border-b border-gray-100 pb-4">
+                  <CardTitle className="text-lg text-gray-900">Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="pt-5">
+                  <div className="flex flex-wrap gap-3">
+                    <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="bg-gray-800 hover:bg-gray-900 text-white">
+                          <Plus className="w-4 h-4 mr-2" />
+                          Add User
+                        </Button>
+                      </DialogTrigger>
+                    </Dialog>
+                    <Button variant="outline" onClick={() => setActiveTab('tutors')} className="border-gray-200">
+                      <Users className="w-4 h-4 mr-2" />
+                      Manage Tutors
+                    </Button>
+                    <Button variant="outline" onClick={() => setActiveTab('students')} className="border-gray-200">
+                      <GraduationCap className="w-4 h-4 mr-2" />
+                      Manage Students
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
+          )}
+
+          {/* Tutors Tab */}
+          {activeTab === 'tutors' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search tutors..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 border-gray-200"
+                  />
+                </div>
+                <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gray-800 hover:bg-gray-900 text-white" onClick={() => setNewUserData(prev => ({ ...prev, role: 'tutor' }))}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Tutor
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
+
+              {tutorsLoading ? (
+                <div className="text-center py-12">
+                  <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading tutors...</p>
+                </div>
+              ) : tutors && tutors.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {tutors.filter(t => 
+                    !searchQuery || 
+                    t.user?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    t.user?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    t.user?.email?.toLowerCase().includes(searchQuery.toLowerCase())
+                  ).map((tutor) => (
+                    <Card key={tutor.id} className="border border-gray-200 bg-white hover:shadow-sm transition-shadow">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-semibold text-gray-900 truncate">
+                              {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : `Tutor #${tutor.id.slice(-6)}`}
+                            </h4>
+                            {tutor.user?.email && (
+                              <p className="text-sm text-gray-500 truncate">{tutor.user.email}</p>
+                            )}
+                          </div>
+                          <Badge className={tutor.isVerified ? "bg-green-50 text-green-700 border-green-200 text-[10px]" : "bg-amber-50 text-amber-700 border-amber-200 text-[10px]"}>
+                            {tutor.isVerified ? "Verified" : "Pending"}
+                          </Badge>
+                        </div>
+                        
+                        {(tutor.specialization || tutor.qualifications) && (
+                          <div className="space-y-1 text-sm mb-3">
+                            {tutor.specialization && (
+                              <p className="text-gray-600">
+                                <span className="font-medium">Subject:</span> {tutor.specialization}
+                              </p>
+                            )}
+                            {tutor.qualifications && (
+                              <p className="text-gray-600 line-clamp-2">
+                                <span className="font-medium">Qualifications:</span> {tutor.qualifications}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="bg-white border border-gray-200">
+                  <CardContent className="text-center py-12">
+                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <Users className="w-8 h-8 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Tutors Yet</h3>
+                    <p className="text-gray-500 mb-4">Add tutors to this company to get started.</p>
+                    <Button onClick={() => { setNewUserData(prev => ({ ...prev, role: 'tutor' })); setIsCreateUserDialogOpen(true); }} className="bg-gray-800 hover:bg-gray-900 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First Tutor
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Unassigned Tutors */}
+              {unassignedTutors && unassignedTutors.length > 0 && (
+                <Card className="bg-white border border-gray-200">
+                  <CardHeader className="border-b border-gray-100 pb-4">
+                    <CardTitle className="text-lg text-gray-900">Unassigned Tutors ({unassignedTutors.length})</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {unassignedTutors.map((tutor) => (
+                        <Card key={tutor.id} className="border border-gray-200">
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start mb-3">
+                              <div>
+                                <h4 className="font-semibold text-gray-900">
+                                  {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : `Tutor #${tutor.id.slice(-6)}`}
+                                </h4>
+                                {tutor.user?.email && (
+                                  <p className="text-sm text-gray-500">{tutor.user.email}</p>
+                                )}
+                              </div>
+                            </div>
+                            <Button
+                              size="sm"
+                              onClick={() => assignTutorMutation.mutate(tutor.id)}
+                              disabled={assignTutorMutation.isPending}
+                              className="w-full bg-gray-800 hover:bg-gray-900 text-white"
+                            >
+                              <UserPlus className="w-4 h-4 mr-2" />
+                              Assign to Company
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* Students Tab */}
+          {activeTab === 'students' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search students..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 border-gray-200"
+                  />
+                </div>
+                <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gray-800 hover:bg-gray-900 text-white" onClick={() => setNewUserData(prev => ({ ...prev, role: 'student' }))}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Student
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
+
+              {studentsLoading ? (
+                <div className="text-center py-12">
+                  <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading students...</p>
+                </div>
+              ) : filterUsers(students).length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filterUsers(students).map((student) => (
+                    <UserCard key={student.id} user={student} showDelete={true} />
+                  ))}
+                </div>
+              ) : (
+                <Card className="bg-white border border-gray-200">
+                  <CardContent className="text-center py-12">
+                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <GraduationCap className="w-8 h-8 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                      {searchQuery ? 'No Students Found' : 'No Students Yet'}
+                    </h3>
+                    <p className="text-gray-500 mb-4">
+                      {searchQuery ? 'Try adjusting your search criteria.' : 'Add students to this company to get started.'}
+                    </p>
+                    {!searchQuery && (
+                      <Button onClick={() => { setNewUserData(prev => ({ ...prev, role: 'student' })); setIsCreateUserDialogOpen(true); }} className="bg-gray-800 hover:bg-gray-900 text-white">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add First Student
+                      </Button>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+
+          {/* All Users Tab */}
+          {activeTab === 'all-users' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="relative max-w-sm">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search users..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 border-gray-200"
+                  />
+                </div>
+                <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-gray-800 hover:bg-gray-900 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add User
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
+
+              {usersLoading ? (
+                <div className="text-center py-12">
+                  <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading users...</p>
+                </div>
+              ) : companyUsers && companyUsers.length > 0 ? (
+                <div className="space-y-6">
+                  {/* Group by role */}
+                  {[
+                    { role: 'company_admin', label: 'Business Admins', users: admins },
+                    { role: 'tutor', label: 'Tutors', users: tutorUsers },
+                    { role: 'student', label: 'Students', users: students },
+                    { role: 'parent', label: 'Parents', users: parents },
+                  ].filter(g => filterUsers(g.users).length > 0).map(group => (
+                    <Card key={group.role} className="bg-white border border-gray-200">
+                      <CardHeader className="border-b border-gray-100 pb-3">
+                        <CardTitle className="text-base text-gray-900 flex items-center gap-2">
+                          <Users className="w-4 h-4 text-gray-500" />
+                          {group.label} ({filterUsers(group.users).length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {filterUsers(group.users).map((user) => (
+                            <UserCard key={user.id} user={user} showDelete={true} />
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="bg-white border border-gray-200">
+                  <CardContent className="text-center py-12">
+                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                      <Users className="w-8 h-8 text-gray-500" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Users Yet</h3>
+                    <p className="text-gray-500 mb-4">Add users to this company to get started.</p>
+                    <Button onClick={() => setIsCreateUserDialogOpen(true)} className="bg-gray-800 hover:bg-gray-900 text-white">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add First User
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Create User Dialog */}
+        <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Create New User</DialogTitle>
+              <DialogDescription>Add a new user to {company.name}</DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCreateUser} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="firstName">First Name <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="firstName"
+                    value={newUserData.firstName}
+                    onChange={(e) => setNewUserData(prev => ({ ...prev, firstName: e.target.value }))}
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="lastName">Last Name</Label>
+                  <Input
+                    id="lastName"
+                    value={newUserData.lastName}
+                    onChange={(e) => setNewUserData(prev => ({ ...prev, lastName: e.target.value }))}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newUserData.email}
+                  onChange={(e) => setNewUserData(prev => ({ ...prev, email: e.target.value }))}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="role">Role <span className="text-red-500">*</span></Label>
+                <Select value={newUserData.role} onValueChange={(value) => setNewUserData(prev => ({ ...prev, role: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="student">Student</SelectItem>
+                    <SelectItem value="parent">Parent</SelectItem>
+                    <SelectItem value="tutor">Tutor</SelectItem>
+                    <SelectItem value="company_admin">Business Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createUserMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
+                  {createUserMutation.isPending ? "Creating..." : "Create User"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit User Dialog */}
+        <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Edit User</DialogTitle>
+              <DialogDescription>Update user information</DialogDescription>
+            </DialogHeader>
+            {editingUser && (
+              <form onSubmit={handleEditUserSubmit} className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="editFirstName">First Name</Label>
+                    <Input
+                      id="editFirstName"
+                      name="editFirstName"
+                      defaultValue={editingUser.firstName}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="editLastName">Last Name</Label>
+                    <Input
+                      id="editLastName"
+                      name="editLastName"
+                      defaultValue={editingUser.lastName}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label htmlFor="editEmail">Email</Label>
+                  <Input
+                    id="editEmail"
+                    name="editEmail"
+                    type="email"
+                    defaultValue={editingUser.email}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label>Role</Label>
+                  <Select name="editRole" defaultValue={editingUser.role}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="student">Student</SelectItem>
+                      <SelectItem value="parent">Parent</SelectItem>
+                      <SelectItem value="tutor">Tutor</SelectItem>
+                      <SelectItem value="company_admin">Business Admin</SelectItem>
+                      {currentUser?.role === 'admin' && (
+                        <SelectItem value="admin">System Admin</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="editIsActive"
+                    name="editIsActive"
+                    defaultChecked={editingUser.isActive}
+                    className="rounded border-gray-300"
+                  />
+                  <Label htmlFor="editIsActive">Active User</Label>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button type="button" variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={updateUserMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
+                    {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
+                  </Button>
+                </div>
+              </form>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Edit Company Dialog */}
         <Dialog open={isEditCompanyDialogOpen} onOpenChange={setIsEditCompanyDialogOpen}>
           <DialogContent className="max-w-lg">
             <DialogHeader>
               <DialogTitle>Edit Company Details</DialogTitle>
+              <DialogDescription>Update company information</DialogDescription>
             </DialogHeader>
             <form onSubmit={handleEditCompanySubmit} className="space-y-4">
               <div>
@@ -668,7 +1049,6 @@ export default function CompanyManagement() {
                   value={editCompanyData.name}
                   onChange={(e) => setEditCompanyData(prev => ({ ...prev, name: e.target.value }))}
                   required
-                  className="mt-1"
                 />
               </div>
               <div>
@@ -678,7 +1058,6 @@ export default function CompanyManagement() {
                   value={editCompanyData.description}
                   onChange={(e) => setEditCompanyData(prev => ({ ...prev, description: e.target.value }))}
                   rows={3}
-                  className="mt-1"
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -690,7 +1069,6 @@ export default function CompanyManagement() {
                     value={editCompanyData.contactEmail}
                     onChange={(e) => setEditCompanyData(prev => ({ ...prev, contactEmail: e.target.value }))}
                     required
-                    className="mt-1"
                   />
                 </div>
                 <div>
@@ -700,7 +1078,6 @@ export default function CompanyManagement() {
                     value={editCompanyData.contactPhone}
                     onChange={(e) => setEditCompanyData(prev => ({ ...prev, contactPhone: e.target.value }))}
                     required
-                    className="mt-1"
                   />
                 </div>
               </div>
@@ -712,222 +1089,19 @@ export default function CompanyManagement() {
                   onChange={(e) => setEditCompanyData(prev => ({ ...prev, address: e.target.value }))}
                   required
                   rows={2}
-                  className="mt-1"
                 />
               </div>
-              <div className="flex justify-end space-x-2 pt-4">
+              <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsEditCompanyDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateCompanyMutation.isPending} className="bg-black text-white hover:bg-gray-800">
+                <Button type="submit" disabled={updateCompanyMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
                   {updateCompanyMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
             </form>
           </DialogContent>
         </Dialog>
-
-        {/* Tabs for different sections */}
-        <Tabs defaultValue="users" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="users">All Users ({companyUsers?.length || 0})</TabsTrigger>
-            <TabsTrigger value="tutors">Current Tutors ({tutors?.length || 0})</TabsTrigger>
-            <TabsTrigger value="assign">Assign Tutors ({unassignedTutors?.length || 0})</TabsTrigger>
-          </TabsList>
-
-          {/* All Users Tab */}
-          <TabsContent value="users" className="space-y-6">
-            {usersLoading ? (
-              <p>Loading users...</p>
-            ) : companyUsers && companyUsers.length > 0 ? (
-              <div className="space-y-6">
-                {Object.entries(usersByRole).map(([role, users]) => (
-                  <Card key={role} className="eink-card">
-                    <CardHeader>
-                      <CardTitle className="capitalize flex items-center space-x-2">
-                        <Users className="w-5 h-5" />
-                        <span>{role.replace('_', ' ')}s ({users.length})</span>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {users.map((user) => (
-                          <Card key={user.id} className="border">
-                            <CardContent className="p-4">
-                              <div className="flex justify-between items-start mb-2">
-                                <div className="flex-1">
-                                  <h4 className="font-semibold">
-                                    {user.firstName} {user.lastName}
-                                  </h4>
-                                  <p className="text-sm text-gray-600">{user.email}</p>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <Badge variant={user.isActive ? "default" : "secondary"}>
-                                    {user.isActive ? "Active" : "Inactive"}
-                                  </Badge>
-                                  <div className="flex space-x-1">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleEditUser(user)}
-                                      title="Edit User"
-                                    >
-                                      <span className="text-xs">Edit</span>
-                                    </Button>
-                                    {/* Only show delete for non-master admins and non-self */}
-                                    {currentUser?.role === 'admin' && user.role !== 'admin' && user.id !== currentUser?.id && (
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => handleDeleteUser(user.id, `${user.firstName} ${user.lastName}`)}
-                                        disabled={deleteUserMutation.isPending}
-                                        title="Delete User (Master Admin Only)"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-gray-500 py-8">No users found in this company.</p>
-            )}
-          </TabsContent>
-
-          {/* Current Tutors Tab */}
-          <TabsContent value="tutors" className="space-y-6">
-            {tutorsLoading ? (
-              <div className="text-center py-8">
-                <p>Loading tutors...</p>
-              </div>
-            ) : tutorsError ? (
-              <div className="text-center text-red-500 py-8">
-                <h3 className="text-lg font-semibold mb-2">Error Loading Tutors</h3>
-                <p>Error: {(tutorsError as Error).message}</p>
-              </div>
-            ) : tutors && tutors.length > 0 ? (
-              <div className="space-y-4">
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <p className="text-sm text-green-600">Debug: Found {tutors.length} tutors</p>
-                  <p className="text-xs text-gray-500">Tutors data: {JSON.stringify(tutors, null, 2)}</p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {tutors.map((tutor) => (
-                  <Card key={tutor.id} className="border">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-semibold">
-                            {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : `Tutor #${tutor.id.slice(-6)}`}
-                          </h4>
-                          {tutor.user?.email && (
-                            <p className="text-sm text-gray-600">{tutor.user.email}</p>
-                          )}
-                        </div>
-                        <Badge variant={tutor.isVerified ? "default" : "secondary"}>
-                          {tutor.isVerified ? "Verified" : "Pending"}
-                        </Badge>
-                      </div>
-                      
-                      {tutor.specialization && (
-                        <p className="text-sm text-gray-600 mb-1">
-                          <strong>Specialization:</strong> {tutor.specialization}
-                        </p>
-                      )}
-                      
-                      {tutor.qualifications && (
-                        <p className="text-sm text-gray-600 mb-3">
-                          <strong>Qualifications:</strong> {tutor.qualifications}
-                        </p>
-                      )}
-                      
-
-                    </CardContent>
-                  </Card>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-2">✓ Tutors Section Working</h3>
-                  <p className="text-gray-600 mb-4">This business currently has no tutors assigned.</p>
-                  <p className="text-sm text-blue-600 mb-2">API Status: Successfully loaded (200) - {Array.isArray(tutors) ? tutors.length : 0} tutors found</p>
-                  <div className="text-xs text-gray-500">
-                    <p>• API endpoint: /api/companies/{companyId}/tutors</p>
-                    <p>• Response: {JSON.stringify(tutors)}</p>
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-sm text-gray-600">To add tutors:</p>
-                    <ul className="text-xs text-gray-500 mt-2">
-                      <li>1. Create users with "Tutor" role in the "All Users" tab</li>
-                      <li>2. Or assign existing tutors from the "Assign Tutors" tab</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Assign Tutors Tab */}
-          <TabsContent value="assign" className="space-y-6">
-            {unassignedTutors && unassignedTutors.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {unassignedTutors.map((tutor) => (
-                  <Card key={tutor.id} className="border">
-                    <CardContent className="p-4">
-                      <div className="flex justify-between items-start mb-3">
-                        <div>
-                          <h4 className="font-semibold">
-                            {tutor.user ? `${tutor.user.firstName} ${tutor.user.lastName}` : `Tutor #${tutor.id.slice(-6)}`}
-                          </h4>
-                          {tutor.user?.email && (
-                            <p className="text-sm text-gray-600">{tutor.user.email}</p>
-                          )}
-                        </div>
-                        <Badge variant={tutor.isVerified ? "default" : "secondary"}>
-                          {tutor.isVerified ? "Verified" : "Pending"}
-                        </Badge>
-                      </div>
-                      
-                      {tutor.specialization && (
-                        <p className="text-sm text-gray-600 mb-1">
-                          <strong>Specialization:</strong> {tutor.specialization}
-                        </p>
-                      )}
-                      
-                      {tutor.qualifications && (
-                        <p className="text-sm text-gray-600 mb-3">
-                          <strong>Qualifications:</strong> {tutor.qualifications}
-                        </p>
-                      )}
-                      
-                      <Button
-                        size="sm"
-                        onClick={() => assignTutorMutation.mutate(tutor.id)}
-                        disabled={assignTutorMutation.isPending}
-                        className="w-full"
-                      >
-                        <UserPlus className="w-4 h-4 mr-2" />
-                        Assign to Company
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-gray-500 py-8">No unassigned tutors available.</p>
-            )}
-          </TabsContent>
-        </Tabs>
       </div>
     </Layout>
   );
