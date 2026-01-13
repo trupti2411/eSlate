@@ -17,6 +17,7 @@ export interface CalendarSession {
   attendanceStatus?: AttendanceStatus;
   classId?: string;
   date?: string;
+  sessionDate?: string; // Explicit date string (YYYY-MM-DD) to avoid timezone issues
 }
 
 export interface CalendarHoliday {

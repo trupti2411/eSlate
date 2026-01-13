@@ -31,7 +31,14 @@ export function CalendarDayCell({
   isCurrentMonth = true,
   isCompact = false,
 }: CalendarDayCellProps) {
-  const daySessions = sessions.filter(s => isSameDay(new Date(s.startTime), date));
+  // Use sessionDate if available (for virtual sessions), otherwise fall back to startTime
+  const daySessions = sessions.filter(s => {
+    if (s.sessionDate) {
+      // Compare using the explicit date string to avoid timezone issues
+      return format(date, 'yyyy-MM-dd') === s.sessionDate;
+    }
+    return isSameDay(new Date(s.startTime), date);
+  });
   const dayHolidays = holidays.filter(h => {
     const holidayDate = new Date(h.date);
     return isSameDay(holidayDate, date);

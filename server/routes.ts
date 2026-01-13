@@ -1682,6 +1682,7 @@ trailer<</Size 5/Root 1 0 R>>
                   subject: classInfo.subject,
                   startTime: sessionStart.toISOString(),
                   endTime: sessionEnd.toISOString(),
+                  sessionDate: dateStr, // Explicit date to avoid timezone issues
                   status: 'scheduled',
                   location: classInfo.location,
                   tutorName: classInfo.tutorName,
