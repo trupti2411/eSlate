@@ -10,7 +10,7 @@ import {
   BookOpen, Calendar, CheckCircle, Clock, FileText, 
   AlertTriangle, TrendingUp, ArrowRight, GraduationCap,
   ClipboardCheck, Award, Users, XCircle, Activity, Bell, ChevronRight,
-  LogOut, Tablet, Home
+  LogOut
 } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { Assignment, AcademicTerm, Class, Submission } from '@shared/schema';
@@ -225,13 +225,6 @@ export default function StudentHome() {
     }
   };
 
-  const navigationItems = [
-    { href: '/student/home', icon: Home, label: 'Dashboard' },
-    { href: '/student/portal', icon: BookOpen, label: 'My Worksheets' },
-    { href: '/student/assignments', icon: FileText, label: 'Assignments' },
-    { href: '/student/dashboard', icon: Calendar, label: 'Calendar' },
-  ];
-
   if (profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -245,20 +238,28 @@ export default function StudentHome() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Top Navigation Bar - matching company portal */}
-      <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-6 py-4">
-          <div className="flex justify-between items-center">
-            <Link href="/student/home" className="flex items-center space-x-3">
-              <Tablet className="h-8 w-8 text-gray-700" />
-              <h1 className="text-2xl font-bold text-gray-900">eSlate</h1>
-              <span className="text-sm text-gray-500 font-medium">Student Portal</span>
-            </Link>
-            
-            <div className="flex items-center space-x-4">
-              <span className="text-sm font-medium text-gray-700">
-                {user?.firstName || user?.email || 'Student'}
-              </span>
+      {/* Header - matching company portal exactly */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-5">
+              <div className="p-3 bg-blue-50 rounded-xl">
+                <GraduationCap className="h-8 w-8 text-blue-600" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">Student Dashboard</h1>
+                <p className="text-gray-500 mt-1">Welcome back, {user?.firstName || 'Student'}!</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge className="bg-green-50 text-green-700 border-green-200 px-3 py-1">
+                <Activity className="h-3 w-3 mr-1" />
+                Online
+              </Badge>
+              <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
+                <Bell className="h-4 w-4" />
+                <span>{format(new Date(), 'EEEE, MMM d')}</span>
+              </div>
               <Button
                 onClick={handleLogout}
                 variant="outline"
@@ -271,63 +272,9 @@ export default function StudentHome() {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
-      <div className="flex">
-        {/* Sidebar Navigation - matching company portal style */}
-        <aside className="w-64 min-h-screen border-r border-gray-200 bg-white p-4">
-          <nav className="space-y-2">
-            {navigationItems.map((item) => {
-              const isActive = window.location.pathname === item.href || 
-                (item.href !== '/student/home' && window.location.pathname.startsWith(item.href));
-              const Icon = item.icon;
-              
-              return (
-                <Link key={item.href} href={item.href} className={`
-                  flex items-center space-x-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors
-                  ${isActive 
-                    ? 'bg-gray-100 text-gray-900 border border-gray-200' 
-                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }
-                `}>
-                  <Icon className="h-5 w-5" />
-                  <span>{item.label}</span>
-                </Link>
-              );
-            })}
-          </nav>
-        </aside>
-
-        {/* Main Content */}
-        <main className="flex-1">
-          {/* Page Header */}
-          <div className="bg-white border-b border-gray-200 shadow-sm">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-5">
-                  <div className="p-3 bg-blue-50 rounded-xl">
-                    <GraduationCap className="h-8 w-8 text-blue-600" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-gray-900">Student Dashboard</h1>
-                    <p className="text-gray-500 mt-1">Welcome back, {user?.firstName || 'Student'}!</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge className="bg-green-50 text-green-700 border-green-200 px-3 py-1">
-                    <Activity className="h-3 w-3 mr-1" />
-                    Online
-                  </Badge>
-                  <div className="hidden md:flex items-center gap-2 text-sm text-gray-500">
-                    <Bell className="h-4 w-4" />
-                    <span>{format(new Date(), 'EEEE, MMM d')}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Alert Banner for Overdue Items */}
           {overdueItems.length > 0 && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-4">
@@ -905,8 +852,6 @@ export default function StudentHome() {
               )}
             </div>
           )}
-        </div>
-        </main>
       </div>
     </div>
   );
