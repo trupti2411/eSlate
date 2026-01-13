@@ -393,7 +393,11 @@ export default function CompanyManagement() {
             <Pencil className="w-3 h-3 mr-1" />
             Edit
           </Button>
-          {showDelete && currentUser?.role === 'admin' && user.role !== 'admin' && user.id !== currentUser?.id && (
+          {showDelete && 
+            (currentUser?.role === 'admin' || currentUser?.role === 'company_admin') && 
+            user.role !== 'admin' && 
+            user.role !== 'company_admin' &&
+            user.id !== currentUser?.id && (
             <Button
               size="sm"
               variant="outline"

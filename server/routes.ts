@@ -2606,13 +2606,49 @@ trailer<</Size 5/Root 1 0 R>>
       const user = req.user!;
       const { userId } = req.params;
 
-      if (user.role !== 'admin') {
-        return res.status(403).json({ message: "Admin access required" });
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
       }
 
       // Prevent deleting yourself
       if (user.id === userId) {
         return res.status(400).json({ message: "Cannot delete your own account" });
+      }
+
+      // Get the target user to check permissions
+      const targetUser = await storage.getUser(userId);
+      if (!targetUser) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Company admins can only delete users within their company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin) {
+          return res.status(403).json({ message: "Company admin record not found" });
+        }
+
+        // Check if the target user belongs to the same company
+        let targetCompanyId = null;
+        if (targetUser.role === 'student') {
+          const student = await storage.getStudentByUserId(userId);
+          targetCompanyId = student?.companyId;
+        } else if (targetUser.role === 'tutor') {
+          const tutor = await storage.getTutorByUserId(userId);
+          targetCompanyId = tutor?.companyId;
+        } else if (targetUser.role === 'company_admin') {
+          const targetCompanyAdmin = await storage.getCompanyAdminByUserId(userId);
+          targetCompanyId = targetCompanyAdmin?.companyId;
+        }
+
+        if (targetCompanyId !== companyAdmin.companyId) {
+          return res.status(403).json({ message: "Cannot delete users from other companies" });
+        }
+
+        // Company admins cannot delete system admins or other company admins
+        if (targetUser.role === 'admin' || targetUser.role === 'company_admin') {
+          return res.status(403).json({ message: "Cannot delete admin accounts" });
+        }
       }
 
       await storage.deleteUser(userId, user.id);
