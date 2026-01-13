@@ -113,13 +113,17 @@ function UploadedFilesList({ fileUrls, className }: { fileUrls: string[], classN
   );
 }
 
-export function StudentPortal() {
+interface StudentPortalProps {
+  embedded?: boolean;
+}
+
+export function StudentPortal({ embedded = false }: StudentPortalProps) {
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [submissionContent, setSubmissionContent] = useState("");
-  const [selectedTab, setSelectedTab] = useState("dashboard");
+  const [selectedTab, setSelectedTab] = useState(embedded ? "worksheets" : "dashboard");
   const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
   const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
@@ -743,6 +747,50 @@ export function StudentPortal() {
       </div>
     );
   };
+
+  if (embedded) {
+    return (
+      <div className="bg-gray-50">
+        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+          <TabsList className="grid w-full grid-cols-3 bg-white border border-gray-200 rounded-xl p-2 mb-6 gap-2">
+            <TabsTrigger 
+              value="worksheets" 
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span>Worksheets</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="classes" 
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
+            >
+              <GraduationCap className="h-4 w-4 shrink-0" />
+              <span>Classes</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="terms" 
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
+            >
+              <Calendar className="h-4 w-4 shrink-0" />
+              <span>Terms</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="worksheets" className="mt-0">
+            {renderAssignments()}
+          </TabsContent>
+
+          <TabsContent value="classes" className="mt-0">
+            {renderClasses()}
+          </TabsContent>
+
+          <TabsContent value="terms" className="mt-0">
+            {renderTerms()}
+          </TabsContent>
+        </Tabs>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">

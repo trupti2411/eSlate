@@ -14,6 +14,8 @@ import {
 } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { Assignment, AcademicTerm, Class, Submission } from '@shared/schema';
+import { StudentCalendarDashboard } from '@/components/calendar/StudentCalendarDashboard';
+import { StudentPortal } from './StudentPortal';
 
 interface AttendanceApiResponse {
   summary: {
@@ -294,15 +296,14 @@ export default function StudentHome() {
               <FileText className="h-4 w-4 mr-2" />
               Overview
             </Button>
-            <Link href="/student/portal">
-              <Button
-                variant="ghost"
-                className="rounded-b-none border-b-2 border-transparent hover:bg-gray-100"
-              >
-                <FileText className="h-4 w-4 mr-2" />
-                My Worksheets
-              </Button>
-            </Link>
+            <Button
+              variant={activeTab === 'worksheets' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('worksheets')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'worksheets' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              My Worksheets
+            </Button>
             <Button
               variant={activeTab === 'assignments' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('assignments')}
@@ -311,15 +312,14 @@ export default function StudentHome() {
               <FileText className="h-4 w-4 mr-2" />
               Assignments
             </Button>
-            <Link href="/student/dashboard">
-              <Button
-                variant="ghost"
-                className="rounded-b-none border-b-2 border-transparent hover:bg-gray-100"
-              >
-                <Calendar className="h-4 w-4 mr-2" />
-                Calendar
-              </Button>
-            </Link>
+            <Button
+              variant={activeTab === 'calendar' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('calendar')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'calendar' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Calendar
+            </Button>
             <Button
               variant={activeTab === 'grades' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('grades')}
@@ -452,48 +452,51 @@ export default function StudentHome() {
 
               {/* Quick Links */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Link href="/student/portal">
-                  <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-6 flex items-center gap-4">
-                      <div className="p-3 bg-blue-50 rounded-xl">
-                        <FileText className="h-6 w-6 text-blue-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">My Worksheets</h3>
-                        <p className="text-sm text-gray-500">View and complete worksheets</p>
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
-                    </CardContent>
-                  </Card>
-                </Link>
-                <Link href="/student/assignments">
-                  <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-6 flex items-center gap-4">
-                      <div className="p-3 bg-green-50 rounded-xl">
-                        <BookOpen className="h-6 w-6 text-green-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">Assignments</h3>
-                        <p className="text-sm text-gray-500">View all assignments</p>
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
-                    </CardContent>
-                  </Card>
-                </Link>
-                <Link href="/student/dashboard">
-                  <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-6 flex items-center gap-4">
-                      <div className="p-3 bg-purple-50 rounded-xl">
-                        <Calendar className="h-6 w-6 text-purple-600" />
-                      </div>
-                      <div>
-                        <h3 className="font-semibold text-gray-900">Calendar</h3>
-                        <p className="text-sm text-gray-500">View schedule & classes</p>
-                      </div>
-                      <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
-                    </CardContent>
-                  </Card>
-                </Link>
+                <Card 
+                  className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => setActiveTab('worksheets')}
+                >
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 bg-blue-50 rounded-xl">
+                      <FileText className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">My Worksheets</h3>
+                      <p className="text-sm text-gray-500">View and complete worksheets</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
+                  </CardContent>
+                </Card>
+                <Card 
+                  className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => setActiveTab('assignments')}
+                >
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 bg-green-50 rounded-xl">
+                      <BookOpen className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Assignments</h3>
+                      <p className="text-sm text-gray-500">View all assignments</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
+                  </CardContent>
+                </Card>
+                <Card 
+                  className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => setActiveTab('calendar')}
+                >
+                  <CardContent className="p-6 flex items-center gap-4">
+                    <div className="p-3 bg-purple-50 rounded-xl">
+                      <Calendar className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Calendar</h3>
+                      <p className="text-sm text-gray-500">View schedule & classes</p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
+                  </CardContent>
+                </Card>
               </div>
             </div>
           )}
@@ -642,28 +645,30 @@ export default function StudentHome() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="pt-4 space-y-2">
-                    <Link href="/student/portal">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-50 rounded-lg">
-                            <FileText className="h-4 w-4 text-blue-600" />
-                          </div>
-                          <span className="font-medium text-gray-700">Open Portal</span>
+                    <div 
+                      onClick={() => setActiveTab('worksheets')}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-50 rounded-lg">
+                          <FileText className="h-4 w-4 text-blue-600" />
                         </div>
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                        <span className="font-medium text-gray-700">My Worksheets</span>
                       </div>
-                    </Link>
-                    <Link href="/student/dashboard">
-                      <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-green-50 rounded-lg">
-                            <Calendar className="h-4 w-4 text-green-600" />
-                          </div>
-                          <span className="font-medium text-gray-700">View Calendar</span>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <div 
+                      onClick={() => setActiveTab('calendar')}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-50 rounded-lg">
+                          <Calendar className="h-4 w-4 text-green-600" />
                         </div>
-                        <ChevronRight className="h-4 w-4 text-gray-400" />
+                        <span className="font-medium text-gray-700">View Calendar</span>
                       </div>
-                    </Link>
+                      <ChevronRight className="h-4 w-4 text-gray-400" />
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -1006,6 +1011,32 @@ export default function StudentHome() {
                   </CardContent>
                 </Card>
               )}
+            </div>
+          )}
+
+          {/* Worksheets Tab - embedded StudentPortal */}
+          {activeTab === 'worksheets' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">My Worksheets</h2>
+                  <p className="text-gray-600">View and complete your assigned worksheets</p>
+                </div>
+              </div>
+              <StudentPortal embedded={true} />
+            </div>
+          )}
+
+          {/* Calendar Tab - embedded StudentCalendarDashboard */}
+          {activeTab === 'calendar' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Calendar</h2>
+                  <p className="text-gray-600">View your class schedule and attendance</p>
+                </div>
+              </div>
+              <StudentCalendarDashboard />
             </div>
           )}
       </div>
