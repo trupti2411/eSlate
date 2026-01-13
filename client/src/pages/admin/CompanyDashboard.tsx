@@ -237,41 +237,6 @@ function ReportsSection({ companyId, company }: { companyId: string; company?: T
 
   return (
     <div className="space-y-6">
-      {company && (
-        <Card className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-l-4 border-l-black dark:border-l-white">
-          <CardContent className="py-4">
-            <div className="flex items-start gap-4">
-              <div className="p-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
-                <Building2 className="w-6 h-6 text-gray-700 dark:text-gray-300" />
-              </div>
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 dark:text-white">{company.name}</h3>
-                {company.address && (
-                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
-                    <MapPin className="w-3 h-3" />
-                    {company.address}
-                  </p>
-                )}
-                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  {company.contactEmail && (
-                    <span className="flex items-center gap-1">
-                      <Mail className="w-3 h-3" />
-                      {company.contactEmail}
-                    </span>
-                  )}
-                  {company.contactPhone && (
-                    <span className="flex items-center gap-1">
-                      <Phone className="w-3 h-3" />
-                      {company.contactPhone}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Reports</h2>
@@ -1059,25 +1024,11 @@ export default function CompanyDashboard() {
                 <p className="text-gray-500 text-sm">{company?.name || "Loading..."}</p>
               </div>
             </div>
-            {/* Company Contact Info */}
-            {company && (
-              <div className="hidden md:flex items-center gap-6 text-sm text-gray-600">
-                <div className="flex items-center gap-1">
-                  <Mail className="h-4 w-4" />
-                  <span>{company.contactEmail}</span>
-                </div>
-                {company.contactPhone && (
-                  <div className="flex items-center gap-1">
-                    <Phone className="h-4 w-4" />
-                    <span>{company.contactPhone}</span>
-                  </div>
-                )}
-                {company.address && (
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    <span className="max-w-[200px] truncate">{company.address}</span>
-                  </div>
-                )}
+            {/* Company Address - Prominently displayed */}
+            {company?.address && (
+              <div className="hidden md:flex items-center gap-2 text-sm bg-gray-100 px-4 py-2 rounded-lg">
+                <MapPin className="h-4 w-4 text-gray-500" />
+                <span className="text-gray-700 font-medium">{company.address}</span>
               </div>
             )}
           </div>
@@ -1152,15 +1103,6 @@ export default function CompanyDashboard() {
               Calendar
             </Button>
             <Button
-              variant={mainTab === 'settings' ? 'default' : 'ghost'}
-              onClick={() => setMainTab('settings')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'settings' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
-              data-testid="tab-settings"
-            >
-              <Settings className="h-4 w-4 mr-2" />
-              Settings
-            </Button>
-            <Button
               variant={mainTab === 'reports' ? 'default' : 'ghost'}
               onClick={() => setMainTab('reports')}
               className={`rounded-b-none border-b-2 ${mainTab === 'reports' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
@@ -1168,6 +1110,15 @@ export default function CompanyDashboard() {
             >
               <BarChart3 className="h-4 w-4 mr-2" />
               Reports
+            </Button>
+            <Button
+              variant={mainTab === 'settings' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('settings')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'settings' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-settings"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Settings
             </Button>
           </div>
         </div>

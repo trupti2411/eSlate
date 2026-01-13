@@ -44,18 +44,15 @@ export default function Companies() {
     address: "",
   });
 
-  // Fetch all tutoring companies
   const { data: companies, isLoading: loadingCompanies } = useQuery<TutoringCompany[]>({
     queryKey: ["/api/companies"],
   });
 
-  // Fetch tutors for selected company
   const { data: companyTutors, isLoading: loadingTutors } = useQuery<CompanyTutor[]>({
     queryKey: ["/api/companies", selectedCompany, "tutors"],
     enabled: !!selectedCompany,
   });
 
-  // Create company mutation
   const createCompanyMutation = useMutation({
     mutationFn: async (companyData: typeof formData) => {
       return await apiRequest("/api/companies", "POST", companyData);
@@ -84,7 +81,6 @@ export default function Companies() {
     },
   });
 
-  // Toggle company status mutation
   const toggleCompanyStatusMutation = useMutation({
     mutationFn: async ({ companyId, isActive }: { companyId: string; isActive: boolean }) => {
       return await apiRequest(`/api/companies/${companyId}/status`, "PATCH", { isActive });
@@ -116,9 +112,9 @@ export default function Companies() {
 
   if (loadingCompanies) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-purple-50">
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-10 h-10 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading companies...</p>
         </div>
       </div>
@@ -126,30 +122,30 @@ export default function Companies() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-purple-50 to-pink-50">
-      {/* Gradient Hero Header */}
-      <div className="bg-gradient-to-r from-purple-600 via-pink-600 to-rose-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="min-h-screen bg-gray-50">
+      {/* Light Header */}
+      <div className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
+            <div className="flex items-center gap-5">
               <Link href="/admin">
-                <Button variant="ghost" size="sm" className="text-white/80 hover:text-white hover:bg-white/10">
+                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 hover:bg-gray-100">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back to Admin
                 </Button>
               </Link>
-              <div className="h-8 w-px bg-white/20" />
+              <div className="h-8 w-px bg-gray-200" />
               <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/20 backdrop-blur-sm rounded-xl">
-                  <Building2 className="h-8 w-8 text-white" />
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <Building2 className="h-7 w-7 text-gray-700" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold">Tutoring Companies</h1>
-                  <p className="text-purple-100 mt-1">Manage tutoring companies and their staff</p>
+                  <h1 className="text-2xl font-bold text-gray-900">Tutoring Companies</h1>
+                  <p className="text-gray-500 mt-1">Manage tutoring companies and their staff</p>
                 </div>
               </div>
             </div>
-            <Badge className="bg-white/20 text-white border-white/30 px-3 py-1">
+            <Badge className="bg-gray-100 text-gray-700 border-gray-200 px-3 py-1">
               <TrendingUp className="h-3 w-3 mr-1" />
               {companies?.length || 0} Companies
             </Badge>
@@ -162,7 +158,7 @@ export default function Companies() {
         <div className="flex justify-end">
           <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
             <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white shadow-md hover:shadow-lg transition-all">
+              <Button className="bg-gray-800 hover:bg-gray-900 text-white shadow-sm">
                 <Plus className="w-4 h-4 mr-2" />
                 Add Company
               </Button>
@@ -229,7 +225,7 @@ export default function Companies() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createCompanyMutation.isPending} className="bg-black text-white hover:bg-gray-800">
+                <Button type="submit" disabled={createCompanyMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
                   {createCompanyMutation.isPending ? "Creating..." : "Create Company"}
                 </Button>
               </div>
@@ -241,19 +237,19 @@ export default function Companies() {
         {/* Companies Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {companies?.map((company) => (
-            <Card key={company.id} className="border-0 bg-white shadow-lg hover:shadow-xl transition-all">
+            <Card key={company.id} className="bg-white border border-gray-200 shadow-sm hover:shadow transition-all">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-gradient-to-br from-purple-100 to-pink-100 rounded-lg">
-                      <Building2 className="w-5 h-5 text-purple-600" />
+                    <div className="p-2 bg-gray-100 rounded-lg">
+                      <Building2 className="w-5 h-5 text-gray-600" />
                     </div>
                     <CardTitle className="text-lg text-gray-900">{company.name}</CardTitle>
                   </div>
                   <div className="flex items-center space-x-2">
                     <Badge 
                       className={company.isActive 
-                        ? "bg-green-100 text-green-700 border-green-200" 
+                        ? "bg-green-50 text-green-700 border-green-200" 
                         : "bg-gray-100 text-gray-600 border-gray-200"
                       }
                     >
@@ -285,15 +281,15 @@ export default function Companies() {
                 
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center space-x-2 text-gray-600">
-                    <Mail className="w-4 h-4 text-purple-500" />
+                    <Mail className="w-4 h-4 text-gray-400" />
                     <span>{company.contactEmail || <span className="text-red-500 text-xs">Not set</span>}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-600">
-                    <Phone className="w-4 h-4 text-purple-500" />
+                    <Phone className="w-4 h-4 text-gray-400" />
                     <span>{company.contactPhone || <span className="text-red-500 text-xs">Not set</span>}</span>
                   </div>
                   <div className="flex items-center space-x-2 text-gray-600">
-                    <MapPin className="w-4 h-4 text-purple-500" />
+                    <MapPin className="w-4 h-4 text-gray-400" />
                     <span className="line-clamp-1">{company.address || <span className="text-red-500 text-xs">Not set</span>}</span>
                   </div>
                 </div>
@@ -303,7 +299,7 @@ export default function Companies() {
                     variant="outline"
                     size="sm"
                     onClick={() => setSelectedCompany(company.id)}
-                    className="w-full border-purple-200 text-purple-600 hover:bg-purple-50 hover:border-purple-300"
+                    className="w-full border-gray-200 text-gray-700 hover:bg-gray-50"
                   >
                     <Users className="w-4 h-4 mr-2" />
                     View Tutors
@@ -311,7 +307,7 @@ export default function Companies() {
                   <Link href={`/admin/companies/${company.id}`}>
                     <Button
                       size="sm"
-                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                      className="w-full bg-gray-800 hover:bg-gray-900 text-white"
                     >
                       <Settings className="w-4 h-4 mr-2" />
                       Manage Company
@@ -326,11 +322,11 @@ export default function Companies() {
 
         {/* Selected Company Details */}
         {selectedCompany && (
-          <Card className="border-0 shadow-lg bg-white">
+          <Card className="bg-white border border-gray-200 shadow-sm">
             <CardHeader className="border-b border-gray-100">
               <CardTitle className="flex items-center space-x-2 text-gray-800">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Users className="w-5 h-5 text-purple-600" />
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <Users className="w-5 h-5 text-gray-600" />
                 </div>
                 <span>Company Tutors</span>
               </CardTitle>
@@ -341,13 +337,13 @@ export default function Companies() {
               ) : companyTutors && companyTutors.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {companyTutors.map((tutor) => (
-                    <Card key={tutor.id} className="border border-gray-200 shadow-sm">
+                    <Card key={tutor.id} className="border border-gray-200">
                       <CardContent className="p-4">
                         <div className="flex justify-between items-start mb-2">
                           <h4 className="font-semibold text-gray-900">Tutor #{tutor.id.slice(-6)}</h4>
                           <Badge 
                             className={tutor.isVerified 
-                              ? "bg-green-100 text-green-700 border-green-200"
+                              ? "bg-green-50 text-green-700 border-green-200"
                               : "bg-gray-100 text-gray-600 border-gray-200"
                             }
                           >
@@ -374,7 +370,7 @@ export default function Companies() {
               
               <Button 
                 variant="outline" 
-                className="mt-4 border-purple-200 text-purple-600 hover:bg-purple-50"
+                className="mt-4 border-gray-200 text-gray-700 hover:bg-gray-50"
                 onClick={() => setSelectedCompany(null)}
               >
                 Close Details
@@ -384,16 +380,16 @@ export default function Companies() {
         )}
 
         {companies?.length === 0 && (
-          <Card className="border-0 shadow-lg bg-white">
+          <Card className="bg-white border border-gray-200 shadow-sm">
             <CardContent className="text-center py-12">
-              <div className="p-4 bg-purple-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <Building2 className="w-8 h-8 text-purple-600" />
+              <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                <Building2 className="w-8 h-8 text-gray-600" />
               </div>
               <h3 className="text-lg font-semibold text-gray-800 mb-2">No Companies Yet</h3>
               <p className="text-gray-500 mb-4">Create your first tutoring company to get started.</p>
               <Button 
                 onClick={() => setIsCreateDialogOpen(true)}
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white"
+                className="bg-gray-800 hover:bg-gray-900 text-white"
               >
                 <Plus className="w-4 h-4 mr-2" />
                 Add First Company

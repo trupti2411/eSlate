@@ -372,25 +372,25 @@ export default function CompanyManagement() {
 
   return (
     <Layout>
-      <div className="container py-8 space-y-8 bg-gray-50 dark:bg-gray-900 min-h-screen">
+      <div className="container py-8 space-y-8 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link href="/admin/companies">
-              <Button variant="outline" size="sm" className="border-black dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+              <Button variant="outline" size="sm" className="border-gray-300 hover:bg-gray-100">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Companies
               </Button>
             </Link>
             <div>
-              <h1 className="text-2xl font-bold flex items-center space-x-3 text-gray-900 dark:text-white">
-                <Building2 className="w-8 h-8 text-gray-700 dark:text-gray-300" />
+              <h1 className="text-2xl font-bold flex items-center space-x-3 text-gray-900">
+                <Building2 className="w-8 h-8 text-gray-600" />
                 <span>{company.name}</span>
-                <Badge variant={company.isActive ? "default" : "secondary"}>
+                <Badge className={company.isActive ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-600 border-gray-200"}>
                   {company.isActive ? "Active" : "Inactive"}
                 </Badge>
               </h1>
-              <p className="text-gray-600 dark:text-gray-400">Business Management Dashboard</p>
+              <p className="text-gray-500">Business Management Dashboard</p>
             </div>
           </div>
           
