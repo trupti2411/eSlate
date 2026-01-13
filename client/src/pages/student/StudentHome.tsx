@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
+import Layout from '@/components/Layout';
 import { 
   BookOpen, Calendar, CheckCircle, Clock, FileText, 
   AlertTriangle, TrendingUp, ArrowRight, GraduationCap,
   ClipboardCheck, Award, Users, XCircle
 } from 'lucide-react';
-import { format, differenceInDays, isPast, parseISO } from 'date-fns';
+import { format, differenceInDays, isPast } from 'date-fns';
 import { Assignment, AcademicTerm, Class, Submission } from '@shared/schema';
 
 interface AttendanceApiResponse {
@@ -60,35 +61,38 @@ export default function StudentHome() {
     enabled: !!studentDbId
   });
 
-  const { data: worksheets = [] } = useQuery<any[]>({
+  const { data: worksheets = [], isLoading: worksheetsLoading } = useQuery<any[]>({
     queryKey: ['/api/students', studentDbId, 'worksheets'],
     enabled: !!studentDbId
   });
 
-  const { data: tests = [] } = useQuery<any[]>({
+  const { data: tests = [], isLoading: testsLoading } = useQuery<any[]>({
     queryKey: ['/api/students', studentDbId, 'tests'],
     enabled: !!studentDbId
   });
 
-  const { data: terms = [] } = useQuery<AcademicTerm[]>({
+  const { data: terms = [], isLoading: termsLoading } = useQuery<AcademicTerm[]>({
     queryKey: ['/api/students', studentDbId, 'terms'],
     enabled: !!studentDbId
   });
 
-  const { data: classes = [] } = useQuery<Class[]>({
+  const { data: classes = [], isLoading: classesLoading } = useQuery<Class[]>({
     queryKey: ['/api/students', studentDbId, 'classes'],
     enabled: !!studentDbId
   });
 
-  const { data: progress = [] } = useQuery<any[]>({
+  const { data: progress = [], isLoading: progressLoading } = useQuery<any[]>({
     queryKey: ['/api/progress'],
     enabled: !!user
   });
 
-  const { data: attendanceData } = useQuery<AttendanceApiResponse>({
+  const { data: attendanceData, isLoading: attendanceLoading } = useQuery<AttendanceApiResponse>({
     queryKey: ['/api/attendance/summary/student', studentDbId],
     enabled: !!studentDbId
   });
+
+  // Combined loading state for data
+  const isDataLoading = assignmentsLoading || submissionsLoading || worksheetsLoading || testsLoading;
 
   const typedAssignments = assignments as Assignment[];
   const typedSubmissions = submissions as Submission[];
@@ -111,40 +115,49 @@ export default function StudentHome() {
   }
 
   const normalizeWorksheet = (ws: any): UnifiedItem | null => {
-    const assignment = ws.assignment;
-    const worksheet = ws.worksheet;
-    if (!assignment || !worksheet) return null;
+    // Handle both flat and nested structures
+    const assignment = ws.assignment || ws;
+    const worksheet = ws.worksheet || ws;
     
-    const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : new Date();
-    const isOverdue = isPast(dueDate) && assignment.status !== 'completed' && assignment.status !== 'graded';
+    // Ensure we have valid data
+    if (!assignment?.id) return null;
+    
+    const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : 
+                    worksheet.dueDate ? new Date(worksheet.dueDate) : new Date();
+    const status = assignment.status || 'assigned';
+    const isOverdue = isPast(dueDate) && status !== 'completed' && status !== 'graded';
     
     return {
       id: `ws-${assignment.id}`,
-      title: worksheet.title || 'Worksheet',
-      subject: worksheet.subject || 'General',
+      title: worksheet.title || assignment.title || 'Worksheet',
+      subject: worksheet.subject || assignment.subject || 'General',
       dueDate,
       type: 'worksheet',
-      status: assignment.status === 'completed' ? 'submitted' 
-           : assignment.status === 'graded' ? 'graded'
-           : assignment.status === 'in_progress' ? 'in_progress'
+      status: status === 'completed' ? 'submitted' 
+           : status === 'graded' ? 'graded'
+           : status === 'in_progress' ? 'in_progress'
            : isOverdue ? 'overdue' : 'pending',
       link: '/student/portal',
     };
   };
 
   const normalizeTest = (t: any): UnifiedItem | null => {
-    const assignment = t.assignment;
-    const test = t.test;
-    if (!assignment || !test) return null;
+    // Handle both flat and nested structures
+    const assignment = t.assignment || t;
+    const test = t.test || t;
     
-    const dueDate = test.availableUntil ? new Date(test.availableUntil) : new Date();
-    const attemptStatus = t.attemptStatus || 'not_started';
+    // Ensure we have valid data
+    if (!assignment?.id && !test?.id) return null;
+    
+    const dueDate = test.availableUntil ? new Date(test.availableUntil) :
+                    assignment.dueDate ? new Date(assignment.dueDate) : new Date();
+    const attemptStatus = t.attemptStatus || t.status || 'not_started';
     const isOverdue = isPast(dueDate) && attemptStatus === 'not_started';
     
     return {
-      id: `test-${assignment.id}`,
-      title: test.title || 'Test',
-      subject: test.subject || 'General',
+      id: `test-${assignment.id || test.id}`,
+      title: test.title || assignment.title || 'Test',
+      subject: test.subject || assignment.subject || 'General',
       dueDate,
       type: 'test',
       status: attemptStatus === 'graded' ? 'graded'
@@ -157,6 +170,7 @@ export default function StudentHome() {
 
   const normalizeAssignment = (a: Assignment): UnifiedItem => {
     const submission = getSubmissionForAssignment(a.id);
+    // Use submissionDate (the actual schema field)
     const dueDate = new Date(a.submissionDate);
     const isOverdue = !submission && isPast(dueDate);
     
@@ -169,7 +183,7 @@ export default function StudentHome() {
       status: submission?.status === 'graded' ? 'graded'
            : submission ? 'submitted'
            : isOverdue ? 'overdue' : 'pending',
-      link: '/student/portal',
+      link: '/student/assignments',
     };
   };
 
@@ -227,35 +241,34 @@ export default function StudentHome() {
 
   if (profileLoading) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-4 border-black dark:border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-black dark:text-white font-medium">Loading...</p>
+      <Layout>
+        <div className="flex items-center justify-center p-12">
+          <div className="text-center">
+            <div className="w-8 h-8 border-4 border-black dark:border-white border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-black dark:text-white font-medium">Loading...</p>
+          </div>
         </div>
-      </div>
+      </Layout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* E-ink optimized header - high contrast */}
-      <div className="bg-black dark:bg-white text-white dark:text-black border-b-4 border-black dark:border-white">
-        <div className="max-w-6xl mx-auto px-4 py-6">
+    <Layout>
+      <div className="p-6">
+        {/* Welcome Header */}
+        <div className="mb-6 p-6 bg-gray-50 dark:bg-gray-800 border-2 border-black dark:border-white rounded-lg">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-black tracking-tight">
-                Hello, {user?.firstName}
+              <h1 className="text-2xl font-bold text-black dark:text-white">
+                Welcome back, {user?.firstName}!
               </h1>
-              <p className="text-gray-300 dark:text-gray-600 mt-1 font-medium">
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
                 {format(new Date(), 'EEEE, MMMM d, yyyy')}
               </p>
             </div>
-            <GraduationCap className="h-12 w-12 opacity-50" />
+            <GraduationCap className="h-10 w-10 text-black dark:text-white opacity-50" />
           </div>
         </div>
-      </div>
-
-      <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Alert Banner for Overdue - All Types */}
         {overdueItems.length > 0 && (
           <div className="mb-6 p-4 bg-black dark:bg-white text-white dark:text-black border-4 border-black dark:border-white">
@@ -300,6 +313,14 @@ export default function StudentHome() {
         {/* Overview Tab */}
         {activeTab === 'overview' && (
           <div className="space-y-6">
+            {/* Loading state */}
+            {isDataLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-8 h-8 border-4 border-black dark:border-white border-t-transparent rounded-full animate-spin"></div>
+                <span className="ml-3 font-medium text-black dark:text-white">Loading data...</span>
+              </div>
+            )}
+
             {/* Quick Stats - High contrast cards - Unified counts */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card className="border-4 border-black dark:border-white bg-white dark:bg-gray-900">
@@ -647,6 +668,14 @@ export default function StudentHome() {
         {/* Attendance Tab */}
         {activeTab === 'attendance' && (
           <div className="space-y-6">
+            {/* Loading state */}
+            {attendanceLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="w-8 h-8 border-4 border-black dark:border-white border-t-transparent rounded-full animate-spin"></div>
+                <span className="ml-3 font-medium text-black dark:text-white">Loading attendance...</span>
+              </div>
+            )}
+
             {/* Attendance Overview */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Card className="border-4 border-black dark:border-white">
@@ -726,6 +755,6 @@ export default function StudentHome() {
           </div>
         )}
       </div>
-    </div>
+    </Layout>
   );
 }

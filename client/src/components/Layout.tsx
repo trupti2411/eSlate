@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Tablet, LogOut, User, Home, BookOpen, Users, Settings, Calendar, Shield, FileText, Scale } from "lucide-react";
+import { Tablet, LogOut, User, Home, BookOpen, Users, Settings, Calendar, Shield, FileText, Scale, ClipboardCheck } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { TermsAcceptanceModal } from "./TermsAcceptanceModal";
 
@@ -54,9 +54,10 @@ export default function Layout({ children }: LayoutProps) {
     switch (user?.role) {
       case 'student':
         return [
-          ...baseItems,
-          { href: '/assignments', icon: BookOpen, label: 'Assignments' },
-          { href: '/progress', icon: Users, label: 'Progress' },
+          { href: '/student/home', icon: Home, label: 'Dashboard' },
+          { href: '/student/portal', icon: BookOpen, label: 'My Worksheets' },
+          { href: '/student/assignments', icon: FileText, label: 'Assignments' },
+          { href: '/student/dashboard', icon: Calendar, label: 'Calendar' },
         ];
       case 'parent':
         return [
@@ -95,8 +96,12 @@ export default function Layout({ children }: LayoutProps) {
     }
   };
 
+  // E-ink optimized styling for students
+  const isStudent = user?.role === 'student';
+  const borderClass = isStudent ? 'border-4' : 'border-2';
+
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-gray-900">
       {/* Terms Acceptance Modal */}
       <TermsAcceptanceModal
         isOpen={showTermsModal}
@@ -105,7 +110,7 @@ export default function Layout({ children }: LayoutProps) {
       />
 
       {/* Header */}
-      <header className="border-b-2 border-black bg-white">
+      <header className={`${borderClass} border-b border-black dark:border-white bg-white dark:bg-gray-900`}>
         <div className="container py-4">
           <div className="flex justify-between items-center">
             <Link href="/" className="flex items-center space-x-3 text-decoration-none">
@@ -141,21 +146,21 @@ export default function Layout({ children }: LayoutProps) {
 
       <div className="flex">
         {/* Sidebar Navigation */}
-        <aside className="w-64 min-h-screen border-r-2 border-black bg-white p-4">
-          <nav className="space-y-2">
+        <aside className={`w-64 min-h-screen ${borderClass} border-r border-black dark:border-white bg-white dark:bg-gray-900 p-4`}>
+          <nav className={isStudent ? 'space-y-3' : 'space-y-2'}>
             {getNavigationItems().map((item) => {
-              const isActive = location === item.href;
+              const isActive = location === item.href || (item.href !== '/' && location.startsWith(item.href));
               const Icon = item.icon;
               
               return (
                 <Link key={item.href} href={item.href} className={`
-                  flex items-center space-x-3 px-4 py-3 text-sm font-medium rounded border-2 transition-colors
+                  flex items-center space-x-3 px-4 ${isStudent ? 'py-4 text-base' : 'py-3 text-sm'} font-${isStudent ? 'bold' : 'medium'} rounded ${borderClass} transition-colors
                   ${isActive 
-                    ? 'bg-black text-white border-black' 
-                    : 'bg-white text-black border-black hover:bg-gray-50'
+                    ? 'bg-black dark:bg-white text-white dark:text-black border-black dark:border-white' 
+                    : 'bg-white dark:bg-gray-900 text-black dark:text-white border-black dark:border-white hover:bg-gray-50 dark:hover:bg-gray-800'
                   }
                 `}>
-                  <Icon className="h-5 w-5" />
+                  <Icon className={isStudent ? 'h-6 w-6' : 'h-5 w-5'} />
                   <span>{item.label}</span>
                 </Link>
               );
