@@ -16,7 +16,7 @@ import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3 } from "lucide-react";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
@@ -805,6 +805,15 @@ export default function CompanyDashboard() {
             >
               <Settings className="h-4 w-4 mr-2" />
               Settings
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => window.location.href = '/company/reports'}
+              className="rounded-b-none border-b-2 border-transparent hover:bg-gray-100"
+              data-testid="tab-reports"
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Reports
             </Button>
           </div>
         </div>

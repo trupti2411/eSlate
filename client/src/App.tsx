@@ -30,6 +30,7 @@ import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { WorksheetManagementPage } from "@/pages/admin/WorksheetManagementPage";
 import TestManagement from "@/pages/tests/TestManagement";
 import TestGrading from "@/pages/tests/TestGrading";
+import Reports from "@/pages/company/Reports";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import UserAgreement from "@/pages/legal/UserAgreement";
@@ -107,6 +108,7 @@ function Router() {
           <Route path="/company/worksheets" component={WorksheetManagementPage} />
           <Route path="/company/tests" component={TestManagement} />
           <Route path="/company/tests/:testId/grade/:attemptId" component={TestGrading} />
+          <Route path="/company/reports" component={Reports} />
           <Route path="/assignments" component={StudentAssignments} />
           <Route path="/student/assignments" component={StudentAssignments} />
           <Route path="/student/portal" component={StudentPortal} />

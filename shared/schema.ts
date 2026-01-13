@@ -1042,3 +1042,116 @@ export const insertNotificationPreferencesSchema = createInsertSchema(notificati
 });
 
 export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+
+// Report type and status enums
+export const reportTypeEnum = pgEnum('report_type', [
+  'student_performance',
+  'attendance_summary',
+  'class_utilization',
+  'assignment_completion',
+  'tutor_workload',
+  'enrollment_trends'
+]);
+
+export const reportStatusEnum = pgEnum('report_status', ['pending', 'processing', 'completed', 'failed']);
+
+// Report Definitions table - templates for reports
+export const reportDefinitions = pgTable("report_definitions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
+  name: varchar("name").notNull(),
+  description: text("description"),
+  reportType: reportTypeEnum("report_type").notNull(),
+  defaultFilters: jsonb("default_filters").default({}),
+  isScheduled: boolean("is_scheduled").notNull().default(false),
+  scheduleCron: varchar("schedule_cron"),
+  createdBy: varchar("created_by").references(() => users.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Report Runs table - individual report executions
+export const reportRuns = pgTable("report_runs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
+  reportType: reportTypeEnum("report_type").notNull(),
+  name: varchar("name").notNull(),
+  parameters: jsonb("parameters").default({}),
+  status: reportStatusEnum("status").notNull().default('pending'),
+  resultData: jsonb("result_data"),
+  rowCount: integer("row_count"),
+  errorMessage: text("error_message"),
+  requestedBy: varchar("requested_by").references(() => users.id),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Report Exports table - exported files
+export const reportExports = pgTable("report_exports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  reportRunId: varchar("report_run_id").notNull().references(() => reportRuns.id),
+  exportType: varchar("export_type").notNull(), // 'csv', 'pdf', 'xlsx'
+  fileName: varchar("file_name").notNull(),
+  filePath: varchar("file_path"),
+  fileSize: integer("file_size"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Relations for reports
+export const reportDefinitionsRelations = relations(reportDefinitions, ({ one }) => ({
+  company: one(tutoringCompanies, {
+    fields: [reportDefinitions.companyId],
+    references: [tutoringCompanies.id],
+  }),
+  createdByUser: one(users, {
+    fields: [reportDefinitions.createdBy],
+    references: [users.id],
+  }),
+}));
+
+export const reportRunsRelations = relations(reportRuns, ({ one, many }) => ({
+  company: one(tutoringCompanies, {
+    fields: [reportRuns.companyId],
+    references: [tutoringCompanies.id],
+  }),
+  requestedByUser: one(users, {
+    fields: [reportRuns.requestedBy],
+    references: [users.id],
+  }),
+  exports: many(reportExports),
+}));
+
+export const reportExportsRelations = relations(reportExports, ({ one }) => ({
+  reportRun: one(reportRuns, {
+    fields: [reportExports.reportRunId],
+    references: [reportRuns.id],
+  }),
+}));
+
+// Type exports for reports
+export type ReportDefinition = typeof reportDefinitions.$inferSelect;
+export type ReportRun = typeof reportRuns.$inferSelect;
+export type ReportExport = typeof reportExports.$inferSelect;
+
+// Insert schemas for reports
+export const insertReportDefinitionSchema = createInsertSchema(reportDefinitions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertReportRunSchema = createInsertSchema(reportRuns).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertReportExportSchema = createInsertSchema(reportExports).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertReportDefinition = z.infer<typeof insertReportDefinitionSchema>;
+export type InsertReportRun = z.infer<typeof insertReportRunSchema>;
+export type InsertReportExport = z.infer<typeof insertReportExportSchema>;

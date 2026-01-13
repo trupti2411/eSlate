@@ -28,6 +28,9 @@ import {
   sessionAttendance,
   academicHolidays,
   notificationPreferences,
+  reportDefinitions,
+  reportRuns,
+  reportExports,
   type User,
   type Student,
   type InsertStudent,
@@ -84,6 +87,12 @@ import {
   type InsertAcademicHoliday,
   type NotificationPreferences,
   type InsertNotificationPreferences,
+  type ReportDefinition,
+  type InsertReportDefinition,
+  type ReportRun,
+  type InsertReportRun,
+  type ReportExport,
+  type InsertReportExport,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, or, desc, isNull, sql, arrayContains, inArray } from "drizzle-orm";
@@ -2708,6 +2717,65 @@ export class DatabaseStorage implements IStorage {
       .where(eq(notificationPreferences.userId, userId))
       .returning();
     return prefs;
+  }
+
+  // ==========================================
+  // REPORT OPERATIONS
+  // ==========================================
+
+  async createReportRun(data: Partial<InsertReportRun> & { companyId: string; reportType: any; name: string }): Promise<ReportRun> {
+    const [report] = await db.insert(reportRuns).values(data as any).returning();
+    return report;
+  }
+
+  async getReportRun(id: string): Promise<ReportRun | undefined> {
+    const [report] = await db.select().from(reportRuns).where(eq(reportRuns.id, id));
+    return report;
+  }
+
+  async getReportRunsByCompany(companyId: string): Promise<ReportRun[]> {
+    return db.select().from(reportRuns)
+      .where(eq(reportRuns.companyId, companyId))
+      .orderBy(desc(reportRuns.createdAt));
+  }
+
+  async updateReportRun(id: string, updates: Partial<InsertReportRun>): Promise<ReportRun> {
+    const [report] = await db.update(reportRuns)
+      .set(updates as any)
+      .where(eq(reportRuns.id, id))
+      .returning();
+    return report;
+  }
+
+  async deleteReportRun(id: string): Promise<void> {
+    await db.delete(reportRuns).where(eq(reportRuns.id, id));
+  }
+
+  // Helper methods for report generation
+  async getAttendanceByStudent(studentId: string): Promise<SessionAttendance[]> {
+    return db.select().from(sessionAttendance)
+      .where(eq(sessionAttendance.studentId, studentId));
+  }
+
+  async getClassesByTutor(tutorId: string): Promise<Class[]> {
+    return db.select().from(classes)
+      .where(eq(classes.tutorId, tutorId));
+  }
+
+  async getStudentsByCompany(companyId: string): Promise<Student[]> {
+    return db.select().from(students)
+      .where(eq(students.companyId, companyId));
+  }
+
+  async getTermsByCompany(companyId: string): Promise<AcademicTerm[]> {
+    const years = await db.select().from(academicYears)
+      .where(eq(academicYears.companyId, companyId));
+    
+    if (years.length === 0) return [];
+    
+    const yearIds = years.map(y => y.id);
+    return db.select().from(academicTerms)
+      .where(inArray(academicTerms.academicYearId, yearIds));
   }
 }
 

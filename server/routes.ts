@@ -20,6 +20,187 @@ import { db } from "./db";
 import { assignments, submissions } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
+// Report generation helper functions
+async function generateStudentPerformanceReport(storage: any, companyId: string, parameters: any) {
+  const students = await storage.getStudentsByCompany(companyId);
+  const data = [];
+  
+  for (const student of students) {
+    const user = await storage.getUser(student.userId);
+    const submissions = await storage.getSubmissionsByStudent(student.id);
+    
+    const totalSubmissions = submissions.length;
+    const gradedSubmissions = submissions.filter((s: any) => s.grade !== null);
+    const avgGrade = gradedSubmissions.length > 0 
+      ? gradedSubmissions.reduce((sum: number, s: any) => sum + (s.grade || 0), 0) / gradedSubmissions.length 
+      : null;
+    
+    data.push({
+      studentName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown',
+      email: user?.email || '',
+      gradeLevel: student.gradeLevel || 'N/A',
+      totalSubmissions,
+      gradedSubmissions: gradedSubmissions.length,
+      averageGrade: avgGrade !== null ? avgGrade.toFixed(1) : 'N/A',
+      completionRate: totalSubmissions > 0 ? ((gradedSubmissions.length / totalSubmissions) * 100).toFixed(1) + '%' : '0%'
+    });
+  }
+  
+  return {
+    title: 'Student Performance Report',
+    generatedAt: new Date().toISOString(),
+    summary: { totalStudents: students.length },
+    data
+  };
+}
+
+async function generateAttendanceSummaryReport(storage: any, companyId: string, parameters: any) {
+  const students = await storage.getStudentsByCompany(companyId);
+  const data = [];
+  
+  for (const student of students) {
+    const user = await storage.getUser(student.userId);
+    const attendance = await storage.getAttendanceByStudent(student.id);
+    
+    const present = attendance.filter((a: any) => a.status === 'present').length;
+    const absent = attendance.filter((a: any) => a.status === 'absent').length;
+    const late = attendance.filter((a: any) => a.status === 'late').length;
+    const total = attendance.length;
+    
+    data.push({
+      studentName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown',
+      email: user?.email || '',
+      totalSessions: total,
+      present,
+      absent,
+      late,
+      attendanceRate: total > 0 ? ((present / total) * 100).toFixed(1) + '%' : 'N/A'
+    });
+  }
+  
+  return {
+    title: 'Attendance Summary Report',
+    generatedAt: new Date().toISOString(),
+    summary: { totalStudents: students.length },
+    data
+  };
+}
+
+async function generateClassUtilizationReport(storage: any, companyId: string, parameters: any) {
+  const classes = await storage.getClassesByCompany(companyId);
+  const data = [];
+  
+  for (const cls of classes) {
+    const enrollments = await storage.getStudentClassAssignmentsByClass(cls.id);
+    const utilizationRate = cls.maxStudents > 0 
+      ? (enrollments.length / cls.maxStudents) * 100 
+      : 0;
+    
+    data.push({
+      className: cls.name,
+      subject: cls.subject,
+      maxCapacity: cls.maxStudents,
+      enrolled: enrollments.length,
+      availableSpots: cls.maxStudents - enrollments.length,
+      utilizationRate: utilizationRate.toFixed(1) + '%',
+      status: cls.isActive ? 'Active' : 'Inactive'
+    });
+  }
+  
+  return {
+    title: 'Class Utilization Report',
+    generatedAt: new Date().toISOString(),
+    summary: { totalClasses: classes.length },
+    data
+  };
+}
+
+async function generateAssignmentCompletionReport(storage: any, companyId: string, parameters: any) {
+  const assignments = await storage.getAssignmentsByCompany(companyId);
+  const data = [];
+  
+  for (const assignment of assignments) {
+    const submissions = await storage.getSubmissionsByAssignment(assignment.id);
+    const submitted = submissions.length;
+    const graded = submissions.filter((s: any) => s.status === 'graded').length;
+    
+    data.push({
+      assignmentTitle: assignment.title,
+      type: assignment.kind || 'worksheet',
+      dueDate: assignment.dueDate ? new Date(assignment.dueDate).toLocaleDateString() : 'N/A',
+      totalSubmissions: submitted,
+      gradedCount: graded,
+      pendingGrading: submitted - graded,
+      status: assignment.status
+    });
+  }
+  
+  return {
+    title: 'Assignment Completion Report',
+    generatedAt: new Date().toISOString(),
+    summary: { totalAssignments: assignments.length },
+    data
+  };
+}
+
+async function generateTutorWorkloadReport(storage: any, companyId: string, parameters: any) {
+  const tutors = await storage.getTutorsByCompany(companyId);
+  const data = [];
+  
+  for (const tutor of tutors) {
+    const user = await storage.getUser(tutor.userId);
+    const classes = await storage.getClassesByTutor(tutor.id);
+    const students = await storage.getStudentsByTutor(tutor.id);
+    
+    data.push({
+      tutorName: user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : 'Unknown',
+      email: user?.email || '',
+      specialization: tutor.specialization || 'General',
+      totalClasses: classes.length,
+      totalStudents: students.length,
+      status: tutor.isVerified ? 'Verified' : 'Pending'
+    });
+  }
+  
+  return {
+    title: 'Tutor Workload Report',
+    generatedAt: new Date().toISOString(),
+    summary: { totalTutors: tutors.length },
+    data
+  };
+}
+
+async function generateEnrollmentTrendsReport(storage: any, companyId: string, parameters: any) {
+  const students = await storage.getStudentsByCompany(companyId);
+  const terms = await storage.getTermsByCompany(companyId);
+  
+  const enrollmentsByTerm: Record<string, number> = {};
+  for (const term of terms) {
+    enrollmentsByTerm[term.name] = 0;
+  }
+  
+  for (const student of students) {
+    if (student.termId) {
+      const term = terms.find((t: any) => t.id === student.termId);
+      if (term) {
+        enrollmentsByTerm[term.name] = (enrollmentsByTerm[term.name] || 0) + 1;
+      }
+    }
+  }
+  
+  const data = Object.entries(enrollmentsByTerm).map(([termName, count]) => ({
+    term: termName,
+    enrolledStudents: count
+  }));
+  
+  return {
+    title: 'Enrollment Trends Report',
+    generatedAt: new Date().toISOString(),
+    summary: { totalStudents: students.length, totalTerms: terms.length },
+    data
+  };
+}
+
 // Global declaration for file storage
 declare global {
   var uploadedFiles: Map<string, {
@@ -5296,6 +5477,205 @@ Good luck with your assignment!"
     } catch (error: any) {
       console.error('Error updating notification preferences:', error);
       res.status(500).json({ error: error.message || 'Failed to update notification preferences' });
+    }
+  });
+
+  // ==========================================
+  // REPORTING ROUTES
+  // ==========================================
+
+  // Get available report types
+  app.get('/api/reports/types', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const reportTypes = [
+        { id: 'student_performance', name: 'Student Performance', description: 'Track student grades, progress, and academic achievements' },
+        { id: 'attendance_summary', name: 'Attendance Summary', description: 'Overview of student attendance rates and patterns' },
+        { id: 'class_utilization', name: 'Class Utilization', description: 'Class capacity usage and enrollment statistics' },
+        { id: 'assignment_completion', name: 'Assignment Completion', description: 'Assignment submission rates and completion status' },
+        { id: 'tutor_workload', name: 'Tutor Workload', description: 'Tutor class assignments and student load' },
+        { id: 'enrollment_trends', name: 'Enrollment Trends', description: 'Student enrollment patterns over time' }
+      ];
+      res.json(reportTypes);
+    } catch (error: any) {
+      res.status(500).json({ error: error.message || 'Failed to get report types' });
+    }
+  });
+
+  // Get report history for company
+  app.get('/api/reports/history/:companyId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user;
+      
+      // Verify user has access to this company
+      if (user?.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } else if (user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Only company admins can access reports' });
+      }
+
+      const reports = await storage.getReportRunsByCompany(companyId);
+      res.json(reports);
+    } catch (error: any) {
+      console.error('Error getting report history:', error);
+      res.status(500).json({ error: error.message || 'Failed to get report history' });
+    }
+  });
+
+  // Run a report
+  app.post('/api/reports/run', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      const { companyId, reportType, name, parameters } = req.body;
+      
+      // Verify user has access to this company
+      if (user?.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } else if (user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Only company admins can run reports' });
+      }
+
+      // Create report run entry
+      const reportRun = await storage.createReportRun({
+        companyId,
+        reportType,
+        name: name || `${reportType} Report`,
+        parameters: parameters || {},
+        status: 'processing',
+        requestedBy: user.id,
+        startedAt: new Date(),
+      });
+
+      // Generate report data based on type
+      let resultData: any = {};
+      let rowCount = 0;
+
+      try {
+        switch (reportType) {
+          case 'student_performance':
+            resultData = await generateStudentPerformanceReport(storage, companyId, parameters);
+            break;
+          case 'attendance_summary':
+            resultData = await generateAttendanceSummaryReport(storage, companyId, parameters);
+            break;
+          case 'class_utilization':
+            resultData = await generateClassUtilizationReport(storage, companyId, parameters);
+            break;
+          case 'assignment_completion':
+            resultData = await generateAssignmentCompletionReport(storage, companyId, parameters);
+            break;
+          case 'tutor_workload':
+            resultData = await generateTutorWorkloadReport(storage, companyId, parameters);
+            break;
+          case 'enrollment_trends':
+            resultData = await generateEnrollmentTrendsReport(storage, companyId, parameters);
+            break;
+          default:
+            throw new Error(`Unknown report type: ${reportType}`);
+        }
+        rowCount = Array.isArray(resultData.data) ? resultData.data.length : 0;
+
+        // Update report run with results
+        await storage.updateReportRun(reportRun.id, {
+          status: 'completed',
+          resultData,
+          rowCount,
+          completedAt: new Date(),
+        });
+
+        res.json({ ...reportRun, status: 'completed', resultData, rowCount });
+      } catch (error: any) {
+        await storage.updateReportRun(reportRun.id, {
+          status: 'failed',
+          errorMessage: error.message,
+          completedAt: new Date(),
+        });
+        throw error;
+      }
+    } catch (error: any) {
+      console.error('Error running report:', error);
+      res.status(500).json({ error: error.message || 'Failed to run report' });
+    }
+  });
+
+  // Get a specific report run
+  app.get('/api/reports/run/:reportRunId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { reportRunId } = req.params;
+      const user = req.user;
+      const reportRun = await storage.getReportRun(reportRunId);
+      
+      if (!reportRun) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+      
+      // Verify user has access to this company's reports
+      if (user?.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== reportRun.companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } else if (user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Only company admins can access reports' });
+      }
+      
+      res.json(reportRun);
+    } catch (error: any) {
+      console.error('Error getting report run:', error);
+      res.status(500).json({ error: error.message || 'Failed to get report' });
+    }
+  });
+
+  // Export report to CSV
+  app.get('/api/reports/export/:reportRunId/csv', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { reportRunId } = req.params;
+      const user = req.user;
+      const reportRun = await storage.getReportRun(reportRunId);
+      
+      if (!reportRun) {
+        return res.status(404).json({ error: 'Report not found' });
+      }
+      
+      // Verify user has access to this company's reports
+      if (user?.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== reportRun.companyId) {
+          return res.status(403).json({ error: 'Access denied' });
+        }
+      } else if (user?.role !== 'admin') {
+        return res.status(403).json({ error: 'Only company admins can access reports' });
+      }
+      
+      if (reportRun.status !== 'completed' || !reportRun.resultData) {
+        return res.status(400).json({ error: 'Report data not available' });
+      }
+
+      const data = (reportRun.resultData as any).data || [];
+      if (data.length === 0) {
+        return res.status(400).json({ error: 'No data to export' });
+      }
+
+      // Generate CSV
+      const headers = Object.keys(data[0]);
+      const csvRows = [
+        headers.join(','),
+        ...data.map((row: any) => headers.map(h => `"${String(row[h] || '').replace(/"/g, '""')}"`).join(','))
+      ];
+      const csvContent = csvRows.join('\n');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="${reportRun.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv"`);
+      res.send(csvContent);
+    } catch (error: any) {
+      console.error('Error exporting report:', error);
+      res.status(500).json({ error: error.message || 'Failed to export report' });
     }
   });
 
