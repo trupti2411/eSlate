@@ -2960,6 +2960,31 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Delete academic year
+  app.delete('/api/companies/:companyId/academic-years/:yearId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, yearId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      await storage.deleteAcademicYear(yearId);
+      res.json({ message: "Academic year deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting academic year:", error);
+      res.status(500).json({ message: "Failed to delete academic year" });
+    }
+  });
+
   // Academic Terms routes
   app.get('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res: any) => {
     try {

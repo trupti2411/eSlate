@@ -237,6 +237,33 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     },
   });
 
+  const deleteYearMutation = useMutation({
+    mutationFn: async (yearId: string) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-years/${yearId}`, 'DELETE');
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Academic year deleted successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-years`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete academic year",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteYear = (yearId: string, yearName: string) => {
+    if (confirm(`Are you sure you want to delete "${yearName}"? This will also delete all terms and classes under this year.`)) {
+      deleteYearMutation.mutate(yearId);
+    }
+  };
+
   const createTermMutation = useMutation({
     mutationFn: async (data: AcademicTermFormData) => {
       return await apiRequest(`/api/companies/${companyId}/academic-terms`, 'POST', {
@@ -938,7 +965,11 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                             <Edit className="w-4 h-4 mr-2" />
                             Edit
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600">
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDeleteYear(year.id, year.name)}
+                            disabled={deleteYearMutation.isPending}
+                          >
                             <Trash2 className="w-4 h-4 mr-2" />
                             Delete
                           </DropdownMenuItem>
