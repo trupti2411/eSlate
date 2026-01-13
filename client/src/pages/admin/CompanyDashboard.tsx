@@ -171,7 +171,7 @@ const reportIcons: Record<string, any> = {
   enrollment_trends: TrendingUp,
 };
 
-function ReportsSection({ companyId }: { companyId: string }) {
+function ReportsSection({ companyId, company }: { companyId: string; company?: TutoringCompany | null }) {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState<'builder' | 'history'>('builder');
   const [selectedReportType, setSelectedReportType] = useState<string>('');
@@ -237,6 +237,41 @@ function ReportsSection({ companyId }: { companyId: string }) {
 
   return (
     <div className="space-y-6">
+      {company && (
+        <Card className="bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-l-4 border-l-black dark:border-l-white">
+          <CardContent className="py-4">
+            <div className="flex items-start gap-4">
+              <div className="p-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm">
+                <Building2 className="w-6 h-6 text-gray-700 dark:text-gray-300" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white">{company.name}</h3>
+                {company.address && (
+                  <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-1 mt-1">
+                    <MapPin className="w-3 h-3" />
+                    {company.address}
+                  </p>
+                )}
+                <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  {company.contactEmail && (
+                    <span className="flex items-center gap-1">
+                      <Mail className="w-3 h-3" />
+                      {company.contactEmail}
+                    </span>
+                  )}
+                  {company.contactPhone && (
+                    <span className="flex items-center gap-1">
+                      <Phone className="w-3 h-3" />
+                      {company.contactPhone}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Reports</h2>
@@ -2622,7 +2657,7 @@ export default function CompanyDashboard() {
 
       {mainTab === 'reports' && companyAdmin?.companyId && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <ReportsSection companyId={companyAdmin.companyId} />
+          <ReportsSection companyId={companyAdmin.companyId} company={company} />
         </div>
       )}
 
