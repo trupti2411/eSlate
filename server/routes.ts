@@ -2623,6 +2623,11 @@ trailer<</Size 5/Root 1 0 R>>
 
       // Company admins can only delete users within their company
       if (user.role === 'company_admin') {
+        // Company admins cannot delete system admins or other company admins
+        if (targetUser.role === 'admin' || targetUser.role === 'company_admin') {
+          return res.status(403).json({ message: "Cannot delete admin accounts" });
+        }
+
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (!companyAdmin) {
           return res.status(403).json({ message: "Company admin record not found" });
@@ -2636,18 +2641,10 @@ trailer<</Size 5/Root 1 0 R>>
         } else if (targetUser.role === 'tutor') {
           const tutor = await storage.getTutorByUserId(userId);
           targetCompanyId = tutor?.companyId;
-        } else if (targetUser.role === 'company_admin') {
-          const targetCompanyAdmin = await storage.getCompanyAdminByUserId(userId);
-          targetCompanyId = targetCompanyAdmin?.companyId;
         }
 
-        if (targetCompanyId !== companyAdmin.companyId) {
+        if (!targetCompanyId || targetCompanyId !== companyAdmin.companyId) {
           return res.status(403).json({ message: "Cannot delete users from other companies" });
-        }
-
-        // Company admins cannot delete system admins or other company admins
-        if (targetUser.role === 'admin' || targetUser.role === 'company_admin') {
-          return res.status(403).json({ message: "Cannot delete admin accounts" });
         }
       }
 
