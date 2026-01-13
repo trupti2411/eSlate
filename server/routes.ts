@@ -1634,10 +1634,59 @@ trailer<</Size 5/Root 1 0 R>>
       }
 
       const { startDate, endDate } = req.query;
-      const start = startDate ? new Date(startDate as string) : undefined;
-      const end = endDate ? new Date(endDate as string) : undefined;
+      const now = new Date();
+      const start = startDate ? new Date(startDate as string) : new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = endDate ? new Date(endDate as string) : new Date(now.getFullYear(), now.getMonth() + 2, 0);
 
-      const sessions = await storage.getClassSessionsByStudent(studentId, start, end);
+      let sessions = await storage.getClassSessionsByStudent(studentId, start, end);
+      
+      // If no sessions exist, generate virtual sessions from enrolled classes
+      if (sessions.length === 0) {
+        const enrolledClasses = await storage.getEnrolledClassesWithDetails(studentId);
+        const virtualSessions: any[] = [];
+        
+        for (const classInfo of enrolledClasses) {
+          if (classInfo.isActive && classInfo.daysOfWeek && classInfo.startTime && classInfo.endTime) {
+            // Generate sessions for each day the class meets within the date range
+            const daysOfWeek = Array.isArray(classInfo.daysOfWeek) 
+              ? classInfo.daysOfWeek 
+              : [classInfo.dayOfWeek || 1];
+            
+            // Loop through date range
+            const currentDate = new Date(start);
+            while (currentDate <= end) {
+              const dayOfWeek = currentDate.getDay() === 0 ? 7 : currentDate.getDay(); // Convert Sun=0 to Sun=7
+              
+              if (daysOfWeek.includes(dayOfWeek)) {
+                const sessionDate = new Date(currentDate);
+                const [startHour, startMin] = classInfo.startTime.split(':').map(Number);
+                const [endHour, endMin] = classInfo.endTime.split(':').map(Number);
+                
+                const sessionStart = new Date(sessionDate);
+                sessionStart.setHours(startHour, startMin, 0, 0);
+                
+                const sessionEnd = new Date(sessionDate);
+                sessionEnd.setHours(endHour, endMin, 0, 0);
+                
+                virtualSessions.push({
+                  id: `virtual-${classInfo.id}-${sessionDate.toISOString().split('T')[0]}`,
+                  classId: classInfo.id,
+                  className: classInfo.name,
+                  subject: classInfo.subject,
+                  startTime: sessionStart.toISOString(),
+                  endTime: sessionEnd.toISOString(),
+                  status: 'scheduled',
+                  location: classInfo.location,
+                  tutorName: classInfo.tutorName,
+                });
+              }
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+          }
+        }
+        sessions = virtualSessions;
+      }
+      
       const assignments = await storage.getStudentAssignments(studentId);
       const holidays = await storage.getPublicHolidays(start, end);
 

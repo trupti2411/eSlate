@@ -8,7 +8,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -22,16 +21,6 @@ import {
   AlertCircle,
   FileText,
 } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 
 interface StudentSession extends CalendarSession {
   attendanceStatus?: AttendanceStatus;
@@ -97,15 +86,21 @@ export function StudentCalendarDashboard() {
   const { user } = useAuth();
   const [selectedSession, setSelectedSession] = useState<StudentSession | null>(null);
   const [isSessionModalOpen, setIsSessionModalOpen] = useState(false);
-  const [hoursView, setHoursView] = useState<"weekly" | "monthly">("weekly");
+
+  const { data: studentProfile } = useQuery<{ id: string }>({
+    queryKey: ['/api/auth/student-profile'],
+    enabled: !!user && user.role === 'student',
+  });
+
+  const studentDbId = studentProfile?.id || '';
 
   const { data: calendarData, isLoading: isCalendarLoading } = useQuery<StudentCalendarData>({
     queryKey: ["/api/calendar/student"],
   });
 
   const { data: attendanceSummary, isLoading: isAttendanceLoading } = useQuery<AttendanceSummary>({
-    queryKey: ["/api/attendance/summary/student", user?.id],
-    enabled: !!user?.id,
+    queryKey: ["/api/attendance/summary/student", studentDbId],
+    enabled: !!studentDbId,
   });
 
   const todaysSessions = useMemo(() => {
@@ -129,7 +124,7 @@ export function StudentCalendarDashboard() {
         const dateB = typeof b.dueDate === "string" ? parseISO(b.dueDate) : b.dueDate;
         return dateA.getTime() - dateB.getTime();
       })
-      .slice(0, 5);
+      .slice(0, 3);
   }, [calendarData?.homeworkDeadlines]);
 
   const calendarSessions: CalendarSession[] = useMemo(() => {
@@ -158,96 +153,46 @@ export function StudentCalendarDashboard() {
     }
   };
 
-  const getStatusIcon = (status: AttendanceStatus) => {
-    switch (status) {
-      case "present":
-        return <CheckCircle2 className="w-4 h-4 text-green-500" />;
-      case "absent":
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      case "late":
-        return <Clock className="w-4 h-4 text-orange-500" />;
-      case "excused":
-        return <AlertCircle className="w-4 h-4 text-blue-500" />;
-      default:
-        return null;
-    }
-  };
-
-  const attendanceChartData = useMemo(() => {
-    if (!attendanceSummary?.subjectBreakdown) return [];
-    return attendanceSummary.subjectBreakdown.map((subject) => ({
-      name: subject.subject,
-      percentage: subject.percentage,
-      color: getSubjectColor(subject.subject),
-    }));
-  }, [attendanceSummary?.subjectBreakdown]);
-
-  const learningHoursData = useMemo(() => {
-    if (!attendanceSummary?.learningHours?.bySubject) return [];
-    return attendanceSummary.learningHours.bySubject.map((item) => ({
-      name: item.subject,
-      hours: item.hours,
-      color: getSubjectColor(item.subject),
-    }));
-  }, [attendanceSummary?.learningHours?.bySubject]);
-
   if (isCalendarLoading || isAttendanceLoading) {
     return (
-      <div className="space-y-4 p-4" data-testid="student-calendar-loading">
-        <Skeleton className="h-12 w-full" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Skeleton key={i} className="h-32 w-full" />
+      <div className="space-y-4" data-testid="student-calendar-loading">
+        <Skeleton className="h-[350px] w-full rounded-xl" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-32 w-full rounded-xl" />
           ))}
         </div>
-        <Skeleton className="h-[400px] w-full" />
       </div>
     );
   }
 
   return (
     <div className="space-y-6" data-testid="student-calendar-dashboard">
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="border-2 border-black dark:border-white" data-testid="card-total-classes">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <CalendarDays className="w-4 h-4" />
-              Total Classes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold" data-testid="total-classes-value">
-              {attendanceSummary?.totalClasses ?? 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Classes held this term</p>
-          </CardContent>
-        </Card>
+      <RoleCalendar
+        role="student"
+        sessions={calendarSessions}
+        holidays={calendarData?.holidays || []}
+        homeworkDeadlines={calendarData?.homeworkDeadlines || []}
+        onEventClick={handleEventClick}
+        isLoading={isCalendarLoading}
+      />
 
-        <Card className="border-2 border-black dark:border-white" data-testid="card-classes-attended">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border border-gray-200 shadow-sm" data-testid="card-attendance">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4" />
-              Classes Attended
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-green-600" data-testid="classes-attended-value">
-              {attendanceSummary?.classesAttended ?? 0}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">Present or late arrivals</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-black dark:border-white" data-testid="card-attendance-percentage">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
               <TrendingUp className="w-4 h-4" />
               Attendance Rate
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-3xl font-bold" data-testid="attendance-percentage-value">
-              {attendanceSummary?.attendancePercentage?.toFixed(1) ?? 0}%
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold" data-testid="attendance-percentage-value">
+                {attendanceSummary?.attendancePercentage?.toFixed(0) ?? 0}%
+              </span>
+              <span className="text-xs text-gray-500">
+                ({attendanceSummary?.classesAttended ?? 0}/{attendanceSummary?.totalClasses ?? 0} classes)
+              </span>
             </div>
             <Progress
               value={attendanceSummary?.attendancePercentage ?? 0}
@@ -257,218 +202,82 @@ export function StudentCalendarDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-black dark:border-white" data-testid="card-learning-hours">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              Learning Hours
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold" data-testid="learning-hours-value">
-              {hoursView === "weekly"
-                ? attendanceSummary?.learningHours?.weekly ?? 0
-                : attendanceSummary?.learningHours?.monthly ?? 0}
-              h
-            </div>
-            <Tabs value={hoursView} onValueChange={(v) => setHoursView(v as "weekly" | "monthly")} className="mt-2">
-              <TabsList className="h-7">
-                <TabsTrigger value="weekly" className="text-xs px-2 py-1" data-testid="hours-weekly-tab">
-                  Week
-                </TabsTrigger>
-                <TabsTrigger value="monthly" className="text-xs px-2 py-1" data-testid="hours-monthly-tab">
-                  Month
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card className="border-2 border-black dark:border-white" data-testid="card-subject-attendance">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <BookOpen className="w-5 h-5" />
-              Attendance by Subject
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {attendanceChartData.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-8 text-center" data-testid="no-subject-data">
-                No attendance data available yet.
-              </p>
-            ) : (
-              <div className="h-64" data-testid="subject-attendance-chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={attendanceChartData} layout="vertical" margin={{ left: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" domain={[0, 100]} tickFormatter={(v) => `${v}%`} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(value: number) => [`${value.toFixed(1)}%`, "Attendance"]} />
-                    <Bar dataKey="percentage" radius={[0, 4, 4, 0]}>
-                      {attendanceChartData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-
-            <div className="mt-4 space-y-2">
-              {attendanceSummary?.subjectBreakdown?.map((subject) => (
-                <div
-                  key={subject.subject}
-                  className="flex items-center justify-between text-sm"
-                  data-testid={`subject-breakdown-${subject.subject}`}
-                >
-                  <span className="font-medium">{subject.subject}</span>
-                  <div className="flex items-center gap-4 text-muted-foreground">
-                    <span className="text-green-600">{subject.present} present</span>
-                    <span className="text-red-600">{subject.absent} absent</span>
-                    <span className="text-orange-600">{subject.late} late</span>
-                    <span className="text-blue-600">{subject.excused} excused</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-2 border-black dark:border-white" data-testid="card-learning-hours-subject">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-lg flex items-center gap-2">
-              <GraduationCap className="w-5 h-5" />
-              Learning Hours by Subject
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {learningHoursData.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-8 text-center" data-testid="no-hours-data">
-                No learning hours data available yet.
-              </p>
-            ) : (
-              <div className="h-64" data-testid="learning-hours-chart">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={learningHoursData} layout="vertical" margin={{ left: 80 }}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis type="number" tickFormatter={(v) => `${v}h`} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(value: number) => [`${value.toFixed(1)} hours`, "Time Spent"]} />
-                    <Bar dataKey="hours" radius={[0, 4, 4, 0]}>
-                      {learningHoursData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="border-2 border-black dark:border-white" data-testid="card-today-sessions">
+        <Card className="border border-gray-200 shadow-sm" data-testid="card-today-sessions">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <CalendarDays className="w-5 h-5" />
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <CalendarDays className="w-4 h-4" />
                 Today's Classes
               </CardTitle>
-              <Badge variant="outline" data-testid="today-session-count">
-                {todaysSessions.length} classes
-              </Badge>
+              {todaysSessions.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {todaysSessions.length}
+                </Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent>
             {todaysSessions.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-4" data-testid="no-today-sessions">
-                No classes scheduled for today.
+              <p className="text-gray-500 text-sm" data-testid="no-today-sessions">
+                No classes scheduled today
               </p>
             ) : (
-              <div className="space-y-3">
-                {todaysSessions.map((session) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors cursor-pointer"
-                    onClick={() => {
-                      setSelectedSession(session);
-                      setIsSessionModalOpen(true);
-                    }}
-                    data-testid={`today-session-${session.id}`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {session.attendanceStatus && (
-                        <AttendanceStatusBadge status={session.attendanceStatus} size="sm" />
-                      )}
-                      <div>
-                        <p className="font-medium">{session.className || session.subject}</p>
-                        <p className="text-sm text-muted-foreground">
-                          <Clock className="w-3 h-3 inline mr-1" />
-                          {format(
-                            typeof session.startTime === "string" ? parseISO(session.startTime) : session.startTime,
-                            "h:mm a"
-                          )}{" "}
-                          -{" "}
-                          {format(
-                            typeof session.endTime === "string" ? parseISO(session.endTime) : session.endTime,
-                            "h:mm a"
-                          )}
-                        </p>
-                      </div>
+              <ScrollArea className={todaysSessions.length > 3 ? "h-[100px]" : ""}>
+                <div className="space-y-1">
+                  {todaysSessions.map((session) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between text-sm cursor-pointer hover:bg-gray-50 p-1 rounded"
+                      onClick={() => {
+                        setSelectedSession(session);
+                        setIsSessionModalOpen(true);
+                      }}
+                      data-testid={`today-session-${session.id}`}
+                    >
+                      <span className="font-medium truncate">{session.className || session.subject}</span>
+                      <span className="text-gray-500 text-xs">
+                        {format(
+                          typeof session.startTime === "string" ? parseISO(session.startTime) : session.startTime,
+                          "h:mm a"
+                        )}
+                      </span>
                     </div>
-                    {session.tutorName && (
-                      <span className="text-sm text-muted-foreground">{session.tutorName}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-black dark:border-white lg:col-span-2" data-testid="card-upcoming-homework">
+        <Card className="border border-gray-200 shadow-sm" data-testid="card-upcoming-homework">
           <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Upcoming Homework
-              </CardTitle>
-              <Badge variant="outline" data-testid="upcoming-homework-count">
-                {upcomingHomework.length} due
-              </Badge>
-            </div>
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Upcoming Homework
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {upcomingHomework.length === 0 ? (
-              <p className="text-muted-foreground text-sm py-4" data-testid="no-upcoming-homework">
-                No upcoming homework deadlines.
+              <p className="text-gray-500 text-sm" data-testid="no-upcoming-homework">
+                No upcoming deadlines
               </p>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-1">
                 {upcomingHomework.map((hw) => {
                   const dueDate = typeof hw.dueDate === "string" ? parseISO(hw.dueDate) : hw.dueDate;
                   const isTodays = isToday(dueDate);
                   return (
                     <div
                       key={hw.id}
-                      className="flex items-center justify-between p-3 border rounded-lg"
+                      className="flex items-center justify-between text-sm"
                       data-testid={`homework-item-${hw.id}`}
                     >
-                      <div>
-                        <p className="font-medium">{hw.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {hw.subject}
-                          {hw.description && ` - ${hw.description.substring(0, 50)}...`}
-                        </p>
-                      </div>
+                      <span className="font-medium truncate max-w-[120px]">{hw.title}</span>
                       <Badge
                         variant={isTodays ? "destructive" : "secondary"}
-                        data-testid={`homework-due-${hw.id}`}
+                        className="text-xs"
                       >
-                        {isTodays ? "Due Today" : format(dueDate, "MMM d")}
+                        {isTodays ? "Today" : format(dueDate, "MMM d")}
                       </Badge>
                     </div>
                   );
@@ -479,14 +288,63 @@ export function StudentCalendarDashboard() {
         </Card>
       </div>
 
-      <RoleCalendar
-        role="student"
-        sessions={calendarSessions}
-        holidays={calendarData?.holidays || []}
-        homeworkDeadlines={calendarData?.homeworkDeadlines || []}
-        onEventClick={handleEventClick}
-        isLoading={isCalendarLoading}
-      />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border border-gray-200 shadow-sm" data-testid="card-learning-hours">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Learning Hours
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <div>
+                <span className="text-2xl font-bold">{attendanceSummary?.learningHours?.weekly ?? 0}h</span>
+                <p className="text-xs text-gray-500">This Week</p>
+              </div>
+              <div className="h-8 w-px bg-gray-200" />
+              <div>
+                <span className="text-2xl font-bold">{attendanceSummary?.learningHours?.monthly ?? 0}h</span>
+                <p className="text-xs text-gray-500">This Month</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border border-gray-200 shadow-sm" data-testid="card-subject-breakdown">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              By Subject
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(!attendanceSummary?.learningHours?.bySubject || attendanceSummary.learningHours.bySubject.length === 0) ? (
+              <p className="text-gray-500 text-sm" data-testid="no-subject-data">
+                No subject data yet
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {attendanceSummary.learningHours.bySubject.slice(0, 3).map((item) => (
+                  <div key={item.subject} className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: getSubjectColor(item.subject) }}
+                    />
+                    <span className="text-sm flex-1 truncate">{item.subject}</span>
+                    <span className="text-sm font-medium">{item.hours}h</span>
+                  </div>
+                ))}
+                {attendanceSummary.learningHours.bySubject.length > 3 && (
+                  <p className="text-xs text-gray-400">
+                    +{attendanceSummary.learningHours.bySubject.length - 3} more subjects
+                  </p>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       <Dialog open={isSessionModalOpen} onOpenChange={setIsSessionModalOpen}>
         <DialogContent className="max-w-lg" data-testid="session-details-modal">
@@ -540,32 +398,25 @@ export function StudentCalendarDashboard() {
                   </p>
                 </div>
 
-                <div className="p-3 border rounded-lg" data-testid="session-subject">
-                  <p className="text-xs text-muted-foreground mb-1">Subject</p>
-                  <p className="font-medium">{selectedSession.subject}</p>
-                </div>
-
                 {selectedSession.tutorName && (
                   <div className="p-3 border rounded-lg" data-testid="session-tutor">
                     <p className="text-xs text-muted-foreground mb-1">Tutor</p>
                     <p className="font-medium">{selectedSession.tutorName}</p>
                   </div>
                 )}
-
-                {selectedSession.location && (
-                  <div className="p-3 border rounded-lg" data-testid="session-location">
-                    <p className="text-xs text-muted-foreground mb-1">Location</p>
-                    <p className="font-medium">{selectedSession.location}</p>
-                  </div>
-                )}
               </div>
+
+              {selectedSession.location && (
+                <div className="p-3 border rounded-lg" data-testid="session-location">
+                  <p className="text-xs text-muted-foreground mb-1">Location</p>
+                  <p className="font-medium">{selectedSession.location}</p>
+                </div>
+              )}
 
               {selectedSession.notes && (
                 <div className="p-3 border rounded-lg" data-testid="session-notes">
                   <p className="text-xs text-muted-foreground mb-1">Notes</p>
-                  <ScrollArea className="max-h-32">
-                    <p className="text-sm">{selectedSession.notes}</p>
-                  </ScrollArea>
+                  <p className="text-sm">{selectedSession.notes}</p>
                 </div>
               )}
             </div>

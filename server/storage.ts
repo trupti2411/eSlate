@@ -213,6 +213,7 @@ export interface IStorage {
   assignStudentToClass(assignment: InsertStudentClassAssignment): Promise<StudentClassAssignment>;
   getStudentsByClass(classId: string): Promise<StudentClassAssignment[]>;
   getClassesByStudent(studentId: string): Promise<StudentClassAssignment[]>;
+  getEnrolledClassesWithDetails(studentId: string): Promise<any[]>;
   removeStudentFromClass(studentId: string, classId: string): Promise<void>;
 
   // Assignment operations
@@ -1432,6 +1433,44 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(studentClassAssignments)
       .where(and(eq(studentClassAssignments.studentId, studentId), eq(studentClassAssignments.isActive, true)))
       .orderBy(studentClassAssignments.assignedDate);
+  }
+
+  async getEnrolledClassesWithDetails(studentId: string): Promise<any[]> {
+    const result = await db.select({
+      id: classes.id,
+      name: classes.name,
+      subject: classes.subject,
+      description: classes.description,
+      startTime: classes.startTime,
+      endTime: classes.endTime,
+      daysOfWeek: classes.daysOfWeek,
+      dayOfWeek: classes.dayOfWeek,
+      location: classes.location,
+      isActive: classes.isActive,
+      tutorId: classes.tutorId,
+      termId: classes.termId,
+    })
+    .from(studentClassAssignments)
+    .innerJoin(classes, eq(studentClassAssignments.classId, classes.id))
+    .where(and(
+      eq(studentClassAssignments.studentId, studentId),
+      eq(studentClassAssignments.isActive, true),
+      eq(classes.isActive, true)
+    ));
+
+    // Get tutor names for each class
+    const classesWithTutors = await Promise.all(result.map(async (classInfo) => {
+      let tutorName = undefined;
+      if (classInfo.tutorId) {
+        const tutor = await this.getTutor(classInfo.tutorId);
+        if (tutor) {
+          tutorName = `${tutor.firstName} ${tutor.lastName}`;
+        }
+      }
+      return { ...classInfo, tutorName };
+    }));
+
+    return classesWithTutors;
   }
 
   async removeStudentFromClass(studentId: string, classId: string): Promise<void> {
