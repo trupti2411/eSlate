@@ -48,25 +48,25 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       {/* Header */}
-      <div className="bg-white border-b-2 border-black">
+      <div className="bg-white dark:bg-gray-800 border-b-2 border-black dark:border-gray-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <Link href="/admin">
-                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
+                <Button variant="outline" size="sm" className="border-2 border-black dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
                   <Home className="h-4 w-4 mr-2" />
                   Dashboard
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-gray-300" />
+              <div className="h-6 w-px bg-gray-300 dark:bg-gray-600" />
               <div>
-                <h1 className="text-2xl font-bold text-black">Admin Portal</h1>
-                <p className="text-gray-500 text-sm">System management and platform oversight</p>
+                <h1 className="text-2xl font-bold text-black dark:text-white">Admin Portal</h1>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">System management and platform oversight</p>
               </div>
             </div>
-            <Shield className="h-12 w-12 text-black opacity-10" />
+            <Shield className="h-12 w-12 text-black dark:text-white opacity-10" />
           </div>
         </div>
       </div>
@@ -75,19 +75,19 @@ export default function AdminDashboard() {
         {/* Quick Actions */}
         <div className="flex gap-4 mb-8">
           <Link href="/admin/users">
-            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold">
+            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 dark:bg-white dark:text-black dark:border-white dark:hover:bg-gray-200 py-3 px-6 font-semibold">
               <UserPlus className="h-5 w-5 mr-2" />
               Manage Users
             </Button>
           </Link>
           <Link href="/admin/companies">
-            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold">
+            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 dark:bg-white dark:text-black dark:border-white dark:hover:bg-gray-200 py-3 px-6 font-semibold">
               <Building2 className="h-5 w-5 mr-2" />
               Companies
             </Button>
           </Link>
           <Link href="/admin/settings">
-            <Button className="border-2 border-black hover:bg-gray-100 py-3 px-6 font-semibold">
+            <Button className="border-2 border-black hover:bg-gray-100 dark:border-gray-600 dark:hover:bg-gray-700 py-3 px-6 font-semibold">
               <Settings className="h-5 w-5 mr-2" />
               Settings
             </Button>
@@ -96,105 +96,105 @@ export default function AdminDashboard() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+          <Card className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800 hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-gray-900 dark:text-white">
                 <Users className="h-4 w-4" />
                 Total Users
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{stats?.totalUsers || 0}</div>
-              <p className="text-xs text-gray-600 mt-1">Active users</p>
+              <div className="text-3xl font-bold text-black dark:text-white">{stats?.totalUsers || 0}</div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Active users</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+          <Card className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800 hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-gray-900 dark:text-white">
                 <BookOpen className="h-4 w-4" />
                 Assignments
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{stats?.totalAssignments || 0}</div>
-              <p className="text-xs text-gray-600 mt-1">Total created</p>
+              <div className="text-3xl font-bold text-black dark:text-white">{stats?.totalAssignments || 0}</div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Total created</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+          <Card className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800 hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-gray-900 dark:text-white">
                 <BarChart3 className="h-4 w-4" />
                 Completion Rate
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{stats?.completionRate || 0}%</div>
-              <p className="text-xs text-gray-600 mt-1">Submissions done</p>
+              <div className="text-3xl font-bold text-black dark:text-white">{stats?.completionRate || 0}%</div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Submissions done</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
+          <Card className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800 hover:shadow-lg transition-shadow">
             <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-gray-900 dark:text-white">
                 <Building2 className="h-4 w-4" />
                 Companies
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-black">{stats?.totalCompanies || 0}</div>
-              <p className="text-xs text-gray-600 mt-1">Active companies</p>
+              <div className="text-3xl font-bold text-black dark:text-white">{stats?.totalCompanies || 0}</div>
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Active companies</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Details Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <Card className="border-2 border-black lg:col-span-2">
+          <Card className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800 lg:col-span-2">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
                 <Users className="h-5 w-5" />
                 User Breakdown
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                <div className="flex justify-between p-3 bg-gray-50 rounded border border-gray-200">
-                  <span className="text-black font-medium">Students</span>
-                  <span className="text-black font-bold">{stats?.students || 0}</span>
+                <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <span className="text-black dark:text-white font-medium">Students</span>
+                  <span className="text-black dark:text-white font-bold">{stats?.students || 0}</span>
                 </div>
-                <div className="flex justify-between p-3 bg-gray-50 rounded border border-gray-200">
-                  <span className="text-black font-medium">Tutors</span>
-                  <span className="text-black font-bold">{stats?.tutors || 0}</span>
+                <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <span className="text-black dark:text-white font-medium">Tutors</span>
+                  <span className="text-black dark:text-white font-bold">{stats?.tutors || 0}</span>
                 </div>
-                <div className="flex justify-between p-3 bg-gray-50 rounded border border-gray-200">
-                  <span className="text-black font-medium">Parents</span>
-                  <span className="text-black font-bold">{stats?.parents || 0}</span>
+                <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <span className="text-black dark:text-white font-medium">Parents</span>
+                  <span className="text-black dark:text-white font-bold">{stats?.parents || 0}</span>
                 </div>
-                <div className="flex justify-between p-3 bg-gray-50 rounded border border-gray-200">
-                  <span className="text-black font-medium">Company Admins</span>
-                  <span className="text-black font-bold">{stats?.companyAdmins || 0}</span>
+                <div className="flex justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded border border-gray-200 dark:border-gray-600">
+                  <span className="text-black dark:text-white font-medium">Company Admins</span>
+                  <span className="text-black dark:text-white font-bold">{stats?.companyAdmins || 0}</span>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black bg-blue-50">
+          <Card className="border-2 border-black dark:border-gray-600 bg-gray-50 dark:bg-gray-700">
             <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-base flex items-center gap-2 text-gray-900 dark:text-white">
                 <Shield className="h-5 w-5" />
                 System Status
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <p className="text-xs text-gray-600 mb-1">Status</p>
-                <p className="text-2xl font-bold text-green-600">{stats?.systemStatus || 'Good'}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Status</p>
+                <p className="text-2xl font-bold text-green-600 dark:text-green-400">{stats?.systemStatus || 'Good'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-600 mb-1">Submissions</p>
-                <p className="text-2xl font-bold text-black">{stats?.totalSubmissions || 0}</p>
+                <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Submissions</p>
+                <p className="text-2xl font-bold text-black dark:text-white">{stats?.totalSubmissions || 0}</p>
               </div>
             </CardContent>
           </Card>

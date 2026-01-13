@@ -12,7 +12,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
-import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin, Trash2 } from "lucide-react";
+import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin, Trash2, Pencil } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
 
 interface TutoringCompany {
@@ -64,6 +65,14 @@ export default function CompanyManagement() {
   
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
+  const [isEditCompanyDialogOpen, setIsEditCompanyDialogOpen] = useState(false);
+  const [editCompanyData, setEditCompanyData] = useState({
+    name: "",
+    description: "",
+    contactEmail: "",
+    contactPhone: "",
+    address: "",
+  });
 
   // Fetch company details
   const { data: company, isLoading: companyLoading } = useQuery<TutoringCompany>({
@@ -224,6 +233,62 @@ export default function CompanyManagement() {
     },
   });
 
+  // Update company mutation
+  const updateCompanyMutation = useMutation({
+    mutationFn: async (companyData: typeof editCompanyData) => {
+      return await apiRequest(`/api/companies/${companyId}`, "PATCH", companyData);
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Company details updated successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}`] });
+      setIsEditCompanyDialogOpen(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update company",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleEditCompany = () => {
+    if (company) {
+      setEditCompanyData({
+        name: company.name || "",
+        description: company.description || "",
+        contactEmail: company.contactEmail || "",
+        contactPhone: company.contactPhone || "",
+        address: company.address || "",
+      });
+      setIsEditCompanyDialogOpen(true);
+    }
+  };
+
+  const handleEditCompanySubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editCompanyData.name.trim()) {
+      toast({ title: "Error", description: "Company name is required", variant: "destructive" });
+      return;
+    }
+    if (!editCompanyData.contactEmail.trim()) {
+      toast({ title: "Error", description: "Contact email is required", variant: "destructive" });
+      return;
+    }
+    if (!editCompanyData.contactPhone.trim()) {
+      toast({ title: "Error", description: "Contact phone is required", variant: "destructive" });
+      return;
+    }
+    if (!editCompanyData.address.trim()) {
+      toast({ title: "Error", description: "Address is required", variant: "destructive" });
+      return;
+    }
+    updateCompanyMutation.mutate(editCompanyData);
+  };
+
   const handleDeleteUser = (userId: string, userName: string) => {
     if (window.confirm(`Are you sure you want to permanently delete user "${userName}"? This action cannot be undone.`)) {
       deleteUserMutation.mutate(userId);
@@ -307,25 +372,25 @@ export default function CompanyManagement() {
 
   return (
     <Layout>
-      <div className="container py-8 space-y-8">
+      <div className="container py-8 space-y-8 bg-gray-50 dark:bg-gray-900 min-h-screen">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Link href="/admin/companies">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="border-black dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Companies
               </Button>
             </Link>
             <div>
-              <h1 className="page-title flex items-center space-x-3">
-                <Building2 className="w-8 h-8 text-blue-600" />
+              <h1 className="text-2xl font-bold flex items-center space-x-3 text-gray-900 dark:text-white">
+                <Building2 className="w-8 h-8 text-gray-700 dark:text-gray-300" />
                 <span>{company.name}</span>
                 <Badge variant={company.isActive ? "default" : "secondary"}>
                   {company.isActive ? "Active" : "Inactive"}
                 </Badge>
               </h1>
-              <p className="text-gray-600">Business Management Dashboard</p>
+              <p className="text-gray-600 dark:text-gray-400">Business Management Dashboard</p>
             </div>
           </div>
           
@@ -552,39 +617,115 @@ export default function CompanyManagement() {
         </div>
 
         {/* Company Details */}
-        <Card className="eink-card">
-          <CardHeader>
-            <CardTitle>Company Information</CardTitle>
+        <Card className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800">
+          <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardTitle className="text-lg font-semibold text-gray-900 dark:text-white">Company Information</CardTitle>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleEditCompany}
+              className="border-black dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+            >
+              <Pencil className="w-4 h-4 mr-2" />
+              Edit Details
+            </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <h3 className="font-semibold text-sm text-gray-600 mb-1">Description</h3>
-                <p>{company.description || "No description provided"}</p>
+                <h3 className="font-semibold text-sm text-gray-600 dark:text-gray-400 mb-1">Description</h3>
+                <p className="text-gray-900 dark:text-gray-200">{company.description || "No description provided"}</p>
               </div>
-              <div className="space-y-2">
-                {company.contactEmail && (
-                  <div className="flex items-center space-x-2">
-                    <Mail className="w-4 h-4 text-gray-500" />
-                    <span>{company.contactEmail}</span>
-                  </div>
-                )}
-                {company.contactPhone && (
-                  <div className="flex items-center space-x-2">
-                    <Phone className="w-4 h-4 text-gray-500" />
-                    <span>{company.contactPhone}</span>
-                  </div>
-                )}
-                {company.address && (
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="w-4 h-4 text-gray-500" />
-                    <span>{company.address}</span>
-                  </div>
-                )}
+              <div className="space-y-3">
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-gray-900 dark:text-gray-200">{company.contactEmail || <span className="text-red-500">Not set (required)</span>}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Phone className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-gray-900 dark:text-gray-200">{company.contactPhone || <span className="text-red-500">Not set (required)</span>}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <MapPin className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                  <span className="text-gray-900 dark:text-gray-200">{company.address || <span className="text-red-500">Not set (required)</span>}</span>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
+
+        {/* Edit Company Dialog */}
+        <Dialog open={isEditCompanyDialogOpen} onOpenChange={setIsEditCompanyDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Edit Company Details</DialogTitle>
+            </DialogHeader>
+            <form onSubmit={handleEditCompanySubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="companyName">Company Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="companyName"
+                  value={editCompanyData.name}
+                  onChange={(e) => setEditCompanyData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label htmlFor="companyDescription">Description</Label>
+                <Textarea
+                  id="companyDescription"
+                  value={editCompanyData.description}
+                  onChange={(e) => setEditCompanyData(prev => ({ ...prev, description: e.target.value }))}
+                  rows={3}
+                  className="mt-1"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="companyEmail">Contact Email <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="companyEmail"
+                    type="email"
+                    value={editCompanyData.contactEmail}
+                    onChange={(e) => setEditCompanyData(prev => ({ ...prev, contactEmail: e.target.value }))}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="companyPhone">Contact Phone <span className="text-red-500">*</span></Label>
+                  <Input
+                    id="companyPhone"
+                    value={editCompanyData.contactPhone}
+                    onChange={(e) => setEditCompanyData(prev => ({ ...prev, contactPhone: e.target.value }))}
+                    required
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+              <div>
+                <Label htmlFor="companyAddress">Address <span className="text-red-500">*</span></Label>
+                <Textarea
+                  id="companyAddress"
+                  value={editCompanyData.address}
+                  onChange={(e) => setEditCompanyData(prev => ({ ...prev, address: e.target.value }))}
+                  required
+                  rows={2}
+                  className="mt-1"
+                />
+              </div>
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsEditCompanyDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={updateCompanyMutation.isPending} className="bg-black text-white hover:bg-gray-800">
+                  {updateCompanyMutation.isPending ? "Saving..." : "Save Changes"}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Tabs for different sections */}
         <Tabs defaultValue="users" className="w-full">

@@ -119,16 +119,16 @@ export default function Companies() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 bg-gray-50 dark:bg-gray-900 min-h-screen">
       <div className="flex justify-between items-center">
         <div>
           <Link href="/admin">
-            <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
+            <Button variant="outline" size="sm" className="mb-3 border-black dark:border-gray-600 text-black dark:text-white hover:bg-gray-100 dark:hover:bg-gray-700">
               ← Back to Admin
             </Button>
           </Link>
-          <h1 className="text-3xl font-bold">Tutoring Companies</h1>
-          <p className="text-gray-600">Manage tutoring companies and their staff</p>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Tutoring Companies</h1>
+          <p className="text-gray-600 dark:text-gray-400">Manage tutoring companies and their staff</p>
         </div>
         
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -145,7 +145,7 @@ export default function Companies() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="name">Company Name</Label>
+                  <Label htmlFor="name">Company Name <span className="text-red-500">*</span></Label>
                   <Input
                     id="name"
                     value={formData.name}
@@ -154,12 +154,13 @@ export default function Companies() {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="contactEmail">Contact Email</Label>
+                  <Label htmlFor="contactEmail">Contact Email <span className="text-red-500">*</span></Label>
                   <Input
                     id="contactEmail"
                     type="email"
                     value={formData.contactEmail}
                     onChange={(e) => handleInputChange("contactEmail", e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -176,19 +177,21 @@ export default function Companies() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="contactPhone">Contact Phone</Label>
+                  <Label htmlFor="contactPhone">Contact Phone <span className="text-red-500">*</span></Label>
                   <Input
                     id="contactPhone"
                     value={formData.contactPhone}
                     onChange={(e) => handleInputChange("contactPhone", e.target.value)}
+                    required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="address">Address</Label>
+                  <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
                   <Input
                     id="address"
                     value={formData.address}
                     onChange={(e) => handleInputChange("address", e.target.value)}
+                    required
                   />
                 </div>
               </div>
@@ -197,7 +200,7 @@ export default function Companies() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createCompanyMutation.isPending}>
+                <Button type="submit" disabled={createCompanyMutation.isPending} className="bg-black text-white hover:bg-gray-800">
                   {createCompanyMutation.isPending ? "Creating..." : "Create Company"}
                 </Button>
               </div>
@@ -209,15 +212,15 @@ export default function Companies() {
       {/* Companies Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {companies?.map((company) => (
-          <Card key={company.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
+          <Card key={company.id} className="border-2 border-black dark:border-gray-600 bg-white dark:bg-gray-800 hover:shadow-lg transition-shadow">
+            <CardHeader className="pb-2">
               <div className="flex items-start justify-between">
                 <div className="flex items-center space-x-2">
-                  <Building2 className="w-5 h-5 text-blue-600" />
-                  <CardTitle className="text-lg">{company.name}</CardTitle>
+                  <Building2 className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                  <CardTitle className="text-lg text-gray-900 dark:text-white">{company.name}</CardTitle>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Badge variant={company.isActive ? "default" : "secondary"}>
+                  <Badge variant={company.isActive ? "default" : "secondary"} className="text-[10px]">
                     {company.isActive ? "Active" : "Inactive"}
                   </Badge>
                   <Button
@@ -239,30 +242,24 @@ export default function Companies() {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-2">
+            <CardContent className="space-y-2 pt-0">
               {company.description && (
-                <p className="text-gray-600 text-sm line-clamp-2">{company.description}</p>
+                <p className="text-gray-600 dark:text-gray-400 text-sm line-clamp-2">{company.description}</p>
               )}
               
-              <div className="space-y-1 text-sm text-gray-500">
-                {company.contactEmail && (
-                  <div className="flex items-center space-x-2">
-                    <Mail className="w-4 h-4" />
-                    <span>{company.contactEmail}</span>
-                  </div>
-                )}
-                {company.contactPhone && (
-                  <div className="flex items-center space-x-2">
-                    <Phone className="w-4 h-4" />
-                    <span>{company.contactPhone}</span>
-                  </div>
-                )}
-                {company.address && (
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="w-4 h-4" />
-                    <span className="line-clamp-1">{company.address}</span>
-                  </div>
-                )}
+              <div className="space-y-1 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4" />
+                  <span>{company.contactEmail || <span className="text-red-500 text-xs">Not set</span>}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Phone className="w-4 h-4" />
+                  <span>{company.contactPhone || <span className="text-red-500 text-xs">Not set</span>}</span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <MapPin className="w-4 h-4" />
+                  <span className="line-clamp-1">{company.address || <span className="text-red-500 text-xs">Not set</span>}</span>
+                </div>
               </div>
               
               <div className="pt-2 space-y-2">
@@ -270,7 +267,7 @@ export default function Companies() {
                   variant="outline"
                   size="sm"
                   onClick={() => setSelectedCompany(company.id)}
-                  className="w-full"
+                  className="w-full border-black dark:border-gray-600"
                 >
                   <Users className="w-4 h-4 mr-2" />
                   View Tutors
@@ -278,7 +275,7 @@ export default function Companies() {
                 <Link href={`/admin/companies/${company.id}`}>
                   <Button
                     size="sm"
-                    className="w-full"
+                    className="w-full bg-black text-white hover:bg-gray-800 dark:bg-white dark:text-black dark:hover:bg-gray-200"
                   >
                     <Settings className="w-4 h-4 mr-2" />
                     Manage Company

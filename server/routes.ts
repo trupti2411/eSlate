@@ -2729,6 +2729,55 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Update company details
+  app.patch('/api/companies/:companyId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      const { name, description, contactEmail, contactPhone, address } = req.body;
+
+      // Only admin or company admin can update company details
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      // Company admin can only update their own company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      // Validate required fields
+      if (!name || !name.trim()) {
+        return res.status(400).json({ message: "Company name is required" });
+      }
+      if (!contactEmail || !contactEmail.trim()) {
+        return res.status(400).json({ message: "Contact email is required" });
+      }
+      if (!contactPhone || !contactPhone.trim()) {
+        return res.status(400).json({ message: "Contact phone is required" });
+      }
+      if (!address || !address.trim()) {
+        return res.status(400).json({ message: "Address is required" });
+      }
+
+      const updatedCompany = await storage.updateTutoringCompany(companyId, {
+        name: name.trim(),
+        description: description?.trim() || null,
+        contactEmail: contactEmail.trim(),
+        contactPhone: contactPhone.trim(),
+        address: address.trim(),
+      });
+
+      res.json(updatedCompany);
+    } catch (error) {
+      console.error("Error updating company:", error);
+      res.status(500).json({ message: "Failed to update company" });
+    }
+  });
+
   // Company admin profile route
   app.get('/api/company-admin/profile', isAuthenticated, async (req: any, res: any) => {
     try {
