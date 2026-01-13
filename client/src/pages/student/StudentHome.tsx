@@ -42,7 +42,7 @@ interface AttendanceApiResponse {
 
 export default function StudentHome() {
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('dashboard');
 
   const { data: studentProfile, isLoading: profileLoading } = useQuery({
     queryKey: ['/api/auth/student-profile'],
@@ -274,6 +274,72 @@ export default function StudentHome() {
         </div>
       </div>
 
+      {/* Tab Navigation - matching company portal exactly */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex gap-1">
+            <Button
+              variant={activeTab === 'dashboard' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('dashboard')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'dashboard' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <BookOpen className="h-4 w-4 mr-2" />
+              Dashboard
+            </Button>
+            <Button
+              variant={activeTab === 'overview' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('overview')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'overview' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Overview
+            </Button>
+            <Link href="/student/portal">
+              <Button
+                variant="ghost"
+                className="rounded-b-none border-b-2 border-transparent hover:bg-gray-100"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                My Worksheets
+              </Button>
+            </Link>
+            <Button
+              variant={activeTab === 'assignments' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('assignments')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'assignments' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              Assignments
+            </Button>
+            <Link href="/student/dashboard">
+              <Button
+                variant="ghost"
+                className="rounded-b-none border-b-2 border-transparent hover:bg-gray-100"
+              >
+                <Calendar className="h-4 w-4 mr-2" />
+                Calendar
+              </Button>
+            </Link>
+            <Button
+              variant={activeTab === 'grades' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('grades')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'grades' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <Award className="h-4 w-4 mr-2" />
+              Grades
+            </Button>
+            <Button
+              variant={activeTab === 'attendance' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('attendance')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'attendance' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <ClipboardCheck className="h-4 w-4 mr-2" />
+              Attendance
+            </Button>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Alert Banner for Overdue Items */}
           {overdueItems.length > 0 && (
@@ -295,52 +361,142 @@ export default function StudentHome() {
             </div>
           )}
 
-          {/* Quick Actions */}
-          <div className="flex flex-wrap gap-3 mb-8">
-            <Link href="/student/portal">
-              <Button className="bg-gray-800 hover:bg-gray-900 text-white shadow-sm py-2.5 px-5 font-medium">
-                <FileText className="h-4 w-4 mr-2" />
-                My Worksheets
-              </Button>
-            </Link>
-            <Link href="/student/assignments">
-              <Button className="bg-gray-700 hover:bg-gray-800 text-white shadow-sm py-2.5 px-5 font-medium">
-                <BookOpen className="h-4 w-4 mr-2" />
-                Assignments
-              </Button>
-            </Link>
-            <Link href="/student/dashboard">
-              <Button variant="outline" className="border-gray-300 hover:bg-gray-50 py-2.5 px-5 font-medium shadow-sm">
-                <Calendar className="h-4 w-4 mr-2" />
-                Calendar
-              </Button>
-            </Link>
-          </div>
+          {/* Dashboard Tab */}
+          {activeTab === 'dashboard' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Dashboard Overview</h2>
+                  <p className="text-gray-600">Welcome back! Here's your learning summary.</p>
+                </div>
+                <Badge className="bg-green-100 text-green-800 px-3 py-1">
+                  <Activity className="h-3 w-3 mr-1 inline" />
+                  Live
+                </Badge>
+              </div>
 
-          {/* Navigation Tabs */}
-          <div className="mb-6 border-b border-gray-200">
-            <div className="flex gap-1">
-              {[
-                { id: 'overview', label: 'Overview', icon: BookOpen },
-                { id: 'assignments', label: 'Assignments', icon: FileText },
-                { id: 'grades', label: 'Grades', icon: Award },
-                { id: 'attendance', label: 'Attendance', icon: ClipboardCheck },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-4 py-3 font-medium text-sm border-b-2 transition-colors ${
-                    activeTab === tab.id 
-                      ? 'border-gray-900 text-gray-900' 
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
-                >
-                  <tab.icon className="h-4 w-4" />
-                  {tab.label}
-                </button>
-              ))}
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-100 text-sm font-medium">Pending</p>
+                        <div className="text-3xl font-bold">{pendingItems.length}</div>
+                        <p className="text-blue-100 text-xs mt-1 flex items-center">
+                          <Clock className="h-3 w-3 mr-1" />
+                          Items to complete
+                        </p>
+                      </div>
+                      <div className="bg-blue-400/30 p-3 rounded-full">
+                        <Clock className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-sm font-medium">Completed</p>
+                        <div className="text-3xl font-bold">{completedItems.length}</div>
+                        <p className="text-green-100 text-xs mt-1 flex items-center">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Submitted work
+                        </p>
+                      </div>
+                      <div className="bg-green-400/30 p-3 rounded-full">
+                        <CheckCircle className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-purple-500 to-purple-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-purple-100 text-sm font-medium">Attendance</p>
+                        <div className="text-3xl font-bold">{attendancePercentage}%</div>
+                        <p className="text-purple-100 text-xs mt-1 flex items-center">
+                          <ClipboardCheck className="h-3 w-3 mr-1" />
+                          {classesAttended}/{totalClasses} classes
+                        </p>
+                      </div>
+                      <div className="bg-purple-400/30 p-3 rounded-full">
+                        <ClipboardCheck className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-gradient-to-br from-amber-500 to-amber-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
+                  <CardContent className="pt-6 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-amber-100 text-sm font-medium">Overdue</p>
+                        <div className="text-3xl font-bold">{overdueItems.length}</div>
+                        <p className="text-amber-100 text-xs mt-1 flex items-center">
+                          <AlertTriangle className="h-3 w-3 mr-1" />
+                          Needs attention
+                        </p>
+                      </div>
+                      <div className="bg-amber-400/30 p-3 rounded-full">
+                        <AlertTriangle className="h-6 w-6" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Quick Links */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Link href="/student/portal">
+                  <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
+                    <CardContent className="p-6 flex items-center gap-4">
+                      <div className="p-3 bg-blue-50 rounded-xl">
+                        <FileText className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">My Worksheets</h3>
+                        <p className="text-sm text-gray-500">View and complete worksheets</p>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href="/student/assignments">
+                  <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
+                    <CardContent className="p-6 flex items-center gap-4">
+                      <div className="p-3 bg-green-50 rounded-xl">
+                        <BookOpen className="h-6 w-6 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">Assignments</h3>
+                        <p className="text-sm text-gray-500">View all assignments</p>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
+                    </CardContent>
+                  </Card>
+                </Link>
+                <Link href="/student/dashboard">
+                  <Card className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer">
+                    <CardContent className="p-6 flex items-center gap-4">
+                      <div className="p-3 bg-purple-50 rounded-xl">
+                        <Calendar className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">Calendar</h3>
+                        <p className="text-sm text-gray-500">View schedule & classes</p>
+                      </div>
+                      <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Overview Tab */}
           {activeTab === 'overview' && (
