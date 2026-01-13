@@ -1024,11 +1024,27 @@ export default function CompanyDashboard() {
                 <p className="text-gray-500 text-sm">{company?.name || "Loading..."}</p>
               </div>
             </div>
-            {/* Company Address - Prominently displayed */}
-            {company?.address && (
-              <div className="hidden md:flex items-center gap-2 text-sm bg-gray-100 px-4 py-2 rounded-lg">
-                <MapPin className="h-4 w-4 text-gray-500" />
-                <span className="text-gray-700 font-medium">{company.address}</span>
+            {/* Company Contact Info */}
+            {company && (
+              <div className="hidden md:flex items-center gap-4 text-sm bg-gray-100 px-4 py-2 rounded-lg">
+                {company.contactEmail && (
+                  <div className="flex items-center gap-1">
+                    <Mail className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-700">{company.contactEmail}</span>
+                  </div>
+                )}
+                {company.contactPhone && (
+                  <div className="flex items-center gap-1">
+                    <Phone className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-700">{company.contactPhone}</span>
+                  </div>
+                )}
+                {company.address && (
+                  <div className="flex items-center gap-1">
+                    <MapPin className="h-4 w-4 text-gray-500" />
+                    <span className="text-gray-700 max-w-[250px] truncate">{company.address}</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
