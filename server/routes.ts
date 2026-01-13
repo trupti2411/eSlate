@@ -2729,6 +2729,30 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Company admin profile route
+  app.get('/api/company-admin/profile', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user;
+      if (user?.role !== 'company_admin') {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+      
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) {
+        return res.status(404).json({ error: 'Company admin profile not found' });
+      }
+      
+      const company = await storage.getTutoringCompany(companyAdmin.companyId);
+      res.json({
+        ...companyAdmin,
+        company
+      });
+    } catch (error: any) {
+      console.error('Error getting company admin profile:', error);
+      res.status(500).json({ error: error.message || 'Failed to get profile' });
+    }
+  });
+
   // Academic management routes
   app.get('/api/admin/company-admin/:userId', isAuthenticated, async (req: any, res: any) => {
     try {
