@@ -2326,6 +2326,89 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Get tutor's student submissions (for grading)
+  app.get('/api/tutor/submissions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const tutor = await storage.getTutorByUserId(user.id);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      const submissions = await storage.getTutorSubmissions(tutor.id);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching tutor submissions:", error);
+      res.status(500).json({ message: "Failed to fetch submissions" });
+    }
+  });
+
+  // Get a specific submission for grading
+  app.get('/api/tutor/submissions/:submissionId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const tutor = await storage.getTutorByUserId(user.id);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      const { submissionId } = req.params;
+      const submission = await storage.getTutorSubmission(tutor.id, submissionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: "Submission not found or access denied" });
+      }
+
+      res.json(submission);
+    } catch (error) {
+      console.error("Error fetching submission:", error);
+      res.status(500).json({ message: "Failed to fetch submission" });
+    }
+  });
+
+  // Grade a submission
+  app.patch('/api/tutor/submissions/:submissionId/grade', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const tutor = await storage.getTutorByUserId(user.id);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+
+      const { submissionId } = req.params;
+      const { score, feedback } = req.body;
+
+      // Verify the tutor has access to this submission
+      const submission = await storage.getTutorSubmission(tutor.id, submissionId);
+      if (!submission) {
+        return res.status(404).json({ message: "Submission not found or access denied" });
+      }
+
+      // Validate score
+      if (score !== undefined && (typeof score !== 'number' || score < 0 || score > 100)) {
+        return res.status(400).json({ message: "Score must be a number between 0 and 100" });
+      }
+
+      const updated = await storage.gradeSubmission(submissionId, score || 0, feedback || '', user.id);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error grading submission:", error);
+      res.status(500).json({ message: "Failed to grade submission" });
+    }
+  });
+
   // Administrative routes
   
   // Admin stats endpoint for dashboard
