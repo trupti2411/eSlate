@@ -1774,88 +1774,87 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log("Getting submissions for tutor:", tutorId);
       
-      const results = await db
-        .select({
-          submissionId: submissions.id,
-          assignmentId: submissions.assignmentId,
-          studentId: submissions.studentId,
-          content: submissions.content,
-          digitalContent: submissions.digitalContent,
-          fileUrls: submissions.fileUrls,
-          status: submissions.status,
-          isDraft: submissions.isDraft,
-          submittedAt: submissions.submittedAt,
-          isLate: submissions.isLate,
-          score: submissions.score,
-          feedback: submissions.feedback,
-          deviceType: submissions.deviceType,
-          inputMethod: submissions.inputMethod,
-          submissionCreatedAt: submissions.createdAt,
-          submissionUpdatedAt: submissions.updatedAt,
-          studentUserId: students.userId,
-          studentCompanyId: students.companyId,
-          userFirstName: users.firstName,
-          userLastName: users.lastName,
-          userEmail: users.email,
-          assignmentTitle: assignments.title,
-          assignmentDescription: assignments.description,
-          assignmentInstructions: assignments.instructions,
-          assignmentSubmissionDate: assignments.submissionDate,
-          assignmentSubject: assignments.subject,
-          classId: assignments.classId,
-          className: classes.name,
-        })
-        .from(submissions)
-        .innerJoin(students, eq(submissions.studentId, students.id))
-        .innerJoin(users, eq(students.userId, users.id))
-        .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
-        .innerJoin(classes, eq(assignments.classId, classes.id))
-        .where(and(
-          eq(classes.tutorId, tutorId),
-          ne(submissions.status, 'draft')
-        ))
-        .orderBy(desc(submissions.createdAt));
+      // Use raw SQL to avoid Drizzle ORM issues with complex joins
+      const results = await db.execute(sql`
+        SELECT 
+          s.id as submission_id,
+          s.assignment_id,
+          s.student_id,
+          s.content,
+          s.digital_content,
+          s.file_urls,
+          s.status,
+          s.is_draft,
+          s.submitted_at,
+          s.is_late,
+          s.score,
+          s.feedback,
+          s.device_type,
+          s.input_method,
+          s.created_at as submission_created_at,
+          s.updated_at as submission_updated_at,
+          st.user_id as student_user_id,
+          st.company_id as student_company_id,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          u.email as user_email,
+          a.title as assignment_title,
+          a.description as assignment_description,
+          a.instructions as assignment_instructions,
+          a.submission_date as assignment_submission_date,
+          a.subject as assignment_subject,
+          a.class_id,
+          c.name as class_name
+        FROM submissions s
+        INNER JOIN students st ON s.student_id = st.id
+        INNER JOIN users u ON st.user_id = u.id
+        INNER JOIN assignments a ON s.assignment_id = a.id
+        INNER JOIN classes c ON a.class_id = c.id
+        WHERE c.tutor_id = ${tutorId}
+          AND s.status != 'draft'
+        ORDER BY s.created_at DESC
+      `);
 
-      console.log("Found tutor submissions:", results.length);
+      console.log("Found tutor submissions:", results.rows?.length || 0);
 
-      return results.map(result => ({
-        id: result.submissionId,
-        assignmentId: result.assignmentId,
-        studentId: result.studentId,
-        content: result.content,
-        digitalContent: result.digitalContent,
-        fileUrls: result.fileUrls,
-        status: result.status,
-        isDraft: result.isDraft,
-        submittedAt: result.submittedAt,
-        isLate: result.isLate,
-        score: result.score,
-        feedback: result.feedback,
-        deviceType: result.deviceType,
-        inputMethod: result.inputMethod,
-        createdAt: result.submissionCreatedAt,
-        updatedAt: result.submissionUpdatedAt,
+      return (results.rows || []).map((row: any) => ({
+        id: row.submission_id,
+        assignmentId: row.assignment_id,
+        studentId: row.student_id,
+        content: row.content,
+        digitalContent: row.digital_content,
+        fileUrls: row.file_urls,
+        status: row.status,
+        isDraft: row.is_draft,
+        submittedAt: row.submitted_at,
+        isLate: row.is_late,
+        score: row.score,
+        feedback: row.feedback,
+        deviceType: row.device_type,
+        inputMethod: row.input_method,
+        createdAt: row.submission_created_at,
+        updatedAt: row.submission_updated_at,
         student: {
-          id: result.studentId,
-          userId: result.studentUserId,
-          companyId: result.studentCompanyId,
+          id: row.student_id,
+          userId: row.student_user_id,
+          companyId: row.student_company_id,
           user: {
-            firstName: result.userFirstName,
-            lastName: result.userLastName,
-            email: result.userEmail,
+            firstName: row.user_first_name,
+            lastName: row.user_last_name,
+            email: row.user_email,
           }
         },
         assignment: {
-          id: result.assignmentId,
-          title: result.assignmentTitle,
-          description: result.assignmentDescription,
-          instructions: result.assignmentInstructions,
-          submissionDate: result.assignmentSubmissionDate,
-          subject: result.assignmentSubject,
+          id: row.assignment_id,
+          title: row.assignment_title,
+          description: row.assignment_description,
+          instructions: row.assignment_instructions,
+          submissionDate: row.assignment_submission_date,
+          subject: row.assignment_subject,
         },
         class: {
-          id: result.classId,
-          name: result.className,
+          id: row.class_id,
+          name: row.class_name,
         }
       }));
     } catch (error) {
@@ -1866,89 +1865,88 @@ export class DatabaseStorage implements IStorage {
 
   async getTutorSubmission(tutorId: string, submissionId: string): Promise<any | undefined> {
     try {
-      const results = await db
-        .select({
-          submissionId: submissions.id,
-          assignmentId: submissions.assignmentId,
-          studentId: submissions.studentId,
-          content: submissions.content,
-          digitalContent: submissions.digitalContent,
-          fileUrls: submissions.fileUrls,
-          status: submissions.status,
-          isDraft: submissions.isDraft,
-          submittedAt: submissions.submittedAt,
-          isLate: submissions.isLate,
-          score: submissions.score,
-          feedback: submissions.feedback,
-          deviceType: submissions.deviceType,
-          inputMethod: submissions.inputMethod,
-          submissionCreatedAt: submissions.createdAt,
-          submissionUpdatedAt: submissions.updatedAt,
-          studentUserId: students.userId,
-          studentCompanyId: students.companyId,
-          userFirstName: users.firstName,
-          userLastName: users.lastName,
-          userEmail: users.email,
-          assignmentTitle: assignments.title,
-          assignmentDescription: assignments.description,
-          assignmentInstructions: assignments.instructions,
-          assignmentSubmissionDate: assignments.submissionDate,
-          assignmentSubject: assignments.subject,
-          classId: assignments.classId,
-          className: classes.name,
-        })
-        .from(submissions)
-        .innerJoin(students, eq(submissions.studentId, students.id))
-        .innerJoin(users, eq(students.userId, users.id))
-        .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
-        .innerJoin(classes, eq(assignments.classId, classes.id))
-        .where(and(
-          eq(submissions.id, submissionId),
-          eq(classes.tutorId, tutorId)
-        ))
-        .limit(1);
+      // Use raw SQL to avoid Drizzle ORM issues with complex joins
+      const results = await db.execute(sql`
+        SELECT 
+          s.id as submission_id,
+          s.assignment_id,
+          s.student_id,
+          s.content,
+          s.digital_content,
+          s.file_urls,
+          s.status,
+          s.is_draft,
+          s.submitted_at,
+          s.is_late,
+          s.score,
+          s.feedback,
+          s.device_type,
+          s.input_method,
+          s.created_at as submission_created_at,
+          s.updated_at as submission_updated_at,
+          st.user_id as student_user_id,
+          st.company_id as student_company_id,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          u.email as user_email,
+          a.title as assignment_title,
+          a.description as assignment_description,
+          a.instructions as assignment_instructions,
+          a.submission_date as assignment_submission_date,
+          a.subject as assignment_subject,
+          a.class_id,
+          c.name as class_name
+        FROM submissions s
+        INNER JOIN students st ON s.student_id = st.id
+        INNER JOIN users u ON st.user_id = u.id
+        INNER JOIN assignments a ON s.assignment_id = a.id
+        INNER JOIN classes c ON a.class_id = c.id
+        WHERE s.id = ${submissionId}
+          AND c.tutor_id = ${tutorId}
+        LIMIT 1
+      `);
 
-      if (results.length === 0) return undefined;
+      if (!results.rows || results.rows.length === 0) return undefined;
 
-      const result = results[0];
+      const row: any = results.rows[0];
       return {
-        id: result.submissionId,
-        assignmentId: result.assignmentId,
-        studentId: result.studentId,
-        content: result.content,
-        digitalContent: result.digitalContent,
-        fileUrls: result.fileUrls,
-        status: result.status,
-        isDraft: result.isDraft,
-        submittedAt: result.submittedAt,
-        isLate: result.isLate,
-        score: result.score,
-        feedback: result.feedback,
-        deviceType: result.deviceType,
-        inputMethod: result.inputMethod,
-        createdAt: result.submissionCreatedAt,
-        updatedAt: result.submissionUpdatedAt,
+        id: row.submission_id,
+        assignmentId: row.assignment_id,
+        studentId: row.student_id,
+        content: row.content,
+        digitalContent: row.digital_content,
+        fileUrls: row.file_urls,
+        status: row.status,
+        isDraft: row.is_draft,
+        submittedAt: row.submitted_at,
+        isLate: row.is_late,
+        score: row.score,
+        feedback: row.feedback,
+        deviceType: row.device_type,
+        inputMethod: row.input_method,
+        createdAt: row.submission_created_at,
+        updatedAt: row.submission_updated_at,
         student: {
-          id: result.studentId,
-          userId: result.studentUserId,
-          companyId: result.studentCompanyId,
+          id: row.student_id,
+          userId: row.student_user_id,
+          companyId: row.student_company_id,
           user: {
-            firstName: result.userFirstName,
-            lastName: result.userLastName,
-            email: result.userEmail,
+            firstName: row.user_first_name,
+            lastName: row.user_last_name,
+            email: row.user_email,
           }
         },
         assignment: {
-          id: result.assignmentId,
-          title: result.assignmentTitle,
-          description: result.assignmentDescription,
-          instructions: result.assignmentInstructions,
-          submissionDate: result.assignmentSubmissionDate,
-          subject: result.assignmentSubject,
+          id: row.assignment_id,
+          title: row.assignment_title,
+          description: row.assignment_description,
+          instructions: row.assignment_instructions,
+          submissionDate: row.assignment_submission_date,
+          subject: row.assignment_subject,
         },
         class: {
-          id: result.classId,
-          name: result.className,
+          id: row.class_id,
+          name: row.class_name,
         }
       };
     } catch (error) {
@@ -1965,6 +1963,8 @@ export class DatabaseStorage implements IStorage {
         feedback,
         status: 'graded',
         isDraft: false,
+        gradedBy,
+        gradedAt: new Date(),
         updatedAt: new Date(),
       })
       .where(eq(submissions.id, submissionId))

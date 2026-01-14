@@ -165,6 +165,11 @@ export const submissions = pgTable("submissions", {
   isDraft: boolean("is_draft").notNull().default(true),
   submittedAt: timestamp("submitted_at"),
   isLate: boolean("is_late").notNull().default(false),
+  // Grading fields
+  score: integer("score"), // Grade score (0-100)
+  feedback: text("feedback"), // Tutor feedback on the submission
+  gradedBy: varchar("graded_by").references(() => users.id), // Who graded this submission
+  gradedAt: timestamp("graded_at"), // When it was graded
   // E-ink device specific fields
   deviceType: varchar("device_type"), // 'e-ink', 'tablet', 'desktop'
   inputMethod: varchar("input_method"), // 'pen', 'touch', 'keyboard'
