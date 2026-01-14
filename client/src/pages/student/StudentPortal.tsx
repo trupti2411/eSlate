@@ -14,8 +14,9 @@ import { Assignment, Submission, AcademicTerm, Class } from '@shared/schema';
 import { 
   BookOpen, Clock, CheckCircle, GraduationCap, Calendar, FileText, 
   Upload, Download, Edit, Eye, Home, AlertCircle, TrendingUp, 
-  Star, ArrowRight, CalendarDays, Users, MapPin
+  Star, ArrowRight, CalendarDays, Users, MapPin, CalendarIcon
 } from 'lucide-react';
+import { StudentCalendarDashboard } from '@/components/calendar/StudentCalendarDashboard';
 import { format, isPast, differenceInDays, isWithinInterval } from 'date-fns';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { useFileMetadata } from '@/hooks/useFileMetadata';
@@ -123,7 +124,7 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
   const queryClient = useQueryClient();
   const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
   const [submissionContent, setSubmissionContent] = useState("");
-  const [selectedTab, setSelectedTab] = useState(embedded ? "worksheets" : "dashboard");
+  const [selectedTab, setSelectedTab] = useState("dashboard");
   const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
   const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
   const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
@@ -348,10 +349,10 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card 
           className="border-2 border-black hover:shadow-lg transition-all cursor-pointer group"
-          onClick={() => setSelectedTab('terms')}
+          onClick={() => setSelectedTab('calendar')}
         >
           <CardContent className="p-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -359,26 +360,8 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
                 <Calendar className="h-6 w-6" />
               </div>
               <div>
-                <h3 className="font-semibold text-lg">View Terms</h3>
-                <p className="text-sm text-gray-500">{typedStudentTerms.length} terms available</p>
-              </div>
-            </div>
-            <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
-          </CardContent>
-        </Card>
-
-        <Card 
-          className="border-2 border-black hover:shadow-lg transition-all cursor-pointer group"
-          onClick={() => setSelectedTab('classes')}
-        >
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center group-hover:bg-black group-hover:text-white transition-colors">
-                <GraduationCap className="h-6 w-6" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg">My Classes</h3>
-                <p className="text-sm text-gray-500">{typedStudentClasses.length} enrolled classes</p>
+                <h3 className="font-semibold text-lg">View Calendar</h3>
+                <p className="text-sm text-gray-500">Classes & attendance</p>
               </div>
             </div>
             <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
@@ -402,7 +385,6 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
             <ArrowRight className="h-5 w-5 text-gray-400 group-hover:text-black transition-colors" />
           </CardContent>
         </Card>
-
       </div>
 
       {/* Recent Assignments */}
@@ -754,38 +736,38 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
           <TabsList className="grid w-full grid-cols-3 bg-white border border-gray-200 rounded-xl p-2 mb-6 gap-2">
             <TabsTrigger 
-              value="worksheets" 
+              value="dashboard" 
               className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
             >
-              <FileText className="h-4 w-4 shrink-0" />
-              <span>Worksheets</span>
+              <TrendingUp className="h-4 w-4 shrink-0" />
+              <span>Dashboard</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="classes" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
-            >
-              <GraduationCap className="h-4 w-4 shrink-0" />
-              <span>Classes</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="terms" 
+              value="calendar" 
               className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
             >
               <Calendar className="h-4 w-4 shrink-0" />
-              <span>Terms</span>
+              <span>Calendar</span>
+            </TabsTrigger>
+            <TabsTrigger 
+              value="assignments" 
+              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span>Assignments</span>
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="worksheets" className="mt-0">
+          <TabsContent value="dashboard" className="mt-0">
+            {renderDashboard()}
+          </TabsContent>
+
+          <TabsContent value="calendar" className="mt-0">
+            <StudentCalendarDashboard />
+          </TabsContent>
+
+          <TabsContent value="assignments" className="mt-0">
             {renderAssignments()}
-          </TabsContent>
-
-          <TabsContent value="classes" className="mt-0">
-            {renderClasses()}
-          </TabsContent>
-
-          <TabsContent value="terms" className="mt-0">
-            {renderTerms()}
           </TabsContent>
         </Tabs>
       </div>
@@ -817,7 +799,7 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-4 bg-white border-2 border-black rounded-xl p-2 mb-6 gap-2">
+          <TabsList className="grid w-full grid-cols-3 bg-white border-2 border-black rounded-xl p-2 mb-6 gap-2">
             <TabsTrigger 
               value="dashboard" 
               className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
@@ -826,18 +808,11 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
               <span>Dashboard</span>
             </TabsTrigger>
             <TabsTrigger 
-              value="terms" 
+              value="calendar" 
               className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
             >
               <Calendar className="h-4 w-4 shrink-0" />
-              <span>Terms</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="classes" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
-            >
-              <GraduationCap className="h-4 w-4 shrink-0" />
-              <span>Classes</span>
+              <span>Calendar</span>
             </TabsTrigger>
             <TabsTrigger 
               value="assignments" 
@@ -852,12 +827,8 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
             {renderDashboard()}
           </TabsContent>
 
-          <TabsContent value="terms" className="mt-0">
-            {renderTerms()}
-          </TabsContent>
-
-          <TabsContent value="classes" className="mt-0">
-            {renderClasses()}
+          <TabsContent value="calendar" className="mt-0">
+            <StudentCalendarDashboard />
           </TabsContent>
 
           <TabsContent value="assignments" className="mt-0">
