@@ -646,7 +646,7 @@ trailer<</Size 5/Root 1 0 R>>
       // Enrich assignments with worksheet data if applicable
       const enrichedAssignments = await Promise.all(assignments.map(async (assignment) => {
         if (assignment.assignmentKind === 'worksheet' && assignment.worksheetId) {
-          const worksheet = await storage.getWorksheetWithDetails(assignment.worksheetId);
+          const worksheet = await storage.getFullWorksheet(assignment.worksheetId);
           return { ...assignment, worksheet };
         }
         return assignment;
