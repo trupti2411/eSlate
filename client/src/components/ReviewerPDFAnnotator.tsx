@@ -23,7 +23,10 @@ import * as pdfjsLib from 'pdfjs-dist';
 import * as fabricModule from 'fabric';
 const { fabric } = fabricModule as any;
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url
+).toString();
 
 interface ReviewerAnnotation {
   id: string;

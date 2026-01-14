@@ -312,9 +312,19 @@ trailer<</Size 5/Root 1 0 R>>
     const bucket = objectStorageClient.bucket(bucketName);
     const file = bucket.file(objectName);
     
-    // Check if file already exists
+    // Check if file already exists and is a valid PDF
     const [exists] = await file.exists();
-    if (!exists) {
+    let shouldUpload = !exists;
+    
+    if (exists) {
+      const [metadata] = await file.getMetadata();
+      if (metadata.contentType !== 'application/pdf') {
+        shouldUpload = true;
+        console.log('Existing file is not a PDF, replacing with sample PDF');
+      }
+    }
+    
+    if (shouldUpload) {
       await file.save(samplePDF, {
         metadata: {
           contentType: 'application/pdf',
