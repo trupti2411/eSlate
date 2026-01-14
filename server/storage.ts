@@ -231,6 +231,9 @@ export interface IStorage {
   getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
   getSubmissionsByAssignmentAndStudent(assignmentId: string, studentId: string): Promise<Submission[]>;
   getCompanySubmissions(companyId: string): Promise<any[]>;
+  getTutorSubmissions(tutorId: string): Promise<any[]>;
+  getTutorSubmission(tutorId: string, submissionId: string): Promise<any | undefined>;
+  gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
   deleteSubmission(id: string): Promise<void>;
 
@@ -1765,6 +1768,208 @@ export class DatabaseStorage implements IStorage {
       console.error("Error in getCompanySubmissions:", error);
       return [];
     }
+  }
+
+  async getTutorSubmissions(tutorId: string): Promise<any[]> {
+    try {
+      console.log("Getting submissions for tutor:", tutorId);
+      
+      const results = await db
+        .select({
+          submissionId: submissions.id,
+          assignmentId: submissions.assignmentId,
+          studentId: submissions.studentId,
+          content: submissions.content,
+          digitalContent: submissions.digitalContent,
+          fileUrls: submissions.fileUrls,
+          status: submissions.status,
+          isDraft: submissions.isDraft,
+          submittedAt: submissions.submittedAt,
+          isLate: submissions.isLate,
+          score: submissions.score,
+          feedback: submissions.feedback,
+          deviceType: submissions.deviceType,
+          inputMethod: submissions.inputMethod,
+          submissionCreatedAt: submissions.createdAt,
+          submissionUpdatedAt: submissions.updatedAt,
+          studentUserId: students.userId,
+          studentCompanyId: students.companyId,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+          userEmail: users.email,
+          assignmentTitle: assignments.title,
+          assignmentDescription: assignments.description,
+          assignmentInstructions: assignments.instructions,
+          assignmentSubmissionDate: assignments.submissionDate,
+          assignmentSubject: assignments.subject,
+          classId: assignments.classId,
+          className: classes.name,
+        })
+        .from(submissions)
+        .innerJoin(students, eq(submissions.studentId, students.id))
+        .innerJoin(users, eq(students.userId, users.id))
+        .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+        .innerJoin(classes, eq(assignments.classId, classes.id))
+        .where(and(
+          eq(classes.tutorId, tutorId),
+          ne(submissions.status, 'draft')
+        ))
+        .orderBy(desc(submissions.createdAt));
+
+      console.log("Found tutor submissions:", results.length);
+
+      return results.map(result => ({
+        id: result.submissionId,
+        assignmentId: result.assignmentId,
+        studentId: result.studentId,
+        content: result.content,
+        digitalContent: result.digitalContent,
+        fileUrls: result.fileUrls,
+        status: result.status,
+        isDraft: result.isDraft,
+        submittedAt: result.submittedAt,
+        isLate: result.isLate,
+        score: result.score,
+        feedback: result.feedback,
+        deviceType: result.deviceType,
+        inputMethod: result.inputMethod,
+        createdAt: result.submissionCreatedAt,
+        updatedAt: result.submissionUpdatedAt,
+        student: {
+          id: result.studentId,
+          userId: result.studentUserId,
+          companyId: result.studentCompanyId,
+          user: {
+            firstName: result.userFirstName,
+            lastName: result.userLastName,
+            email: result.userEmail,
+          }
+        },
+        assignment: {
+          id: result.assignmentId,
+          title: result.assignmentTitle,
+          description: result.assignmentDescription,
+          instructions: result.assignmentInstructions,
+          submissionDate: result.assignmentSubmissionDate,
+          subject: result.assignmentSubject,
+        },
+        class: {
+          id: result.classId,
+          name: result.className,
+        }
+      }));
+    } catch (error) {
+      console.error("Error in getTutorSubmissions:", error);
+      return [];
+    }
+  }
+
+  async getTutorSubmission(tutorId: string, submissionId: string): Promise<any | undefined> {
+    try {
+      const results = await db
+        .select({
+          submissionId: submissions.id,
+          assignmentId: submissions.assignmentId,
+          studentId: submissions.studentId,
+          content: submissions.content,
+          digitalContent: submissions.digitalContent,
+          fileUrls: submissions.fileUrls,
+          status: submissions.status,
+          isDraft: submissions.isDraft,
+          submittedAt: submissions.submittedAt,
+          isLate: submissions.isLate,
+          score: submissions.score,
+          feedback: submissions.feedback,
+          deviceType: submissions.deviceType,
+          inputMethod: submissions.inputMethod,
+          submissionCreatedAt: submissions.createdAt,
+          submissionUpdatedAt: submissions.updatedAt,
+          studentUserId: students.userId,
+          studentCompanyId: students.companyId,
+          userFirstName: users.firstName,
+          userLastName: users.lastName,
+          userEmail: users.email,
+          assignmentTitle: assignments.title,
+          assignmentDescription: assignments.description,
+          assignmentInstructions: assignments.instructions,
+          assignmentSubmissionDate: assignments.submissionDate,
+          assignmentSubject: assignments.subject,
+          classId: assignments.classId,
+          className: classes.name,
+        })
+        .from(submissions)
+        .innerJoin(students, eq(submissions.studentId, students.id))
+        .innerJoin(users, eq(students.userId, users.id))
+        .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
+        .innerJoin(classes, eq(assignments.classId, classes.id))
+        .where(and(
+          eq(submissions.id, submissionId),
+          eq(classes.tutorId, tutorId)
+        ))
+        .limit(1);
+
+      if (results.length === 0) return undefined;
+
+      const result = results[0];
+      return {
+        id: result.submissionId,
+        assignmentId: result.assignmentId,
+        studentId: result.studentId,
+        content: result.content,
+        digitalContent: result.digitalContent,
+        fileUrls: result.fileUrls,
+        status: result.status,
+        isDraft: result.isDraft,
+        submittedAt: result.submittedAt,
+        isLate: result.isLate,
+        score: result.score,
+        feedback: result.feedback,
+        deviceType: result.deviceType,
+        inputMethod: result.inputMethod,
+        createdAt: result.submissionCreatedAt,
+        updatedAt: result.submissionUpdatedAt,
+        student: {
+          id: result.studentId,
+          userId: result.studentUserId,
+          companyId: result.studentCompanyId,
+          user: {
+            firstName: result.userFirstName,
+            lastName: result.userLastName,
+            email: result.userEmail,
+          }
+        },
+        assignment: {
+          id: result.assignmentId,
+          title: result.assignmentTitle,
+          description: result.assignmentDescription,
+          instructions: result.assignmentInstructions,
+          submissionDate: result.assignmentSubmissionDate,
+          subject: result.assignmentSubject,
+        },
+        class: {
+          id: result.classId,
+          name: result.className,
+        }
+      };
+    } catch (error) {
+      console.error("Error in getTutorSubmission:", error);
+      return undefined;
+    }
+  }
+
+  async gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission> {
+    const [updated] = await db
+      .update(submissions)
+      .set({
+        score,
+        feedback,
+        status: 'graded',
+        isDraft: false,
+        updatedAt: new Date(),
+      })
+      .where(eq(submissions.id, submissionId))
+      .returning();
+    return updated;
   }
 
   // ==========================================
