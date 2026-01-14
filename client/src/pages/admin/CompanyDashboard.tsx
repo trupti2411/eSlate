@@ -16,7 +16,7 @@ import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3 } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3, Download, AlertCircle, ClipboardCheck } from "lucide-react";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
@@ -471,7 +471,7 @@ export default function CompanyDashboard() {
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isStudentProfileOpen, setIsStudentProfileOpen] = useState(false);
   const [companyAdmin, setCompanyAdmin] = useState<CompanyAdmin | null>(null);
-  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'assignments' | 'settings' | 'reports'>('dashboard');
+  const [mainTab, setMainTab] = useState<'dashboard' | 'overview' | 'calendar' | 'tutors' | 'students' | 'academic' | 'assignments' | 'settings' | 'reports' | 'submissions'>('dashboard');
   const [isEditTutorOpen, setIsEditTutorOpen] = useState(false);
   const [editingTutor, setEditingTutor] = useState<CompanyTutor | null>(null);
   const [isCreateStudentOpen, setIsCreateStudentOpen] = useState(false);
@@ -547,6 +547,10 @@ export default function CompanyDashboard() {
     tutorId: "",
   });
 
+  // Grading state for submissions
+  const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
+  const [gradingScore, setGradingScore] = useState<string>('');
+  const [gradingFeedback, setGradingFeedback] = useState<string>('');
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -591,6 +595,85 @@ export default function CompanyDashboard() {
     queryKey: [`/api/companies/${companyAdmin?.companyId}/academic-hierarchy`],
     enabled: !!companyAdmin?.companyId && mainTab === 'overview',
   });
+
+  // Fetch submissions for grading (company admins see all, tutors see their own)
+  interface CompanySubmission {
+    id: string;
+    assignmentId: string;
+    studentId: string;
+    content: string;
+    digitalContent: any;
+    fileUrls: string[];
+    status: string;
+    isDraft: boolean;
+    submittedAt: string;
+    isLate: boolean;
+    score: number | null;
+    feedback: string | null;
+    createdAt: string;
+    student: {
+      id: string;
+      user: {
+        firstName: string;
+        lastName: string;
+        email: string;
+      };
+    };
+    assignment: {
+      id: string;
+      title: string;
+      description: string;
+      subject: string;
+      submissionDate: string;
+    };
+    class: {
+      id: string;
+      name: string;
+    };
+  }
+
+  const { data: companySubmissions = [], isLoading: submissionsLoading, refetch: refetchSubmissions } = useQuery<CompanySubmission[]>({
+    queryKey: ['/api/tutor/submissions'],
+    enabled: !!user && (user.role === 'tutor' || user.role === 'company_admin'),
+  });
+
+  // Mutation for grading a submission
+  const gradeSubmissionMutation = useMutation({
+    mutationFn: async ({ submissionId, score, feedback }: { submissionId: string; score: number; feedback: string }) => {
+      const response = await apiRequest(`/api/tutor/submissions/${submissionId}/grade`, 'PATCH', { score, feedback });
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Submission graded successfully",
+      });
+      refetchSubmissions();
+      setSelectedSubmissionId(null);
+      setGradingScore('');
+      setGradingFeedback('');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to grade submission",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleGradeSubmission = (submissionId: string) => {
+    const score = parseInt(gradingScore);
+    if (isNaN(score) || score < 0 || score > 100) {
+      toast({
+        title: "Invalid Score",
+        description: "Please enter a score between 0 and 100",
+        variant: "destructive",
+      });
+      return;
+    }
+    gradeSubmissionMutation.mutate({ submissionId, score, feedback: gradingFeedback });
+  };
 
   const toggleYear = (yearId: string) => {
     setExpandedYears(prev => ({
@@ -1112,7 +1195,16 @@ export default function CompanyDashboard() {
               data-testid="tab-assignments"
             >
               <FileText className="h-4 w-4 mr-2" />
-              Assignment Management
+              Assignments
+            </Button>
+            <Button
+              variant={mainTab === 'submissions' ? 'default' : 'ghost'}
+              onClick={() => setMainTab('submissions')}
+              className={`rounded-b-none border-b-2 ${mainTab === 'submissions' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              data-testid="tab-submissions"
+            >
+              <ClipboardCheck className="h-4 w-4 mr-2" />
+              Grading
             </Button>
             <Button
               variant={mainTab === 'calendar' ? 'default' : 'ghost'}
@@ -2630,6 +2722,256 @@ export default function CompanyDashboard() {
       {mainTab === 'reports' && companyAdmin?.companyId && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <ReportsSection companyId={companyAdmin.companyId} company={company} />
+        </div>
+      )}
+
+      {/* Submissions/Grading Tab */}
+      {mainTab === 'submissions' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">Student Submissions</h2>
+              <p className="text-gray-600">View and grade submitted assignments from students</p>
+            </div>
+
+            <Card className="border-2 border-gray-200">
+              <CardContent className="p-6">
+                {submissionsLoading ? (
+                  <div className="flex justify-center py-8">
+                    <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                ) : companySubmissions.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>No submissions to review yet</p>
+                    <p className="text-sm">Submissions from students will appear here</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {/* Pending Grading */}
+                    <div>
+                      <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                        <AlertCircle className="h-5 w-5 text-orange-500" />
+                        Needs Grading ({companySubmissions.filter(s => s.status === 'submitted').length})
+                      </h3>
+                      {companySubmissions.filter(s => s.status === 'submitted').length === 0 ? (
+                        <p className="text-gray-500 text-sm">All submissions have been graded!</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {companySubmissions
+                            .filter(s => s.status === 'submitted')
+                            .map(submission => (
+                              <Card key={submission.id} className="border border-orange-200 bg-orange-50">
+                                <CardContent className="p-4">
+                                  <div className="flex justify-between items-start">
+                                    <div className="flex-1">
+                                      <h4 className="font-medium">{submission.assignment.title}</h4>
+                                      <p className="text-sm text-gray-600">
+                                        Student: {submission.student.user.firstName} {submission.student.user.lastName}
+                                      </p>
+                                      <p className="text-sm text-gray-500">
+                                        Class: {submission.class.name} | Subject: {submission.assignment.subject}
+                                      </p>
+                                      <p className="text-sm text-gray-500">
+                                        Submitted: {submission.submittedAt ? new Date(submission.submittedAt).toLocaleString() : 'N/A'}
+                                        {submission.isLate && <Badge className="ml-2 bg-red-100 text-red-800">Late</Badge>}
+                                      </p>
+                                      
+                                      {/* File Downloads */}
+                                      {submission.fileUrls && submission.fileUrls.length > 0 && (
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                          {submission.fileUrls.map((url, index) => (
+                                            <Button
+                                              key={index}
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => window.open(url, '_blank')}
+                                            >
+                                              <Download className="h-3 w-3 mr-1" />
+                                              View File {index + 1}
+                                            </Button>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                    
+                                    <Button
+                                      onClick={() => {
+                                        setSelectedSubmissionId(submission.id);
+                                        setGradingScore(submission.score?.toString() || '');
+                                        setGradingFeedback(submission.feedback || '');
+                                      }}
+                                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    >
+                                      Grade
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Grading Form */}
+                                  {selectedSubmissionId === submission.id && (
+                                    <div className="mt-4 p-4 bg-white border rounded-lg">
+                                      <h5 className="font-medium mb-3">Grade Submission</h5>
+                                      <div className="space-y-3">
+                                        <div>
+                                          <Label htmlFor="grading-score">Score (0-100)</Label>
+                                          <Input
+                                            id="grading-score"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={gradingScore}
+                                            onChange={(e) => setGradingScore(e.target.value)}
+                                            placeholder="Enter score"
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor="grading-feedback">Feedback</Label>
+                                          <Textarea
+                                            id="grading-feedback"
+                                            value={gradingFeedback}
+                                            onChange={(e) => setGradingFeedback(e.target.value)}
+                                            placeholder="Provide feedback to the student..."
+                                            rows={4}
+                                          />
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            onClick={() => handleGradeSubmission(submission.id)}
+                                            disabled={gradeSubmissionMutation.isPending}
+                                            className="bg-green-600 hover:bg-green-700 text-white"
+                                          >
+                                            {gradeSubmissionMutation.isPending ? 'Saving...' : 'Save Grade'}
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                              setSelectedSubmissionId(null);
+                                              setGradingScore('');
+                                              setGradingFeedback('');
+                                            }}
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Already Graded */}
+                    <div className="mt-6">
+                      <h3 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                        Graded ({companySubmissions.filter(s => s.status === 'graded').length})
+                      </h3>
+                      {companySubmissions.filter(s => s.status === 'graded').length === 0 ? (
+                        <p className="text-gray-500 text-sm">No graded submissions yet</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {companySubmissions
+                            .filter(s => s.status === 'graded')
+                            .map(submission => (
+                              <Card key={submission.id} className="border border-green-200 bg-green-50">
+                                <CardContent className="p-4">
+                                  <div className="flex justify-between items-start">
+                                    <div>
+                                      <h4 className="font-medium">{submission.assignment.title}</h4>
+                                      <p className="text-sm text-gray-600">
+                                        Student: {submission.student.user.firstName} {submission.student.user.lastName}
+                                      </p>
+                                      <p className="text-sm text-gray-500">
+                                        Class: {submission.class.name}
+                                      </p>
+                                      <div className="mt-2">
+                                        <Badge className="bg-green-100 text-green-800">
+                                          Score: {submission.score}/100
+                                        </Badge>
+                                      </div>
+                                      {submission.feedback && (
+                                        <p className="text-sm text-gray-600 mt-2 italic">
+                                          Feedback: {submission.feedback}
+                                        </p>
+                                      )}
+                                    </div>
+                                    
+                                    {/* Edit Grade Button */}
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setSelectedSubmissionId(submission.id);
+                                        setGradingScore(submission.score?.toString() || '');
+                                        setGradingFeedback(submission.feedback || '');
+                                      }}
+                                    >
+                                      <Edit className="h-3 w-3 mr-1" />
+                                      Edit
+                                    </Button>
+                                  </div>
+                                  
+                                  {/* Edit Grading Form */}
+                                  {selectedSubmissionId === submission.id && (
+                                    <div className="mt-4 p-4 bg-white border rounded-lg">
+                                      <h5 className="font-medium mb-3">Edit Grade</h5>
+                                      <div className="space-y-3">
+                                        <div>
+                                          <Label htmlFor="edit-grading-score">Score (0-100)</Label>
+                                          <Input
+                                            id="edit-grading-score"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            value={gradingScore}
+                                            onChange={(e) => setGradingScore(e.target.value)}
+                                          />
+                                        </div>
+                                        <div>
+                                          <Label htmlFor="edit-grading-feedback">Feedback</Label>
+                                          <Textarea
+                                            id="edit-grading-feedback"
+                                            value={gradingFeedback}
+                                            onChange={(e) => setGradingFeedback(e.target.value)}
+                                            rows={4}
+                                          />
+                                        </div>
+                                        <div className="flex gap-2">
+                                          <Button
+                                            onClick={() => handleGradeSubmission(submission.id)}
+                                            disabled={gradeSubmissionMutation.isPending}
+                                            className="bg-green-600 hover:bg-green-700 text-white"
+                                          >
+                                            {gradeSubmissionMutation.isPending ? 'Saving...' : 'Update Grade'}
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                              setSelectedSubmissionId(null);
+                                              setGradingScore('');
+                                              setGradingFeedback('');
+                                            }}
+                                          >
+                                            Cancel
+                                          </Button>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </CardContent>
+                              </Card>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
       )}
 
