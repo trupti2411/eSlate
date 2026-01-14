@@ -1,7 +1,6 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { Link } from 'wouter';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,12 +9,13 @@ import {
   BookOpen, Calendar, CheckCircle, Clock, FileText, 
   AlertTriangle, TrendingUp, ArrowRight, GraduationCap,
   ClipboardCheck, Award, Users, XCircle, Activity, Bell, ChevronRight,
-  LogOut
+  LogOut, ArrowLeft
 } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { Assignment, AcademicTerm, Class, Submission } from '@shared/schema';
 import { StudentCalendarDashboard } from '@/components/calendar/StudentCalendarDashboard';
 import { StudentPortal } from './StudentPortal';
+import { AssignmentCompletionArea } from '@/components/AssignmentCompletionArea';
 import { ESlateHeader } from '@/components/eSlateHeader';
 import { ESlateFooter } from '@/components/eSlateFooter';
 
@@ -46,7 +46,9 @@ interface AttendanceApiResponse {
 
 export default function StudentHome() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [selectedAssignment, setSelectedAssignment] = useState<Assignment | null>(null);
 
   const { data: studentProfile, isLoading: profileLoading } = useQuery({
     queryKey: ['/api/auth/student-profile'],
@@ -109,7 +111,7 @@ export default function StudentHome() {
     dueDate: Date;
     type: 'assignment' | 'worksheet' | 'test';
     status: 'pending' | 'overdue' | 'submitted' | 'graded' | 'in_progress';
-    link: string;
+    rawAssignment?: Assignment;
   }
 
   const normalizeWorksheet = (ws: any): UnifiedItem | null => {
@@ -132,7 +134,6 @@ export default function StudentHome() {
            : status === 'graded' ? 'graded'
            : status === 'in_progress' ? 'in_progress'
            : isOverdue ? 'overdue' : 'pending',
-      link: '/student/portal',
     };
   };
 
@@ -156,7 +157,6 @@ export default function StudentHome() {
            : attemptStatus === 'submitted' ? 'submitted'
            : attemptStatus === 'in_progress' ? 'in_progress'
            : isOverdue ? 'overdue' : 'pending',
-      link: '/student/portal',
     };
   };
 
@@ -174,8 +174,22 @@ export default function StudentHome() {
       status: submission?.status === 'graded' ? 'graded'
            : submission ? 'submitted'
            : isOverdue ? 'overdue' : 'pending',
-      link: '/student/assignments',
+      rawAssignment: a,
     };
+  };
+
+  const handleStartAssignment = (item: UnifiedItem) => {
+    if (item.type === 'assignment' && item.rawAssignment) {
+      setSelectedAssignment(item.rawAssignment);
+    } else if (item.type === 'worksheet' || item.type === 'test') {
+      window.location.href = '/student/portal';
+    }
+  };
+
+  const handleBackToList = () => {
+    setSelectedAssignment(null);
+    queryClient.invalidateQueries({ queryKey: ['/api/students', studentDbId, 'assignments'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/students', studentDbId, 'submissions'] });
   };
 
   const allItems: UnifiedItem[] = [
@@ -334,11 +348,13 @@ export default function StudentHome() {
                 </p>
                 <p className="text-sm text-red-600">Please submit as soon as possible</p>
               </div>
-              <Link href="/student/assignments">
-                <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
-                  View All
-                </Button>
-              </Link>
+              <Button 
+                size="sm" 
+                className="bg-red-600 hover:bg-red-700 text-white"
+                onClick={() => setActiveTab('assignments')}
+              >
+                View All
+              </Button>
             </div>
           )}
 
@@ -565,163 +581,199 @@ export default function StudentHome() {
           {/* Assignments Tab */}
           {activeTab === 'assignments' && (
             <div className="space-y-6">
-              {/* Assignment Type Summary */}
-              <div className="grid grid-cols-3 gap-4">
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-green-50 rounded-xl inline-block mb-3">
-                      <FileText className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="text-3xl font-bold text-gray-900">{typedAssignments.length}</div>
-                    <p className="text-sm text-gray-500">Assignments</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-blue-50 rounded-xl inline-block mb-3">
-                      <BookOpen className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div className="text-3xl font-bold text-gray-900">{typedWorksheets.length}</div>
-                    <p className="text-sm text-gray-500">Worksheets</p>
-                  </CardContent>
-                </Card>
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-purple-50 rounded-xl inline-block mb-3">
-                      <ClipboardCheck className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div className="text-3xl font-bold text-gray-900">{typedTests.length}</div>
-                    <p className="text-sm text-gray-500">Tests</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Overdue Section */}
-              {overdueItems.length > 0 && (
-                <Card className="border border-red-200 shadow-sm bg-white">
-                  <CardHeader className="bg-red-50 border-b border-red-200">
-                    <CardTitle className="flex items-center gap-2 text-red-800">
-                      <AlertTriangle className="h-5 w-5" />
-                      Overdue ({overdueItems.length})
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {overdueItems.map((item, index) => (
-                      <div key={item.id} className={`p-4 flex items-center justify-between ${index !== overdueItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            item.type === 'worksheet' ? 'bg-blue-50' : 
-                            item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
-                          }`}>
-                            {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
-                             item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
-                             <FileText className="h-4 w-4 text-green-600" />}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{item.title}</p>
-                            <p className="text-xs text-gray-500">{item.subject} • Was due {format(item.dueDate, 'MMM d')}</p>
-                          </div>
+              {/* Show Assignment Completion Area when assignment is selected */}
+              {selectedAssignment ? (
+                <div className="space-y-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleBackToList}
+                    className="mb-4"
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Back to Assignments
+                  </Button>
+                  <Card className="border border-gray-200 shadow-sm bg-white">
+                    <CardHeader className="border-b border-gray-100">
+                      <CardTitle className="flex items-center gap-2 text-gray-800">
+                        <FileText className="h-5 w-5" />
+                        {selectedAssignment.title}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-6">
+                      <AssignmentCompletionArea
+                        assignment={selectedAssignment}
+                        submission={getSubmissionForAssignment(selectedAssignment.id)}
+                        onSubmissionUpdate={handleBackToList}
+                      />
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <>
+                  {/* Assignment Type Summary */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <Card className="bg-white border border-gray-200 shadow-sm">
+                      <CardContent className="pt-5 pb-4 text-center">
+                        <div className="p-3 bg-green-50 rounded-xl inline-block mb-3">
+                          <FileText className="h-6 w-6 text-green-600" />
                         </div>
-                        <Link href={item.link}>
-                          <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white">
-                            Submit Now
-                          </Button>
-                        </Link>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Pending Section */}
-              <Card className="border border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100">
-                  <CardTitle className="flex items-center gap-2 text-gray-800">
-                    <div className="p-2 bg-amber-50 rounded-lg">
-                      <Clock className="h-5 w-5 text-amber-600" />
-                    </div>
-                    Pending ({pendingItems.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {pendingItems.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p className="text-gray-500 font-medium">All caught up!</p>
-                    </div>
-                  ) : (
-                    pendingItems.map((item, index) => (
-                      <div key={item.id} className={`p-4 flex items-center justify-between hover:bg-gray-50 ${index !== pendingItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            item.type === 'worksheet' ? 'bg-blue-50' : 
-                            item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
-                          }`}>
-                            {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
-                             item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
-                             <FileText className="h-4 w-4 text-green-600" />}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{item.title}</p>
-                            <p className="text-xs text-gray-500">{item.subject} • Due {format(item.dueDate, 'MMM d')}</p>
-                          </div>
+                        <div className="text-3xl font-bold text-gray-900">{typedAssignments.length}</div>
+                        <p className="text-sm text-gray-500">Assignments</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-white border border-gray-200 shadow-sm">
+                      <CardContent className="pt-5 pb-4 text-center">
+                        <div className="p-3 bg-blue-50 rounded-xl inline-block mb-3">
+                          <BookOpen className="h-6 w-6 text-blue-600" />
                         </div>
-                        <div className="flex items-center gap-3">
-                          <Badge className={getUrgencyColor(item.dueDate)}>
-                            {getDaysUntilDue(item.dueDate)}
-                          </Badge>
-                          <Link href={item.link}>
-                            <Button size="sm" variant="outline" className="border-gray-300">
-                              Start
+                        <div className="text-3xl font-bold text-gray-900">{typedWorksheets.length}</div>
+                        <p className="text-sm text-gray-500">Worksheets</p>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-white border border-gray-200 shadow-sm">
+                      <CardContent className="pt-5 pb-4 text-center">
+                        <div className="p-3 bg-purple-50 rounded-xl inline-block mb-3">
+                          <ClipboardCheck className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div className="text-3xl font-bold text-gray-900">{typedTests.length}</div>
+                        <p className="text-sm text-gray-500">Tests</p>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Overdue Section */}
+                  {overdueItems.length > 0 && (
+                    <Card className="border border-red-200 shadow-sm bg-white">
+                      <CardHeader className="bg-red-50 border-b border-red-200">
+                        <CardTitle className="flex items-center gap-2 text-red-800">
+                          <AlertTriangle className="h-5 w-5" />
+                          Overdue ({overdueItems.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        {overdueItems.map((item, index) => (
+                          <div key={item.id} className={`p-4 flex items-center justify-between ${index !== overdueItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${
+                                item.type === 'worksheet' ? 'bg-blue-50' : 
+                                item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
+                              }`}>
+                                {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
+                                 item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
+                                 <FileText className="h-4 w-4 text-green-600" />}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-800">{item.title}</p>
+                                <p className="text-xs text-gray-500">{item.subject} • Was due {format(item.dueDate, 'MMM d')}</p>
+                              </div>
+                            </div>
+                            <Button 
+                              size="sm" 
+                              className="bg-red-600 hover:bg-red-700 text-white"
+                              onClick={() => handleStartAssignment(item)}
+                            >
+                              Submit Now
                             </Button>
-                          </Link>
-                        </div>
-                      </div>
-                    ))
+                          </div>
+                        ))}
+                      </CardContent>
+                    </Card>
                   )}
-                </CardContent>
-              </Card>
 
-              {/* Completed Section */}
-              <Card className="border border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100">
-                  <CardTitle className="flex items-center gap-2 text-gray-800">
-                    <div className="p-2 bg-green-50 rounded-lg">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    </div>
-                    Completed ({completedItems.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {completedItems.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <p className="text-gray-500">No submissions yet</p>
-                    </div>
-                  ) : (
-                    completedItems.slice(0, 10).map((item, index) => (
-                      <div key={item.id} className={`p-4 flex items-center justify-between ${index !== Math.min(completedItems.length, 10) - 1 ? 'border-b border-gray-100' : ''}`}>
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-lg ${
-                            item.type === 'worksheet' ? 'bg-blue-50' : 
-                            item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
-                          }`}>
-                            {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
-                             item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
-                             <FileText className="h-4 w-4 text-green-600" />}
-                          </div>
-                          <div>
-                            <p className="font-medium text-gray-800">{item.title}</p>
-                            <p className="text-xs text-gray-500">{item.subject}</p>
-                          </div>
+                  {/* Pending Section */}
+                  <Card className="border border-gray-200 shadow-sm bg-white">
+                    <CardHeader className="border-b border-gray-100">
+                      <CardTitle className="flex items-center gap-2 text-gray-800">
+                        <div className="p-2 bg-amber-50 rounded-lg">
+                          <Clock className="h-5 w-5 text-amber-600" />
                         </div>
-                        <Badge className={item.status === 'graded' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'}>
-                          {item.status === 'graded' ? 'Graded' : 'Pending Review'}
-                        </Badge>
-                      </div>
-                    ))
-                  )}
-                </CardContent>
-              </Card>
+                        Pending ({pendingItems.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {pendingItems.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                          <p className="text-gray-500 font-medium">All caught up!</p>
+                        </div>
+                      ) : (
+                        pendingItems.map((item, index) => (
+                          <div key={item.id} className={`p-4 flex items-center justify-between hover:bg-gray-50 ${index !== pendingItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${
+                                item.type === 'worksheet' ? 'bg-blue-50' : 
+                                item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
+                              }`}>
+                                {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
+                                 item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
+                                 <FileText className="h-4 w-4 text-green-600" />}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-800">{item.title}</p>
+                                <p className="text-xs text-gray-500">{item.subject} • Due {format(item.dueDate, 'MMM d')}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <Badge className={getUrgencyColor(item.dueDate)}>
+                                {getDaysUntilDue(item.dueDate)}
+                              </Badge>
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="border-gray-300"
+                                onClick={() => handleStartAssignment(item)}
+                              >
+                                Start
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Completed Section */}
+                  <Card className="border border-gray-200 shadow-sm bg-white">
+                    <CardHeader className="border-b border-gray-100">
+                      <CardTitle className="flex items-center gap-2 text-gray-800">
+                        <div className="p-2 bg-green-50 rounded-lg">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        </div>
+                        Completed ({completedItems.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                      {completedItems.length === 0 ? (
+                        <div className="p-8 text-center">
+                          <p className="text-gray-500">No submissions yet</p>
+                        </div>
+                      ) : (
+                        completedItems.slice(0, 10).map((item, index) => (
+                          <div key={item.id} className={`p-4 flex items-center justify-between ${index !== Math.min(completedItems.length, 10) - 1 ? 'border-b border-gray-100' : ''}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`p-2 rounded-lg ${
+                                item.type === 'worksheet' ? 'bg-blue-50' : 
+                                item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
+                              }`}>
+                                {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
+                                 item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
+                                 <FileText className="h-4 w-4 text-green-600" />}
+                              </div>
+                              <div>
+                                <p className="font-medium text-gray-800">{item.title}</p>
+                                <p className="text-xs text-gray-500">{item.subject}</p>
+                              </div>
+                            </div>
+                            <Badge className={item.status === 'graded' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'}>
+                              {item.status === 'graded' ? 'Graded' : 'Pending Review'}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
           )}
 

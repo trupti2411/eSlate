@@ -56,7 +56,6 @@ export default function Layout({ children }: LayoutProps) {
         return [
           { href: '/student/home', icon: Home, label: 'Dashboard' },
           { href: '/student/portal', icon: BookOpen, label: 'My Worksheets' },
-          { href: '/student/assignments', icon: FileText, label: 'Assignments' },
           { href: '/student/dashboard', icon: Calendar, label: 'Calendar' },
         ];
       case 'parent':

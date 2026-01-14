@@ -22,7 +22,6 @@ import CompanyStudents from "@/pages/admin/CompanyStudents";
 import CompanyAcademicManagement from "@/pages/admin/CompanyAcademicManagement";
 import AdminSettings from "@/pages/admin/Settings";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { StudentAssignments } from "@/pages/assignments/StudentAssignments";
 import { StudentPortal } from "@/pages/student/StudentPortal";
 import { StudentWorksheets } from "@/pages/student/StudentWorksheets";
 import GoogleDocsViewer from "@/pages/GoogleDocsViewer";
@@ -109,8 +108,6 @@ function Router() {
           <Route path="/company/tests" component={TestManagement} />
           <Route path="/company/tests/:testId/grade/:attemptId" component={TestGrading} />
           <Route path="/company/reports" component={Reports} />
-          <Route path="/assignments" component={StudentAssignments} />
-          <Route path="/student/assignments" component={StudentAssignments} />
           <Route path="/student/portal" component={StudentPortal} />
           <Route path="/student/worksheets" component={StudentWorksheets} />
           <Route path="/pdf-annotator" component={GoogleDocsViewer} />
