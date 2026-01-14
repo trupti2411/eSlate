@@ -281,65 +281,6 @@ async function notifyParentOfSubmission(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize sample files in object storage (only if not already present)
-  try {
-    const objectStorageService = new ObjectStorageService();
-    const privateDir = objectStorageService.getPrivateObjectDir();
-    
-    // Create sample PDF for testing
-    const samplePDF = Buffer.from(`%PDF-1.4
-1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
-2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
-3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Contents 4 0 R>>endobj
-4 0 obj<</Length 44>>stream
-BT
-/F1 12 Tf
-100 700 Td
-(Sample Assignment File) Tj
-ET
-endstream
-endobj
-trailer<</Size 5/Root 1 0 R>>
-%%EOF`);
-
-    // Sample file ID that matches the one in the database
-    const sampleFileId = '01514bf6-31ed-4ecf-914a-8833926cd594';
-    const objectPath = `${privateDir}/uploads/${sampleFileId}`;
-    const pathParts = objectPath.split('/').filter(p => p);
-    const bucketName = pathParts[0];
-    const objectName = pathParts.slice(1).join('/');
-    
-    const bucket = objectStorageClient.bucket(bucketName);
-    const file = bucket.file(objectName);
-    
-    // Check if file already exists and is a valid PDF
-    const [exists] = await file.exists();
-    let shouldUpload = !exists;
-    
-    if (exists) {
-      const [metadata] = await file.getMetadata();
-      if (metadata.contentType !== 'application/pdf') {
-        shouldUpload = true;
-        console.log('Existing file is not a PDF, replacing with sample PDF');
-      }
-    }
-    
-    if (shouldUpload) {
-      await file.save(samplePDF, {
-        metadata: {
-          contentType: 'application/pdf',
-          metadata: {
-            originalName: 'sample-assignment.pdf',
-            uploadedAt: new Date().toISOString()
-          }
-        }
-      });
-      console.log('Initialized sample files for testing assignment completion');
-    }
-  } catch (error) {
-    console.error('Error initializing sample files:', error);
-  }
-
   // Auth middleware
   setupCustomAuth(app);
 
