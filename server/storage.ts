@@ -95,7 +95,7 @@ import {
   type InsertReportExport,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, isNull, sql, arrayContains, inArray } from "drizzle-orm";
+import { eq, and, or, desc, isNull, sql, arrayContains, inArray, ne } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (supports both Replit Auth and Custom Auth)
@@ -1719,7 +1719,10 @@ export class DatabaseStorage implements IStorage {
         .innerJoin(students, eq(submissions.studentId, students.id))
         .innerJoin(users, eq(students.userId, users.id))
         .innerJoin(assignments, eq(submissions.assignmentId, assignments.id))
-        .where(eq(students.companyId, companyId))
+        .where(and(
+          eq(students.companyId, companyId),
+          ne(submissions.status, 'draft')
+        ))
         .orderBy(desc(submissions.createdAt));
 
       console.log("Found submissions:", results.length);

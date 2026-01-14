@@ -172,7 +172,8 @@ export default function StudentHome() {
       dueDate,
       type: 'assignment',
       status: submission?.status === 'graded' ? 'graded'
-           : submission ? 'submitted'
+           : submission?.status === 'submitted' ? 'submitted'
+           : submission?.status === 'draft' ? 'in_progress'
            : isOverdue ? 'overdue' : 'pending',
       rawAssignment: a,
     };
