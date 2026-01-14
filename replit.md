@@ -62,6 +62,13 @@ Built with Express.js and TypeScript, providing a RESTful API.
 - **Primary Database**: PostgreSQL with Drizzle ORM for type-safe operations and schema management.
 - **Database Schema**: Comprehensive relational model supporting user management (student, parent, tutor, company_admin, admin), tutoring company management, assignment/submission tracking, real-time messaging, progress tracking, and calendar events.
 - **Schema Management**: Drizzle Kit for database migrations.
+- **Object Storage**: Google Cloud Storage (GCS) via Replit Object Storage integration for persistent file uploads (homework submissions, assignment attachments). Files stored at `{privateDir}/uploads/{fileId}`.
+
+## PDF Annotation System
+- **PDF.js**: PDF rendering with locally bundled worker (not CDN) for reliability
+- **Fabric.js**: Canvas-based annotation layer for drawing tools
+- **Student Tools**: Pen, highlighter, eraser, text for completing assignments
+- **Reviewer Tools**: Tick (✓), cross (✗), comment, freehand marking for tutors/admins
 
 ## Authentication and Authorization
 - **Primary Authentication**: Replit OIDC.
