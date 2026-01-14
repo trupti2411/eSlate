@@ -1078,6 +1078,35 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Grade a submission (company admin version)
+  app.patch('/api/company/submissions/:submissionId/grade', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) {
+        return res.status(404).json({ message: "Company admin profile not found" });
+      }
+
+      const { submissionId } = req.params;
+      const { score, feedback } = req.body;
+
+      // Validate score
+      if (score !== undefined && (typeof score !== 'number' || score < 0 || score > 100)) {
+        return res.status(400).json({ message: "Score must be a number between 0 and 100" });
+      }
+
+      const updated = await storage.gradeSubmission(submissionId, score || 0, feedback || '', user.id);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error grading submission:", error);
+      res.status(500).json({ message: "Failed to grade submission" });
+    }
+  });
+
   // Simple file upload route
   app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
     try {

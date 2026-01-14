@@ -633,14 +633,14 @@ export default function CompanyDashboard() {
   }
 
   const { data: companySubmissions = [], isLoading: submissionsLoading, refetch: refetchSubmissions } = useQuery<CompanySubmission[]>({
-    queryKey: ['/api/tutor/submissions'],
-    enabled: !!user && (user.role === 'tutor' || user.role === 'company_admin'),
+    queryKey: ['/api/company/submissions'],
+    enabled: !!user && user.role === 'company_admin',
   });
 
-  // Mutation for grading a submission
+  // Mutation for grading a submission (company admin)
   const gradeSubmissionMutation = useMutation({
     mutationFn: async ({ submissionId, score, feedback }: { submissionId: string; score: number; feedback: string }) => {
-      const response = await apiRequest(`/api/tutor/submissions/${submissionId}/grade`, 'PATCH', { score, feedback });
+      const response = await apiRequest(`/api/company/submissions/${submissionId}/grade`, 'PATCH', { score, feedback });
       return response;
     },
     onSuccess: () => {
