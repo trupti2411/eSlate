@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Progress } from '@/components/ui/progress';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
@@ -17,7 +18,7 @@ import {
   Star, ArrowRight, CalendarDays, Users, MapPin, CalendarIcon
 } from 'lucide-react';
 import { StudentCalendarDashboard } from '@/components/calendar/StudentCalendarDashboard';
-import { format, isPast, differenceInDays, isWithinInterval } from 'date-fns';
+import { format, isPast, differenceInDays, isWithinInterval, parseISO, isToday } from 'date-fns';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import { useFileMetadata } from '@/hooks/useFileMetadata';
 import { PDFAnnotator } from '@/components/PDFAnnotator';
@@ -157,6 +158,84 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
     queryKey: ['/api/students', studentDbId, 'submissions'],
     enabled: !!studentDbId
   });
+
+  interface CalendarHomeworkDeadline {
+    id: string;
+    title: string;
+    dueDate: string | Date;
+    subject?: string;
+  }
+
+  interface StudentCalendarData {
+    sessions: any[];
+    holidays: any[];
+    homeworkDeadlines: CalendarHomeworkDeadline[];
+  }
+
+  interface LearningHours {
+    subject: string;
+    hours: number;
+  }
+
+  interface AttendanceSummary {
+    totalClasses: number;
+    classesAttended: number;
+    attendancePercentage: number;
+    learningHours: {
+      weekly: number;
+      monthly: number;
+      bySubject: LearningHours[];
+    };
+  }
+
+  const { data: calendarData } = useQuery<StudentCalendarData>({
+    queryKey: ["/api/calendar/student"],
+  });
+
+  const { data: attendanceSummary } = useQuery<AttendanceSummary>({
+    queryKey: ["/api/attendance/summary/student", studentDbId],
+    enabled: !!studentDbId,
+  });
+
+  const todaysSessions = useMemo(() => {
+    if (!calendarData?.sessions) return [];
+    return calendarData.sessions.filter((session) => {
+      const sessionDate = typeof session.startTime === "string" ? parseISO(session.startTime) : session.startTime;
+      return isToday(sessionDate);
+    });
+  }, [calendarData?.sessions]);
+
+  const upcomingHomework = useMemo(() => {
+    if (!calendarData?.homeworkDeadlines) return [];
+    const now = new Date();
+    return calendarData.homeworkDeadlines
+      .filter((hw) => {
+        const dueDate = typeof hw.dueDate === "string" ? parseISO(hw.dueDate) : hw.dueDate;
+        return dueDate >= now;
+      })
+      .sort((a, b) => {
+        const dateA = typeof a.dueDate === "string" ? parseISO(a.dueDate) : a.dueDate;
+        const dateB = typeof b.dueDate === "string" ? parseISO(b.dueDate) : b.dueDate;
+        return dateA.getTime() - dateB.getTime();
+      })
+      .slice(0, 3);
+  }, [calendarData?.homeworkDeadlines]);
+
+  const SUBJECT_COLORS: Record<string, string> = {
+    Mathematics: "#3b82f6",
+    English: "#10b981",
+    Science: "#f59e0b",
+    History: "#8b5cf6",
+    Geography: "#ec4899",
+    Art: "#06b6d4",
+    Music: "#f97316",
+    "Physical Education": "#84cc16",
+    default: "#6b7280",
+  };
+
+  const getSubjectColor = (subject: string): string => {
+    return SUBJECT_COLORS[subject] || SUBJECT_COLORS.default;
+  };
 
   const typedStudentTerms = studentTerms as AcademicTerm[];
   const typedStudentClasses = studentClasses as Class[];
@@ -344,6 +423,164 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
             </div>
             <div className="text-3xl font-bold text-black">{overdueCount}</div>
             <p className="text-sm text-gray-500 mt-1">Overdue</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Attendance & Learning Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="border-2 border-black hover:shadow-lg transition-all">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              Attendance Rate
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-baseline gap-2">
+              <span className="text-2xl font-bold">
+                {attendanceSummary?.attendancePercentage?.toFixed(0) ?? 0}%
+              </span>
+              <span className="text-xs text-gray-500">
+                ({attendanceSummary?.classesAttended ?? 0}/{attendanceSummary?.totalClasses ?? 0} classes)
+              </span>
+            </div>
+            <Progress
+              value={attendanceSummary?.attendancePercentage ?? 0}
+              className="mt-2 h-2"
+            />
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-black hover:shadow-lg transition-all">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                <CalendarDays className="w-4 h-4" />
+                Today's Classes
+              </CardTitle>
+              {todaysSessions.length > 0 && (
+                <Badge variant="secondary" className="text-xs">
+                  {todaysSessions.length}
+                </Badge>
+              )}
+            </div>
+          </CardHeader>
+          <CardContent>
+            {todaysSessions.length === 0 ? (
+              <p className="text-gray-500 text-sm">No classes scheduled today</p>
+            ) : (
+              <ScrollArea className={todaysSessions.length > 3 ? "h-[100px]" : ""}>
+                <div className="space-y-1">
+                  {todaysSessions.map((session: any) => (
+                    <div
+                      key={session.id}
+                      className="flex items-center justify-between text-sm p-1 rounded"
+                    >
+                      <span className="font-medium truncate">{session.className || session.subject}</span>
+                      <span className="text-gray-500 text-xs">
+                        {format(
+                          typeof session.startTime === "string" ? parseISO(session.startTime) : session.startTime,
+                          "h:mm a"
+                        )}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-black hover:shadow-lg transition-all">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              Upcoming Homework
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {upcomingHomework.length === 0 ? (
+              <p className="text-gray-500 text-sm">No upcoming deadlines</p>
+            ) : (
+              <div className="space-y-1">
+                {upcomingHomework.map((hw) => {
+                  const dueDate = typeof hw.dueDate === "string" ? parseISO(hw.dueDate) : hw.dueDate;
+                  const isTodaysDue = isToday(dueDate);
+                  return (
+                    <div
+                      key={hw.id}
+                      className="flex items-center justify-between text-sm"
+                    >
+                      <span className="font-medium truncate max-w-[120px]">{hw.title}</span>
+                      <Badge
+                        variant={isTodaysDue ? "destructive" : "secondary"}
+                        className="text-xs"
+                      >
+                        {isTodaysDue ? "Today" : format(dueDate, "MMM d")}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Learning Hours & Subject Breakdown */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-2 border-black hover:shadow-lg transition-all">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Learning Hours
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-6">
+              <div>
+                <span className="text-2xl font-bold">{attendanceSummary?.learningHours?.weekly ?? 0}h</span>
+                <p className="text-xs text-gray-500">This Week</p>
+              </div>
+              <div className="h-8 w-px bg-gray-200" />
+              <div>
+                <span className="text-2xl font-bold">{attendanceSummary?.learningHours?.monthly ?? 0}h</span>
+                <p className="text-xs text-gray-500">This Month</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-2 border-black hover:shadow-lg transition-all">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+              <BookOpen className="w-4 h-4" />
+              By Subject
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(!attendanceSummary?.learningHours?.bySubject || attendanceSummary.learningHours.bySubject.length === 0) ? (
+              <p className="text-gray-500 text-sm">No subject data yet</p>
+            ) : (
+              <div className="space-y-2">
+                {attendanceSummary.learningHours.bySubject.slice(0, 3).map((item) => (
+                  <div key={item.subject} className="flex items-center gap-2">
+                    <div
+                      className="w-2 h-2 rounded-full"
+                      style={{ backgroundColor: getSubjectColor(item.subject) }}
+                    />
+                    <span className="text-sm flex-1 truncate">{item.subject}</span>
+                    <span className="text-sm font-medium">{item.hours}h</span>
+                  </div>
+                ))}
+                {attendanceSummary.learningHours.bySubject.length > 3 && (
+                  <p className="text-xs text-gray-400">
+                    +{attendanceSummary.learningHours.bySubject.length - 3} more subjects
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
