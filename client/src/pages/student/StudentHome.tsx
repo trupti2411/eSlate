@@ -276,7 +276,7 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* Tab Navigation - matching company portal exactly */}
+      {/* Tab Navigation - 3 tabs only: Dashboard, Calendar, Assignments */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1">
@@ -289,30 +289,6 @@ export default function StudentHome() {
               Dashboard
             </Button>
             <Button
-              variant={activeTab === 'overview' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('overview')}
-              className={`rounded-b-none border-b-2 ${activeTab === 'overview' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Overview
-            </Button>
-            <Button
-              variant={activeTab === 'worksheets' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('worksheets')}
-              className={`rounded-b-none border-b-2 ${activeTab === 'worksheets' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              My Worksheets
-            </Button>
-            <Button
-              variant={activeTab === 'assignments' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('assignments')}
-              className={`rounded-b-none border-b-2 ${activeTab === 'assignments' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
-            >
-              <FileText className="h-4 w-4 mr-2" />
-              Assignments
-            </Button>
-            <Button
               variant={activeTab === 'calendar' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('calendar')}
               className={`rounded-b-none border-b-2 ${activeTab === 'calendar' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
@@ -321,20 +297,12 @@ export default function StudentHome() {
               Calendar
             </Button>
             <Button
-              variant={activeTab === 'grades' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('grades')}
-              className={`rounded-b-none border-b-2 ${activeTab === 'grades' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              variant={activeTab === 'assignments' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('assignments')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'assignments' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
             >
-              <Award className="h-4 w-4 mr-2" />
-              Grades
-            </Button>
-            <Button
-              variant={activeTab === 'attendance' ? 'default' : 'ghost'}
-              onClick={() => setActiveTab('attendance')}
-              className={`rounded-b-none border-b-2 ${activeTab === 'attendance' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
-            >
-              <ClipboardCheck className="h-4 w-4 mr-2" />
-              Attendance
+              <FileText className="h-4 w-4 mr-2" />
+              Assignments
             </Button>
           </div>
         </div>
@@ -450,23 +418,103 @@ export default function StudentHome() {
                 </Card>
               </div>
 
-              {/* Quick Links */}
+              {/* Today's Classes, Upcoming Homework, Learning Hours */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card 
-                  className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => setActiveTab('worksheets')}
-                >
-                  <CardContent className="p-6 flex items-center gap-4">
-                    <div className="p-3 bg-blue-50 rounded-xl">
-                      <FileText className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-900">My Worksheets</h3>
-                      <p className="text-sm text-gray-500">View and complete worksheets</p>
-                    </div>
-                    <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
+                <Card className="border border-gray-200 shadow-sm bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      Today's Classes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {typedClasses.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No classes scheduled today</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {typedClasses.slice(0, 3).map((cls: any) => (
+                          <div key={cls.id} className="flex items-center justify-between text-sm p-1 rounded">
+                            <span className="font-medium truncate">{cls.name}</span>
+                            <span className="text-gray-500 text-xs">{cls.startTime}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
+
+                <Card className="border border-gray-200 shadow-sm bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Upcoming Homework
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {upcomingDeadlines.length === 0 ? (
+                      <p className="text-gray-500 text-sm">No upcoming deadlines</p>
+                    ) : (
+                      <div className="space-y-1">
+                        {upcomingDeadlines.slice(0, 3).map((item) => (
+                          <div key={item.id} className="flex items-center justify-between text-sm">
+                            <span className="font-medium truncate max-w-[120px]">{item.title}</span>
+                            <Badge variant="secondary" className="text-xs">
+                              {format(item.dueDate, "MMM d")}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card className="border border-gray-200 shadow-sm bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      Learning Hours
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <span className="text-2xl font-bold">{Math.round(totalStudyMinutes / 60)}h</span>
+                        <p className="text-xs text-gray-500">Total</p>
+                      </div>
+                      <div className="h-8 w-px bg-gray-200" />
+                      <div>
+                        <span className="text-2xl font-bold">{typedClasses.length}</span>
+                        <p className="text-xs text-gray-500">Classes</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Subject Breakdown */}
+              {attendanceData?.bySubject && attendanceData.bySubject.length > 0 && (
+                <Card className="border border-gray-200 shadow-sm bg-white">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-600 flex items-center gap-2">
+                      <BookOpen className="w-4 h-4" />
+                      By Subject
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {attendanceData.bySubject.slice(0, 4).map((subject) => (
+                        <div key={subject.subject} className="text-center p-3 bg-gray-50 rounded-lg">
+                          <div className="text-xl font-bold">{subject.percentage}%</div>
+                          <p className="text-xs text-gray-500 truncate">{subject.subject}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Quick Links */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card 
                   className="border border-gray-200 shadow-sm bg-white hover:shadow-md transition-shadow cursor-pointer"
                   onClick={() => setActiveTab('assignments')}
@@ -495,180 +543,6 @@ export default function StudentHome() {
                       <p className="text-sm text-gray-500">View schedule & classes</p>
                     </div>
                     <ArrowRight className="h-5 w-5 text-gray-400 ml-auto" />
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          )}
-
-          {/* Overview Tab */}
-          {activeTab === 'overview' && (
-            <div className="space-y-6">
-              {/* Loading state */}
-              {isDataLoading && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="ml-3 text-gray-600 font-medium">Loading data...</span>
-                </div>
-              )}
-
-              {/* Stats Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="bg-white border border-gray-200 shadow-sm hover:shadow transition-shadow">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Pending</p>
-                        <div className="text-3xl font-bold text-gray-900">{pendingItems.length}</div>
-                        <p className="text-gray-400 text-xs mt-1 flex items-center">
-                          <Clock className="h-3 w-3 mr-1" />
-                          Items to complete
-                        </p>
-                      </div>
-                      <div className="p-3 bg-amber-50 rounded-xl">
-                        <Clock className="h-6 w-6 text-amber-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm hover:shadow transition-shadow">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Completed</p>
-                        <div className="text-3xl font-bold text-gray-900">{completedItems.length}</div>
-                        <p className="text-gray-400 text-xs mt-1 flex items-center">
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                          Submitted work
-                        </p>
-                      </div>
-                      <div className="p-3 bg-green-50 rounded-xl">
-                        <CheckCircle className="h-6 w-6 text-green-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm hover:shadow transition-shadow">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Classes</p>
-                        <div className="text-3xl font-bold text-gray-900">{typedClasses.length}</div>
-                        <p className="text-gray-400 text-xs mt-1 flex items-center">
-                          <Users className="h-3 w-3 mr-1" />
-                          Enrolled classes
-                        </p>
-                      </div>
-                      <div className="p-3 bg-blue-50 rounded-xl">
-                        <Users className="h-6 w-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm hover:shadow transition-shadow">
-                  <CardContent className="pt-5 pb-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-gray-500 text-sm font-medium">Study Time</p>
-                        <div className="text-3xl font-bold text-gray-900">{totalStudyMinutes}m</div>
-                        <p className="text-gray-400 text-xs mt-1 flex items-center">
-                          <TrendingUp className="h-3 w-3 mr-1" />
-                          Total minutes
-                        </p>
-                      </div>
-                      <div className="p-3 bg-purple-50 rounded-xl">
-                        <TrendingUp className="h-6 w-6 text-purple-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Details Grid */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Upcoming Deadlines */}
-                <Card className="lg:col-span-2 border border-gray-200 shadow-sm bg-white">
-                  <CardHeader className="border-b border-gray-100 pb-4">
-                    <CardTitle className="flex items-center gap-2 text-gray-800">
-                      <div className="p-2 bg-amber-50 rounded-lg">
-                        <AlertTriangle className="h-5 w-5 text-amber-600" />
-                      </div>
-                      Upcoming Deadlines
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4">
-                    {upcomingDeadlines.length === 0 ? (
-                      <div className="py-8 text-center">
-                        <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                        <p className="text-gray-500 font-medium">No upcoming deadlines</p>
-                        <p className="text-gray-400 text-sm mt-1">Great job staying on top of your work!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {upcomingDeadlines.map((item) => (
-                          <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 transition-colors">
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                item.type === 'worksheet' ? 'bg-blue-50' : 
-                                item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
-                              }`}>
-                                {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
-                                 item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
-                                 <FileText className="h-4 w-4 text-green-600" />}
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-800">{item.title}</p>
-                                <p className="text-xs text-gray-500">{item.subject} • Due {format(item.dueDate, 'MMM d')}</p>
-                              </div>
-                            </div>
-                            <Badge className={getUrgencyColor(item.dueDate)}>
-                              {getDaysUntilDue(item.dueDate)}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Quick Links */}
-                <Card className="border border-gray-200 shadow-sm bg-white">
-                  <CardHeader className="border-b border-gray-100 pb-4">
-                    <CardTitle className="flex items-center gap-2 text-gray-800">
-                      <div className="p-2 bg-gray-100 rounded-lg">
-                        <ArrowRight className="h-5 w-5 text-gray-600" />
-                      </div>
-                      Quick Links
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-4 space-y-2">
-                    <div 
-                      onClick={() => setActiveTab('worksheets')}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-blue-50 rounded-lg">
-                          <FileText className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <span className="font-medium text-gray-700">My Worksheets</span>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <div 
-                      onClick={() => setActiveTab('calendar')}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 hover:bg-gray-100 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="p-2 bg-green-50 rounded-lg">
-                          <Calendar className="h-4 w-4 text-green-600" />
-                        </div>
-                        <span className="font-medium text-gray-700">View Calendar</span>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-gray-400" />
-                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -835,195 +709,6 @@ export default function StudentHome() {
                   )}
                 </CardContent>
               </Card>
-            </div>
-          )}
-
-          {/* Grades Tab */}
-          {activeTab === 'grades' && (
-            <div className="space-y-6">
-              {/* Grade Summary */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-amber-50 rounded-xl inline-block mb-3">
-                      <Award className="h-6 w-6 text-amber-600" />
-                    </div>
-                    <div className="text-4xl font-bold text-gray-900">{gradedSubmissions.length}</div>
-                    <p className="text-sm text-gray-500">Graded Work</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-green-50 rounded-xl inline-block mb-3">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="text-4xl font-bold text-gray-900">{submittedCount}</div>
-                    <p className="text-sm text-gray-500">Total Submitted</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-blue-50 rounded-xl inline-block mb-3">
-                      <TrendingUp className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div className="text-4xl font-bold text-gray-900">
-                      {typedAssignments.length > 0 ? Math.round((submittedCount / typedAssignments.length) * 100) : 0}%
-                    </div>
-                    <p className="text-sm text-gray-500">Completion Rate</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Graded Work List */}
-              <Card className="border border-gray-200 shadow-sm bg-white">
-                <CardHeader className="border-b border-gray-100">
-                  <CardTitle className="flex items-center gap-2 text-gray-800">
-                    <div className="p-2 bg-amber-50 rounded-lg">
-                      <Award className="h-5 w-5 text-amber-600" />
-                    </div>
-                    Graded Submissions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {gradedSubmissions.length === 0 ? (
-                    <div className="p-8 text-center">
-                      <Award className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                      <p className="text-gray-500 font-medium">No graded work yet</p>
-                      <p className="text-gray-400 text-sm mt-1">Grades will appear here once tutors review your submissions</p>
-                    </div>
-                  ) : (
-                    gradedSubmissions.map((submission: any, index) => {
-                      const assignment = typedAssignments.find(a => a.id === submission.assignmentId);
-                      return (
-                        <div key={submission.id} className={`p-4 flex items-center justify-between ${index !== gradedSubmissions.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-50 rounded-lg">
-                              <FileText className="h-4 w-4 text-green-600" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-gray-800">{assignment?.title || 'Assignment'}</p>
-                              <p className="text-xs text-gray-500">{assignment?.subject}</p>
-                            </div>
-                          </div>
-                          <Badge className="bg-green-50 text-green-700 border-green-200">
-                            Graded
-                          </Badge>
-                        </div>
-                      );
-                    })
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Attendance Tab */}
-          {activeTab === 'attendance' && (
-            <div className="space-y-6">
-              {/* Loading state */}
-              {attendanceLoading && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-8 h-8 border-4 border-gray-400 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="ml-3 text-gray-600 font-medium">Loading attendance...</span>
-                </div>
-              )}
-
-              {/* Attendance Overview */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-green-50 rounded-xl inline-block mb-3">
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="text-4xl font-bold text-gray-900">{classesAttended}</div>
-                    <p className="text-sm text-gray-500">Classes Attended</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-blue-50 rounded-xl inline-block mb-3">
-                      <Calendar className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div className="text-4xl font-bold text-gray-900">{totalClasses}</div>
-                    <p className="text-sm text-gray-500">Total Classes</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white border border-gray-200 shadow-sm">
-                  <CardContent className="pt-5 pb-4 text-center">
-                    <div className="p-3 bg-purple-50 rounded-xl inline-block mb-3">
-                      <TrendingUp className="h-6 w-6 text-purple-600" />
-                    </div>
-                    <div className="text-4xl font-bold text-gray-900">{attendancePercentage}%</div>
-                    <p className="text-sm text-gray-500">Attendance Rate</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Subject Breakdown */}
-              {attendanceData?.bySubject && attendanceData.bySubject.length > 0 && (
-                <Card className="border border-gray-200 shadow-sm bg-white">
-                  <CardHeader className="border-b border-gray-100">
-                    <CardTitle className="flex items-center gap-2 text-gray-800">
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <BookOpen className="h-5 w-5 text-blue-600" />
-                      </div>
-                      Attendance by Subject
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="p-0">
-                    {attendanceData.bySubject.map((subject, index) => (
-                      <div key={index} className={`p-4 ${index !== attendanceData.bySubject.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="font-medium text-gray-800">{subject.subject}</span>
-                          <span className="text-xl font-bold text-gray-900">{subject.percentage}%</span>
-                        </div>
-                        <Progress value={subject.percentage} className="h-2 bg-gray-100" />
-                        <div className="flex gap-4 mt-2 text-xs text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3 text-green-500" /> {subject.present} present
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <XCircle className="h-3 w-3 text-red-500" /> {subject.absent} absent
-                          </span>
-                          {subject.late > 0 && (
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3 text-amber-500" /> {subject.late} late
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Empty state */}
-              {(!attendanceData || totalClasses === 0) && (
-                <Card className="border border-gray-200 shadow-sm bg-white">
-                  <CardContent className="p-12 text-center">
-                    <ClipboardCheck className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">No Attendance Records</h3>
-                    <p className="text-gray-500">Attendance will appear here once classes begin</p>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* Worksheets Tab - embedded StudentPortal */}
-          {activeTab === 'worksheets' && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">My Worksheets</h2>
-                  <p className="text-gray-600">View and complete your assigned worksheets</p>
-                </div>
-              </div>
-              <StudentPortal embedded={true} />
             </div>
           )}
 
