@@ -276,7 +276,7 @@ export default function StudentHome() {
         </div>
       </div>
 
-      {/* Tab Navigation - 3 tabs only: Dashboard, Calendar, Assignments */}
+      {/* Tab Navigation - 4 tabs: Dashboard, Calendar, Assignments, Reports */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-1">
@@ -303,6 +303,14 @@ export default function StudentHome() {
             >
               <FileText className="h-4 w-4 mr-2" />
               Assignments
+            </Button>
+            <Button
+              variant={activeTab === 'reports' ? 'default' : 'ghost'}
+              onClick={() => setActiveTab('reports')}
+              className={`rounded-b-none border-b-2 ${activeTab === 'reports' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+            >
+              <Award className="h-4 w-4 mr-2" />
+              Reports
             </Button>
           </div>
         </div>
@@ -722,6 +730,94 @@ export default function StudentHome() {
                 </div>
               </div>
               <StudentCalendarDashboard />
+            </div>
+          )}
+
+          {/* Reports Tab */}
+          {activeTab === 'reports' && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">Reports</h2>
+                  <p className="text-gray-600">View your grades and academic progress</p>
+                </div>
+              </div>
+
+              {/* Grade Summary */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Card className="bg-white border border-gray-200 shadow-sm">
+                  <CardContent className="pt-5 pb-4 text-center">
+                    <div className="p-3 bg-amber-50 rounded-xl inline-block mb-3">
+                      <Award className="h-6 w-6 text-amber-600" />
+                    </div>
+                    <div className="text-4xl font-bold text-gray-900">{gradedSubmissions.length}</div>
+                    <p className="text-sm text-gray-500">Graded Work</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white border border-gray-200 shadow-sm">
+                  <CardContent className="pt-5 pb-4 text-center">
+                    <div className="p-3 bg-green-50 rounded-xl inline-block mb-3">
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="text-4xl font-bold text-gray-900">{submittedCount}</div>
+                    <p className="text-sm text-gray-500">Total Submitted</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white border border-gray-200 shadow-sm">
+                  <CardContent className="pt-5 pb-4 text-center">
+                    <div className="p-3 bg-blue-50 rounded-xl inline-block mb-3">
+                      <TrendingUp className="h-6 w-6 text-blue-600" />
+                    </div>
+                    <div className="text-4xl font-bold text-gray-900">
+                      {typedAssignments.length > 0 ? Math.round((submittedCount / typedAssignments.length) * 100) : 0}%
+                    </div>
+                    <p className="text-sm text-gray-500">Completion Rate</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Graded Work List */}
+              <Card className="border border-gray-200 shadow-sm bg-white">
+                <CardHeader className="border-b border-gray-100">
+                  <CardTitle className="flex items-center gap-2 text-gray-800">
+                    <div className="p-2 bg-amber-50 rounded-lg">
+                      <Award className="h-5 w-5 text-amber-600" />
+                    </div>
+                    Graded Submissions
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {gradedSubmissions.length === 0 ? (
+                    <div className="p-8 text-center">
+                      <Award className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                      <p className="text-gray-500 font-medium">No graded work yet</p>
+                      <p className="text-gray-400 text-sm mt-1">Grades will appear here once tutors review your submissions</p>
+                    </div>
+                  ) : (
+                    gradedSubmissions.map((submission: any, index) => {
+                      const assignment = typedAssignments.find(a => a.id === submission.assignmentId);
+                      return (
+                        <div key={submission.id} className={`p-4 flex items-center justify-between ${index !== gradedSubmissions.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-green-50 rounded-lg">
+                              <FileText className="h-4 w-4 text-green-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-gray-800">{assignment?.title || 'Assignment'}</p>
+                              <p className="text-xs text-gray-500">{assignment?.subject}</p>
+                            </div>
+                          </div>
+                          <Badge className="bg-green-50 text-green-700 border-green-200">
+                            Graded
+                          </Badge>
+                        </div>
+                      );
+                    })
+                  )}
+                </CardContent>
+              </Card>
             </div>
           )}
       </div>
