@@ -281,12 +281,12 @@ async function notifyParentOfSubmission(
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize global file storage
-  global.uploadedFiles = global.uploadedFiles || new Map();
-  
-  // Add some sample files for testing (only if storage is empty)
-  if (global.uploadedFiles.size === 0) {
-    // Create a sample PDF file for testing
+  // Initialize sample files in object storage (only if not already present)
+  try {
+    const objectStorageService = new ObjectStorageService();
+    const privateDir = objectStorageService.getPrivateObjectDir();
+    
+    // Create sample PDF for testing
     const samplePDF = Buffer.from(`%PDF-1.4
 1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
 2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
@@ -302,25 +302,32 @@ endobj
 trailer<</Size 5/Root 1 0 R>>
 %%EOF`);
 
-    global.uploadedFiles.set('01514bf6-31ed-4ecf-914a-8833926cd594', {
-      buffer: samplePDF,
-      originalname: 'sample-assignment.pdf',
-      mimetype: 'application/pdf',
-      size: samplePDF.length,
-      uploadedAt: new Date()
-    });
-
-    // Create a sample text file
-    const sampleText = Buffer.from('Sample assignment instructions:\n\n1. Read the material carefully\n2. Answer all questions\n3. Submit before the deadline\n\nGood luck!');
-    global.uploadedFiles.set('sample-text-file-id', {
-      buffer: sampleText,
-      originalname: 'instructions.txt',
-      mimetype: 'text/plain',
-      size: sampleText.length,
-      uploadedAt: new Date()
-    });
-
-    console.log('Initialized sample files for testing assignment completion');
+    // Sample file ID that matches the one in the database
+    const sampleFileId = '01514bf6-31ed-4ecf-914a-8833926cd594';
+    const objectPath = `${privateDir}/uploads/${sampleFileId}`;
+    const pathParts = objectPath.split('/').filter(p => p);
+    const bucketName = pathParts[0];
+    const objectName = pathParts.slice(1).join('/');
+    
+    const bucket = objectStorageClient.bucket(bucketName);
+    const file = bucket.file(objectName);
+    
+    // Check if file already exists
+    const [exists] = await file.exists();
+    if (!exists) {
+      await file.save(samplePDF, {
+        metadata: {
+          contentType: 'application/pdf',
+          metadata: {
+            originalName: 'sample-assignment.pdf',
+            uploadedAt: new Date().toISOString()
+          }
+        }
+      });
+      console.log('Initialized sample files for testing assignment completion');
+    }
+  } catch (error) {
+    console.error('Error initializing sample files:', error);
   }
 
   // Auth middleware
@@ -585,17 +592,34 @@ trailer<</Size 5/Root 1 0 R>>
         return res.status(403).json({ message: "Access denied" });
       }
       
-      // Store files in memory
+      // Store files in object storage
       const fileUrls: string[] = [];
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      
       for (const file of files) {
         const fileId = randomUUID();
-        global.uploadedFiles.set(fileId, {
-          buffer: file.buffer,
-          originalname: file.originalname,
-          mimetype: file.mimetype,
-          size: file.size,
-          uploadedAt: new Date()
+        const objectPath = `${privateDir}/uploads/${fileId}`;
+        
+        // Parse the path to get bucket and object name
+        const pathParts = objectPath.split('/').filter(p => p);
+        const bucketName = pathParts[0];
+        const objectName = pathParts.slice(1).join('/');
+        
+        // Upload to object storage
+        const bucket = objectStorageClient.bucket(bucketName);
+        const gcsFile = bucket.file(objectName);
+        
+        await gcsFile.save(file.buffer, {
+          metadata: {
+            contentType: file.mimetype,
+            metadata: {
+              originalName: file.originalname,
+              uploadedAt: new Date().toISOString()
+            }
+          }
         });
+        
         fileUrls.push(`/api/files/${fileId}`);
       }
       
@@ -849,22 +873,8 @@ trailer<</Size 5/Root 1 0 R>>
       // The filename parameter is actually the file ID
       const fileId = filename;
       console.log(`Looking for assignment file with ID: ${fileId}`);
-      console.log("Available files in memory:", Array.from((global.uploadedFiles || new Map()).keys()));
       
-      // First try to find the file in memory storage
-      const uploadedFiles = global.uploadedFiles || new Map();
-      const fileData = uploadedFiles.get(fileId);
-      
-      if (fileData) {
-        console.log("Found assignment file in memory:", fileData.originalname);
-        res.setHeader('Content-Disposition', `inline; filename="${fileData.originalname}"`);
-        res.setHeader('Content-Type', fileData.mimetype || 'application/octet-stream');
-        res.setHeader('Content-Length', fileData.size);
-        return res.send(fileData.buffer);
-      }
-      
-      // If not found in memory, try object storage
-      console.log("File not found in memory, checking object storage...");
+      // Get file from object storage
       try {
         const objectStorageService = new ObjectStorageService();
         
@@ -1200,7 +1210,7 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
-  // Simple file upload route
+  // Simple file upload route - uploads to object storage
   app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
     try {
       if (!req.file) {
@@ -1209,21 +1219,34 @@ trailer<</Size 5/Root 1 0 R>>
 
       console.log("Simple file upload:", req.file.originalname, "Size:", req.file.size);
 
-      // Simple in-memory storage
+      // Upload to object storage
       const fileId = randomUUID();
-      const fileUrl = `/api/files/${fileId}`;
-
-      // Store file in memory with file ID
-      global.uploadedFiles = global.uploadedFiles || new Map();
-      global.uploadedFiles.set(fileId, {
-        buffer: req.file.buffer,
-        originalname: req.file.originalname,
-        mimetype: req.file.mimetype,
-        size: req.file.size,
-        uploadedAt: new Date()
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const objectPath = `${privateDir}/uploads/${fileId}`;
+      
+      // Parse the path to get bucket and object name
+      const pathParts = objectPath.split('/').filter(p => p);
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join('/');
+      
+      // Upload file to object storage
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      
+      await file.save(req.file.buffer, {
+        metadata: {
+          contentType: req.file.mimetype,
+          metadata: {
+            originalName: req.file.originalname,
+            uploadedAt: new Date().toISOString()
+          }
+        }
       });
 
-      console.log("File stored with ID:", fileId);
+      const fileUrl = `/api/files/${fileId}`;
+      console.log("File stored in object storage with ID:", fileId);
+      
       res.json({
         success: true,
         fileUrl: fileUrl,
@@ -1237,31 +1260,33 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
-  // Simple file download route
+  // Simple file download route - downloads from object storage
   app.get('/api/files/:fileId', isAuthenticated, async (req: any, res: any) => {
     try {
       const { fileId } = req.params;
       console.log(`Looking for file with ID: ${fileId}`);
 
-      const uploadedFiles = global.uploadedFiles || new Map();
-      console.log("Available files:", Array.from(uploadedFiles.keys()));
-
-      if (uploadedFiles.has(fileId)) {
-        const file = uploadedFiles.get(fileId);
-        if (file) {
-          console.log("Found file:", file.originalname);
-
-          // Set proper headers for download
-          res.setHeader('Content-Disposition', `attachment; filename="${file.originalname}"`);
-          res.setHeader('Content-Type', file.mimetype || 'application/octet-stream');
-          res.setHeader('Content-Length', file.size);
-
-          // Send the file buffer
-          return res.send(file.buffer);
-        }
+      // Try to get from object storage
+      const objectStorageService = new ObjectStorageService();
+      const privateDir = objectStorageService.getPrivateObjectDir();
+      const objectPath = `${privateDir}/uploads/${fileId}`;
+      
+      // Parse the path to get bucket and object name
+      const pathParts = objectPath.split('/').filter(p => p);
+      const bucketName = pathParts[0];
+      const objectName = pathParts.slice(1).join('/');
+      
+      const bucket = objectStorageClient.bucket(bucketName);
+      const file = bucket.file(objectName);
+      
+      const [exists] = await file.exists();
+      if (exists) {
+        console.log("Found file in object storage:", fileId);
+        await objectStorageService.downloadObject(file, res);
+        return;
       }
 
-      console.error(`File ${fileId} not found`);
+      console.error(`File ${fileId} not found in object storage`);
       res.status(404).json({ message: "File not found" });
     } catch (error) {
       console.error("Error serving file:", error);
