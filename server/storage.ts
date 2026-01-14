@@ -234,6 +234,7 @@ export interface IStorage {
   getTutorSubmissions(tutorId: string): Promise<any[]>;
   getTutorSubmission(tutorId: string, submissionId: string): Promise<any | undefined>;
   gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission>;
+  updateSubmissionAnnotations(submissionId: string, reviewerAnnotations: string): Promise<Submission>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
   deleteSubmission(id: string): Promise<void>;
 
@@ -1716,6 +1717,7 @@ export class DatabaseStorage implements IStorage {
           a.instructions as assignment_instructions,
           a.submission_date as assignment_submission_date,
           a.subject as assignment_subject,
+          a.attachment_urls as assignment_attachment_urls,
           a.class_id,
           c.name as class_name
         FROM submissions s
@@ -1765,6 +1767,7 @@ export class DatabaseStorage implements IStorage {
           instructions: row.assignment_instructions,
           submissionDate: row.assignment_submission_date,
           subject: row.assignment_subject,
+          attachmentUrls: row.assignment_attachment_urls || [],
         },
         class: {
           id: row.class_id,
@@ -1810,6 +1813,7 @@ export class DatabaseStorage implements IStorage {
           a.instructions as assignment_instructions,
           a.submission_date as assignment_submission_date,
           a.subject as assignment_subject,
+          a.attachment_urls as assignment_attachment_urls,
           a.class_id,
           c.name as class_name
         FROM submissions s
@@ -1830,7 +1834,7 @@ export class DatabaseStorage implements IStorage {
         studentId: row.student_id,
         content: row.content,
         digitalContent: row.digital_content,
-        fileUrls: row.file_urls,
+        fileUrls: row.file_urls || [],
         status: row.status,
         isDraft: row.is_draft,
         submittedAt: row.submitted_at,
@@ -1858,6 +1862,7 @@ export class DatabaseStorage implements IStorage {
           instructions: row.assignment_instructions,
           submissionDate: row.assignment_submission_date,
           subject: row.assignment_subject,
+          attachmentUrls: row.assignment_attachment_urls || [],
         },
         class: {
           id: row.class_id,
@@ -1901,6 +1906,7 @@ export class DatabaseStorage implements IStorage {
           a.instructions as assignment_instructions,
           a.submission_date as assignment_submission_date,
           a.subject as assignment_subject,
+          a.attachment_urls as assignment_attachment_urls,
           a.class_id,
           c.name as class_name
         FROM submissions s
@@ -1922,7 +1928,7 @@ export class DatabaseStorage implements IStorage {
         studentId: row.student_id,
         content: row.content,
         digitalContent: row.digital_content,
-        fileUrls: row.file_urls,
+        fileUrls: row.file_urls || [],
         status: row.status,
         isDraft: row.is_draft,
         submittedAt: row.submitted_at,
@@ -1950,6 +1956,7 @@ export class DatabaseStorage implements IStorage {
           instructions: row.assignment_instructions,
           submissionDate: row.assignment_submission_date,
           subject: row.assignment_subject,
+          attachmentUrls: row.assignment_attachment_urls || [],
         },
         class: {
           id: row.class_id,
@@ -1972,6 +1979,18 @@ export class DatabaseStorage implements IStorage {
         isDraft: false,
         gradedBy,
         gradedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .where(eq(submissions.id, submissionId))
+      .returning();
+    return updated;
+  }
+
+  async updateSubmissionAnnotations(submissionId: string, reviewerAnnotations: string): Promise<Submission> {
+    const [updated] = await db
+      .update(submissions)
+      .set({
+        reviewerAnnotations,
         updatedAt: new Date(),
       })
       .where(eq(submissions.id, submissionId))

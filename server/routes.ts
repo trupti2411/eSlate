@@ -1107,6 +1107,99 @@ trailer<</Size 5/Root 1 0 R>>
     }
   });
 
+  // Save reviewer annotations (tutor/company_admin/parent)
+  app.patch('/api/submissions/:submissionId/reviewer-annotations', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'parent'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { submissionId } = req.params;
+      const { reviewerAnnotations } = req.body;
+
+      // Get submission to check if already graded
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) {
+        return res.status(404).json({ message: "Submission not found" });
+      }
+
+      // Prevent annotation updates after grading
+      if (submission.status === 'graded') {
+        return res.status(400).json({ message: "Cannot modify annotations after grading" });
+      }
+
+      // Validate access based on role
+      if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor) {
+          return res.status(404).json({ message: "Tutor not found" });
+        }
+      } else if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin) {
+          return res.status(404).json({ message: "Company admin not found" });
+        }
+      } else if (user.role === 'parent') {
+        const parent = await storage.getParentByUserId(user.id);
+        if (!parent) {
+          return res.status(404).json({ message: "Parent not found" });
+        }
+        // Verify parent has access to this student's submission
+        const student = await storage.getStudent(submission.studentId);
+        if (!student || student.parentId !== parent.id) {
+          return res.status(403).json({ message: "Access denied to this submission" });
+        }
+      }
+
+      const updated = await storage.updateSubmissionAnnotations(submissionId, reviewerAnnotations);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error saving reviewer annotations:", error);
+      res.status(500).json({ message: "Failed to save annotations" });
+    }
+  });
+
+  // Get submission details for review (tutor/company_admin/parent)
+  app.get('/api/submissions/:submissionId/review', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'parent', 'student'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { submissionId } = req.params;
+      const submission = await storage.getSubmission(submissionId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: "Submission not found" });
+      }
+
+      // Get assignment details
+      const assignment = await storage.getAssignment(submission.assignmentId);
+      
+      // Get student details
+      const student = await storage.getStudent(submission.studentId);
+      const studentUser = student ? await storage.getUser(student.userId) : null;
+
+      res.json({
+        ...submission,
+        assignment,
+        student: student ? {
+          ...student,
+          user: studentUser ? {
+            firstName: studentUser.firstName,
+            lastName: studentUser.lastName,
+            email: studentUser.email
+          } : null
+        } : null
+      });
+    } catch (error) {
+      console.error("Error fetching submission for review:", error);
+      res.status(500).json({ message: "Failed to fetch submission" });
+    }
+  });
+
   // Simple file upload route
   app.post('/api/homework/upload-direct', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
     try {

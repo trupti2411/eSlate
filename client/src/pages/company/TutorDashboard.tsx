@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { TutorCalendarDashboard } from "@/components/calendar";
+import { ReviewerPDFAnnotator } from "@/components/ReviewerPDFAnnotator";
 import { 
   Users, 
   User,
@@ -33,7 +34,9 @@ import {
   Plus,
   Upload,
   MapPin,
-  X
+  X,
+  Eye,
+  Pencil
 } from "lucide-react";
 
 interface Assignment {
@@ -59,6 +62,7 @@ interface Submission {
   isLate: boolean;
   score: number;
   feedback: string;
+  reviewerAnnotations?: string;
   student: {
     id: string;
     user: {
@@ -160,6 +164,10 @@ export default function TutorDashboard() {
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [gradingScore, setGradingScore] = useState<string>('');
   const [gradingFeedback, setGradingFeedback] = useState<string>('');
+  
+  // Reviewer annotation state
+  const [annotatorSubmission, setAnnotatorSubmission] = useState<any>(null);
+  const [isAnnotatorOpen, setIsAnnotatorOpen] = useState(false);
   
   // Profile editing state
   const [isEditingProfile, setIsEditingProfile] = useState(false);
@@ -267,6 +275,7 @@ export default function TutorDashboard() {
       description: string;
       subject: string;
       submissionDate: string;
+      attachmentUrls?: string[];
     };
     class: {
       id: string;
@@ -315,6 +324,41 @@ export default function TutorDashboard() {
       return;
     }
     gradeSubmissionMutation.mutate({ submissionId, score, feedback: gradingFeedback });
+  };
+
+  // Mutation for saving reviewer annotations
+  const saveAnnotationsMutation = useMutation({
+    mutationFn: async ({ submissionId, reviewerAnnotations }: { submissionId: string; reviewerAnnotations: string }) => {
+      const response = await apiRequest(`/api/submissions/${submissionId}/reviewer-annotations`, 'PATCH', { reviewerAnnotations });
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Annotations saved successfully",
+      });
+      refetchSubmissions();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save annotations",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpenAnnotator = (submission: any) => {
+    setAnnotatorSubmission(submission);
+    setIsAnnotatorOpen(true);
+  };
+
+  const handleSaveAnnotations = async (annotations: string) => {
+    if (!annotatorSubmission) return;
+    await saveAnnotationsMutation.mutateAsync({ 
+      submissionId: annotatorSubmission.id, 
+      reviewerAnnotations: annotations 
+    });
   };
 
   // Initialize profile form when tutorProfile loads
@@ -812,16 +856,29 @@ export default function TutorDashboard() {
                                       )}
                                     </div>
                                     
-                                    <Button
-                                      onClick={() => {
-                                        setSelectedSubmissionId(submission.id);
-                                        setGradingScore(submission.score?.toString() || '');
-                                        setGradingFeedback(submission.feedback || '');
-                                      }}
-                                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                                    >
-                                      Grade
-                                    </Button>
+                                    <div className="flex gap-2">
+                                      {/* Review & Annotate Button - show if there are submission files or assignment attachments */}
+                                      {((submission.fileUrls && submission.fileUrls.length > 0) || 
+                                        (submission.assignment?.attachmentUrls && submission.assignment.attachmentUrls.length > 0)) && (
+                                        <Button
+                                          variant="outline"
+                                          onClick={() => handleOpenAnnotator(submission)}
+                                        >
+                                          <Pencil className="h-4 w-4 mr-1" />
+                                          Review
+                                        </Button>
+                                      )}
+                                      <Button
+                                        onClick={() => {
+                                          setSelectedSubmissionId(submission.id);
+                                          setGradingScore(submission.score?.toString() || '');
+                                          setGradingFeedback(submission.feedback || '');
+                                        }}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                      >
+                                        Grade
+                                      </Button>
+                                    </div>
                                   </div>
                                   
                                   {/* Grading Form */}
@@ -916,19 +973,33 @@ export default function TutorDashboard() {
                                       )}
                                     </div>
                                     
-                                    {/* Edit Grade Button */}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedSubmissionId(submission.id);
-                                        setGradingScore(submission.score?.toString() || '');
-                                        setGradingFeedback(submission.feedback || '');
-                                      }}
-                                    >
-                                      <Edit className="h-3 w-3 mr-1" />
-                                      Edit
-                                    </Button>
+                                    <div className="flex gap-2">
+                                      {/* View Submission Button - for graded submissions */}
+                                      {((submission.fileUrls && submission.fileUrls.length > 0) || 
+                                        (submission.assignment?.attachmentUrls && submission.assignment.attachmentUrls.length > 0)) && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleOpenAnnotator(submission)}
+                                        >
+                                          <Eye className="h-3 w-3 mr-1" />
+                                          View
+                                        </Button>
+                                      )}
+                                      {/* Edit Grade Button */}
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedSubmissionId(submission.id);
+                                          setGradingScore(submission.score?.toString() || '');
+                                          setGradingFeedback(submission.feedback || '');
+                                        }}
+                                      >
+                                        <Edit className="h-3 w-3 mr-1" />
+                                        Edit
+                                      </Button>
+                                    </div>
                                   </div>
                                   
                                   {/* Edit Grading Form */}
@@ -1565,6 +1636,23 @@ export default function TutorDashboard() {
         </>
         )}
       </div>
+
+      {/* Reviewer PDF Annotator Modal */}
+      {isAnnotatorOpen && annotatorSubmission && (
+        <ReviewerPDFAnnotator
+          pdfUrl={annotatorSubmission.fileUrls?.[0] || annotatorSubmission.assignment?.attachmentUrls?.[0] || ''}
+          submissionId={annotatorSubmission.id}
+          existingAnnotations={annotatorSubmission.reviewerAnnotations}
+          isViewOnly={annotatorSubmission.status === 'graded'}
+          onSave={handleSaveAnnotations}
+          onClose={() => {
+            setIsAnnotatorOpen(false);
+            setAnnotatorSubmission(null);
+          }}
+          studentName={`${annotatorSubmission.student?.user?.firstName || ''} ${annotatorSubmission.student?.user?.lastName || ''}`}
+          assignmentTitle={annotatorSubmission.assignment?.title}
+        />
+      )}
     </Layout>
   );
 }

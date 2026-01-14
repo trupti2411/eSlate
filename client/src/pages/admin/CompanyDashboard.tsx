@@ -16,8 +16,9 @@ import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3, Download, AlertCircle, ClipboardCheck } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3, Download, AlertCircle, ClipboardCheck, Pencil } from "lucide-react";
 import NotificationSettings from "@/components/settings/NotificationSettings";
+import { ReviewerPDFAnnotator } from "@/components/ReviewerPDFAnnotator";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
 import { ESlateHeader } from "@/components/eSlateHeader";
@@ -551,6 +552,10 @@ export default function CompanyDashboard() {
   const [selectedSubmissionId, setSelectedSubmissionId] = useState<string | null>(null);
   const [gradingScore, setGradingScore] = useState<string>('');
   const [gradingFeedback, setGradingFeedback] = useState<string>('');
+  
+  // Reviewer annotation state
+  const [annotatorSubmission, setAnnotatorSubmission] = useState<any>(null);
+  const [isAnnotatorOpen, setIsAnnotatorOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -673,6 +678,41 @@ export default function CompanyDashboard() {
       return;
     }
     gradeSubmissionMutation.mutate({ submissionId, score, feedback: gradingFeedback });
+  };
+
+  // Mutation for saving reviewer annotations
+  const saveAnnotationsMutation = useMutation({
+    mutationFn: async ({ submissionId, reviewerAnnotations }: { submissionId: string; reviewerAnnotations: string }) => {
+      const response = await apiRequest(`/api/submissions/${submissionId}/reviewer-annotations`, 'PATCH', { reviewerAnnotations });
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Annotations saved successfully",
+      });
+      refetchSubmissions();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to save annotations",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleOpenAnnotator = (submission: any) => {
+    setAnnotatorSubmission(submission);
+    setIsAnnotatorOpen(true);
+  };
+
+  const handleSaveAnnotations = async (annotations: string) => {
+    if (!annotatorSubmission) return;
+    await saveAnnotationsMutation.mutateAsync({ 
+      submissionId: annotatorSubmission.id, 
+      reviewerAnnotations: annotations 
+    });
   };
 
   const toggleYear = (yearId: string) => {
@@ -2795,16 +2835,29 @@ export default function CompanyDashboard() {
                                       )}
                                     </div>
                                     
-                                    <Button
-                                      onClick={() => {
-                                        setSelectedSubmissionId(submission.id);
-                                        setGradingScore(submission.score?.toString() || '');
-                                        setGradingFeedback(submission.feedback || '');
-                                      }}
-                                      className="bg-blue-600 hover:bg-blue-700 text-white"
-                                    >
-                                      Grade
-                                    </Button>
+                                    <div className="flex gap-2">
+                                      {/* Review & Annotate Button - show if there are submission files or assignment attachments */}
+                                      {((submission.fileUrls && submission.fileUrls.length > 0) || 
+                                        (submission.assignment?.attachmentUrls && submission.assignment.attachmentUrls.length > 0)) && (
+                                        <Button
+                                          variant="outline"
+                                          onClick={() => handleOpenAnnotator(submission)}
+                                        >
+                                          <Pencil className="h-4 w-4 mr-1" />
+                                          Review
+                                        </Button>
+                                      )}
+                                      <Button
+                                        onClick={() => {
+                                          setSelectedSubmissionId(submission.id);
+                                          setGradingScore(submission.score?.toString() || '');
+                                          setGradingFeedback(submission.feedback || '');
+                                        }}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                      >
+                                        Grade
+                                      </Button>
+                                    </div>
                                   </div>
                                   
                                   {/* Grading Form */}
@@ -2899,19 +2952,33 @@ export default function CompanyDashboard() {
                                       )}
                                     </div>
                                     
-                                    {/* Edit Grade Button */}
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => {
-                                        setSelectedSubmissionId(submission.id);
-                                        setGradingScore(submission.score?.toString() || '');
-                                        setGradingFeedback(submission.feedback || '');
-                                      }}
-                                    >
-                                      <Edit className="h-3 w-3 mr-1" />
-                                      Edit
-                                    </Button>
+                                    <div className="flex gap-2">
+                                      {/* View Submission Button - for graded submissions */}
+                                      {((submission.fileUrls && submission.fileUrls.length > 0) || 
+                                        (submission.assignment?.attachmentUrls && submission.assignment.attachmentUrls.length > 0)) && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleOpenAnnotator(submission)}
+                                        >
+                                          <Eye className="h-3 w-3 mr-1" />
+                                          View
+                                        </Button>
+                                      )}
+                                      {/* Edit Grade Button */}
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setSelectedSubmissionId(submission.id);
+                                          setGradingScore(submission.score?.toString() || '');
+                                          setGradingFeedback(submission.feedback || '');
+                                        }}
+                                      >
+                                        <Edit className="h-3 w-3 mr-1" />
+                                        Edit
+                                      </Button>
+                                    </div>
                                   </div>
                                   
                                   {/* Edit Grading Form */}
@@ -3007,6 +3074,23 @@ export default function CompanyDashboard() {
 
       {selectedStudentId && companyAdmin?.companyId && (
         <StudentProfileDialog studentId={selectedStudentId} companyId={companyAdmin.companyId} isOpen={isStudentProfileOpen} onClose={() => { setIsStudentProfileOpen(false); setSelectedStudentId(null); }} />
+      )}
+
+      {/* Reviewer PDF Annotator Modal */}
+      {isAnnotatorOpen && annotatorSubmission && (
+        <ReviewerPDFAnnotator
+          pdfUrl={annotatorSubmission.fileUrls?.[0] || annotatorSubmission.assignment?.attachmentUrls?.[0] || ''}
+          submissionId={annotatorSubmission.id}
+          existingAnnotations={annotatorSubmission.reviewerAnnotations}
+          isViewOnly={annotatorSubmission.status === 'graded'}
+          onSave={handleSaveAnnotations}
+          onClose={() => {
+            setIsAnnotatorOpen(false);
+            setAnnotatorSubmission(null);
+          }}
+          studentName={`${annotatorSubmission.student?.user?.firstName || ''} ${annotatorSubmission.student?.user?.lastName || ''}`}
+          assignmentTitle={annotatorSubmission.assignment?.title}
+        />
       )}
       
       {/* eSlate Footer */}
