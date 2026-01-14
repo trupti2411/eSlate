@@ -20,6 +20,8 @@ import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
+import { ESlateHeader } from "@/components/eSlateHeader";
+import { ESlateFooter } from "@/components/eSlateFooter";
 
 interface CompanyAdmin {
   id: string;
@@ -1006,8 +1008,11 @@ export default function CompanyDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* eSlate Branded Header */}
+      <ESlateHeader />
+      
+      {/* Page Header */}
       <div className="bg-white border-b-2 border-black">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
@@ -2661,6 +2666,9 @@ export default function CompanyDashboard() {
       {selectedStudentId && companyAdmin?.companyId && (
         <StudentProfileDialog studentId={selectedStudentId} companyId={companyAdmin.companyId} isOpen={isStudentProfileOpen} onClose={() => { setIsStudentProfileOpen(false); setSelectedStudentId(null); }} />
       )}
+      
+      {/* eSlate Footer */}
+      <ESlateFooter />
     </div>
   );
 }

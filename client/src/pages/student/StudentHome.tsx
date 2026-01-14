@@ -16,6 +16,8 @@ import { format, differenceInDays, isPast } from 'date-fns';
 import { Assignment, AcademicTerm, Class, Submission } from '@shared/schema';
 import { StudentCalendarDashboard } from '@/components/calendar/StudentCalendarDashboard';
 import { StudentPortal } from './StudentPortal';
+import { ESlateHeader } from '@/components/eSlateHeader';
+import { ESlateFooter } from '@/components/eSlateFooter';
 
 interface AttendanceApiResponse {
   summary: {
@@ -239,8 +241,11 @@ export default function StudentHome() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header - matching company portal exactly */}
+    <div className="min-h-screen bg-gray-50 flex flex-col">
+      {/* eSlate Branded Header */}
+      <ESlateHeader />
+      
+      {/* Page Header */}
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
@@ -821,6 +826,9 @@ export default function StudentHome() {
             </div>
           )}
       </div>
+      
+      {/* eSlate Footer */}
+      <ESlateFooter />
     </div>
   );
 }
