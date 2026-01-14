@@ -893,9 +893,50 @@ export class DatabaseStorage implements IStorage {
 
       const tutorUserMap = new Map(tutorUsers.map((u: any) => [u.id, u]));
 
+      // Get class enrollments from studentClassAssignments for students without direct classId
+      const studentIds = companyStudents.map((row: any) => row.students.id);
+      const classEnrollments = studentIds.length > 0
+        ? await db.select()
+            .from(studentClassAssignments)
+            .innerJoin(classes, eq(studentClassAssignments.classId, classes.id))
+            .where(
+              and(
+                inArray(studentClassAssignments.studentId, studentIds),
+                eq(studentClassAssignments.isActive, true)
+              )
+            )
+        : [];
+
+      // Create a map of student ID to enrolled class
+      const enrollmentMap = new Map<string, any>();
+      for (const enrollment of classEnrollments) {
+        const studentId = (enrollment as any).student_class_assignments.studentId;
+        if (!enrollmentMap.has(studentId)) {
+          enrollmentMap.set(studentId, (enrollment as any).classes);
+        }
+      }
+
       // Transform the result to match expected structure
       return companyStudents.map((row: any) => {
         const tutorUser = row.tutors?.userId ? tutorUserMap.get(row.tutors.userId) : null;
+        
+        // Use direct classId if available, otherwise check enrollments
+        let classInfo = row.classes ? {
+          id: row.classes.id,
+          name: row.classes.name,
+          academicYearId: row.classes.academicYearId
+        } : null;
+        
+        // If no direct class, check class enrollments
+        if (!classInfo && enrollmentMap.has(row.students.id)) {
+          const enrolledClass = enrollmentMap.get(row.students.id);
+          classInfo = {
+            id: enrolledClass.id,
+            name: enrolledClass.name,
+            academicYearId: enrolledClass.academicYearId
+          };
+        }
+        
         return {
           id: row.students.id,
           userId: row.students.userId,
@@ -914,11 +955,7 @@ export class DatabaseStorage implements IStorage {
             isActive: row.users.isActive,
             createdAt: row.users.createdAt
           },
-          class: row.classes ? {
-            id: row.classes.id,
-            name: row.classes.name,
-            academicYearId: row.classes.academicYearId
-          } : null,
+          class: classInfo,
           tutor: row.tutors ? {
             id: row.tutors.id,
             user: tutorUser ? {
