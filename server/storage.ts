@@ -2057,7 +2057,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateWorksheetQuestion(id: string, data: Partial<InsertWorksheetQuestion>): Promise<WorksheetQuestion> {
-    const [question] = await db.update(worksheetQuestions).set(data).where(eq(worksheetQuestions.id, id)).returning();
+    // Remove read-only fields that shouldn't be updated
+    const { id: _id, createdAt, ...updateData } = data as any;
+    const [question] = await db.update(worksheetQuestions).set(updateData).where(eq(worksheetQuestions.id, id)).returning();
     return question;
   }
 

@@ -433,7 +433,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignmentData = {
         ...req.body,
         createdBy: user.id,
-        submissionDate: new Date(req.body.submissionDate) // Convert string to Date
+        submissionDate: new Date(req.body.submissionDate), // Convert string to Date
+        // Convert empty strings to null for optional foreign key fields (not regular strings)
+        academicYearId: req.body.academicYearId || null,
+        academicTermId: req.body.academicTermId || null,
+        termId: req.body.termId || null,
+        worksheetId: req.body.worksheetId || null,
       };
       console.log("Processing assignment data:", assignmentData);
       
@@ -481,6 +486,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (updateData.submissionDate && typeof updateData.submissionDate === 'string') {
         updateData.submissionDate = new Date(updateData.submissionDate);
       }
+      
+      // Convert empty strings to null for optional foreign key fields
+      if ('academicYearId' in updateData) updateData.academicYearId = updateData.academicYearId || null;
+      if ('academicTermId' in updateData) updateData.academicTermId = updateData.academicTermId || null;
+      if ('termId' in updateData) updateData.termId = updateData.termId || null;
+      if ('worksheetId' in updateData) updateData.worksheetId = updateData.worksheetId || null;
       
       const validatedData = insertAssignmentSchema.partial().parse(updateData);
       const updatedAssignment = await storage.updateAssignment(assignmentId, validatedData);
