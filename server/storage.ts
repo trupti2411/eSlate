@@ -1718,6 +1718,8 @@ export class DatabaseStorage implements IStorage {
           a.submission_date as assignment_submission_date,
           a.subject as assignment_subject,
           a.attachment_urls as assignment_attachment_urls,
+          a.assignment_kind,
+          a.worksheet_id,
           a.class_id,
           c.name as class_name
         FROM submissions s
@@ -1768,6 +1770,8 @@ export class DatabaseStorage implements IStorage {
           submissionDate: row.assignment_submission_date,
           subject: row.assignment_subject,
           attachmentUrls: row.assignment_attachment_urls || [],
+          assignmentKind: row.assignment_kind || 'file_upload',
+          worksheetId: row.worksheet_id,
         },
         class: {
           id: row.class_id,

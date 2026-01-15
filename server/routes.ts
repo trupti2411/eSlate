@@ -5052,6 +5052,73 @@ Good luck with your assignment!"
     }
   });
 
+  // Grade worksheet answers (for tutors/admins)
+  app.post('/api/worksheets/:worksheetId/grade/:studentId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { worksheetId, studentId } = req.params;
+      const { grades } = req.body;
+      
+      if (!Array.isArray(grades)) {
+        return res.status(400).json({ error: 'Grades must be an array' });
+      }
+      
+      // Get all answers for this worksheet/student
+      const answers = await storage.getWorksheetAnswers(worksheetId, studentId);
+      const answerMap = new Map(answers.map(a => [a.questionId, a]));
+      
+      // Update each answer with grade and feedback
+      for (const gradeData of grades) {
+        const { questionId, score, feedback } = gradeData;
+        const answer = answerMap.get(questionId);
+        
+        if (answer) {
+          await storage.updateWorksheetAnswer(answer.id, {
+            grade: score,
+            feedback: feedback || null
+          });
+        }
+      }
+      
+      // Also update the related submission status to 'graded' if exists
+      try {
+        const assignment = await storage.getAssignmentByWorksheetAndStudent(worksheetId, studentId);
+        if (assignment) {
+          const submissions = await storage.getSubmissionsByAssignmentAndStudent(assignment.id, studentId);
+          if (submissions.length > 0) {
+            // Calculate total score
+            const worksheetData = await storage.getFullWorksheet(worksheetId);
+            const allQuestions = worksheetData?.pages?.flatMap(p => p.questions || []) || [];
+            let totalScore = 0;
+            let maxScore = 0;
+            
+            for (const q of allQuestions) {
+              if (q.questionType !== 'information') {
+                maxScore += q.points || 1;
+                const gradeEntry = grades.find((g: any) => g.questionId === q.id);
+                if (gradeEntry) {
+                  totalScore += gradeEntry.score || 0;
+                }
+              }
+            }
+            
+            await storage.updateSubmission(submissions[0].id, {
+              status: 'graded',
+              score: totalScore,
+              feedback: `Graded: ${totalScore}/${maxScore} points`
+            });
+          }
+        }
+      } catch (linkError) {
+        console.log('Note: Could not update linked submission:', linkError);
+      }
+      
+      res.json({ success: true, message: 'Grades saved successfully' });
+    } catch (error) {
+      console.error('Error grading worksheet:', error);
+      res.status(500).json({ error: 'Failed to save grades' });
+    }
+  });
+
   // ============================================
   // Test/Exam Routes
   // ============================================

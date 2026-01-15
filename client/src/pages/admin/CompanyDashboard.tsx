@@ -19,6 +19,7 @@ import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
 import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3, Download, AlertCircle, ClipboardCheck, Pencil } from "lucide-react";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import { ReviewerPDFAnnotator } from "@/components/ReviewerPDFAnnotator";
+import { WorksheetReviewer } from "@/components/WorksheetReviewer";
 import { format } from "date-fns";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart, Legend } from "recharts";
 import { ESlateHeader } from "@/components/eSlateHeader";
@@ -556,6 +557,10 @@ export default function CompanyDashboard() {
   // Reviewer annotation state
   const [annotatorSubmission, setAnnotatorSubmission] = useState<any>(null);
   const [isAnnotatorOpen, setIsAnnotatorOpen] = useState(false);
+  
+  // Worksheet reviewer state
+  const [worksheetReviewData, setWorksheetReviewData] = useState<{ worksheetId: string; studentId: string; studentName: string } | null>(null);
+  const [isWorksheetReviewOpen, setIsWorksheetReviewOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -630,6 +635,8 @@ export default function CompanyDashboard() {
       description: string;
       subject: string;
       submissionDate: string;
+      assignmentKind?: 'file_upload' | 'worksheet';
+      worksheetId?: string;
     };
     class: {
       id: string;
@@ -703,8 +710,20 @@ export default function CompanyDashboard() {
   });
 
   const handleOpenAnnotator = (submission: any) => {
-    setAnnotatorSubmission(submission);
-    setIsAnnotatorOpen(true);
+    // Check if this is a worksheet assignment
+    if (submission.assignment?.assignmentKind === 'worksheet' && submission.assignment?.worksheetId) {
+      const studentName = `${submission.student?.user?.firstName || ''} ${submission.student?.user?.lastName || ''}`.trim();
+      setWorksheetReviewData({
+        worksheetId: submission.assignment.worksheetId,
+        studentId: submission.studentId,
+        studentName: studentName || 'Student'
+      });
+      setIsWorksheetReviewOpen(true);
+    } else {
+      // Regular file-based assignment - open PDF annotator
+      setAnnotatorSubmission(submission);
+      setIsAnnotatorOpen(true);
+    }
   };
 
   const handleSaveAnnotations = async (annotations: string) => {
@@ -2836,8 +2855,9 @@ export default function CompanyDashboard() {
                                     </div>
                                     
                                     <div className="flex gap-2">
-                                      {/* Review & Annotate Button - show if there are submission files or assignment attachments */}
-                                      {((submission.fileUrls && submission.fileUrls.length > 0) || 
+                                      {/* Review Button - show for worksheets OR if there are submission files or assignment attachments */}
+                                      {((submission.assignment?.assignmentKind === 'worksheet' && submission.assignment?.worksheetId) ||
+                                        (submission.fileUrls && submission.fileUrls.length > 0) || 
                                         (submission.assignment?.attachmentUrls && submission.assignment.attachmentUrls.length > 0)) && (
                                         <Button
                                           variant="outline"
@@ -2953,8 +2973,9 @@ export default function CompanyDashboard() {
                                     </div>
                                     
                                     <div className="flex gap-2">
-                                      {/* View Submission Button - for graded submissions */}
-                                      {((submission.fileUrls && submission.fileUrls.length > 0) || 
+                                      {/* View Submission Button - for graded submissions (worksheets or file uploads) */}
+                                      {((submission.assignment?.assignmentKind === 'worksheet' && submission.assignment?.worksheetId) ||
+                                        (submission.fileUrls && submission.fileUrls.length > 0) || 
                                         (submission.assignment?.attachmentUrls && submission.assignment.attachmentUrls.length > 0)) && (
                                         <Button
                                           variant="outline"
@@ -3090,6 +3111,22 @@ export default function CompanyDashboard() {
           }}
           studentName={`${annotatorSubmission.student?.user?.firstName || ''} ${annotatorSubmission.student?.user?.lastName || ''}`}
           assignmentTitle={annotatorSubmission.assignment?.title}
+        />
+      )}
+
+      {/* Worksheet Reviewer Modal */}
+      {isWorksheetReviewOpen && worksheetReviewData && (
+        <WorksheetReviewer
+          worksheetId={worksheetReviewData.worksheetId}
+          studentId={worksheetReviewData.studentId}
+          studentName={worksheetReviewData.studentName}
+          onClose={() => {
+            setIsWorksheetReviewOpen(false);
+            setWorksheetReviewData(null);
+          }}
+          onGradeComplete={() => {
+            refetchSubmissions();
+          }}
         />
       )}
       
