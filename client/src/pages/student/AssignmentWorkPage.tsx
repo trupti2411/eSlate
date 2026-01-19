@@ -148,63 +148,73 @@ export function AssignmentWorkPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[1400px] mx-auto px-4 py-4">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-            <div className="lg:col-span-1">
-              <Card className="border-2 border-black sticky top-4">
-                <CardHeader className="pb-2 pt-3">
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <BookOpen className="h-4 w-4" />
-                    Assignment Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3 text-sm">
-                  <div>
-                    <span className="text-gray-500">Subject:</span>
-                    <Badge variant="outline" className="ml-2 text-xs">{assignment.subject}</Badge>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Type:</span>
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      {assignment.assignmentKind === 'worksheet' ? 'Interactive Worksheet' : 'File Upload'}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-3 w-3 text-gray-400" />
-                    <span className="text-gray-500">Due:</span>
-                    <span className="font-medium">{format(dueDate, 'MMM dd, yyyy')}</span>
-                  </div>
-                  {assignment.description && (
-                    <div className="pt-2 border-t">
-                      <span className="text-gray-500 block mb-1">Description:</span>
-                      <p className="text-gray-700 text-xs">{assignment.description}</p>
-                    </div>
-                  )}
-                  {currentSubmission && (
-                    <div className="pt-2 border-t">
-                      <span className="text-gray-500 block mb-1">Status:</span>
-                      <div className="flex items-center gap-2">
-                        {currentSubmission.status === 'submitted' || currentSubmission.status === 'graded' || currentSubmission.status === 'parent_verified' ? (
-                          <CheckCircle className="h-4 w-4 text-green-500" />
-                        ) : (
-                          <Clock className="h-4 w-4 text-yellow-500" />
-                        )}
-                        <span className="capitalize">{currentSubmission.status}</span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            <div className="lg:col-span-3">
+        <div className="w-full px-4 py-3">
+          {assignment.assignmentKind === 'worksheet' ? (
+            <div className="w-full">
               <AssignmentCompletionArea
                 assignment={assignment}
                 submission={currentSubmission}
                 onSubmissionUpdate={handleSubmissionUpdate}
               />
             </div>
-          </div>
+          ) : (
+            <div className="max-w-[1400px] mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
+                <div className="lg:col-span-1">
+                  <Card className="border-2 border-black sticky top-4">
+                    <CardHeader className="pb-2 pt-3">
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <BookOpen className="h-4 w-4" />
+                        Assignment Details
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                      <div>
+                        <span className="text-gray-500">Subject:</span>
+                        <Badge variant="outline" className="ml-2 text-xs">{assignment.subject}</Badge>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Type:</span>
+                        <Badge variant="secondary" className="ml-2 text-xs">File Upload</Badge>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3 w-3 text-gray-400" />
+                        <span className="text-gray-500">Due:</span>
+                        <span className="font-medium">{format(dueDate, 'MMM dd, yyyy')}</span>
+                      </div>
+                      {assignment.description && (
+                        <div className="pt-2 border-t">
+                          <span className="text-gray-500 block mb-1">Description:</span>
+                          <p className="text-gray-700 text-xs">{assignment.description}</p>
+                        </div>
+                      )}
+                      {currentSubmission && (
+                        <div className="pt-2 border-t">
+                          <span className="text-gray-500 block mb-1">Status:</span>
+                          <div className="flex items-center gap-2">
+                            {currentSubmission.status === 'submitted' || currentSubmission.status === 'graded' || currentSubmission.status === 'parent_verified' ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <Clock className="h-4 w-4 text-yellow-500" />
+                            )}
+                            <span className="capitalize">{currentSubmission.status}</span>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="lg:col-span-3">
+                  <AssignmentCompletionArea
+                    assignment={assignment}
+                    submission={currentSubmission}
+                    onSubmissionUpdate={handleSubmissionUpdate}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

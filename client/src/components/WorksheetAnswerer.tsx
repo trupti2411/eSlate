@@ -566,37 +566,37 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
   };
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      {/* Header */}
-      <div className="border-b p-4 flex items-center justify-between bg-card">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-answerer">
-            <ChevronLeft className="h-5 w-5" />
+    <div className="flex flex-col h-full min-h-[600px] bg-background">
+      {/* Header - Compact for 13.3" e-ink screens */}
+      <div className="border-b-2 border-black p-3 flex items-center justify-between bg-card">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8" data-testid="button-close-answerer">
+            <ChevronLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-xl font-bold">{worksheet.title}</h1>
-            <div className="flex items-center gap-2 mt-1">
+            <h1 className="text-lg font-bold">{worksheet.title}</h1>
+            <div className="flex items-center gap-2">
               {worksheet.subject && (
-                <span className="text-sm text-muted-foreground">{worksheet.subject}</span>
+                <span className="text-xs text-muted-foreground">{worksheet.subject}</span>
               )}
               <span className="text-muted-foreground">•</span>
-              <span className="text-sm text-muted-foreground">{totalPages} pages</span>
+              <span className="text-xs text-muted-foreground">{totalPages} pages</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4" />
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+            <CheckCircle2 className="h-3.5 w-3.5" />
             {progress.answered}/{progress.total} answered
           </div>
-          <Button variant="outline" onClick={handleSaveAll} disabled={isSaving} data-testid="button-save-all">
-            <Save className="h-4 w-4 mr-2" />
+          <Button variant="outline" size="sm" onClick={handleSaveAll} disabled={isSaving} className="h-8 px-3 text-sm" data-testid="button-save-all">
+            <Save className="h-3.5 w-3.5 mr-1.5" />
             {isSaving ? 'Saving...' : 'Save Work'}
           </Button>
           <AlertDialog open={showSubmitDialog} onOpenChange={setShowSubmitDialog}>
             <AlertDialogTrigger asChild>
-              <Button data-testid="button-submit-worksheet">
-                <Send className="h-4 w-4 mr-2" /> Submit
+              <Button size="sm" className="h-8 px-3 text-sm bg-black text-white hover:bg-gray-800" data-testid="button-submit-worksheet">
+                <Send className="h-3.5 w-3.5 mr-1.5" /> Submit
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
@@ -619,8 +619,8 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Page Navigation Sidebar */}
-        <div className="w-48 border-r bg-muted/30 p-4 flex flex-col">
+        {/* Page Navigation Sidebar - Narrower for 13.3" screens */}
+        <div className="w-40 border-r-2 border-black bg-muted/30 p-3 flex flex-col">
           <div className="font-medium mb-3">Pages</div>
           <ScrollArea className="flex-1">
             <div className="space-y-2">
@@ -654,12 +654,12 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
           </ScrollArea>
         </div>
 
-        {/* Main Content Area */}
+        {/* Main Content Area - Full width for 13.3" e-ink screens */}
         <ScrollArea className="flex-1">
-          <div className="p-6 max-w-3xl mx-auto">
+          <div className="p-4 w-full">
             {currentPage ? (
               <>
-                <h2 className="text-2xl font-bold mb-6">Page {currentPage.pageNumber}</h2>
+                <h2 className="text-xl font-bold mb-4">Page {currentPage.pageNumber}</h2>
                 {currentPage.questions.map(renderQuestionInput)}
               </>
             ) : (

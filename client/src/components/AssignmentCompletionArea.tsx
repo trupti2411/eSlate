@@ -219,9 +219,9 @@ export function AssignmentCompletionArea({
   // For worksheet-type assignments, render the WorksheetAnswerer component
   if (assignment.assignmentKind === 'worksheet' && assignment.worksheetId) {
     return (
-      <div className="space-y-6 max-w-4xl mx-auto">
-        {/* Assignment Header */}
-        <div className={`${eInkStyles.card} p-6`}>
+      <div className="space-y-4 w-full">
+        {/* Assignment Header - Compact for 13.3" screens */}
+        <div className={`${eInkStyles.card} p-4`}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-4">
             <div>
               <h1 className="text-2xl font-bold text-black mb-2">{assignment.title}</h1>
@@ -317,9 +317,9 @@ export function AssignmentCompletionArea({
           </div>
         )}
 
-        {/* Worksheet Answerer */}
-        <div className={`${eInkStyles.card} p-6`}>
-          <h3 className="font-semibold text-lg mb-4">Complete Your Worksheet</h3>
+        {/* Worksheet Answerer - Full width for 13.3" e-ink screens */}
+        <div className={`${eInkStyles.card} p-4`}>
+          <h3 className="font-semibold text-base mb-3">Complete Your Worksheet</h3>
           <WorksheetAnswerer
             worksheetId={assignment.worksheetId}
             assignmentId={assignment.id}
