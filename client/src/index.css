@@ -42,6 +42,17 @@
   --eink-light: hsl(0, 0%, 40%);
   --eink-white: hsl(0, 0%, 100%);
   
+  /* 13.3" E-ink Screen Layout Tokens */
+  /* Typical 13.3" e-ink: 2200x1650 (4:3) or 1600x1200 */
+  --eink-container-max: 1400px;
+  --eink-sidebar-width: 200px;
+  --eink-header-height: 56px;
+  --eink-content-padding: 16px;
+  --eink-card-gap: 12px;
+  --eink-font-base: 15px;
+  --eink-line-height: 1.5;
+  --eink-touch-target: 44px;
+  
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-serif: Georgia, serif;
   --font-mono: Menlo, monospace;
@@ -142,23 +153,127 @@
 
 @layer components {
   .container {
-    @apply mx-auto max-w-6xl px-4;
+    @apply mx-auto px-4;
+    max-width: var(--eink-container-max);
+  }
+  
+  /* 13.3" E-ink Screen Layout Classes */
+  .eink-layout {
+    display: flex;
+    min-height: 100vh;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+  
+  .eink-sidebar {
+    width: var(--eink-sidebar-width);
+    min-height: calc(100vh - var(--eink-header-height));
+    flex-shrink: 0;
+    border-right: 2px solid var(--eink-black);
+    padding: var(--eink-content-padding);
+  }
+  
+  .eink-main {
+    flex: 1;
+    padding: var(--eink-content-padding);
+    max-width: calc(100vw - var(--eink-sidebar-width));
+    overflow-x: auto;
+  }
+  
+  .eink-header {
+    height: var(--eink-header-height);
+    border-bottom: 2px solid var(--eink-black);
+    display: flex;
+    align-items: center;
+    padding: 0 var(--eink-content-padding);
+  }
+  
+  .eink-content-grid {
+    display: grid;
+    gap: var(--eink-card-gap);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+  
+  .eink-content-grid-2 {
+    display: grid;
+    gap: var(--eink-card-gap);
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .eink-content-grid-3 {
+    display: grid;
+    gap: var(--eink-card-gap);
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  .eink-content-grid-4 {
+    display: grid;
+    gap: var(--eink-card-gap);
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  .eink-compact-card {
+    @apply border-2 border-black bg-white p-3;
+  }
+  
+  .eink-touch-target {
+    min-height: var(--eink-touch-target);
+    min-width: var(--eink-touch-target);
+  }
+  
+  .eink-nav-item {
+    @apply flex items-center gap-2 px-3 py-2 text-sm font-medium border-2 border-black;
+    min-height: var(--eink-touch-target);
+  }
+  
+  .eink-nav-item-active {
+    @apply bg-black text-white;
+  }
+  
+  .eink-nav-item-inactive {
+    @apply bg-white text-black hover:bg-gray-50;
+  }
+  
+  .eink-section {
+    @apply mb-4;
+  }
+  
+  .eink-section-header {
+    @apply flex items-center justify-between mb-3 pb-2 border-b-2 border-black;
+  }
+  
+  .eink-table {
+    @apply w-full border-2 border-black text-sm;
+  }
+  
+  .eink-table th {
+    @apply bg-black text-white px-3 py-2 text-left font-semibold;
+  }
+  
+  .eink-table td {
+    @apply px-3 py-2 border-t border-black;
+  }
+  
+  .eink-table tr:hover {
+    @apply bg-gray-50;
   }
   
   .page-title {
-    @apply text-3xl font-bold text-black mb-6;
-  }
-  
-  .section-title {
     @apply text-2xl font-bold text-black mb-4;
   }
   
+  .section-title {
+    @apply text-lg font-bold text-black mb-3;
+  }
+  
   .dashboard-grid {
-    @apply grid gap-6 md:grid-cols-2 lg:grid-cols-3;
+    display: grid;
+    gap: var(--eink-card-gap);
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   }
   
   .status-badge {
-    @apply inline-flex items-center px-3 py-1 text-xs font-medium border-2 border-black;
+    @apply inline-flex items-center px-2 py-1 text-xs font-medium border-2 border-black;
   }
   
   .status-assigned {
@@ -171,5 +286,49 @@
   
   .status-completed {
     @apply bg-black text-white;
+  }
+  
+  /* Compact footer for 13.3" screens */
+  .eink-footer {
+    @apply border-t-2 border-black bg-white py-3 px-4 text-sm;
+  }
+  
+  .eink-footer-grid {
+    display: grid;
+    gap: var(--eink-card-gap);
+    grid-template-columns: repeat(4, 1fr);
+  }
+  
+  /* Scrollable content area that fits within 13.3" viewport */
+  .eink-scroll-area {
+    max-height: calc(100vh - var(--eink-header-height) - 120px);
+    overflow-y: auto;
+  }
+  
+  /* Compact form elements for e-ink */
+  .eink-form-group {
+    @apply mb-3;
+  }
+  
+  .eink-label {
+    @apply block text-sm font-medium text-black mb-1;
+  }
+  
+  .eink-input {
+    @apply w-full border-2 border-black px-3 py-2 text-sm;
+    min-height: var(--eink-touch-target);
+  }
+  
+  .eink-btn {
+    @apply border-2 border-black px-4 py-2 text-sm font-medium;
+    min-height: var(--eink-touch-target);
+  }
+  
+  .eink-btn-primary {
+    @apply bg-black text-white hover:bg-gray-800;
+  }
+  
+  .eink-btn-secondary {
+    @apply bg-white text-black hover:bg-gray-100;
   }
 }

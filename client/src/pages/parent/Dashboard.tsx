@@ -194,59 +194,59 @@ export default function ParentDashboard() {
   const activeChild = selectedChild ? children?.find(c => c.id === selectedChild) : null;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b-2 border-black sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen max-h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Header - Compact for 13.3" screen */}
+      <div className="bg-white border-b-2 border-black sticky top-0 z-10 flex-shrink-0">
+        <div className="max-w-[1400px] mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Link href="/parent">
-                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100" data-testid="button-home">
-                  <Home className="h-4 w-4 mr-2" />
-                  Dashboard
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm" data-testid="button-home">
+                  <Home className="h-3 w-3 mr-1" />
+                  Home
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-gray-300" />
-              <div className="flex items-center gap-1">
+              <div className="h-5 w-px bg-gray-300" />
+              <div className="flex items-center gap-0.5">
                 <Button
                   variant={mainTab === 'overview' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setMainTab('overview')}
-                  className={mainTab === 'overview' ? 'bg-black text-white' : ''}
+                  className={`h-8 px-3 text-sm ${mainTab === 'overview' ? 'bg-black text-white' : ''}`}
                   data-testid="tab-overview"
                 >
-                  <BookOpen className="h-4 w-4 mr-2" />
+                  <BookOpen className="h-3.5 w-3.5 mr-1.5" />
                   Overview
                 </Button>
                 <Button
                   variant={mainTab === 'calendar' ? 'default' : 'ghost'}
                   size="sm"
                   onClick={() => setMainTab('calendar')}
-                  className={mainTab === 'calendar' ? 'bg-black text-white' : ''}
+                  className={`h-8 px-3 text-sm ${mainTab === 'calendar' ? 'bg-black text-white' : ''}`}
                   data-testid="tab-calendar"
                 >
-                  <Calendar className="h-4 w-4 mr-2" />
+                  <Calendar className="h-3.5 w-3.5 mr-1.5" />
                   Calendar
                 </Button>
               </div>
-              <div className="h-6 w-px bg-gray-300" />
+              <div className="h-5 w-px bg-gray-300" />
               <div>
-                <h1 className="text-2xl font-bold text-black">Parent Portal</h1>
-                <p className="text-gray-500 text-sm">Monitor your children's learning progress</p>
+                <h1 className="text-lg font-bold text-black">Parent Portal</h1>
+                <p className="text-gray-500 text-xs">Monitor your children's progress</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-2 border-black hover:bg-gray-100"
+                className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm"
                 onClick={() => setShowSettings(!showSettings)}
                 data-testid="button-settings"
               >
-                <Settings className="h-4 w-4 mr-2" />
+                <Settings className="h-3.5 w-3.5 mr-1" />
                 Settings
               </Button>
-              <Badge className="bg-black text-white px-4 py-2 text-sm" data-testid="text-username">
+              <Badge className="bg-black text-white px-3 py-1 text-xs" data-testid="text-username">
                 {user?.firstName} {user?.lastName}
               </Badge>
             </div>
@@ -254,29 +254,24 @@ export default function ParentDashboard() {
         </div>
       </div>
 
-      {/* Settings Panel */}
+      {/* Settings Panel - Compact */}
       {showSettings && (
-        <div className="bg-gray-50 border-b-2 border-black">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="bg-gray-50 border-b-2 border-black flex-shrink-0">
+          <div className="max-w-[1400px] mx-auto px-4 py-3">
             <Card className="border-2 border-black">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Sparkles className="h-5 w-5 text-purple-600" />
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <Sparkles className="h-4 w-4 text-purple-600" />
                   AI Learning Features
                 </CardTitle>
-                <CardDescription>
-                  Control AI-powered features for your children's learning experience
-                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center justify-between p-4 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="flex items-center gap-3">
-                    <Lightbulb className="h-5 w-5 text-amber-600" />
+              <CardContent className="space-y-3 pb-3">
+                <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                  <div className="flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 text-amber-600" />
                     <div>
-                      <Label className="text-base font-medium">AI Hints</Label>
-                      <p className="text-sm text-gray-600">
-                        Allow your children to get helpful hints when they're stuck on questions
-                      </p>
+                      <Label className="text-sm font-medium">AI Hints</Label>
+                      <p className="text-xs text-gray-600">Allow hints when stuck on questions</p>
                     </div>
                   </div>
                   <Switch
@@ -287,17 +282,15 @@ export default function ParentDashboard() {
                     data-testid="switch-ai-hints"
                   />
                 </div>
-                <p className="text-xs text-gray-500">
-                  Hints are provided in 3 progressive levels - from gentle nudges to more detailed guidance. 
-                  This helps students learn while still encouraging independent problem-solving.
-                </p>
               </CardContent>
             </Card>
           </div>
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      {/* Main Content - Scrollable for 13.3" screen */}
+      <div className="flex-1 overflow-y-auto">
+      <div className="max-w-[1400px] mx-auto px-4 py-4">
         {mainTab === 'calendar' ? (
           <ParentCalendarDashboard />
         ) : childrenLoading ? (
@@ -507,6 +500,8 @@ export default function ParentDashboard() {
           </>
         )}
       </div>
+      </div>
+      {/* End of scrollable content */}
     </div>
   );
 }

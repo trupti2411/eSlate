@@ -53,95 +53,97 @@ export default function TutorDashboard() {
   const pendingReview = assignments?.filter((a: any) => a.status === 'submitted') || [];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b-2 border-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen max-h-screen bg-gray-50 flex flex-col overflow-hidden">
+      {/* Header - Compact for 13.3" screen */}
+      <div className="bg-white border-b-2 border-black flex-shrink-0">
+        <div className="max-w-[1400px] mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Link href="/tutor">
-                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
-                  <Home className="h-4 w-4 mr-2" />
-                  Dashboard
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm">
+                  <Home className="h-3 w-3 mr-1" />
+                  Home
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-gray-300" />
+              <div className="h-5 w-px bg-gray-300" />
               <div>
-                <h1 className="text-2xl font-bold text-black">Tutor Portal</h1>
-                <p className="text-gray-500 text-sm">Manage students and track their progress</p>
+                <h1 className="text-lg font-bold text-black">Tutor Portal</h1>
+                <p className="text-gray-500 text-xs">Manage students and track progress</p>
               </div>
             </div>
-            <BookOpen className="h-12 w-12 text-black opacity-10" />
+            <BookOpen className="h-8 w-8 text-black opacity-10" />
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Quick Actions */}
-        <div className="flex gap-4 mb-8">
+      {/* Main Content - Scrollable for 13.3" screen */}
+      <div className="flex-1 overflow-y-auto">
+      <div className="max-w-[1400px] mx-auto px-4 py-4">
+        {/* Quick Actions - Compact */}
+        <div className="flex gap-3 mb-4">
           <Link href="/company/assignments">
-            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 py-3 px-6 font-semibold">
-              <Plus className="h-5 w-5 mr-2" />
+            <Button className="bg-black text-white border-2 border-black hover:bg-gray-800 h-9 px-4 text-sm font-semibold">
+              <Plus className="h-4 w-4 mr-1.5" />
               New Assignment
             </Button>
           </Link>
-          <Button className="border-2 border-black hover:bg-gray-100 py-3 px-6 font-semibold">
-            <Calendar className="h-5 w-5 mr-2" />
+          <Button className="border-2 border-black hover:bg-gray-100 h-9 px-4 text-sm font-semibold">
+            <Calendar className="h-4 w-4 mr-1.5" />
             Schedule Class
           </Button>
         </div>
 
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Users className="h-4 w-4" />
+        {/* Stats Grid - Compact for 13.3" */}
+        <div className="grid grid-cols-4 gap-3 mb-4">
+          <Card className="border-2 border-black bg-white">
+            <CardHeader className="pb-2 pt-3">
+              <CardTitle className="text-xs flex items-center gap-1.5">
+                <Users className="h-3.5 w-3.5" />
                 Students
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">{students?.length || 0}</div>
-              <p className="text-xs text-gray-600 mt-1">Active students</p>
+            <CardContent className="pb-3">
+              <div className="text-2xl font-bold text-black">{students?.length || 0}</div>
+              <p className="text-xs text-gray-600">Active</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <BookOpen className="h-4 w-4" />
+          <Card className="border-2 border-black bg-white">
+            <CardHeader className="pb-2 pt-3">
+              <CardTitle className="text-xs flex items-center gap-1.5">
+                <BookOpen className="h-3.5 w-3.5" />
                 Assignments
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">{assignments?.length || 0}</div>
-              <p className="text-xs text-gray-600 mt-1">Total created</p>
+            <CardContent className="pb-3">
+              <div className="text-2xl font-bold text-black">{assignments?.length || 0}</div>
+              <p className="text-xs text-gray-600">Created</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Pending Review
+          <Card className="border-2 border-black bg-white">
+            <CardHeader className="pb-2 pt-3">
+              <CardTitle className="text-xs flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5" />
+                Pending
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">{pendingReview.length}</div>
-              <p className="text-xs text-gray-600 mt-1">Need grading</p>
+            <CardContent className="pb-3">
+              <div className="text-2xl font-bold text-black">{pendingReview.length}</div>
+              <p className="text-xs text-gray-600">Need grading</p>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
+          <Card className="border-2 border-black bg-white">
+            <CardHeader className="pb-2 pt-3">
+              <CardTitle className="text-xs flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
                 Today
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-black">{todayEvents.length}</div>
-              <p className="text-xs text-gray-600 mt-1">Classes scheduled</p>
+            <CardContent className="pb-3">
+              <div className="text-2xl font-bold text-black">{todayEvents.length}</div>
+              <p className="text-xs text-gray-600">Classes</p>
             </CardContent>
           </Card>
         </div>
@@ -237,6 +239,8 @@ export default function TutorDashboard() {
           </div>
         </div>
       </div>
+      </div>
+      {/* End of scrollable content */}
     </div>
   );
 }

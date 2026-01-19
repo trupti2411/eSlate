@@ -1150,46 +1150,40 @@ export default function CompanyDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen max-h-screen bg-gray-50 flex flex-col overflow-hidden">
       {/* eSlate Branded Header */}
       <ESlateHeader />
       
-      {/* Page Header */}
-      <div className="bg-white border-b-2 border-black">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      {/* Page Header - Compact for 13.3" screen */}
+      <div className="bg-white border-b-2 border-black flex-shrink-0">
+        <div className="max-w-[1400px] mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Link href="/company">
-                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
-                  <Home className="h-4 w-4 mr-2" />
-                  Dashboard
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm">
+                  <Home className="h-3 w-3 mr-1" />
+                  Home
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-gray-300" />
+              <div className="h-5 w-px bg-gray-300" />
               <div>
-                <h1 className="text-2xl font-bold text-black">Business Admin Portal</h1>
-                <p className="text-gray-500 text-sm">{company?.name || "Loading..."}</p>
+                <h1 className="text-lg font-bold text-black">Business Admin Portal</h1>
+                <p className="text-gray-500 text-xs">{company?.name || "Loading..."}</p>
               </div>
             </div>
-            {/* Company Contact Info */}
+            {/* Company Contact Info - Compact */}
             {company && (
-              <div className="hidden md:flex items-center gap-4 text-sm bg-gray-100 px-4 py-2 rounded-lg">
+              <div className="hidden lg:flex items-center gap-3 text-xs bg-gray-100 px-3 py-1.5 rounded-lg">
                 {company.contactEmail && (
                   <div className="flex items-center gap-1">
-                    <Mail className="h-4 w-4 text-gray-500" />
+                    <Mail className="h-3 w-3 text-gray-500" />
                     <span className="text-gray-700">{company.contactEmail}</span>
                   </div>
                 )}
                 {company.contactPhone && (
                   <div className="flex items-center gap-1">
-                    <Phone className="h-4 w-4 text-gray-500" />
+                    <Phone className="h-3 w-3 text-gray-500" />
                     <span className="text-gray-700">{company.contactPhone}</span>
-                  </div>
-                )}
-                {company.address && (
-                  <div className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4 text-gray-500" />
-                    <span className="text-gray-700 max-w-[250px] truncate">{company.address}</span>
                   </div>
                 )}
               </div>
@@ -1198,128 +1192,140 @@ export default function CompanyDashboard() {
         </div>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex gap-1">
+      {/* Tab Navigation - Compact for 13.3" screen */}
+      <div className="bg-white border-b border-gray-200 flex-shrink-0">
+        <div className="max-w-[1400px] mx-auto px-4">
+          <div className="flex gap-0.5 overflow-x-auto">
             <Button
               variant={mainTab === 'dashboard' ? 'default' : 'ghost'}
               onClick={() => setMainTab('dashboard')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'dashboard' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'dashboard' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-dashboard"
             >
-              <LayoutDashboard className="h-4 w-4 mr-2" />
+              <LayoutDashboard className="h-3.5 w-3.5 mr-1.5" />
               Dashboard
             </Button>
             <Button
               variant={mainTab === 'overview' ? 'default' : 'ghost'}
               onClick={() => setMainTab('overview')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'overview' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'overview' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-overview"
             >
-              <Calendar className="h-4 w-4 mr-2" />
+              <Calendar className="h-3.5 w-3.5 mr-1.5" />
               Overview
             </Button>
             <Button
               variant={mainTab === 'tutors' ? 'default' : 'ghost'}
               onClick={() => setMainTab('tutors')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'tutors' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'tutors' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-tutors"
             >
-              <Users className="h-4 w-4 mr-2" />
-              Manage Staff
+              <Users className="h-3.5 w-3.5 mr-1.5" />
+              Staff
             </Button>
             <Button
               variant={mainTab === 'students' ? 'default' : 'ghost'}
               onClick={() => setMainTab('students')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'students' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'students' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-students"
             >
-              <GraduationCap className="h-4 w-4 mr-2" />
-              Manage Students
+              <GraduationCap className="h-3.5 w-3.5 mr-1.5" />
+              Students
             </Button>
             <Button
               variant={mainTab === 'academic' ? 'default' : 'ghost'}
               onClick={() => setMainTab('academic')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'academic' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'academic' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-academic"
             >
-              <BookOpen className="h-4 w-4 mr-2" />
-              Academic Setup
+              <BookOpen className="h-3.5 w-3.5 mr-1.5" />
+              Academic
             </Button>
             <Button
               variant={mainTab === 'assignments' ? 'default' : 'ghost'}
               onClick={() => setMainTab('assignments')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'assignments' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'assignments' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-assignments"
             >
-              <FileText className="h-4 w-4 mr-2" />
+              <FileText className="h-3.5 w-3.5 mr-1.5" />
               Assignments
             </Button>
             <Button
               variant={mainTab === 'submissions' ? 'default' : 'ghost'}
               onClick={() => setMainTab('submissions')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'submissions' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'submissions' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-submissions"
             >
-              <ClipboardCheck className="h-4 w-4 mr-2" />
+              <ClipboardCheck className="h-3.5 w-3.5 mr-1.5" />
               Grading
             </Button>
             <Button
               variant={mainTab === 'calendar' ? 'default' : 'ghost'}
               onClick={() => setMainTab('calendar')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'calendar' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'calendar' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-calendar"
             >
-              <Calendar className="h-4 w-4 mr-2" />
+              <Calendar className="h-3.5 w-3.5 mr-1.5" />
               Calendar
             </Button>
             <Button
               variant={mainTab === 'reports' ? 'default' : 'ghost'}
               onClick={() => setMainTab('reports')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'reports' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'reports' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-reports"
             >
-              <BarChart3 className="h-4 w-4 mr-2" />
+              <BarChart3 className="h-3.5 w-3.5 mr-1.5" />
               Reports
             </Button>
             <Button
               variant={mainTab === 'settings' ? 'default' : 'ghost'}
               onClick={() => setMainTab('settings')}
-              className={`rounded-b-none border-b-2 ${mainTab === 'settings' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
+              size="sm"
+              className={`rounded-b-none border-b-2 h-9 px-3 text-sm ${mainTab === 'settings' ? 'border-black bg-black text-white' : 'border-transparent hover:bg-gray-100'}`}
               data-testid="tab-settings"
             >
-              <Settings className="h-4 w-4 mr-2" />
+              <Settings className="h-3.5 w-3.5 mr-1.5" />
               Settings
             </Button>
           </div>
         </div>
       </div>
 
+      {/* Main Content Area - Scrollable for 13.3" screen */}
+      <div className="flex-1 overflow-y-auto">
       {mainTab === 'dashboard' && (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-[1400px] mx-auto px-4 py-4 space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Dashboard Overview</h2>
-            <p className="text-gray-600 dark:text-gray-300">Welcome back! Here's what's happening with your organization.</p>
+            <h2 className="text-lg font-bold text-gray-900">Dashboard Overview</h2>
+            <p className="text-gray-600 text-sm">Welcome back! Here's what's happening with your organization.</p>
           </div>
-          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 px-3 py-1">
+          <Badge className="bg-green-100 text-green-800 px-2 py-0.5 text-xs">
             <Activity className="h-3 w-3 mr-1 inline" />
             Live
           </Badge>
         </div>
 
-        {/* Vibrant Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg hover:shadow-xl transition-shadow">
-            <CardContent className="pt-6 pb-4">
+        {/* Stats Grid - Compact for 13.3" */}
+        <div className="grid grid-cols-4 gap-3">
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white border-0 shadow-lg">
+            <CardContent className="p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-blue-100 text-sm font-medium">Total Tutors</p>
-                  <div className="text-3xl font-bold">{Array.isArray(tutors) ? tutors.length : 0}</div>
-                  <p className="text-blue-100 text-xs mt-1 flex items-center">
+                  <p className="text-blue-100 text-xs font-medium">Total Tutors</p>
+                  <div className="text-2xl font-bold">{Array.isArray(tutors) ? tutors.length : 0}</div>
+                  <p className="text-blue-100 text-xs flex items-center">
                     <TrendingUp className="h-3 w-3 mr-1" />
-                    Active educators
+                    Active
                   </p>
                 </div>
                 <div className="bg-blue-400/30 p-3 rounded-full">
@@ -3092,6 +3098,9 @@ export default function CompanyDashboard() {
           </form>
         </DialogContent>
       </Dialog>
+
+      </div>
+      {/* End of scrollable content area */}
 
       {selectedStudentId && companyAdmin?.companyId && (
         <StudentProfileDialog studentId={selectedStudentId} companyId={companyAdmin.companyId} isOpen={isStudentProfileOpen} onClose={() => { setIsStudentProfileOpen(false); setSelectedStudentId(null); }} />

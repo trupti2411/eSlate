@@ -359,70 +359,70 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
   const activeTerm = typedStudentTerms.find((term: AcademicTerm) => term.isActive);
 
   const renderDashboard = () => (
-    <div className="space-y-8">
-      {/* Welcome Banner */}
-      <div className="bg-gradient-to-r from-gray-900 to-gray-700 rounded-xl p-6 text-white">
+    <div className="space-y-4">
+      {/* Welcome Banner - Compact for 13.3" */}
+      <div className="bg-gradient-to-r from-gray-900 to-gray-700 rounded-lg p-4 text-white">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold mb-2">Welcome back, {user?.firstName}!</h2>
-            <p className="text-gray-300">
+            <h2 className="text-lg font-bold mb-1">Welcome back, {user?.firstName}!</h2>
+            <p className="text-gray-300 text-sm">
               {activeTerm ? `Current Term: ${activeTerm.name}` : 'No active term'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card className="border-2 border-black hover:shadow-lg transition-all">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                <BookOpen className="h-5 w-5 text-blue-600" />
+      {/* Quick Stats - Compact grid for 13.3" */}
+      <div className="grid grid-cols-4 gap-3">
+        <Card className="border-2 border-black">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <BookOpen className="h-4 w-4 text-blue-600" />
               </div>
-              <Badge variant="outline" className="text-xs">Total</Badge>
+              <Badge variant="outline" className="text-xs px-1.5 py-0">Total</Badge>
             </div>
-            <div className="text-3xl font-bold text-black">{typedAssignments.length}</div>
-            <p className="text-sm text-gray-500 mt-1">Assignments</p>
+            <div className="text-2xl font-bold text-black">{typedAssignments.length}</div>
+            <p className="text-xs text-gray-500">Assignments</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-black hover:shadow-lg transition-all">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                <CheckCircle className="h-5 w-5 text-green-600" />
+        <Card className="border-2 border-black">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <CheckCircle className="h-4 w-4 text-green-600" />
               </div>
-              <Badge className="bg-green-100 text-green-800 text-xs">Done</Badge>
+              <Badge className="bg-green-100 text-green-800 text-xs px-1.5 py-0">Done</Badge>
             </div>
-            <div className="text-3xl font-bold text-black">{completedCount}</div>
-            <p className="text-sm text-gray-500 mt-1">Completed</p>
+            <div className="text-2xl font-bold text-black">{completedCount}</div>
+            <p className="text-xs text-gray-500">Completed</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-black hover:shadow-lg transition-all">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Clock className="h-5 w-5 text-yellow-600" />
+        <Card className="border-2 border-black">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                <Clock className="h-4 w-4 text-yellow-600" />
               </div>
-              <Badge className="bg-yellow-100 text-yellow-800 text-xs">Soon</Badge>
+              <Badge className="bg-yellow-100 text-yellow-800 text-xs px-1.5 py-0">Soon</Badge>
             </div>
-            <div className="text-3xl font-bold text-black">{dueSoonCount}</div>
-            <p className="text-sm text-gray-500 mt-1">Due in 3 days</p>
+            <div className="text-2xl font-bold text-black">{dueSoonCount}</div>
+            <p className="text-xs text-gray-500">Due in 3 days</p>
           </CardContent>
         </Card>
 
-        <Card className="border-2 border-black hover:shadow-lg transition-all">
-          <CardContent className="p-5">
-            <div className="flex items-center justify-between mb-3">
-              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
-                <AlertCircle className="h-5 w-5 text-red-600" />
+        <Card className="border-2 border-black">
+          <CardContent className="p-3">
+            <div className="flex items-center justify-between mb-2">
+              <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                <AlertCircle className="h-4 w-4 text-red-600" />
               </div>
-              <Badge variant="destructive" className="text-xs">Alert</Badge>
+              <Badge variant="destructive" className="text-xs px-1.5 py-0">Alert</Badge>
             </div>
-            <div className="text-3xl font-bold text-black">{overdueCount}</div>
-            <p className="text-sm text-gray-500 mt-1">Overdue</p>
+            <div className="text-2xl font-bold text-black">{overdueCount}</div>
+            <p className="text-xs text-gray-500">Overdue</p>
           </CardContent>
         </Card>
       </div>
@@ -1012,66 +1012,69 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b-2 border-black sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+    <div className="min-h-screen max-h-screen bg-gray-50 overflow-hidden flex flex-col">
+      {/* Header - Compact for 13.3" screen */}
+      <div className="bg-white border-b-2 border-black sticky top-0 z-10 flex-shrink-0">
+        <div className="max-w-[1400px] mx-auto px-4 py-2">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
               <Link href="/student/home">
-                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100">
-                  <Home className="h-4 w-4 mr-2" />
-                  Dashboard
+                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm">
+                  <Home className="h-3 w-3 mr-1" />
+                  Home
                 </Button>
               </Link>
-              <div className="h-6 w-px bg-gray-300" />
-              <h1 className="text-2xl font-bold text-black">Student Portal</h1>
+              <div className="h-5 w-px bg-gray-300" />
+              <h1 className="text-lg font-bold text-black">Student Portal</h1>
             </div>
-            <Badge className="bg-black text-white px-4 py-2 text-sm">
+            <Badge className="bg-black text-white px-3 py-1 text-xs">
               {user?.firstName} {user?.lastName}
             </Badge>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-          <TabsList className="grid w-full grid-cols-3 bg-white border-2 border-black rounded-xl p-2 mb-6 gap-2">
-            <TabsTrigger 
-              value="dashboard" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
-            >
-              <TrendingUp className="h-4 w-4 shrink-0" />
-              <span>Dashboard</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="calendar" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
-            >
-              <Calendar className="h-4 w-4 shrink-0" />
-              <span>Calendar</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="assignments" 
-              className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2 font-medium transition-all"
-            >
-              <FileText className="h-4 w-4 shrink-0" />
-              <span>Assignments</span>
-            </TabsTrigger>
-          </TabsList>
+      {/* Main Content - Scrollable for 13.3" screen */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="max-w-[1400px] mx-auto px-4 py-3">
+          <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+            <TabsList className="grid w-full grid-cols-3 bg-white border-2 border-black rounded-lg p-1.5 mb-4 gap-1">
+              <TabsTrigger 
+                value="dashboard" 
+                className="flex items-center justify-center gap-1.5 data-[state=active]:bg-black data-[state=active]:text-white rounded py-1.5 text-sm font-medium transition-all"
+              >
+                <TrendingUp className="h-3.5 w-3.5 shrink-0" />
+                <span>Dashboard</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="calendar" 
+                className="flex items-center justify-center gap-1.5 data-[state=active]:bg-black data-[state=active]:text-white rounded py-1.5 text-sm font-medium transition-all"
+              >
+                <Calendar className="h-3.5 w-3.5 shrink-0" />
+                <span>Calendar</span>
+              </TabsTrigger>
+              <TabsTrigger 
+                value="assignments" 
+                className="flex items-center justify-center gap-1.5 data-[state=active]:bg-black data-[state=active]:text-white rounded py-1.5 text-sm font-medium transition-all"
+              >
+                <FileText className="h-3.5 w-3.5 shrink-0" />
+                <span>Assignments</span>
+              </TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="dashboard" className="mt-0">
-            {renderDashboard()}
-          </TabsContent>
+            <TabsContent value="dashboard" className="mt-0">
+              {renderDashboard()}
+            </TabsContent>
 
-          <TabsContent value="calendar" className="mt-0">
-            <StudentCalendarDashboard />
-          </TabsContent>
+            <TabsContent value="calendar" className="mt-0">
+              <StudentCalendarDashboard />
+            </TabsContent>
 
-          <TabsContent value="assignments" className="mt-0">
-            {renderAssignments()}
-          </TabsContent>
-        </Tabs>
+            <TabsContent value="assignments" className="mt-0">
+              {renderAssignments()}
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
     </div>
   );
