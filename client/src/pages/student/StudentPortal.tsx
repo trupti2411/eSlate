@@ -128,8 +128,7 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
   const [selectedTab, setSelectedTab] = useState("dashboard");
   const [showPDFAnnotator, setShowPDFAnnotator] = useState(false);
   const [annotatingAssignment, setAnnotatingAssignment] = useState<Assignment | null>(null);
-  const [expandedAssignment, setExpandedAssignment] = useState<string | null>(null);
-
+  
   const studentId = user?.id ? `student-${user.id}` : '';
 
   const { data: studentProfile, isLoading: isLoadingProfile } = useQuery({
@@ -928,30 +927,15 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
                                   </div>
                                   <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="h-7 px-2 text-xs whitespace-nowrap flex-shrink-0"
+                                    className="h-7 px-3 text-xs whitespace-nowrap flex-shrink-0 bg-black text-white hover:bg-gray-800"
                                     onClick={() => {
-                                      setExpandedAssignment(expandedAssignment === assignment.id ? null : assignment.id);
+                                      window.open(`/student/assignment/${assignment.id}`, '_blank');
                                     }}
                                   >
-                                    {expandedAssignment === assignment.id ? 'Hide' : (submission ? 'View' : 'Start')}
+                                    {submission?.status === 'submitted' || submission?.status === 'graded' ? 'View' : 'Work on it'}
                                   </Button>
                                 </div>
                               </div>
-                              {expandedAssignment === assignment.id && (
-                                <div className="px-3 py-3 bg-white border-t border-gray-100">
-                                  <AssignmentCompletionArea
-                                    assignment={assignment}
-                                    submission={submission}
-                                    onSubmissionUpdate={() => {
-                                      queryClient.invalidateQueries({
-                                        queryKey: [`/api/students/student-${user?.id}/submissions`]
-                                      });
-                                      setExpandedAssignment(null);
-                                    }}
-                                  />
-                                </div>
-                              )}
                             </div>
                           );
                         })}
