@@ -68,7 +68,7 @@ interface ProgressInsightParams {
 }
 
 class AIService {
-  private model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  private model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   private safeParseJSON<T>(response: string, type: 'array' | 'object'): T {
     try {
@@ -340,8 +340,8 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
         throw new Error("PDF processing failed");
       }
 
-      // Use gemini-1.5-pro for better PDF understanding (larger context)
-      const pdfModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+      // Use gemini-2.0-flash for PDF understanding (supports multimodal, large context)
+      const pdfModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
       const pageRange = options?.startPage && options?.endPage 
         ? `Focus on pages ${options.startPage} to ${options.endPage}.` 
