@@ -4692,6 +4692,84 @@ Good luck with your assignment!"
     return user && ['admin', 'company_admin', 'tutor'].includes(user.role);
   };
 
+  // Convert PDF to worksheet using AI (tutors and admins only)
+  app.post('/api/companies/:companyId/worksheets/from-pdf', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      
+      if (!canManageWorksheets(user)) {
+        return res.status(403).json({ error: 'Only tutors and admins can create worksheets' });
+      }
+
+      if (!aiService.isConfigured()) {
+        return res.status(400).json({ error: 'AI service not configured. Please add GEMINI_API_KEY.' });
+      }
+
+      const { companyId } = req.params;
+      const { pdfPath, subject, gradeLevel, startPage, endPage } = req.body;
+
+      if (!pdfPath) {
+        return res.status(400).json({ error: 'pdfPath is required' });
+      }
+
+      // Verify file exists
+      const fs = require('fs');
+      if (!fs.existsSync(pdfPath)) {
+        return res.status(400).json({ error: 'PDF file not found at specified path' });
+      }
+
+      console.log(`Converting PDF to worksheet: ${pdfPath}`);
+
+      // Extract worksheet data from PDF using AI
+      const worksheetData = await aiService.extractWorksheetFromPDF(pdfPath, {
+        startPage,
+        endPage,
+        subject,
+        gradeLevel,
+      });
+
+      // Create the worksheet
+      const worksheet = await storage.createWorksheet({
+        title: worksheetData.title || 'Untitled Worksheet',
+        subject: worksheetData.subject || subject || 'General',
+        description: worksheetData.description || '',
+        companyId,
+        createdBy: user.id,
+        isPublished: false,
+      });
+
+      // Create pages and questions
+      for (const pageData of worksheetData.pages) {
+        const page = await storage.createWorksheetPage({
+          worksheetId: worksheet.id,
+          pageNumber: pageData.pageNumber,
+          title: pageData.title || `Page ${pageData.pageNumber}`,
+        });
+
+        // Create questions for this page
+        for (const questionData of pageData.questions) {
+          await storage.createWorksheetQuestion({
+            pageId: page.id,
+            questionNumber: questionData.questionNumber,
+            questionType: questionData.questionType,
+            questionText: questionData.questionText,
+            options: questionData.options || null,
+            correctAnswer: questionData.correctAnswer || null,
+            helpText: questionData.helpText || null,
+            points: questionData.points || 1,
+          });
+        }
+      }
+
+      // Return the full worksheet with pages and questions
+      const fullWorksheet = await storage.getFullWorksheet(worksheet.id);
+      res.status(201).json(fullWorksheet);
+    } catch (error: any) {
+      console.error('Error converting PDF to worksheet:', error);
+      res.status(500).json({ error: error.message || 'Failed to convert PDF to worksheet' });
+    }
+  });
+
   // Get all worksheets for a company
   app.get('/api/companies/:companyId/worksheets', isAuthenticated, async (req: any, res: any) => {
     try {

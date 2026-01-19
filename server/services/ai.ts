@@ -1,6 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleAIFileManager } from "@google/generative-ai/server";
+import * as fs from 'fs';
+import * as path from 'path';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
+const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY || "");
 
 interface QuestionGenerationParams {
   subject: string;
@@ -291,6 +295,153 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
 
   isConfigured(): boolean {
     return !!process.env.GEMINI_API_KEY;
+  }
+
+  async extractWorksheetFromPDF(pdfPath: string, options?: { 
+    startPage?: number; 
+    endPage?: number;
+    subject?: string;
+    gradeLevel?: string;
+  }): Promise<{
+    title: string;
+    subject: string;
+    description: string;
+    pages: {
+      pageNumber: number;
+      title: string;
+      questions: {
+        questionNumber: number;
+        questionType: 'multiple_choice' | 'short_text' | 'long_text' | 'fill_blank' | 'true_false' | 'information';
+        questionText: string;
+        options?: { id: string; text: string }[];
+        correctAnswer?: string;
+        helpText?: string;
+        points: number;
+      }[];
+    }[];
+  }> {
+    try {
+      // Upload the PDF file to Gemini
+      const uploadResult = await fileManager.uploadFile(pdfPath, {
+        mimeType: "application/pdf",
+        displayName: path.basename(pdfPath),
+      });
+
+      console.log(`Uploaded file ${uploadResult.file.displayName} as: ${uploadResult.file.uri}`);
+
+      // Wait for file to be processed
+      let file = await fileManager.getFile(uploadResult.file.name);
+      while (file.state === "PROCESSING") {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        file = await fileManager.getFile(uploadResult.file.name);
+      }
+
+      if (file.state === "FAILED") {
+        throw new Error("PDF processing failed");
+      }
+
+      // Use gemini-1.5-pro for better PDF understanding (larger context)
+      const pdfModel = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+      const pageRange = options?.startPage && options?.endPage 
+        ? `Focus on pages ${options.startPage} to ${options.endPage}.` 
+        : 'Process all pages.';
+
+      const prompt = `You are an expert at converting educational PDFs into digital worksheets.
+
+Analyze this PDF document and extract ALL questions, exercises, and content to create a comprehensive digital worksheet.
+
+${pageRange}
+
+For each piece of content, determine the appropriate question type:
+- "information" - For instructional text, examples, or reading passages (not questions)
+- "multiple_choice" - Questions with specific answer options (A, B, C, D, etc.)
+- "short_text" - Questions requiring brief 1-2 word or short phrase answers
+- "long_text" - Questions requiring paragraph-length written responses
+- "fill_blank" - Sentences with blanks to fill in
+- "true_false" - True/False questions
+
+IMPORTANT EXTRACTION RULES:
+1. Preserve the EXACT wording of all questions from the PDF
+2. For multiple choice, extract ALL answer options exactly as shown
+3. Include any diagrams/images descriptions as part of the question text if relevant
+4. Group questions by their page number in the PDF
+5. For reading comprehension, include the passage as an "information" type, followed by questions
+6. Extract correct answers if they are provided in the PDF (often in answer keys)
+7. Assign point values based on question complexity (simple: 1-2 pts, medium: 3-5 pts, complex: 10+ pts)
+
+${options?.subject ? `Subject hint: ${options.subject}` : ''}
+${options?.gradeLevel ? `Grade level hint: ${options.gradeLevel}` : ''}
+
+Return the response as JSON with this EXACT structure (no markdown, just raw JSON):
+{
+  "title": "Worksheet title from the PDF",
+  "subject": "Subject area (English, Math, Science, etc.)",
+  "description": "Brief description of the worksheet content",
+  "pages": [
+    {
+      "pageNumber": 1,
+      "title": "Page title or section name",
+      "questions": [
+        {
+          "questionNumber": 1,
+          "questionType": "multiple_choice",
+          "questionText": "The exact question text",
+          "options": [
+            { "id": "a", "text": "Option A text" },
+            { "id": "b", "text": "Option B text" },
+            { "id": "c", "text": "Option C text" },
+            { "id": "d", "text": "Option D text" }
+          ],
+          "correctAnswer": "a",
+          "helpText": "A hint without giving away the answer",
+          "points": 2
+        }
+      ]
+    }
+  ]
+}
+
+Extract all content comprehensively. Do not summarize or skip any questions.`;
+
+      const result = await pdfModel.generateContent([
+        {
+          fileData: {
+            mimeType: uploadResult.file.mimeType,
+            fileUri: uploadResult.file.uri,
+          },
+        },
+        { text: prompt },
+      ]);
+
+      const response = result.response.text();
+      const worksheetData = this.safeParseJSON<{
+        title: string;
+        subject: string;
+        description: string;
+        pages: {
+          pageNumber: number;
+          title: string;
+          questions: {
+            questionNumber: number;
+            questionType: 'multiple_choice' | 'short_text' | 'long_text' | 'fill_blank' | 'true_false' | 'information';
+            questionText: string;
+            options?: { id: string; text: string }[];
+            correctAnswer?: string;
+            helpText?: string;
+            points: number;
+          }[];
+        }[];
+      }>(response, 'object');
+
+      // Clean up uploaded file
+      await fileManager.deleteFile(uploadResult.file.name);
+
+      return worksheetData;
+    } catch (error: any) {
+      console.error("Error extracting worksheet from PDF:", error);
+      throw new Error(error.message || "Failed to extract worksheet from PDF. Please try again.");
+    }
   }
 }
 
