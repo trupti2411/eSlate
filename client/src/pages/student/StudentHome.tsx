@@ -181,9 +181,9 @@ export default function StudentHome() {
 
   const handleStartAssignment = (item: UnifiedItem) => {
     if (item.type === 'assignment' && item.rawAssignment) {
-      setSelectedAssignment(item.rawAssignment);
+      window.open(`/student/assignment/${item.rawAssignment.id}`, '_blank');
     } else if (item.type === 'worksheet' || item.type === 'test') {
-      window.location.href = '/student/portal';
+      window.open('/student/portal', '_blank');
     }
   };
 

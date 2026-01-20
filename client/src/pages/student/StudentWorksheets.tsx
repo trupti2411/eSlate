@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { WorksheetAnswerer } from '@/components/WorksheetAnswerer';
 import { 
   FileText, 
   Calendar, 
@@ -42,7 +40,6 @@ interface Student {
 export function StudentWorksheets() {
   const { user } = useAuth();
   const [, setLocation] = useLocation();
-  const [activeWorksheetId, setActiveWorksheetId] = useState<string | null>(null);
 
   const { data: student, isLoading: studentLoading } = useQuery<Student>({
     queryKey: ['/api/auth/student-profile'],
@@ -55,15 +52,9 @@ export function StudentWorksheets() {
     enabled: !!student?.id,
   });
 
-  if (activeWorksheetId && student?.id) {
-    return (
-      <WorksheetAnswerer
-        worksheetId={activeWorksheetId}
-        studentId={student.id}
-        onClose={() => setActiveWorksheetId(null)}
-      />
-    );
-  }
+  const openWorksheetInNewTab = (assignmentId: string) => {
+    window.open(`/student/assignment/${assignmentId}`, '_blank');
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -123,7 +114,7 @@ export function StudentWorksheets() {
                       </div>
                     </div>
                     <Button 
-                      onClick={() => setActiveWorksheetId(worksheet.id)}
+                      onClick={() => openWorksheetInNewTab(assignment.id)}
                       data-testid={`button-open-worksheet-${worksheet.id}`}
                     >
                       Open Worksheet
