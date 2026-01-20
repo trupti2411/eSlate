@@ -37,6 +37,7 @@ import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import UserAgreement from "@/pages/legal/UserAgreement";
 import HomePage from "@/pages/HomePage";
+import VideoStoryboard from "@/pages/VideoStoryboard";
 
 import NotFound from "@/pages/not-found";
 
@@ -64,6 +65,9 @@ function Router() {
       <Route path="/legal/privacy" component={PrivacyPolicy} />
       <Route path="/legal/terms" component={TermsOfService} />
       <Route path="/legal/agreement" component={UserAgreement} />
+      
+      {/* Video storyboard - always accessible */}
+      <Route path="/storyboard" component={VideoStoryboard} />
 
       {!isAuthenticated ? (
         <>

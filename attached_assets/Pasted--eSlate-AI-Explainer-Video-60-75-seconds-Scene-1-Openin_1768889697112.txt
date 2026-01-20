@@ -1,0 +1,113 @@
+🎬 eSlate – AI Explainer Video (60–75 seconds)
+🎥 Scene 1: Opening (5 sec)
+
+Visual: Calm classroom → e-ink tablet close-up
+On-screen text:
+“eSlate – Smarter Learning on e-Ink”
+
+Voiceover:
+“Welcome to eSlate — a smarter, distraction-free learning platform built for students, parents, tutors, and learning centres.”
+
+🎥 Scene 2: Students & Parents – Dashboard (8 sec)
+
+Visual: Student dashboard on e-ink screen
+On-screen text:
+📊 Assignments • Deadlines • Progress
+
+Voiceover:
+“Students and parents get a clear dashboard showing assignments, deadlines, and learning progress at a glance.”
+
+🎥 Scene 3: Interactive Worksheets (8 sec)
+
+Visual: Student answering questions, auto-save icon
+On-screen text:
+✍️ Interactive Worksheets
+💾 Auto-Save Enabled
+
+Voiceover:
+“Complete interactive worksheets with auto-save, so no work is ever lost.”
+
+🎥 Scene 4: PDF Annotation (8 sec)
+
+Visual: Pen, highlighter, notes on worksheet
+On-screen text:
+🖊️ Annotate PDFs
+✏️ Pen • Highlight • Text
+
+Voiceover:
+“Annotate PDFs naturally using pen, highlighter, and text tools — just like writing on paper.”
+
+🎥 Scene 5: Solution Videos (6 sec)
+
+Visual: Teacher explaining steps, split screen with worksheet
+On-screen text:
+🎥 Step-by-Step Solution Videos
+
+Voiceover:
+“Watch clear, step-by-step solution videos anytime you need extra help.”
+
+🎥 Scene 6: Smart Hints (7 sec)
+
+Visual: AI hint popup, parent control icon
+On-screen text:
+🤖 Smart AI Hints
+🔒 Parent Controlled
+
+Voiceover:
+“Get AI-powered smart hints — with full parent controls for safe, guided learning.”
+
+🎥 Scene 7: Messaging (6 sec)
+
+Visual: Tutor message notification
+On-screen text:
+💬 Tutor Chat
+🔔 Real-Time Notifications
+
+Voiceover:
+“Stay connected with tutors through real-time messages and notifications.”
+
+🎥 Scene 8: Tutors & Centre Managers (Title – 4 sec)
+
+Visual: Carousel transition
+On-screen text:
+For Tutors & Centre Managers
+
+🎥 Scene 9: Student & Worksheet Management (10 sec)
+
+Visual: Tutor managing students, creating worksheets
+On-screen text:
+👥 Student Management
+📝 Create Worksheets – 6+ Question Types
+
+Voiceover:
+“Tutors and centre managers can manage students, classes, and create rich worksheets with multiple question types.”
+
+🎥 Scene 10: Assign, Track & Grade (8 sec)
+
+Visual: Bulk assign → grading with annotations
+On-screen text:
+📌 Assign & Track
+🧠 AI-Assisted Grading
+
+Voiceover:
+“Assign work in bulk, track deadlines, and grade faster with AI-assisted feedback and annotations.”
+
+🎥 Scene 11: Reports, Calendar & Attendance (8 sec)
+
+Visual: Progress report → calendar view
+On-screen text:
+📈 Student Reports
+📅 Calendar & Attendance
+
+Voiceover:
+“Track student progress, share reports with parents, and manage schedules and attendance effortlessly.”
+
+🎥 Scene 12: Closing (5 sec)
+
+Visual: Student confidently studying on e-ink device
+On-screen text:
+eSlate
+Focused Learning. Smarter Teaching.
+
+Voiceover:
+“eSlate — focused learning, smarter teaching.”
