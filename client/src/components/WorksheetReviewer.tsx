@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { AIGradingAssistant } from './AIGradingAssistant';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -254,13 +253,6 @@ export function WorksheetReviewer({ worksheetId, studentId, studentName, onClose
     }));
   };
 
-  const handleApplyAISuggestion = (questionId: string, score: number, feedback: string) => {
-    setGrades(prev => ({
-      ...prev,
-      [questionId]: { score, feedback }
-    }));
-  };
-
   const handleSaveGrades = () => {
     const gradeData = Object.entries(grades).map(([questionId, grade]) => ({
       questionId,
@@ -288,7 +280,7 @@ export function WorksheetReviewer({ worksheetId, studentId, studentName, onClose
 
   return (
     <Dialog open onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-[95vw] max-w-none h-[95vh] max-h-none overflow-hidden flex flex-col">
         <DialogHeader className="border-b pb-4">
           <div className="flex items-center justify-between">
             <div>
@@ -374,8 +366,8 @@ export function WorksheetReviewer({ worksheetId, studentId, studentName, onClose
                       />
                     )}
 
-                    <div className="bg-slate-50 dark:bg-slate-900 rounded-lg p-4 border">
-                      <Label className="text-xs text-muted-foreground mb-2 block">Student's Answer:</Label>
+                    <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4 border-2 border-blue-200 dark:border-blue-800">
+                      <Label className="text-sm font-semibold text-blue-800 dark:text-blue-200 mb-2 block">Student's Answer:</Label>
                       
                       {question.questionType === 'multiple_choice' ? (
                         <div className="space-y-2">
@@ -408,12 +400,12 @@ export function WorksheetReviewer({ worksheetId, studentId, studentName, onClose
                       ) : answer?.handwritingData ? (
                         <canvas
                           ref={el => canvasRefs.current[question.id] = el}
-                          width={400}
-                          height={150}
-                          className="border rounded bg-white"
+                          width={600}
+                          height={200}
+                          className="border-2 rounded bg-white w-full"
                         />
                       ) : (
-                        <p className={`${answer?.textAnswer ? 'text-foreground' : 'text-muted-foreground italic'}`}>
+                        <p className={`text-lg ${answer?.textAnswer ? 'text-foreground font-medium' : 'text-muted-foreground italic'}`}>
                           {getDisplayAnswer(question)}
                         </p>
                       )}
@@ -428,7 +420,7 @@ export function WorksheetReviewer({ worksheetId, studentId, studentName, onClose
 
                     <Separator />
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4">
                       <div>
                         <Label htmlFor={`score-${question.id}`}>Score (out of {question.points || 1})</Label>
                         <Input
@@ -438,16 +430,7 @@ export function WorksheetReviewer({ worksheetId, studentId, studentName, onClose
                           max={question.points || 1}
                           value={grade.score}
                           onChange={(e) => handleGradeChange(question.id, 'score', Number(e.target.value))}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <AIGradingAssistant
-                          question={question.questionText}
-                          studentAnswer={getDisplayAnswer(question)}
-                          correctAnswer={question.correctAnswer}
-                          maxPoints={question.points || 1}
-                          onApplySuggestion={(score, feedback) => handleApplyAISuggestion(question.id, score, feedback)}
+                          className="mt-1 w-32"
                         />
                       </div>
                     </div>
