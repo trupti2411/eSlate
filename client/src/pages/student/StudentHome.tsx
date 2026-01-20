@@ -123,7 +123,7 @@ export default function StudentHome() {
     const dueDate = assignment.dueDate ? new Date(assignment.dueDate) : 
                     worksheet.dueDate ? new Date(worksheet.dueDate) : new Date();
     const status = assignment.status || 'assigned';
-    const isOverdue = isPast(dueDate) && status !== 'completed' && status !== 'graded';
+    const isOverdue = isPast(dueDate) && status !== 'submitted' && status !== 'graded';
     
     return {
       id: `ws-${assignment.id}`,
@@ -131,7 +131,7 @@ export default function StudentHome() {
       subject: worksheet.subject || assignment.subject || 'General',
       dueDate,
       type: 'worksheet',
-      status: status === 'completed' ? 'submitted' 
+      status: status === 'submitted' ? 'submitted' 
            : status === 'graded' ? 'graded'
            : status === 'in_progress' ? 'in_progress'
            : isOverdue ? 'overdue' : 'pending',

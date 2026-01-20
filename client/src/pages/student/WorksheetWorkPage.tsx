@@ -14,6 +14,8 @@ interface WorksheetAssignment {
     studentId: string;
     dueDate?: string;
     createdAt: string;
+    status: 'assigned' | 'in_progress' | 'submitted' | 'graded';
+    submittedAt?: string;
   };
   worksheet: {
     id: string;

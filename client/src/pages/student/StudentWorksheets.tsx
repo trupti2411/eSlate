@@ -3,13 +3,16 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 import { 
   FileText, 
   Calendar, 
   Clock,
   CheckCircle2,
   ChevronLeft,
-  BookOpen
+  BookOpen,
+  Send,
+  Eye
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useLocation } from 'wouter';
@@ -21,6 +24,8 @@ interface WorksheetAssignment {
     studentId: string;
     dueDate?: string;
     createdAt: string;
+    status: 'assigned' | 'in_progress' | 'submitted' | 'graded';
+    submittedAt?: string;
   };
   worksheet: {
     id: string;
@@ -83,46 +88,71 @@ export function StudentWorksheets() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {assignments.map(({ assignment, worksheet }) => (
-              <Card key={assignment.id} className="hover:shadow-md transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <FileText className="h-5 w-5 text-primary" />
-                        <h3 className="text-lg font-semibold">{worksheet.title}</h3>
-                      </div>
-                      {worksheet.subject && (
-                        <p className="text-sm text-muted-foreground mb-2">{worksheet.subject}</p>
-                      )}
-                      {worksheet.description && (
-                        <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                          {worksheet.description}
-                        </p>
-                      )}
-                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Assigned {format(new Date(assignment.createdAt), 'MMM d, yyyy')}
-                        </span>
-                        {assignment.dueDate && (
-                          <span className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            Due {format(new Date(assignment.dueDate), 'MMM d, yyyy')}
-                          </span>
+            {assignments.map(({ assignment, worksheet }) => {
+              const isSubmitted = assignment.status === 'submitted' || assignment.status === 'graded';
+              const isGraded = assignment.status === 'graded';
+              const isInProgress = assignment.status === 'in_progress';
+              
+              const getStatusBadge = () => {
+                if (isGraded) return <Badge className="bg-green-100 text-green-800 border-green-200">Graded</Badge>;
+                if (isSubmitted) return <Badge className="bg-blue-100 text-blue-800 border-blue-200">Submitted</Badge>;
+                if (isInProgress) return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">In Progress</Badge>;
+                return <Badge variant="outline">Pending</Badge>;
+              };
+              
+              return (
+                <Card key={assignment.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileText className="h-5 w-5 text-primary" />
+                          <h3 className="text-lg font-semibold">{worksheet.title}</h3>
+                          {getStatusBadge()}
+                        </div>
+                        {worksheet.subject && (
+                          <p className="text-sm text-muted-foreground mb-2">{worksheet.subject}</p>
                         )}
+                        {worksheet.description && (
+                          <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
+                            {worksheet.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                          <span className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            Assigned {format(new Date(assignment.createdAt), 'MMM d, yyyy')}
+                          </span>
+                          {assignment.dueDate && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              Due {format(new Date(assignment.dueDate), 'MMM d, yyyy')}
+                            </span>
+                          )}
+                          {assignment.submittedAt && (
+                            <span className="flex items-center gap-1">
+                              <CheckCircle2 className="h-3 w-3 text-green-600" />
+                              Submitted {format(new Date(assignment.submittedAt), 'MMM d, yyyy')}
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <Button 
+                        onClick={() => openWorksheetInNewTab(assignment.id)}
+                        variant={isSubmitted ? "outline" : "default"}
+                        data-testid={`button-open-worksheet-${worksheet.id}`}
+                      >
+                        {isSubmitted ? (
+                          <><Eye className="h-4 w-4 mr-2" /> View Worksheet</>
+                        ) : (
+                          <><Send className="h-4 w-4 mr-2" /> Open Worksheet</>
+                        )}
+                      </Button>
                     </div>
-                    <Button 
-                      onClick={() => openWorksheetInNewTab(assignment.id)}
-                      data-testid={`button-open-worksheet-${worksheet.id}`}
-                    >
-                      Open Worksheet
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>
