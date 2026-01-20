@@ -556,11 +556,11 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
         </div>
       </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 min-h-0">
         {/* Page Navigation Sidebar */}
-        <div className="w-44 border-r bg-muted/30 p-3 flex flex-col">
+        <div className="w-44 border-r bg-muted/30 p-3 flex flex-col flex-shrink-0">
           <div className="font-medium text-sm mb-2">Pages</div>
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto">
             <div className="space-y-1.5">
               {worksheet.pages.map((page, index) => (
                 <button
@@ -578,7 +578,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
                 </button>
               ))}
             </div>
-          </ScrollArea>
+          </div>
           <Separator className="my-2" />
           <Button
             variant="outline"
@@ -603,7 +603,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
         </div>
 
         {/* Main Content Area - Question List */}
-        <div className={`flex-1 overflow-auto transition-all ${isPanelOpen ? 'w-1/2' : 'w-full'}`}>
+        <div className={`flex-1 overflow-y-auto overflow-x-hidden transition-all ${isPanelOpen ? 'w-1/2' : 'w-full'}`}>
           {currentPage ? (
             <div className="p-4">
               <div className="flex items-center justify-between mb-4">
@@ -660,8 +660,8 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
 
         {/* Right Panel - Question Editor */}
         {isPanelOpen && (
-          <div className="w-1/2 border-l bg-card flex flex-col">
-            <div className="p-4 border-b flex items-center justify-between">
+          <div className="w-1/2 border-l bg-card flex flex-col flex-shrink-0 min-h-0">
+            <div className="p-4 border-b flex items-center justify-between flex-shrink-0">
               <h3 className="font-semibold text-lg">
                 {editorMode === 'add' ? 'Add Question' : 'Edit Question'}
               </h3>
@@ -669,10 +669,10 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <ScrollArea className="flex-1 p-4">
+            <div className="flex-1 overflow-y-auto p-4">
               {editorMode === 'add' && renderQuestionForm(newQuestion, setNewQuestion)}
               {editorMode === 'edit' && editingQuestion && renderQuestionForm(editingQuestion, (q) => setEditingQuestion(q as Question))}
-            </ScrollArea>
+            </div>
             <div className="p-4 border-t bg-muted/30 flex gap-2">
               {editorMode === 'add' ? (
                 <>
