@@ -90,20 +90,13 @@ interface Stroke {
   width: number;
 }
 
-const questionTypeIcons: Record<QuestionType, any> = {
-  short_text: Type,
-  long_text: AlignLeft,
-  multiple_choice: List,
-  fill_blank: FileText,
-  text_image: Image,
-  information: Info,
-};
-
 export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, assignmentId, onClose, onComplete }: WorksheetAnswererProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, Answer>>({});
+  const [savedAnswerIds, setSavedAnswerIds] = useState<Set<string>>(new Set());
+  const [editingQuestionId, setEditingQuestionId] = useState<string | null>(null);
   const [inputMode, setInputMode] = useState<'type' | 'draw'>('type');
   const [isSaving, setIsSaving] = useState(false);
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
@@ -131,10 +124,13 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
   useEffect(() => {
     if (savedAnswers) {
       const answersMap: Record<string, Answer> = {};
+      const savedIds = new Set<string>();
       savedAnswers.forEach(answer => {
         answersMap[answer.questionId] = answer;
+        savedIds.add(answer.questionId);
       });
       setAnswers(answersMap);
+      setSavedAnswerIds(savedIds);
       
       savedAnswers.forEach(answer => {
         if (answer.handwritingData) {
@@ -195,6 +191,8 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
           handwritingData,
         },
       });
+      setSavedAnswerIds(prev => new Set(Array.from(prev).concat(questionId)));
+      setEditingQuestionId(null);
       toast({ title: 'Answer saved' });
     } finally {
       setIsSaving(false);
@@ -205,6 +203,7 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
     setIsSaving(true);
     try {
       const allQuestions = worksheet?.pages.flatMap(p => p.questions) || [];
+      const newSavedIds = new Set(savedAnswerIds);
       for (const question of allQuestions) {
         const answer = answers[question.id];
         const strokes = currentStrokes[question.id];
@@ -218,8 +217,11 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
               handwritingData: strokes ? JSON.stringify(strokes) : undefined,
             },
           });
+          newSavedIds.add(question.id);
         }
       }
+      setSavedAnswerIds(newSavedIds);
+      setEditingQuestionId(null);
       toast({ title: 'All answers saved' });
     } finally {
       setIsSaving(false);
@@ -402,26 +404,16 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
 
   const renderQuestionInput = (question: Question) => {
     const answer = answers[question.id];
-    const Icon = questionTypeIcons[question.questionType];
+    const isSaved = savedAnswerIds.has(question.id);
+    const isEditing = editingQuestionId === question.id;
+    const showAnswerForm = !isSaved || isEditing;
 
     if (question.questionType === 'information') {
       return (
         <Card key={question.id} className="mb-6 border-2 border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950">
           <CardContent className="pt-6">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <Info className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="text-sm font-medium text-blue-700 dark:text-blue-300 uppercase">
-                    Information
-                  </span>
-                </div>
-                <div className="prose prose-lg dark:prose-invert max-w-none">
-                  <div className="text-base font-serif leading-relaxed" dangerouslySetInnerHTML={{ __html: question.questionText }} />
-                </div>
-              </div>
+            <div className="prose prose-lg dark:prose-invert max-w-none">
+              <div className="text-base font-serif leading-relaxed" dangerouslySetInnerHTML={{ __html: question.questionText }} />
             </div>
           </CardContent>
         </Card>
@@ -435,10 +427,6 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
             <span className="font-bold text-xl">{question.questionNumber}.</span>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-2">
-                <Icon className="h-4 w-4 text-muted-foreground" />
-                <span className="text-xs font-medium text-muted-foreground uppercase">
-                  {question.questionType.replace('_', ' ')}
-                </span>
                 <span className="text-xs text-muted-foreground">({question.points} pts)</span>
                 <AIHintButton
                   question={question.questionText}
@@ -446,6 +434,11 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
                   correctAnswer={question.correctAnswer}
                   studentAttempt={answer?.textAnswer || answer?.selectedOption}
                 />
+                {isSaved && !isEditing && (
+                  <span className="text-xs font-medium text-green-600 flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3" /> Answer Saved
+                  </span>
+                )}
               </div>
               <p className="text-lg font-serif leading-relaxed">{question.questionText}</p>
               
@@ -457,109 +450,144 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
 
           <Separator className="my-4" />
 
-          {/* Input Mode Toggle */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm font-medium">Answer with:</span>
-            <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'type' | 'draw')}>
-              <TabsList>
-                <TabsTrigger value="type" data-testid={`toggle-type-${question.id}`}>
-                  <Type className="h-4 w-4 mr-1" /> Typing
-                </TabsTrigger>
-                <TabsTrigger value="draw" data-testid={`toggle-draw-${question.id}`}>
-                  <Pencil className="h-4 w-4 mr-1" /> Pen/Stylus
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-
-          {/* Answer Input Area */}
-          {question.questionType === 'multiple_choice' ? (
-            <RadioGroup
-              value={answer?.selectedOption || ''}
-              onValueChange={(value) => updateAnswer(question.id, { selectedOption: value })}
-              className="space-y-2"
-            >
-              {question.options?.map((option, i) => (
-                <div key={option.id} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
-                  <RadioGroupItem 
-                    value={option.id} 
-                    id={`${question.id}-${option.id}`}
-                    data-testid={`option-${question.id}-${i}`}
-                  />
-                  <Label 
-                    htmlFor={`${question.id}-${option.id}`}
-                    className="flex-1 cursor-pointer text-base"
-                  >
-                    {option.text}
-                  </Label>
-                </div>
-              ))}
-            </RadioGroup>
-          ) : inputMode === 'type' ? (
-            question.questionType === 'short_text' || question.questionType === 'fill_blank' ? (
-              <Input
-                value={answer?.textAnswer || ''}
-                onChange={(e) => updateAnswer(question.id, { textAnswer: e.target.value })}
-                placeholder={question.questionType === 'fill_blank' ? 'Enter the missing word...' : 'Type your answer...'}
-                className="text-lg font-serif"
-                data-testid={`input-answer-${question.id}`}
-              />
-            ) : (
-              <Textarea
-                value={answer?.textAnswer || ''}
-                onChange={(e) => updateAnswer(question.id, { textAnswer: e.target.value })}
-                placeholder="Type your answer here..."
-                className="min-h-[150px] text-lg font-serif leading-relaxed"
-                data-testid={`textarea-answer-${question.id}`}
-              />
-            )
+          {/* Show saved answer or input form */}
+          {isSaved && !isEditing ? (
+            <div className="space-y-3">
+              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="text-sm font-medium text-green-800 dark:text-green-200 mb-2">Your Answer:</div>
+                {question.questionType === 'multiple_choice' ? (
+                  <p className="text-base">
+                    {question.options?.find(o => o.id === answer?.selectedOption)?.text || 'No selection'}
+                  </p>
+                ) : (
+                  <p className="text-base whitespace-pre-wrap">{answer?.textAnswer || 'No answer'}</p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setEditingQuestionId(question.id)}
+                data-testid={`button-edit-answer-${question.id}`}
+              >
+                <Pencil className="h-4 w-4 mr-1" /> Edit Answer
+              </Button>
+            </div>
           ) : (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
+            <>
+              {/* Input Mode Toggle */}
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-sm font-medium">Answer with:</span>
+                <Tabs value={inputMode} onValueChange={(v) => setInputMode(v as 'type' | 'draw')}>
+                  <TabsList>
+                    <TabsTrigger value="type" data-testid={`toggle-type-${question.id}`}>
+                      <Type className="h-4 w-4 mr-1" /> Typing
+                    </TabsTrigger>
+                    <TabsTrigger value="draw" data-testid={`toggle-draw-${question.id}`}>
+                      <Pencil className="h-4 w-4 mr-1" /> Pen/Stylus
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
+
+              {/* Answer Input Area */}
+              {question.questionType === 'multiple_choice' ? (
+                <RadioGroup
+                  value={answer?.selectedOption || ''}
+                  onValueChange={(value) => updateAnswer(question.id, { selectedOption: value })}
+                  className="space-y-2"
+                >
+                  {question.options?.map((option, i) => (
+                    <div key={option.id} className="flex items-center space-x-3 p-3 rounded-lg border hover:bg-muted/50">
+                      <RadioGroupItem 
+                        value={option.id} 
+                        id={`${question.id}-${option.id}`}
+                        data-testid={`option-${question.id}-${i}`}
+                      />
+                      <Label 
+                        htmlFor={`${question.id}-${option.id}`}
+                        className="flex-1 cursor-pointer text-base"
+                      >
+                        {option.text}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              ) : inputMode === 'type' ? (
+                question.questionType === 'short_text' || question.questionType === 'fill_blank' ? (
+                  <Input
+                    value={answer?.textAnswer || ''}
+                    onChange={(e) => updateAnswer(question.id, { textAnswer: e.target.value })}
+                    placeholder={question.questionType === 'fill_blank' ? 'Enter the missing word...' : 'Type your answer...'}
+                    className="text-lg font-serif"
+                    data-testid={`input-answer-${question.id}`}
+                  />
+                ) : (
+                  <Textarea
+                    value={answer?.textAnswer || ''}
+                    onChange={(e) => updateAnswer(question.id, { textAnswer: e.target.value })}
+                    placeholder="Type your answer here..."
+                    className="min-h-[150px] text-lg font-serif leading-relaxed"
+                    data-testid={`textarea-answer-${question.id}`}
+                  />
+                )
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => clearCanvas(question.id)}
+                      data-testid={`button-clear-canvas-${question.id}`}
+                    >
+                      <Eraser className="h-4 w-4 mr-1" /> Clear
+                    </Button>
+                  </div>
+                  <div className="border-2 border-dashed rounded-lg overflow-hidden bg-white">
+                    <canvas
+                      ref={(el) => { canvasRefs.current[question.id] = el; }}
+                      width={600}
+                      height={question.questionType === 'long_text' || question.questionType === 'text_image' ? 300 : 150}
+                      className="w-full touch-none cursor-crosshair"
+                      onMouseDown={(e) => startDrawing(question.id, e)}
+                      onMouseMove={(e) => draw(question.id, e)}
+                      onMouseUp={() => stopDrawing(question.id)}
+                      onMouseLeave={() => stopDrawing(question.id)}
+                      onTouchStart={(e) => { e.preventDefault(); startDrawing(question.id, e); }}
+                      onTouchMove={(e) => { e.preventDefault(); draw(question.id, e); }}
+                      onTouchEnd={() => stopDrawing(question.id)}
+                      data-testid={`canvas-answer-${question.id}`}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use your stylus, finger, or mouse to write your answer
+                  </p>
+                </div>
+              )}
+
+              {/* Save individual answer button */}
+              <div className="mt-4 flex justify-end gap-2">
+                {isEditing && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditingQuestionId(null)}
+                  >
+                    Cancel
+                  </Button>
+                )}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => clearCanvas(question.id)}
-                  data-testid={`button-clear-canvas-${question.id}`}
+                  onClick={() => handleSaveAnswer(question.id)}
+                  disabled={isSaving}
+                  data-testid={`button-save-answer-${question.id}`}
                 >
-                  <Eraser className="h-4 w-4 mr-1" /> Clear
+                  <Save className="h-4 w-4 mr-1" />
+                  {isSaving ? 'Saving...' : 'Save Answer'}
                 </Button>
               </div>
-              <div className="border-2 border-dashed rounded-lg overflow-hidden bg-white">
-                <canvas
-                  ref={(el) => { canvasRefs.current[question.id] = el; }}
-                  width={600}
-                  height={question.questionType === 'long_text' || question.questionType === 'text_image' ? 300 : 150}
-                  className="w-full touch-none cursor-crosshair"
-                  onMouseDown={(e) => startDrawing(question.id, e)}
-                  onMouseMove={(e) => draw(question.id, e)}
-                  onMouseUp={() => stopDrawing(question.id)}
-                  onMouseLeave={() => stopDrawing(question.id)}
-                  onTouchStart={(e) => { e.preventDefault(); startDrawing(question.id, e); }}
-                  onTouchMove={(e) => { e.preventDefault(); draw(question.id, e); }}
-                  onTouchEnd={() => stopDrawing(question.id)}
-                  data-testid={`canvas-answer-${question.id}`}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Use your stylus, finger, or mouse to write your answer
-              </p>
-            </div>
+            </>
           )}
-
-          {/* Save individual answer button */}
-          <div className="mt-4 flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleSaveAnswer(question.id)}
-              disabled={isSaving}
-              data-testid={`button-save-answer-${question.id}`}
-            >
-              <Save className="h-4 w-4 mr-1" />
-              Save Answer
-            </Button>
-          </div>
         </CardContent>
       </Card>
     );
