@@ -2870,19 +2870,22 @@ export default function CompanyDashboard() {
                                           onClick={() => handleOpenAnnotator(submission)}
                                         >
                                           <Pencil className="h-4 w-4 mr-1" />
-                                          Review
+                                          {submission.assignment?.assignmentKind === 'worksheet' ? 'Review & Grade' : 'Review'}
                                         </Button>
                                       )}
-                                      <Button
-                                        onClick={() => {
-                                          setSelectedSubmissionId(submission.id);
-                                          setGradingScore(submission.score?.toString() || '');
-                                          setGradingFeedback(submission.feedback || '');
-                                        }}
-                                        className="bg-blue-600 hover:bg-blue-700 text-white"
-                                      >
-                                        Grade
-                                      </Button>
+                                      {/* Hide standard Grade button for worksheets - they use WorksheetReviewer for grading */}
+                                      {submission.assignment?.assignmentKind !== 'worksheet' && (
+                                        <Button
+                                          onClick={() => {
+                                            setSelectedSubmissionId(submission.id);
+                                            setGradingScore(submission.score?.toString() || '');
+                                            setGradingFeedback(submission.feedback || '');
+                                          }}
+                                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                                        >
+                                          Grade
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                   
@@ -2989,22 +2992,24 @@ export default function CompanyDashboard() {
                                           onClick={() => handleOpenAnnotator(submission)}
                                         >
                                           <Eye className="h-3 w-3 mr-1" />
-                                          View
+                                          {submission.assignment?.assignmentKind === 'worksheet' ? 'View & Edit' : 'View'}
                                         </Button>
                                       )}
-                                      {/* Edit Grade Button */}
-                                      <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                          setSelectedSubmissionId(submission.id);
-                                          setGradingScore(submission.score?.toString() || '');
-                                          setGradingFeedback(submission.feedback || '');
-                                        }}
-                                      >
-                                        <Edit className="h-3 w-3 mr-1" />
-                                        Edit
-                                      </Button>
+                                      {/* Edit Grade Button - hide for worksheets as they use WorksheetReviewer */}
+                                      {submission.assignment?.assignmentKind !== 'worksheet' && (
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedSubmissionId(submission.id);
+                                            setGradingScore(submission.score?.toString() || '');
+                                            setGradingFeedback(submission.feedback || '');
+                                          }}
+                                        >
+                                          <Edit className="h-3 w-3 mr-1" />
+                                          Edit
+                                        </Button>
+                                      )}
                                     </div>
                                   </div>
                                   

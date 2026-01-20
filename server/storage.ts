@@ -1790,6 +1790,7 @@ export class DatabaseStorage implements IStorage {
       console.log("Getting worksheet submissions for company:", companyId);
       
       // Fetch submitted worksheets from worksheet_assignments table
+      // Enforce both student company and worksheet company match for security
       const results = await db.execute(sql`
         SELECT 
           wa.id as worksheet_assignment_id,
@@ -1812,6 +1813,7 @@ export class DatabaseStorage implements IStorage {
         INNER JOIN students st ON wa.student_id = st.id
         INNER JOIN users u ON st.user_id = u.id
         WHERE st.company_id = ${companyId}
+          AND w.company_id = ${companyId}
           AND wa.status IN ('submitted', 'graded')
         ORDER BY wa.submitted_at DESC NULLS LAST, wa.created_at DESC
       `);

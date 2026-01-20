@@ -1041,9 +1041,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Company admin profile not found" });
       }
       
-      // Get all submissions for students in this company
-      const submissions = await storage.getCompanySubmissions(companyAdmin.companyId);
-      res.json(submissions);
+      // Get all submissions for students in this company (both regular and worksheet submissions)
+      const [regularSubmissions, worksheetSubmissions] = await Promise.all([
+        storage.getCompanySubmissions(companyAdmin.companyId),
+        storage.getCompanyWorksheetSubmissions(companyAdmin.companyId)
+      ]);
+      
+      // Merge and sort by submission date (most recent first)
+      const allSubmissions = [...regularSubmissions, ...worksheetSubmissions].sort((a, b) => {
+        const dateA = new Date(a.submittedAt || a.createdAt).getTime();
+        const dateB = new Date(b.submittedAt || b.createdAt).getTime();
+        return dateB - dateA;
+      });
+      
+      res.json(allSubmissions);
     } catch (error) {
       console.error("Error fetching company submissions:", error);
       res.status(500).json({ message: "Failed to fetch submissions" });
