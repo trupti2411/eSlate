@@ -231,6 +231,7 @@ export interface IStorage {
   getSubmissionsByStudent(studentId: string): Promise<Submission[]>;
   getSubmissionsByAssignmentAndStudent(assignmentId: string, studentId: string): Promise<Submission[]>;
   getCompanySubmissions(companyId: string): Promise<any[]>;
+  getCompanyWorksheetSubmissions(companyId: string): Promise<any[]>;
   getTutorSubmissions(tutorId: string): Promise<any[]>;
   getTutorSubmission(tutorId: string, submissionId: string): Promise<any | undefined>;
   gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission>;
@@ -1780,6 +1781,88 @@ export class DatabaseStorage implements IStorage {
       }));
     } catch (error) {
       console.error("Error in getCompanySubmissions:", error);
+      return [];
+    }
+  }
+
+  async getCompanyWorksheetSubmissions(companyId: string): Promise<any[]> {
+    try {
+      console.log("Getting worksheet submissions for company:", companyId);
+      
+      // Fetch submitted worksheets from worksheet_assignments table
+      const results = await db.execute(sql`
+        SELECT 
+          wa.id as worksheet_assignment_id,
+          wa.worksheet_id,
+          wa.student_id,
+          wa.status,
+          wa.submitted_at,
+          wa.created_at,
+          w.title as worksheet_title,
+          w.description as worksheet_description,
+          w.subject as worksheet_subject,
+          st.user_id as student_user_id,
+          st.company_id as student_company_id,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          u.email as user_email,
+          w.company_id as worksheet_company_id
+        FROM worksheet_assignments wa
+        INNER JOIN worksheets w ON wa.worksheet_id = w.id
+        INNER JOIN students st ON wa.student_id = st.id
+        INNER JOIN users u ON st.user_id = u.id
+        WHERE st.company_id = ${companyId}
+          AND wa.status IN ('submitted', 'graded')
+        ORDER BY wa.submitted_at DESC NULLS LAST, wa.created_at DESC
+      `);
+
+      console.log("Found worksheet submissions:", results.rows?.length || 0);
+
+      return (results.rows || []).map((row: any) => ({
+        id: `ws-${row.worksheet_assignment_id}`,
+        assignmentId: row.worksheet_assignment_id,
+        studentId: row.student_id,
+        content: null,
+        digitalContent: null,
+        fileUrls: [],
+        status: row.status,
+        isDraft: false,
+        submittedAt: row.submitted_at || row.created_at,
+        isLate: false,
+        score: null,
+        feedback: null,
+        deviceType: null,
+        inputMethod: null,
+        createdAt: row.created_at,
+        updatedAt: row.created_at,
+        student: {
+          id: row.student_id,
+          userId: row.student_user_id,
+          companyId: row.student_company_id,
+          user: {
+            firstName: row.user_first_name,
+            lastName: row.user_last_name,
+            email: row.user_email,
+          }
+        },
+        assignment: {
+          id: row.worksheet_assignment_id,
+          title: row.worksheet_title,
+          description: row.worksheet_description || '',
+          instructions: '',
+          submissionDate: row.submitted_at || row.created_at,
+          subject: row.worksheet_subject || 'General',
+          attachmentUrls: [],
+          assignmentKind: 'worksheet',
+          worksheetId: row.worksheet_id,
+        },
+        class: {
+          id: 'worksheet',
+          name: 'Worksheet',
+        }
+      }));
+    } catch (error) {
+      console.error("Error in getCompanyWorksheetSubmissions:", error);
       return [];
     }
   }
