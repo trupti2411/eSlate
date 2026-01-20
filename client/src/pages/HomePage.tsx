@@ -158,7 +158,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">For Everyone</h3>
                 <p className="text-gray-600 leading-relaxed">
-                  Separate spaces for students, parents, tutors, and managers. Everyone gets exactly what they need.
+                  Separate spaces for students, parents, tutors, and centre managers. Everyone gets exactly what they need.
                 </p>
               </CardContent>
             </Card>
@@ -249,7 +249,7 @@ export default function HomePage() {
               <div className="w-20 h-20 mx-auto mb-5 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
                 <Shield className="h-10 w-10 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Managers</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Centre Managers</h3>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Oversee everything - manage staff, students, classes, and view reports
               </p>
@@ -346,7 +346,7 @@ export default function HomePage() {
             "eSlate has transformed how we run our education provider. Parents love the updates, students find it easy to use, and our tutors save hours every week."
           </p>
           <p className="text-white/80">
-            - Happy Manager
+            - Happy Centre Manager
           </p>
         </div>
       </section>
