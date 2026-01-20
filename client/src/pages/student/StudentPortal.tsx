@@ -643,7 +643,11 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
               const daysLeft = differenceInDays(new Date(assignment.submissionDate), new Date());
               
               return (
-                <Card key={assignment.id} className="border-2 border-gray-200 hover:border-black transition-colors">
+                <Card 
+                  key={assignment.id} 
+                  className="border-2 border-gray-200 hover:border-black transition-colors cursor-pointer"
+                  onClick={() => window.open(`/student/assignment/${assignment.id}`, '_blank')}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -894,7 +898,8 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
                           return (
                             <div key={assignment.id}>
                               <div 
-                                className="px-3 py-2 hover:bg-gray-50 transition-colors"
+                                className="px-3 py-2 hover:bg-gray-50 transition-colors cursor-pointer"
+                                onClick={() => window.open(`/student/assignment/${assignment.id}`, '_blank')}
                               >
                                 <div className="flex items-start gap-3">
                                   <div className="w-1 h-1 bg-black rounded-full mt-2 flex-shrink-0" />
@@ -928,7 +933,8 @@ export function StudentPortal({ embedded = false }: StudentPortalProps) {
                                   <Button
                                     size="sm"
                                     className="h-7 px-3 text-xs whitespace-nowrap flex-shrink-0 bg-black text-white hover:bg-gray-800"
-                                    onClick={() => {
+                                    onClick={(e) => {
+                                      e.stopPropagation();
                                       window.open(`/student/assignment/${assignment.id}`, '_blank');
                                     }}
                                   >
