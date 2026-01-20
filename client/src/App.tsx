@@ -36,6 +36,7 @@ import Reports from "@/pages/company/Reports";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import UserAgreement from "@/pages/legal/UserAgreement";
+import HomePage from "@/pages/HomePage";
 
 import NotFound from "@/pages/not-found";
 
@@ -66,7 +67,7 @@ function Router() {
 
       {!isAuthenticated ? (
         <>
-          <Route path="/" component={AuthPage} />
+          <Route path="/" component={HomePage} />
           {/* Redirect any protected route to auth page when not logged in */}
           <Route path="/company" component={AuthPage} />
           <Route path="/company/:rest*" component={AuthPage} />
