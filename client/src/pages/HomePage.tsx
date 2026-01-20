@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -21,8 +22,220 @@ import {
   Eye,
   Zap,
   Battery,
-  Sun
+  Sun,
+  ChevronLeft,
+  ChevronRight,
+  Play,
+  Pause,
+  FileText,
+  PenTool,
+  ClipboardCheck,
+  Bell,
+  Video,
+  Lightbulb,
+  UserCheck,
+  Settings,
+  FolderOpen,
+  Award
 } from "lucide-react";
+
+const studentParentFeatures = [
+  {
+    id: 1,
+    title: "Dashboard Overview",
+    description: "Students see all their assignments, upcoming deadlines, and progress at a glance. Parents can monitor their child's learning journey.",
+    icon: BarChart3,
+    color: "from-blue-500 to-blue-600",
+    features: ["Assignment tracking", "Due date reminders", "Progress overview"]
+  },
+  {
+    id: 2,
+    title: "Complete Worksheets",
+    description: "Interactive worksheets with multiple question types. Students answer directly in the app with instant feedback on their work.",
+    icon: FileText,
+    color: "from-purple-500 to-purple-600",
+    features: ["Multiple choice", "Short & long answers", "Auto-save progress"]
+  },
+  {
+    id: 3,
+    title: "Annotate PDFs",
+    description: "Write directly on PDF assignments using pen, highlighter, and text tools. Perfect for showing your working on e-ink tablets.",
+    icon: PenTool,
+    color: "from-pink-500 to-pink-600",
+    features: ["Pen & highlighter", "Text annotations", "E-ink optimised"]
+  },
+  {
+    id: 4,
+    title: "Watch Solution Videos",
+    description: "After submission, students can watch tutor-provided solution videos to understand concepts better and learn from mistakes.",
+    icon: Video,
+    color: "from-red-500 to-red-600",
+    features: ["Step-by-step solutions", "Learn from mistakes", "Tutor explanations"]
+  },
+  {
+    id: 5,
+    title: "Get Smart Hints",
+    description: "Stuck on a problem? AI-powered hints guide students toward the answer without giving it away. Parents can control hint access.",
+    icon: Lightbulb,
+    color: "from-amber-500 to-amber-600",
+    features: ["Progressive hints", "Parent controls", "Encourages thinking"]
+  },
+  {
+    id: 6,
+    title: "Real-time Messages",
+    description: "Stay connected with tutors through instant messaging. Ask questions, get feedback, and never miss important updates.",
+    icon: MessageSquare,
+    color: "from-green-500 to-green-600",
+    features: ["Direct tutor chat", "Instant notifications", "File sharing"]
+  }
+];
+
+const providerTutorFeatures = [
+  {
+    id: 1,
+    title: "Student Management",
+    description: "Centre managers have complete oversight of all students, tutors, and classes. Easily organise and track your entire education provider.",
+    icon: Users,
+    color: "from-blue-500 to-blue-600",
+    features: ["Student profiles", "Class organisation", "Tutor assignments"]
+  },
+  {
+    id: 2,
+    title: "Create Worksheets",
+    description: "Build interactive worksheets with our easy editor. Add multiple choice, short answer, essay questions, and rich formatting.",
+    icon: ClipboardCheck,
+    color: "from-purple-500 to-purple-600",
+    features: ["6+ question types", "Rich text editor", "Page organisation"]
+  },
+  {
+    id: 3,
+    title: "Assign & Track",
+    description: "Assign work to individual students or entire classes. Track who's submitted, who's late, and who needs a reminder.",
+    icon: FolderOpen,
+    color: "from-pink-500 to-pink-600",
+    features: ["Bulk assignments", "Deadline tracking", "Submission status"]
+  },
+  {
+    id: 4,
+    title: "Grade with AI Help",
+    description: "Review student work with AI-assisted grading suggestions. Mark PDFs with ticks, crosses, and comments. Save hours every week.",
+    icon: Award,
+    color: "from-amber-500 to-amber-600",
+    features: ["AI grading assist", "Annotation tools", "Feedback comments"]
+  },
+  {
+    id: 5,
+    title: "Student Reports",
+    description: "Tutors and centre managers create detailed progress reports for students and parents. Track improvement over time.",
+    icon: FileText,
+    color: "from-green-500 to-green-600",
+    features: ["Progress tracking", "Performance insights", "Parent sharing"]
+  },
+  {
+    id: 6,
+    title: "Calendar & Attendance",
+    description: "Manage class schedules, track attendance, and keep everyone organised. Students and parents see their upcoming classes.",
+    icon: Calendar,
+    color: "from-cyan-500 to-cyan-600",
+    features: ["Class scheduling", "Attendance tracking", "Holiday management"]
+  }
+];
+
+function FeatureCarousel({ 
+  features, 
+  title, 
+  subtitle, 
+  gradientFrom, 
+  gradientTo 
+}: { 
+  features: typeof studentParentFeatures;
+  title: string;
+  subtitle: string;
+  gradientFrom: string;
+  gradientTo: string;
+}) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(true);
+
+  useEffect(() => {
+    if (!isPlaying) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % features.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isPlaying, features.length]);
+
+  const goToPrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + features.length) % features.length);
+  };
+
+  const goToNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % features.length);
+  };
+
+  const currentFeature = features[currentIndex];
+  const IconComponent = currentFeature.icon;
+
+  return (
+    <div className="bg-white rounded-3xl shadow-xl overflow-hidden">
+      <div className={`bg-gradient-to-r ${gradientFrom} ${gradientTo} p-6 text-white`}>
+        <h3 className="text-2xl font-bold mb-2">{title}</h3>
+        <p className="text-white/80">{subtitle}</p>
+      </div>
+      
+      <div className="p-8">
+        <div className="flex items-start gap-6 mb-6">
+          <div className={`w-16 h-16 bg-gradient-to-br ${currentFeature.color} rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg`}>
+            <IconComponent className="h-8 w-8 text-white" />
+          </div>
+          <div className="flex-1">
+            <h4 className="text-xl font-bold text-gray-900 mb-2">{currentFeature.title}</h4>
+            <p className="text-gray-600 leading-relaxed">{currentFeature.description}</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 mb-6">
+          {currentFeature.features.map((feature, idx) => (
+            <span key={idx} className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
+              {feature}
+            </span>
+          ))}
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsPlaying(!isPlaying)}
+              className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+            >
+              {isPlaying ? <Pause className="h-4 w-4 text-gray-600" /> : <Play className="h-4 w-4 text-gray-600" />}
+            </button>
+            <button onClick={goToPrev} className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+              <ChevronLeft className="h-4 w-4 text-gray-600" />
+            </button>
+            <button onClick={goToNext} className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors">
+              <ChevronRight className="h-4 w-4 text-gray-600" />
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            {features.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentIndex(idx)}
+                className={`w-2.5 h-2.5 rounded-full transition-all ${
+                  idx === currentIndex 
+                    ? 'bg-gray-800 w-6' 
+                    : 'bg-gray-300 hover:bg-gray-400'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   return (
@@ -440,6 +653,41 @@ export default function HomePage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Interactive Feature Tour Section */}
+      <section className="py-20 px-4 bg-gradient-to-b from-gray-50 to-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 bg-gradient-to-r from-blue-100 to-purple-100 px-4 py-2 rounded-full mb-6">
+              <Play className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium text-purple-700">Interactive Feature Tour</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              See eSlate in Action
+            </h2>
+            <p className="text-gray-600 max-w-2xl mx-auto text-lg">
+              Explore how different users experience eSlate - from students completing homework to centre managers overseeing everything
+            </p>
+          </div>
+
+          <div className="grid lg:grid-cols-2 gap-8">
+            <FeatureCarousel
+              features={studentParentFeatures}
+              title="For Students & Parents"
+              subtitle="Learning made simple and engaging"
+              gradientFrom="from-blue-500"
+              gradientTo="to-purple-600"
+            />
+            <FeatureCarousel
+              features={providerTutorFeatures}
+              title="For Tutors & Centre Managers"
+              subtitle="Powerful tools to manage learning"
+              gradientFrom="from-purple-500"
+              gradientTo="to-pink-600"
+            />
           </div>
         </div>
       </section>
