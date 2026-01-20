@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/RichTextEditor";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -775,13 +776,15 @@ export function AssignmentManagement() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel htmlFor="assignment-description">Description</FormLabel>
+                      <FormDescription>
+                        Use the rich text editor to format text, add tables, and highlight content.
+                      </FormDescription>
                       <FormControl>
-                        <Textarea 
-                          id="assignment-description"
-                          placeholder="Assignment details and instructions" 
-                          rows={3} 
-                          {...field} 
-                          value={field.value || ""} 
+                        <RichTextEditor
+                          content={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Assignment details and instructions"
+                          minHeight="150px"
                         />
                       </FormControl>
                       <FormMessage />
@@ -796,12 +799,11 @@ export function AssignmentManagement() {
                     <FormItem>
                       <FormLabel htmlFor="assignment-instructions">Instructions/Notes</FormLabel>
                       <FormControl>
-                        <Textarea 
-                          id="assignment-instructions"
-                          placeholder="Additional instructions for students" 
-                          rows={3} 
-                          {...field} 
-                          value={field.value || ""} 
+                        <RichTextEditor
+                          content={field.value || ""}
+                          onChange={field.onChange}
+                          placeholder="Additional instructions for students"
+                          minHeight="120px"
                         />
                       </FormControl>
                       <FormMessage />

@@ -319,8 +319,8 @@ export function WorksheetReviewer({ worksheetId, studentId, studentName, onClose
                   <Card key={question.id} className="bg-muted/50">
                     <CardContent className="pt-4">
                       <div className="flex items-start gap-2">
-                        <Info className="w-5 h-5 text-muted-foreground mt-0.5" />
-                        <p className="text-muted-foreground">{question.questionText}</p>
+                        <Info className="w-5 h-5 text-muted-foreground mt-0.5 shrink-0" />
+                        <div className="prose prose-sm dark:prose-invert max-w-none text-muted-foreground" dangerouslySetInnerHTML={{ __html: question.questionText }} />
                       </div>
                     </CardContent>
                   </Card>

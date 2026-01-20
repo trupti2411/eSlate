@@ -419,7 +419,7 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
                   </span>
                 </div>
                 <div className="prose prose-lg dark:prose-invert max-w-none">
-                  <p className="text-base font-serif leading-relaxed whitespace-pre-wrap">{question.questionText}</p>
+                  <div className="text-base font-serif leading-relaxed" dangerouslySetInnerHTML={{ __html: question.questionText }} />
                 </div>
               </div>
             </div>

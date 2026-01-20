@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { AIQuestionGenerator } from './AIQuestionGenerator';
+import { RichTextEditor } from './RichTextEditor';
 import { 
   Plus, 
   Trash2, 
@@ -290,20 +291,27 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
         <Label htmlFor="questionText">
           {question.questionType === 'information' ? 'Content' : 'Question Text'}
         </Label>
-        <Textarea
-          id="questionText"
-          value={question.questionText || ''}
-          onChange={(e) => onChange({ ...question, questionText: e.target.value })}
-          placeholder={question.questionType === 'information' 
-            ? "Enter information, instructions, or content to display..." 
-            : "Enter your question..."}
-          className={question.questionType === 'information' ? "min-h-[150px]" : "min-h-[80px]"}
-          data-testid="input-question-text"
-        />
-        {question.questionType === 'information' && (
-          <p className="text-xs text-muted-foreground mt-1">
-            This content will be displayed to students without requiring an answer.
-          </p>
+        {question.questionType === 'information' ? (
+          <>
+            <RichTextEditor
+              content={question.questionText || ''}
+              onChange={(content) => onChange({ ...question, questionText: content })}
+              placeholder="Enter information, instructions, or content to display..."
+              minHeight="200px"
+            />
+            <p className="text-xs text-muted-foreground mt-1">
+              This content will be displayed to students without requiring an answer. You can add tables, highlight text, and format content.
+            </p>
+          </>
+        ) : (
+          <Textarea
+            id="questionText"
+            value={question.questionText || ''}
+            onChange={(e) => onChange({ ...question, questionText: e.target.value })}
+            placeholder="Enter your question..."
+            className="min-h-[80px]"
+            data-testid="input-question-text"
+          />
         )}
       </div>
 
@@ -432,8 +440,8 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
                 )}
               </div>
               {question.questionType === 'information' ? (
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2">
-                  <p className="text-base whitespace-pre-wrap">{question.questionText}</p>
+                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2 prose prose-sm dark:prose-invert max-w-none">
+                  <div dangerouslySetInnerHTML={{ __html: question.questionText }} />
                 </div>
               ) : (
                 <p className="text-lg mb-2">{question.questionText}</p>
