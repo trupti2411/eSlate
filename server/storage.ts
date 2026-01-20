@@ -2111,6 +2111,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async deleteWorksheet(id: string): Promise<void> {
+    // Delete worksheet answers first (no cascade on foreign key)
+    await db.delete(worksheetAnswers).where(eq(worksheetAnswers.worksheetId, id));
+    // Now delete the worksheet (pages, questions, assignments cascade automatically)
     await db.delete(worksheets).where(eq(worksheets.id, id));
   }
 
