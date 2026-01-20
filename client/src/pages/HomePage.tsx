@@ -15,7 +15,9 @@ import {
   ArrowRight,
   Star,
   Heart,
-  Sparkles
+  Sparkles,
+  Monitor,
+  Lock
 } from "lucide-react";
 
 export default function HomePage() {
@@ -100,7 +102,7 @@ export default function HomePage() {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-blue-50 to-white group">
               <CardContent className="pt-8 pb-6">
                 <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
@@ -169,6 +171,30 @@ export default function HomePage() {
                 <h3 className="text-xl font-bold text-gray-900 mb-3">Tablet Friendly</h3>
                 <p className="text-gray-600 leading-relaxed">
                   Works beautifully on tablets and e-readers. Clear, easy-to-read design that's gentle on the eyes.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-slate-50 to-white group">
+              <CardContent className="pt-8 pb-6">
+                <div className="w-14 h-14 bg-gradient-to-br from-slate-600 to-slate-700 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                  <Monitor className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">E-ink Device Ready</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Specially designed for e-ink screens with high-contrast displays. Perfect for distraction-free learning on any device.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-shadow bg-gradient-to-br from-red-50 to-white group">
+              <CardContent className="pt-8 pb-6">
+                <div className="w-14 h-14 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                  <Lock className="h-7 w-7 text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900 mb-3">Safe & Secure</h3>
+                <p className="text-gray-600 leading-relaxed">
+                  Your data is protected with secure logins and privacy controls. Parents can manage what their children can access.
                 </p>
               </CardContent>
             </Card>
