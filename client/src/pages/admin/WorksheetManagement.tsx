@@ -12,7 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { WorksheetEditor } from '@/components/WorksheetEditor';
 import { 
   Plus, 
   FileText, 
@@ -63,7 +62,6 @@ interface WorksheetManagementProps {
 export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
   const { toast } = useToast();
   const [, setLocation] = useLocation();
-  const [editingWorksheetId, setEditingWorksheetId] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showAssignDialog, setShowAssignDialog] = useState(false);
   const [selectedWorksheet, setSelectedWorksheet] = useState<Worksheet | null>(null);
@@ -104,8 +102,8 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'worksheets'] });
       setShowCreateDialog(false);
       setNewWorksheet({ title: '', description: '', subject: '' });
-      setEditingWorksheetId(worksheet.id);
-      toast({ title: 'Worksheet created' });
+      window.open(`/company/worksheet/edit/${worksheet.id}`, '_blank');
+      toast({ title: 'Worksheet created - opening in new tab' });
     },
     onError: () => {
       toast({ title: 'Failed to create worksheet', variant: 'destructive' });
@@ -185,18 +183,9 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
 
-  if (editingWorksheetId) {
-    return (
-      <WorksheetEditor
-        worksheetId={editingWorksheetId}
-        companyId={companyId}
-        onClose={() => {
-          setEditingWorksheetId(null);
-          queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'worksheets'] });
-        }}
-      />
-    );
-  }
+  const openWorksheetEditor = (worksheetId: string) => {
+    window.open(`/company/worksheet/edit/${worksheetId}`, '_blank');
+  };
 
   return (
     <div className="p-6">
@@ -388,7 +377,7 @@ export function WorksheetManagement({ companyId }: WorksheetManagementProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setEditingWorksheetId(worksheet.id)}
+                    onClick={() => openWorksheetEditor(worksheet.id)}
                     className="flex-1"
                     data-testid={`button-edit-${worksheet.id}`}
                   >

@@ -29,6 +29,7 @@ import { WorksheetWorkPage } from "@/pages/student/WorksheetWorkPage";
 import GoogleDocsViewer from "@/pages/GoogleDocsViewer";
 import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { WorksheetManagementPage } from "@/pages/admin/WorksheetManagementPage";
+import { WorksheetEditorPage } from "@/pages/admin/WorksheetEditorPage";
 import TestManagement from "@/pages/tests/TestManagement";
 import TestGrading from "@/pages/tests/TestGrading";
 import Reports from "@/pages/company/Reports";
@@ -107,6 +108,7 @@ function Router() {
           <Route path="/company/assignments" component={AssignmentManagement} />
           <Route path="/company/homework" component={SubmittedHomework} />
           <Route path="/company/worksheets" component={WorksheetManagementPage} />
+          <Route path="/company/worksheet/edit/:worksheetId" component={WorksheetEditorPage} />
           <Route path="/company/tests" component={TestManagement} />
           <Route path="/company/tests/:testId/grade/:attemptId" component={TestGrading} />
           <Route path="/company/reports" component={Reports} />
