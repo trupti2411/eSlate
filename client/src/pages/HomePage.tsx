@@ -53,7 +53,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto text-center relative">
           <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100 mb-8">
             <Sparkles className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-medium text-gray-600">Trusted by tutoring centres worldwide</span>
+            <span className="text-sm font-medium text-gray-600">Trusted by education providers worldwide</span>
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
@@ -62,7 +62,7 @@ export default function HomePage() {
             <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">Manage Learning</span>
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-10 leading-relaxed">
-            A complete platform for tutoring centres to manage students, track progress, and deliver engaging lessons. 
+            A complete platform for education providers to manage students, track progress, and deliver engaging lessons. 
             Simple, beautiful, and designed with learners in mind.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -98,7 +98,7 @@ export default function HomePage() {
               Everything You Need in One Place
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto text-lg">
-              From homework to messaging, we've got all the tools to help your tutoring centre run smoothly
+              From homework to messaging, we've got all the tools to help your education provider run smoothly
             </p>
           </div>
           
@@ -158,7 +158,7 @@ export default function HomePage() {
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-3">For Everyone</h3>
                 <p className="text-gray-600 leading-relaxed">
-                  Separate spaces for students, parents, tutors, and centre managers. Everyone gets exactly what they need.
+                  Separate spaces for students, parents, tutors, and managers. Everyone gets exactly what they need.
                 </p>
               </CardContent>
             </Card>
@@ -210,7 +210,7 @@ export default function HomePage() {
               Built for Your Whole Team
             </h2>
             <p className="text-gray-600 max-w-2xl mx-auto text-lg">
-              Whether you're a student, parent, tutor, or running the centre, eSlate has you covered
+              Whether you're a student, parent, tutor, or managing the team, eSlate has you covered
             </p>
           </div>
           
@@ -249,7 +249,7 @@ export default function HomePage() {
               <div className="w-20 h-20 mx-auto mb-5 bg-gradient-to-br from-amber-500 to-amber-600 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
                 <Shield className="h-10 w-10 text-white" />
               </div>
-              <h3 className="text-lg font-bold text-gray-900 mb-2">Centre Managers</h3>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">Managers</h3>
               <p className="text-gray-600 text-sm leading-relaxed">
                 Oversee everything - manage staff, students, classes, and view reports
               </p>
@@ -264,7 +264,7 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 gap-16 items-center">
             <div>
               <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">
-                Why Tutoring Centres Love eSlate
+                Why Education Providers Love eSlate
               </h2>
               <div className="space-y-6">
                 <div className="flex items-start gap-4">
@@ -343,10 +343,10 @@ export default function HomePage() {
             ))}
           </div>
           <p className="text-2xl md:text-3xl font-medium text-white mb-6 leading-relaxed">
-            "eSlate has transformed how we run our tutoring centre. Parents love the updates, students find it easy to use, and our tutors save hours every week."
+            "eSlate has transformed how we run our education provider. Parents love the updates, students find it easy to use, and our tutors save hours every week."
           </p>
           <p className="text-white/80">
-            - Happy Centre Manager
+            - Happy Manager
           </p>
         </div>
       </section>
@@ -358,7 +358,7 @@ export default function HomePage() {
             Ready to Get Started?
           </h2>
           <p className="text-gray-600 text-lg mb-8">
-            Join tutoring centres using eSlate to manage learning better
+            Join education providers using eSlate to manage learning better
           </p>
           <Link href="/auth">
             <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-10 shadow-xl shadow-blue-500/25">
