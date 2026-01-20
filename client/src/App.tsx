@@ -25,6 +25,7 @@ import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
 import { StudentPortal } from "@/pages/student/StudentPortal";
 import { StudentWorksheets } from "@/pages/student/StudentWorksheets";
 import { AssignmentWorkPage } from "@/pages/student/AssignmentWorkPage";
+import { WorksheetWorkPage } from "@/pages/student/WorksheetWorkPage";
 import GoogleDocsViewer from "@/pages/GoogleDocsViewer";
 import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { WorksheetManagementPage } from "@/pages/admin/WorksheetManagementPage";
@@ -111,6 +112,7 @@ function Router() {
           <Route path="/company/reports" component={Reports} />
           <Route path="/student/portal">{() => <StudentPortal />}</Route>
           <Route path="/student/worksheets" component={StudentWorksheets} />
+          <Route path="/student/worksheet/:id" component={WorksheetWorkPage} />
           <Route path="/student/assignment/:id" component={AssignmentWorkPage} />
           <Route path="/pdf-annotator" component={GoogleDocsViewer} />
           <Route path="/google-docs-viewer" component={GoogleDocsViewer} />

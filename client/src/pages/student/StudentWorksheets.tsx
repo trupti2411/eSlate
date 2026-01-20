@@ -52,8 +52,8 @@ export function StudentWorksheets() {
     enabled: !!student?.id,
   });
 
-  const openWorksheetInNewTab = (assignmentId: string) => {
-    window.open(`/student/assignment/${assignmentId}`, '_blank');
+  const openWorksheetInNewTab = (worksheetAssignmentId: string) => {
+    window.open(`/student/worksheet/${worksheetAssignmentId}`, '_blank');
   };
 
   return (

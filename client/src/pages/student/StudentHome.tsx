@@ -112,6 +112,7 @@ export default function StudentHome() {
     type: 'assignment' | 'worksheet' | 'test';
     status: 'pending' | 'overdue' | 'submitted' | 'graded' | 'in_progress';
     rawAssignment?: Assignment;
+    rawId?: string;
   }
 
   const normalizeWorksheet = (ws: any): UnifiedItem | null => {
@@ -134,6 +135,7 @@ export default function StudentHome() {
            : status === 'graded' ? 'graded'
            : status === 'in_progress' ? 'in_progress'
            : isOverdue ? 'overdue' : 'pending',
+      rawId: assignment.id,
     };
   };
 
@@ -182,7 +184,9 @@ export default function StudentHome() {
   const handleStartAssignment = (item: UnifiedItem) => {
     if (item.type === 'assignment' && item.rawAssignment) {
       window.open(`/student/assignment/${item.rawAssignment.id}`, '_blank');
-    } else if (item.type === 'worksheet' || item.type === 'test') {
+    } else if (item.type === 'worksheet' && item.rawId) {
+      window.open(`/student/worksheet/${item.rawId}`, '_blank');
+    } else if (item.type === 'test') {
       window.open('/student/portal', '_blank');
     }
   };
