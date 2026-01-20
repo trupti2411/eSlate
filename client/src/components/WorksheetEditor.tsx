@@ -31,7 +31,9 @@ import {
   GripVertical,
   Check,
   Info,
-  Sparkles
+  Sparkles,
+  X,
+  PlusCircle
 } from 'lucide-react';
 
 type QuestionType = 'short_text' | 'long_text' | 'multiple_choice' | 'fill_blank' | 'text_image' | 'information';
@@ -84,18 +86,20 @@ const questionTypeLabels: Record<QuestionType, { label: string; icon: any; descr
   information: { label: 'Information Block', icon: Info, description: 'Display text/instructions without requiring an answer' },
 };
 
+const defaultQuestion: Partial<Question> = {
+  questionType: 'short_text',
+  questionText: '',
+  points: 1,
+  options: [{ id: '1', text: '', isCorrect: true }, { id: '2', text: '', isCorrect: false }],
+};
+
 export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, onClose, onSave }: WorksheetEditorProps) {
   const { toast } = useToast();
   const [worksheetId, setWorksheetId] = useState<string | undefined>(initialWorksheetId);
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-  const [showAddQuestion, setShowAddQuestion] = useState(false);
+  const [editorMode, setEditorMode] = useState<'closed' | 'add' | 'edit'>('closed');
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
-  const [newQuestion, setNewQuestion] = useState<Partial<Question>>({
-    questionType: 'short_text',
-    questionText: '',
-    points: 1,
-    options: [{ id: '1', text: '', isCorrect: true }, { id: '2', text: '', isCorrect: false }],
-  });
+  const [newQuestion, setNewQuestion] = useState<Partial<Question>>({ ...defaultQuestion });
   const [newWorksheetTitle, setNewWorksheetTitle] = useState('');
   const [newWorksheetSubject, setNewWorksheetSubject] = useState('');
   const [showAIGenerator, setShowAIGenerator] = useState(false);
@@ -146,13 +150,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
       apiRequest(`/api/worksheets/pages/${data.pageId}/questions`, 'POST', data.question),
     onSuccess: () => {
       refetch();
-      setShowAddQuestion(false);
-      setNewQuestion({
-        questionType: 'short_text',
-        questionText: '',
-        points: 1,
-        options: [{ id: '1', text: '', isCorrect: true }, { id: '2', text: '', isCorrect: false }],
-      });
+      setNewQuestion({ ...defaultQuestion });
       toast({ title: 'Question added' });
     },
   });
@@ -163,6 +161,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
     onSuccess: () => {
       refetch();
       setEditingQuestion(null);
+      setEditorMode('closed');
       toast({ title: 'Question updated' });
     },
   });
@@ -174,6 +173,22 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
       toast({ title: 'Question deleted' });
     },
   });
+
+  const openAddPanel = () => {
+    setEditorMode('add');
+    setEditingQuestion(null);
+    setNewQuestion({ ...defaultQuestion });
+  };
+
+  const openEditPanel = (question: Question) => {
+    setEditorMode('edit');
+    setEditingQuestion(question);
+  };
+
+  const closePanel = () => {
+    setEditorMode('closed');
+    setEditingQuestion(null);
+  };
 
   if (isLoading && worksheetId) {
     return (
@@ -245,12 +260,18 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
   const currentPage = worksheet.pages[currentPageIndex];
   const totalPages = worksheet.pages.length;
 
-  const handleAddQuestion = () => {
+  const handleAddQuestion = (addAnother = false) => {
     if (!currentPage || !newQuestion.questionText) return;
     
     addQuestionMutation.mutate({
       pageId: currentPage.id,
       question: newQuestion,
+    }, {
+      onSuccess: () => {
+        if (!addAnother) {
+          setEditorMode('closed');
+        }
+      }
     });
   };
 
@@ -263,32 +284,36 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
     });
   };
 
-  const renderQuestionForm = (question: Partial<Question>, onChange: (q: Partial<Question>) => void, isEditing = false) => (
-    <div className="space-y-4">
+  const renderQuestionForm = (question: Partial<Question>, onChange: (q: Partial<Question>) => void) => (
+    <div className="space-y-5">
       <div>
-        <Label htmlFor="questionType">Question Type</Label>
-        <Select
-          value={question.questionType}
-          onValueChange={(value: QuestionType) => onChange({ ...question, questionType: value })}
-        >
-          <SelectTrigger data-testid="select-question-type">
-            <SelectValue placeholder="Select type" />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(questionTypeLabels).map(([type, { label, description }]) => (
-              <SelectItem key={type} value={type} data-testid={`question-type-${type}`}>
-                <div>
-                  <div className="font-medium">{label}</div>
-                  <div className="text-xs text-muted-foreground">{description}</div>
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <Label className="text-sm font-semibold mb-2 block">Question Type</Label>
+        <div className="grid grid-cols-2 gap-2">
+          {Object.entries(questionTypeLabels).map(([type, { label, icon: Icon, description }]) => (
+            <button
+              key={type}
+              onClick={() => onChange({ ...question, questionType: type as QuestionType })}
+              className={`p-3 rounded-lg border-2 text-left transition-all ${
+                question.questionType === type
+                  ? 'border-black bg-gray-50'
+                  : 'border-gray-200 hover:border-gray-300'
+              }`}
+              data-testid={`question-type-${type}`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Icon className="h-4 w-4" />
+                <span className="font-medium text-sm">{label}</span>
+              </div>
+              <span className="text-xs text-muted-foreground">{description}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
+      <Separator />
+
       <div>
-        <Label htmlFor="questionText">
+        <Label className="text-sm font-semibold mb-2 block">
           {question.questionType === 'information' ? 'Content' : 'Question Text'}
         </Label>
         {question.questionType === 'information' ? (
@@ -297,29 +322,29 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
               content={question.questionText || ''}
               onChange={(content) => onChange({ ...question, questionText: content })}
               placeholder="Enter information, instructions, or content to display..."
-              minHeight="200px"
+              minHeight="250px"
             />
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-muted-foreground mt-2">
               This content will be displayed to students without requiring an answer. You can add tables, highlight text, and format content.
             </p>
           </>
         ) : (
           <Textarea
-            id="questionText"
             value={question.questionText || ''}
             onChange={(e) => onChange({ ...question, questionText: e.target.value })}
             placeholder="Enter your question..."
-            className="min-h-[80px]"
+            className="min-h-[120px] text-base"
             data-testid="input-question-text"
           />
         )}
       </div>
 
       {question.questionType === 'multiple_choice' && (
-        <div className="space-y-2">
-          <Label>Answer Options</Label>
+        <div className="space-y-3">
+          <Label className="text-sm font-semibold">Answer Options</Label>
+          <p className="text-xs text-muted-foreground">Select the radio button next to the correct answer</p>
           {(question.options || []).map((option, index) => (
-            <div key={option.id} className="flex items-center gap-2">
+            <div key={option.id} className="flex items-center gap-3">
               <input
                 type="radio"
                 name="correctAnswer"
@@ -331,6 +356,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
                   }));
                   onChange({ ...question, options: newOptions });
                 }}
+                className="w-5 h-5"
                 data-testid={`radio-correct-${index}`}
               />
               <Input
@@ -354,7 +380,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
                   }}
                   data-testid={`button-remove-option-${index}`}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Trash2 className="h-4 w-4 text-red-500" />
                 </Button>
               )}
             </div>
@@ -375,15 +401,14 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
 
       {question.questionType === 'fill_blank' && (
         <div>
-          <Label htmlFor="correctAnswer">Correct Answer</Label>
+          <Label className="text-sm font-semibold mb-2 block">Correct Answer</Label>
           <Input
-            id="correctAnswer"
             value={question.correctAnswer || ''}
             onChange={(e) => onChange({ ...question, correctAnswer: e.target.value })}
             placeholder="Enter the correct answer"
             data-testid="input-correct-answer"
           />
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-xs text-muted-foreground mt-2">
             Use underscores (___) in the question to indicate the blank
           </p>
         </div>
@@ -391,9 +416,8 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
 
       {question.questionType === 'text_image' && (
         <div>
-          <Label htmlFor="imageUrl">Image URL</Label>
+          <Label className="text-sm font-semibold mb-2 block">Image URL</Label>
           <Input
-            id="imageUrl"
             value={question.imageUrl || ''}
             onChange={(e) => onChange({ ...question, imageUrl: e.target.value })}
             placeholder="Enter image URL"
@@ -404,9 +428,8 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
 
       {question.questionType !== 'information' && (
         <div>
-          <Label htmlFor="points">Points</Label>
+          <Label className="text-sm font-semibold mb-2 block">Points</Label>
           <Input
-            id="points"
             type="number"
             min="1"
             value={question.points || 1}
@@ -422,79 +445,67 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
   const renderQuestion = (question: Question, index: number) => {
     const typeInfo = questionTypeLabels[question.questionType];
     const Icon = typeInfo.icon;
+    const isSelected = editorMode === 'edit' && editingQuestion?.id === question.id;
 
     return (
-      <Card key={question.id} className="mb-4 border-2 hover:border-primary/50 transition-colors">
-        <CardContent className="pt-4">
+      <Card 
+        key={question.id} 
+        className={`mb-3 border-2 cursor-pointer transition-all ${
+          isSelected ? 'border-black ring-2 ring-black/10' : 'hover:border-gray-400'
+        }`}
+        onClick={() => openEditPanel(question)}
+      >
+        <CardContent className="py-3 px-4">
           <div className="flex items-start gap-3">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <GripVertical className="h-5 w-5 cursor-move" />
-              <span className="font-bold text-lg">{question.questionNumber}.</span>
+              <span className="font-bold text-base w-6">{question.questionNumber}.</span>
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <Icon className="h-4 w-4 text-muted-foreground" />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <Icon className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                 <span className="text-xs font-medium text-muted-foreground uppercase">{typeInfo.label}</span>
                 {question.questionType !== 'information' && (
                   <span className="text-xs text-muted-foreground">({question.points} pts)</span>
                 )}
               </div>
               {question.questionType === 'information' ? (
-                <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2 prose prose-sm dark:prose-invert max-w-none">
-                  <div dangerouslySetInnerHTML={{ __html: question.questionText }} />
+                <div className="bg-blue-50 border border-blue-200 rounded p-2 text-sm line-clamp-2">
+                  <div dangerouslySetInnerHTML={{ __html: question.questionText }} className="prose prose-sm max-w-none" />
                 </div>
               ) : (
-                <p className="text-lg mb-2">{question.questionText}</p>
+                <p className="text-sm line-clamp-2">{question.questionText}</p>
               )}
               
               {question.questionType === 'multiple_choice' && question.options && (
-                <div className="space-y-1 ml-4">
-                  {question.options.map((option: any, i: number) => (
-                    <div key={i} className={`flex items-center gap-2 ${option.isCorrect ? 'text-green-700 font-medium' : ''}`}>
-                      <div className={`w-4 h-4 rounded-full border-2 ${option.isCorrect ? 'border-green-600 bg-green-100' : 'border-gray-400'}`} />
-                      <span>{option.text}</span>
-                      {option.isCorrect && <span className="text-xs">(correct)</span>}
-                    </div>
-                  ))}
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {question.options.length} options
                 </div>
               )}
-
-              {question.questionType === 'fill_blank' && question.correctAnswer && (
-                <p className="text-sm text-green-700">Answer: {question.correctAnswer}</p>
-              )}
-
-              {question.questionType === 'text_image' && question.imageUrl && (
-                <img src={question.imageUrl} alt="Question" className="max-w-xs rounded mt-2" />
-              )}
             </div>
-            <div className="flex gap-1">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setEditingQuestion(question)}
-                data-testid={`button-edit-question-${index}`}
-              >
-                <FileText className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => question.id && deleteQuestionMutation.mutate(question.id)}
-                data-testid={`button-delete-question-${index}`}
-              >
-                <Trash2 className="h-4 w-4 text-red-500" />
-              </Button>
-            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                question.id && deleteQuestionMutation.mutate(question.id);
+              }}
+              data-testid={`button-delete-question-${index}`}
+            >
+              <Trash2 className="h-4 w-4 text-red-500" />
+            </Button>
           </div>
         </CardContent>
       </Card>
     );
   };
 
+  const isPanelOpen = editorMode !== 'closed';
+
   return (
     <div className="flex flex-col h-full bg-background">
       {/* Header */}
-      <div className="border-b p-4 flex items-center justify-between bg-card">
+      <div className="border-b p-3 flex items-center justify-between bg-card">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-editor">
             <ChevronLeft className="h-5 w-5" />
@@ -503,11 +514,11 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
             <Input
               value={worksheet.title}
               onChange={(e) => updateWorksheetMutation.mutate({ title: e.target.value })}
-              className="text-xl font-bold border-none focus:ring-0 p-0 h-auto"
+              className="text-lg font-bold border-none focus:ring-0 p-0 h-auto"
               placeholder="Worksheet Title"
               data-testid="input-worksheet-title"
             />
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-0.5">
               <Input
                 value={worksheet.subject || ''}
                 onChange={(e) => updateWorksheetMutation.mutate({ subject: e.target.value })}
@@ -547,10 +558,10 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
 
       <div className="flex flex-1 overflow-hidden">
         {/* Page Navigation Sidebar */}
-        <div className="w-48 border-r bg-muted/30 p-4 flex flex-col">
-          <div className="font-medium mb-3">Pages</div>
+        <div className="w-44 border-r bg-muted/30 p-3 flex flex-col">
+          <div className="font-medium text-sm mb-2">Pages</div>
           <ScrollArea className="flex-1">
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {worksheet.pages.map((page, index) => (
                 <button
                   key={page.id}
@@ -562,98 +573,79 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
                   }`}
                   data-testid={`button-page-${index + 1}`}
                 >
-                  <div className="font-medium">Page {page.pageNumber}</div>
+                  <div className="font-medium text-sm">Page {page.pageNumber}</div>
                   <div className="text-xs opacity-75">{page.questions.length} questions</div>
                 </button>
               ))}
             </div>
           </ScrollArea>
-          <Separator className="my-3" />
+          <Separator className="my-2" />
           <Button
             variant="outline"
             size="sm"
             onClick={() => addPageMutation.mutate()}
-            className="w-full"
+            className="w-full text-xs"
             data-testid="button-add-page"
           >
-            <Plus className="h-4 w-4 mr-1" /> Add Page
+            <Plus className="h-3 w-3 mr-1" /> Add Page
           </Button>
           {totalPages > 1 && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => currentPage && deletePageMutation.mutate(currentPage.id)}
-              className="w-full mt-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+              className="w-full mt-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 text-xs"
               data-testid="button-delete-page"
             >
-              <Trash2 className="h-4 w-4 mr-1" /> Delete Page
+              <Trash2 className="h-3 w-3 mr-1" /> Delete Page
             </Button>
           )}
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-auto p-6">
+        {/* Main Content Area - Question List */}
+        <div className={`flex-1 overflow-auto transition-all ${isPanelOpen ? 'w-1/2' : 'w-full'}`}>
           {currentPage ? (
-            <>
-              <div className="max-w-3xl mx-auto">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold">Page {currentPage.pageNumber}</h2>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline"
-                      onClick={() => setShowAIGenerator(true)}
-                      data-testid="button-ai-generate"
-                    >
-                      <Sparkles className="h-4 w-4 mr-2" /> AI Generate
-                    </Button>
-                    <Dialog open={showAddQuestion} onOpenChange={setShowAddQuestion}>
-                      <DialogTrigger asChild>
-                        <Button data-testid="button-add-question">
-                          <Plus className="h-4 w-4 mr-2" /> Add Question
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-lg">
-                        <DialogHeader>
-                          <DialogTitle>Add Question</DialogTitle>
-                        </DialogHeader>
-                        {renderQuestionForm(newQuestion, setNewQuestion)}
-                        <div className="flex justify-end gap-2 mt-4">
-                          <Button variant="outline" onClick={() => setShowAddQuestion(false)}>
-                            Cancel
-                          </Button>
-                          <Button 
-                            onClick={handleAddQuestion}
-                            disabled={!newQuestion.questionText}
-                            data-testid="button-confirm-add-question"
-                          >
-                            Add Question
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold">Page {currentPage.pageNumber}</h2>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAIGenerator(true)}
+                    data-testid="button-ai-generate"
+                  >
+                    <Sparkles className="h-4 w-4 mr-1" /> AI Generate
+                  </Button>
+                  <Button 
+                    size="sm"
+                    onClick={openAddPanel}
+                    data-testid="button-add-question"
+                  >
+                    <Plus className="h-4 w-4 mr-1" /> Add Question
+                  </Button>
                 </div>
-
-                {currentPage.questions.length === 0 ? (
-                  <Card className="border-dashed">
-                    <CardContent className="py-12 text-center">
-                      <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                      <h3 className="text-lg font-medium mb-2">No questions yet</h3>
-                      <p className="text-muted-foreground mb-4">
-                        Click "Add Question" to create your first question on this page
-                      </p>
-                      <Button onClick={() => setShowAddQuestion(true)} data-testid="button-add-first-question">
-                        <Plus className="h-4 w-4 mr-2" /> Add Question
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div>
-                    {currentPage.questions.map((question, index) => renderQuestion(question, index))}
-                  </div>
-                )}
               </div>
-            </>
+
+              {currentPage.questions.length === 0 ? (
+                <Card className="border-dashed">
+                  <CardContent className="py-8 text-center">
+                    <FileText className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                    <h3 className="text-base font-medium mb-1">No questions yet</h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      Click "Add Question" to create your first question
+                    </p>
+                    <Button size="sm" onClick={openAddPanel} data-testid="button-add-first-question">
+                      <Plus className="h-4 w-4 mr-1" /> Add Question
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div>
+                  {currentPage.questions.map((question, index) => renderQuestion(question, index))}
+                </div>
+              )}
+            </div>
           ) : (
             <div className="flex items-center justify-center h-full">
               <div className="text-center">
@@ -665,25 +657,62 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
             </div>
           )}
         </div>
-      </div>
 
-      {/* Edit Question Dialog */}
-      <Dialog open={!!editingQuestion} onOpenChange={(open) => !open && setEditingQuestion(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Edit Question</DialogTitle>
-          </DialogHeader>
-          {editingQuestion && renderQuestionForm(editingQuestion, (q) => setEditingQuestion(q as Question), true)}
-          <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setEditingQuestion(null)}>
-              Cancel
-            </Button>
-            <Button onClick={handleUpdateQuestion} data-testid="button-confirm-edit-question">
-              Save Changes
-            </Button>
+        {/* Right Panel - Question Editor */}
+        {isPanelOpen && (
+          <div className="w-1/2 border-l bg-card flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-lg">
+                {editorMode === 'add' ? 'Add Question' : 'Edit Question'}
+              </h3>
+              <Button variant="ghost" size="icon" onClick={closePanel}>
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <ScrollArea className="flex-1 p-4">
+              {editorMode === 'add' && renderQuestionForm(newQuestion, setNewQuestion)}
+              {editorMode === 'edit' && editingQuestion && renderQuestionForm(editingQuestion, (q) => setEditingQuestion(q as Question))}
+            </ScrollArea>
+            <div className="p-4 border-t bg-muted/30 flex gap-2">
+              {editorMode === 'add' ? (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => handleAddQuestion(true)}
+                    disabled={!newQuestion.questionText || addQuestionMutation.isPending}
+                    className="flex-1"
+                  >
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add & Create Another
+                  </Button>
+                  <Button
+                    onClick={() => handleAddQuestion(false)}
+                    disabled={!newQuestion.questionText || addQuestionMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-confirm-add-question"
+                  >
+                    {addQuestionMutation.isPending ? 'Adding...' : 'Add Question'}
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button variant="outline" onClick={closePanel} className="flex-1">
+                    Cancel
+                  </Button>
+                  <Button 
+                    onClick={handleUpdateQuestion} 
+                    disabled={updateQuestionMutation.isPending}
+                    className="flex-1"
+                    data-testid="button-confirm-edit-question"
+                  >
+                    {updateQuestionMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        )}
+      </div>
 
       {/* AI Question Generator Dialog */}
       <Dialog open={showAIGenerator} onOpenChange={setShowAIGenerator}>
@@ -707,7 +736,7 @@ export function WorksheetEditor({ worksheetId: initialWorksheetId, companyId, on
       </Dialog>
 
       {/* Page Navigation Footer */}
-      <div className="border-t p-4 flex items-center justify-center gap-4 bg-card">
+      <div className="border-t p-2 flex items-center justify-center gap-4 bg-card">
         <Button
           variant="outline"
           size="icon"
