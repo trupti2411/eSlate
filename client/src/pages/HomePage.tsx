@@ -207,51 +207,104 @@ export default function HomePage() {
       </section>
 
       {/* E-ink Focus Section - USP */}
-      <section className="py-16 px-4 bg-gradient-to-r from-gray-900 to-slate-800">
+      <section className="py-20 px-4 bg-gradient-to-b from-gray-900 via-slate-900 to-gray-800">
         <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full mb-4">
-                <Monitor className="h-4 w-4 text-cyan-400" />
-                <span className="text-sm font-medium text-white">Our Focus</span>
-              </div>
-              <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-                Built for <span className="text-cyan-400">E-ink Devices</span>
-              </h2>
-              <p className="text-gray-300 leading-relaxed mb-6">
-                Unlike other platforms, eSlate is designed from the ground up for e-ink screens. 
-                High-contrast, distraction-free learning optimised for 13.3" tablets.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Eye className="h-5 w-5 text-cyan-400" />
-                  <span className="text-sm">Easy on eyes</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Zap className="h-5 w-5 text-cyan-400" />
-                  <span className="text-sm">Fast response</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Battery className="h-5 w-5 text-cyan-400" />
-                  <span className="text-sm">Battery friendly</span>
-                </div>
-                <div className="flex items-center gap-2 text-gray-300">
-                  <Sun className="h-5 w-5 text-cyan-400" />
-                  <span className="text-sm">Any lighting</span>
-                </div>
-              </div>
+          <div className="text-center mb-12">
+            <div className="inline-flex items-center gap-2 bg-cyan-500/20 px-4 py-2 rounded-full mb-6">
+              <Monitor className="h-5 w-5 text-cyan-400" />
+              <span className="text-sm font-medium text-cyan-300">Our Unique Focus</span>
             </div>
-            <div className="flex justify-center">
-              <div className="relative">
-                <div className="w-48 h-64 bg-gradient-to-b from-gray-100 to-gray-200 rounded-lg border-4 border-gray-700 shadow-2xl flex items-center justify-center">
-                  <div className="text-center p-4">
-                    <Monitor className="h-10 w-10 text-gray-700 mx-auto mb-2" />
-                    <p className="text-gray-700 font-semibold text-sm">E-ink Optimised</p>
-                    <p className="text-gray-500 text-xs mt-1">High contrast</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
+              Purpose-Built for <span className="text-cyan-400">E-ink Learning</span>
+            </h2>
+            <p className="text-gray-300 max-w-3xl mx-auto text-lg leading-relaxed">
+              While others adapt their apps for e-ink, we built eSlate specifically for it. 
+              Every feature is designed to work perfectly on e-ink displays.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 mb-4 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-xl flex items-center justify-center">
+                <Eye className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Easy on Eyes</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Pure black and white design eliminates eye strain. Students can study for hours without fatigue.
+              </p>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 mb-4 bg-gradient-to-br from-blue-400 to-blue-500 rounded-xl flex items-center justify-center">
+                <Zap className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Optimised Speed</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                No flashy animations or transitions. Every interaction is tuned for e-ink refresh rates.
+              </p>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 mb-4 bg-gradient-to-br from-green-400 to-green-500 rounded-xl flex items-center justify-center">
+                <Battery className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">All-Day Battery</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                Lightweight design means your e-ink tablet lasts all day on a single charge.
+              </p>
+            </div>
+
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-colors">
+              <div className="w-12 h-12 mb-4 bg-gradient-to-br from-amber-400 to-amber-500 rounded-xl flex items-center justify-center">
+                <Sun className="h-6 w-6 text-white" />
+              </div>
+              <h3 className="text-lg font-bold text-white mb-2">Any Lighting</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                High-contrast display works beautifully in bright sunlight or dim classrooms.
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-r from-cyan-500/10 to-blue-500/10 border border-cyan-500/20 rounded-2xl p-8">
+            <div className="grid md:grid-cols-3 gap-8 items-center">
+              <div className="md:col-span-2">
+                <h3 className="text-2xl font-bold text-white mb-4">
+                  Optimised for 13.3" E-ink Tablets
+                </h3>
+                <p className="text-gray-300 leading-relaxed mb-4">
+                  Every button, every text field, every layout is designed for the 1200x900 viewport of popular e-ink tablets. 
+                  Students get a distraction-free learning environment that feels natural.
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                    <span className="text-sm">Compact, readable layouts</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                    <span className="text-sm">Large touch targets</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                    <span className="text-sm">Stylus-friendly annotation</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-gray-300">
+                    <CheckCircle className="h-4 w-4 text-cyan-400 flex-shrink-0" />
+                    <span className="text-sm">Distraction-free tabs</span>
                   </div>
                 </div>
-                <div className="absolute -top-2 -right-2 bg-cyan-400 text-gray-900 font-bold px-2 py-0.5 rounded-full text-xs shadow-lg">
-                  13.3"
+              </div>
+              <div className="flex justify-center">
+                <div className="relative">
+                  <div className="w-40 h-56 bg-gradient-to-b from-gray-100 to-gray-200 rounded-lg border-4 border-gray-700 shadow-2xl flex items-center justify-center">
+                    <div className="text-center p-3">
+                      <Monitor className="h-8 w-8 text-gray-700 mx-auto mb-2" />
+                      <p className="text-gray-700 font-semibold text-xs">E-ink Ready</p>
+                    </div>
+                  </div>
+                  <div className="absolute -top-2 -right-2 bg-cyan-400 text-gray-900 font-bold px-2 py-0.5 rounded-full text-xs shadow-lg">
+                    13.3"
+                  </div>
                 </div>
               </div>
             </div>
