@@ -405,35 +405,17 @@ export default function AuthPage() {
                 </Form>
               )}
 
-              {!showForgotPassword && (
+              {!showForgotPassword && !isLogin && (
                 <div className="text-center pt-4 border-t border-gray-200 dark:border-gray-700">
-                  {isLogin ? (
-                    import.meta.env.DEV && (
-                      <>
-                        <p className="text-sm text-gray-600 dark:text-gray-300">
-                          Don't have an account?
-                        </p>
-                        <button
-                          onClick={() => setIsLogin(!isLogin)}
-                          className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-                        >
-                          Create one here
-                        </button>
-                      </>
-                    )
-                  ) : (
-                    <>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Already have an account?
-                      </p>
-                      <button
-                        onClick={() => setIsLogin(!isLogin)}
-                        className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-                      >
-                        Sign in instead
-                      </button>
-                    </>
-                  )}
+                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                    Already have an account?
+                  </p>
+                  <button
+                    onClick={() => setIsLogin(true)}
+                    className="text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+                  >
+                    Sign in instead
+                  </button>
                 </div>
               )}
             </CardContent>
