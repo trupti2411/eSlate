@@ -290,7 +290,7 @@ export default function StudentHome() {
                 onClick={handleLogout}
                 variant="outline"
                 size="sm"
-                className="border-gray-300 hover:bg-gray-50"
+                className="border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white font-medium"
               >
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -340,7 +340,7 @@ export default function StudentHome() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="flex-1 px-4 sm:px-6 lg:px-8 py-6">
           {/* Alert Banner for Overdue Items */}
           {overdueItems.length > 0 && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-4">
