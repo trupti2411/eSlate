@@ -515,9 +515,6 @@ export default function HomePage() {
                       <p className="text-gray-700 font-semibold text-xs">E-ink Ready</p>
                     </div>
                   </div>
-                  <div className="absolute -top-2 -right-2 bg-cyan-400 text-gray-900 font-bold px-2 py-1 rounded-full text-xs shadow-lg">
-                    All Sizes
-                  </div>
                 </div>
               </div>
             </div>
