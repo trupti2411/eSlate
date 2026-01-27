@@ -1633,16 +1633,25 @@ export class DatabaseStorage implements IStorage {
       throw new Error("Student not found");
     }
     
-    // Get classes for this student's company
-    const studentClasses = await db.select().from(classes)
-      .where(eq(classes.companyId, student.companyId));
-    const classIds = studentClasses.map(cls => cls.id);
+    // Get classes that this specific student is enrolled in via studentClassAssignments
+    const enrollments = await db.select({ classId: studentClassAssignments.classId })
+      .from(studentClassAssignments)
+      .where(and(
+        eq(studentClassAssignments.studentId, studentId),
+        eq(studentClassAssignments.isActive, true)
+      ));
+    const classIds = enrollments.map(e => e.classId);
+    
+    // Also include the student's direct classId if set
+    if (student.classId && !classIds.includes(student.classId)) {
+      classIds.push(student.classId);
+    }
     
     if (classIds.length === 0) {
       return [];
     }
     
-    // Get assignments for these classes
+    // Get assignments for the classes this student is enrolled in
     return await db.select().from(assignments)
       .where(and(
         inArray(assignments.classId, classIds),
