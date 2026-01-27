@@ -586,199 +586,211 @@ export default function StudentHome() {
           {/* Assignments Tab */}
           {activeTab === 'assignments' && (
             <div className="space-y-6">
-              {/* Show Assignment Completion Area when assignment is selected */}
-              {selectedAssignment ? (
-                <div className="space-y-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={handleBackToList}
-                    className="mb-4"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Assignments
-                  </Button>
-                  <Card className="border border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100">
-                      <CardTitle className="flex items-center gap-2 text-gray-800">
-                        <FileText className="h-5 w-5" />
-                        {selectedAssignment.title}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-6">
-                      <AssignmentCompletionArea
-                        assignment={selectedAssignment}
-                        submission={getSubmissionForAssignment(selectedAssignment.id)}
-                        onSubmissionUpdate={handleBackToList}
-                      />
-                    </CardContent>
-                  </Card>
-                </div>
-              ) : (
-                <>
-                  {/* Assignment Type Summary */}
-                  <div className="grid grid-cols-3 gap-4">
-                    <Card className="bg-white border border-gray-200 shadow-sm">
-                      <CardContent className="pt-5 pb-4 text-center">
-                        <div className="p-3 bg-green-50 rounded-xl inline-block mb-3">
-                          <FileText className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-gray-900">{typedAssignments.length}</div>
-                        <p className="text-sm text-gray-500">Assignments</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-white border border-gray-200 shadow-sm">
-                      <CardContent className="pt-5 pb-4 text-center">
-                        <div className="p-3 bg-blue-50 rounded-xl inline-block mb-3">
-                          <BookOpen className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-gray-900">{typedWorksheets.length}</div>
-                        <p className="text-sm text-gray-500">Worksheets</p>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-white border border-gray-200 shadow-sm">
-                      <CardContent className="pt-5 pb-4 text-center">
-                        <div className="p-3 bg-purple-50 rounded-xl inline-block mb-3">
-                          <ClipboardCheck className="h-6 w-6 text-purple-600" />
-                        </div>
-                        <div className="text-3xl font-bold text-gray-900">{typedTests.length}</div>
-                        <p className="text-sm text-gray-500">Tests</p>
-                      </CardContent>
-                    </Card>
+              {/* Main Assignment Container - Focused Work Area */}
+              <Card className="border-2 border-gray-300 shadow-lg bg-white overflow-hidden">
+                {/* Assignment Header */}
+                <div className="bg-gradient-to-r from-gray-900 to-gray-800 px-6 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/10 rounded-lg">
+                        <FileText className="h-6 w-6 text-white" />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-white">My Assignments</h2>
+                        <p className="text-gray-300 text-sm">Complete your homework and track progress</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-white/20 text-white border-white/30 px-3">
+                        {pendingItems.length + overdueItems.length} pending
+                      </Badge>
+                    </div>
                   </div>
+                </div>
 
-                  {/* Overdue Section */}
-                  {overdueItems.length > 0 && (
-                    <Card className="border border-red-200 shadow-sm bg-white">
-                      <CardHeader className="bg-red-50 border-b border-red-200">
-                        <CardTitle className="flex items-center gap-2 text-red-800">
-                          <AlertTriangle className="h-5 w-5" />
-                          Overdue ({overdueItems.length})
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        {overdueItems.map((item, index) => (
-                          <div key={item.id} className={`p-4 flex items-center justify-between ${index !== overdueItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                item.type === 'worksheet' ? 'bg-blue-50' : 
-                                item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
-                              }`}>
-                                {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
-                                 item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
-                                 <FileText className="h-4 w-4 text-green-600" />}
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-800">{item.title}</p>
-                                <p className="text-xs text-gray-500">{item.subject} • Was due {format(item.dueDate, 'MMM d')}</p>
-                              </div>
-                            </div>
-                            <Button 
-                              size="sm" 
-                              className="bg-red-600 hover:bg-red-700 text-white"
-                              onClick={() => handleStartAssignment(item)}
-                            >
-                              Submit Now
-                            </Button>
+                {/* Show Assignment Completion Area when assignment is selected */}
+                {selectedAssignment ? (
+                  <div className="p-6">
+                    <Button 
+                      variant="outline" 
+                      onClick={handleBackToList}
+                      className="mb-4"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Back to Assignments
+                    </Button>
+                    <div className="border border-gray-200 rounded-lg">
+                      <div className="border-b border-gray-100 p-4 bg-gray-50">
+                        <h3 className="flex items-center gap-2 text-gray-800 font-semibold">
+                          <FileText className="h-5 w-5" />
+                          {selectedAssignment.title}
+                        </h3>
+                      </div>
+                      <div className="p-6">
+                        <AssignmentCompletionArea
+                          assignment={selectedAssignment}
+                          submission={getSubmissionForAssignment(selectedAssignment.id)}
+                          onSubmissionUpdate={handleBackToList}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Assignment Type Summary - Inside the main container */}
+                    <div className="p-6 bg-gray-50 border-b border-gray-200">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm">
+                          <div className="p-2.5 bg-green-50 rounded-lg inline-block mb-2">
+                            <FileText className="h-5 w-5 text-green-600" />
                           </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  )}
+                          <div className="text-2xl font-bold text-gray-900">{typedAssignments.length}</div>
+                          <p className="text-xs text-gray-500">Assignments</p>
+                        </div>
+                        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm">
+                          <div className="p-2.5 bg-blue-50 rounded-lg inline-block mb-2">
+                            <BookOpen className="h-5 w-5 text-blue-600" />
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">{typedWorksheets.length}</div>
+                          <p className="text-xs text-gray-500">Worksheets</p>
+                        </div>
+                        <div className="bg-white border border-gray-200 rounded-xl p-4 text-center shadow-sm">
+                          <div className="p-2.5 bg-purple-50 rounded-lg inline-block mb-2">
+                            <ClipboardCheck className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">{typedTests.length}</div>
+                          <p className="text-xs text-gray-500">Tests</p>
+                        </div>
+                      </div>
+                    </div>
 
-                  {/* Pending Section */}
-                  <Card className="border border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100">
-                      <CardTitle className="flex items-center gap-2 text-gray-800">
-                        <div className="p-2 bg-amber-50 rounded-lg">
+                    {/* Assignment Lists - Inside main container */}
+                    <div className="p-6 space-y-6">
+                      {/* Overdue Section */}
+                      {overdueItems.length > 0 && (
+                        <div className="border-2 border-red-300 rounded-xl overflow-hidden">
+                          <div className="bg-red-50 px-4 py-3 border-b border-red-200 flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-red-600" />
+                            <span className="font-semibold text-red-800">Overdue ({overdueItems.length})</span>
+                          </div>
+                          <div className="bg-white">
+                            {overdueItems.map((item, index) => (
+                              <div key={item.id} className={`p-4 flex items-center justify-between ${index !== overdueItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg ${
+                                    item.type === 'worksheet' ? 'bg-blue-50' : 
+                                    item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
+                                  }`}>
+                                    {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
+                                     item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
+                                     <FileText className="h-4 w-4 text-green-600" />}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-gray-800">{item.title}</p>
+                                    <p className="text-xs text-gray-500">{item.subject} • Was due {format(item.dueDate, 'MMM d')}</p>
+                                  </div>
+                                </div>
+                                <Button 
+                                  size="sm" 
+                                  className="bg-red-600 hover:bg-red-700 text-white"
+                                  onClick={() => handleStartAssignment(item)}
+                                >
+                                  Submit Now
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Pending Section */}
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        <div className="bg-amber-50 px-4 py-3 border-b border-amber-200 flex items-center gap-2">
                           <Clock className="h-5 w-5 text-amber-600" />
+                          <span className="font-semibold text-amber-800">Pending ({pendingItems.length})</span>
                         </div>
-                        Pending ({pendingItems.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      {pendingItems.length === 0 ? (
-                        <div className="p-8 text-center">
-                          <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                          <p className="text-gray-500 font-medium">All caught up!</p>
+                        <div className="bg-white">
+                          {pendingItems.length === 0 ? (
+                            <div className="p-8 text-center">
+                              <CheckCircle className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                              <p className="text-gray-500 font-medium">All caught up!</p>
+                            </div>
+                          ) : (
+                            pendingItems.map((item, index) => (
+                              <div key={item.id} className={`p-4 flex items-center justify-between hover:bg-gray-50 ${index !== pendingItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg ${
+                                    item.type === 'worksheet' ? 'bg-blue-50' : 
+                                    item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
+                                  }`}>
+                                    {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
+                                     item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
+                                     <FileText className="h-4 w-4 text-green-600" />}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-gray-800">{item.title}</p>
+                                    <p className="text-xs text-gray-500">{item.subject} • Due {format(item.dueDate, 'MMM d')}</p>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                  <Badge className={getUrgencyColor(item.dueDate)}>
+                                    {getDaysUntilDue(item.dueDate)}
+                                  </Badge>
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    className="border-gray-300"
+                                    onClick={() => handleStartAssignment(item)}
+                                  >
+                                    Start
+                                  </Button>
+                                </div>
+                              </div>
+                            ))
+                          )}
                         </div>
-                      ) : (
-                        pendingItems.map((item, index) => (
-                          <div key={item.id} className={`p-4 flex items-center justify-between hover:bg-gray-50 ${index !== pendingItems.length - 1 ? 'border-b border-gray-100' : ''}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                item.type === 'worksheet' ? 'bg-blue-50' : 
-                                item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
-                              }`}>
-                                {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
-                                 item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
-                                 <FileText className="h-4 w-4 text-green-600" />}
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-800">{item.title}</p>
-                                <p className="text-xs text-gray-500">{item.subject} • Due {format(item.dueDate, 'MMM d')}</p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Badge className={getUrgencyColor(item.dueDate)}>
-                                {getDaysUntilDue(item.dueDate)}
-                              </Badge>
-                              <Button 
-                                size="sm" 
-                                variant="outline" 
-                                className="border-gray-300"
-                                onClick={() => handleStartAssignment(item)}
-                              >
-                                Start
-                              </Button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
+                      </div>
 
-                  {/* Completed Section */}
-                  <Card className="border border-gray-200 shadow-sm bg-white">
-                    <CardHeader className="border-b border-gray-100">
-                      <CardTitle className="flex items-center gap-2 text-gray-800">
-                        <div className="p-2 bg-green-50 rounded-lg">
+                      {/* Completed Section */}
+                      <div className="border border-gray-200 rounded-xl overflow-hidden">
+                        <div className="bg-green-50 px-4 py-3 border-b border-green-200 flex items-center gap-2">
                           <CheckCircle className="h-5 w-5 text-green-600" />
+                          <span className="font-semibold text-green-800">Completed ({completedItems.length})</span>
                         </div>
-                        Completed ({completedItems.length})
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                      {completedItems.length === 0 ? (
-                        <div className="p-8 text-center">
-                          <p className="text-gray-500">No submissions yet</p>
-                        </div>
-                      ) : (
-                        completedItems.slice(0, 10).map((item, index) => (
-                          <div key={item.id} className={`p-4 flex items-center justify-between ${index !== Math.min(completedItems.length, 10) - 1 ? 'border-b border-gray-100' : ''}`}>
-                            <div className="flex items-center gap-3">
-                              <div className={`p-2 rounded-lg ${
-                                item.type === 'worksheet' ? 'bg-blue-50' : 
-                                item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
-                              }`}>
-                                {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
-                                 item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
-                                 <FileText className="h-4 w-4 text-green-600" />}
-                              </div>
-                              <div>
-                                <p className="font-medium text-gray-800">{item.title}</p>
-                                <p className="text-xs text-gray-500">{item.subject}</p>
-                              </div>
+                        <div className="bg-white">
+                          {completedItems.length === 0 ? (
+                            <div className="p-8 text-center">
+                              <p className="text-gray-500">No submissions yet</p>
                             </div>
-                            <Badge className={item.status === 'graded' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'}>
-                              {item.status === 'graded' ? 'Graded' : 'Pending Review'}
-                            </Badge>
-                          </div>
-                        ))
-                      )}
-                    </CardContent>
-                  </Card>
-                </>
-              )}
+                          ) : (
+                            completedItems.slice(0, 10).map((item, index) => (
+                              <div key={item.id} className={`p-4 flex items-center justify-between ${index !== Math.min(completedItems.length, 10) - 1 ? 'border-b border-gray-100' : ''}`}>
+                                <div className="flex items-center gap-3">
+                                  <div className={`p-2 rounded-lg ${
+                                    item.type === 'worksheet' ? 'bg-blue-50' : 
+                                    item.type === 'test' ? 'bg-purple-50' : 'bg-green-50'
+                                  }`}>
+                                    {item.type === 'worksheet' ? <BookOpen className="h-4 w-4 text-blue-600" /> :
+                                     item.type === 'test' ? <ClipboardCheck className="h-4 w-4 text-purple-600" /> :
+                                     <FileText className="h-4 w-4 text-green-600" />}
+                                  </div>
+                                  <div>
+                                    <p className="font-medium text-gray-800">{item.title}</p>
+                                    <p className="text-xs text-gray-500">{item.subject}</p>
+                                  </div>
+                                </div>
+                                <Badge className={item.status === 'graded' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-600 border-gray-200'}>
+                                  {item.status === 'graded' ? 'Graded' : 'Pending Review'}
+                                </Badge>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </Card>
             </div>
           )}
 
