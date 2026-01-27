@@ -9,7 +9,7 @@ import {
   BookOpen, Calendar, CheckCircle, Clock, FileText, 
   AlertTriangle, TrendingUp, ArrowRight, GraduationCap,
   ClipboardCheck, Award, Users, XCircle, Activity, Bell, ChevronRight,
-  LogOut, ArrowLeft
+  ArrowLeft
 } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { Assignment, AcademicTerm, Class, Submission } from '@shared/schema';
@@ -237,17 +237,6 @@ export default function StudentHome() {
   const totalClasses = attendanceData?.summary?.totalSessions ?? 0;
   const classesAttended = attendanceData?.summary?.present ?? 0;
 
-  const handleLogout = async () => {
-    try {
-      localStorage.removeItem('authToken');
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
-      window.location.href = '/';
-    } catch (error) {
-      localStorage.removeItem('authToken');
-      window.location.href = '/';
-    }
-  };
-
   if (profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -286,15 +275,6 @@ export default function StudentHome() {
                 <Bell className="h-4 w-4" />
                 <span>{format(new Date(), 'EEEE, MMM d')}</span>
               </div>
-              <Button
-                onClick={handleLogout}
-                variant="outline"
-                size="sm"
-                className="border-2 border-gray-800 text-gray-800 hover:bg-gray-800 hover:text-white font-medium"
-              >
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
             </div>
           </div>
         </div>

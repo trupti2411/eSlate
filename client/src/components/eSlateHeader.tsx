@@ -50,9 +50,9 @@ export function ESlateHeader({ showNav = false, children }: ESlateHeaderProps) {
                 </div>
                 <Button
                   onClick={handleLogout}
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="border-gray-600 text-white hover:bg-gray-800 hover:text-white"
+                  className="bg-white text-black hover:bg-gray-200 hover:text-black font-medium"
                 >
                   <LogOut className="h-4 w-4 mr-1" />
                   Logout
