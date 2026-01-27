@@ -42,8 +42,8 @@
   --eink-light: hsl(0, 0%, 40%);
   --eink-white: hsl(0, 0%, 100%);
   
-  /* 13.3" E-ink Screen Layout Tokens */
-  /* Typical 13.3" e-ink: 2200x1650 (4:3) or 1600x1200 */
+  /* E-ink Screen Layout Tokens */
+  /* Optimized for e-ink displays with high-contrast and readable layouts */
   --eink-container-max: 1400px;
   --eink-sidebar-width: 200px;
   --eink-header-height: 56px;
@@ -157,7 +157,7 @@
     max-width: var(--eink-container-max);
   }
   
-  /* 13.3" E-ink Screen Layout Classes */
+  /* E-ink Screen Layout Classes */
   .eink-layout {
     display: flex;
     min-height: 100vh;
@@ -288,7 +288,7 @@
     @apply bg-black text-white;
   }
   
-  /* Compact footer for 13.3" screens */
+  /* Compact footer for e-ink screens */
   .eink-footer {
     @apply border-t-2 border-black bg-white py-3 px-4 text-sm;
   }
@@ -299,7 +299,7 @@
     grid-template-columns: repeat(4, 1fr);
   }
   
-  /* Scrollable content area that fits within 13.3" viewport */
+  /* Scrollable content area for e-ink viewport */
   .eink-scroll-area {
     max-height: calc(100vh - var(--eink-header-height) - 120px);
     overflow-y: auto;

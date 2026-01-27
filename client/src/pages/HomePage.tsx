@@ -482,11 +482,11 @@ export default function HomePage() {
             <div className="grid md:grid-cols-3 gap-8 items-center">
               <div className="md:col-span-2">
                 <h3 className="text-2xl font-bold text-white mb-4">
-                  Optimised for 13.3" E-ink Tablets
+                  Optimised for E-ink Tablets
                 </h3>
                 <p className="text-gray-300 leading-relaxed mb-4">
-                  Every button, every text field, every layout is designed for the 1200x900 viewport of popular e-ink tablets. 
-                  Students get a distraction-free learning environment that feels natural.
+                  Every button, every text field, every layout is designed with e-ink displays in mind. 
+                  Students get a distraction-free learning environment that feels natural on any screen size.
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex items-center gap-2 text-gray-300">
@@ -503,7 +503,7 @@ export default function HomePage() {
                   </div>
                   <div className="flex items-center gap-2 text-gray-300">
                     <CheckCircle className="h-4 w-4 text-cyan-400 flex-shrink-0" />
-                    <span className="text-sm">Distraction-free tabs</span>
+                    <span className="text-sm">Distraction-free interface</span>
                   </div>
                 </div>
               </div>
@@ -515,8 +515,8 @@ export default function HomePage() {
                       <p className="text-gray-700 font-semibold text-xs">E-ink Ready</p>
                     </div>
                   </div>
-                  <div className="absolute -top-2 -right-2 bg-cyan-400 text-gray-900 font-bold px-2 py-0.5 rounded-full text-xs shadow-lg">
-                    13.3"
+                  <div className="absolute -top-2 -right-2 bg-cyan-400 text-gray-900 font-bold px-2 py-1 rounded-full text-xs shadow-lg">
+                    All Sizes
                   </div>
                 </div>
               </div>
