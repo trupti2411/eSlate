@@ -458,6 +458,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get single assignment by ID
+  app.get('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const assignmentId = req.params.id;
+      
+      const assignment = await storage.getAssignment(assignmentId);
+      if (!assignment) {
+        return res.status(404).json({ message: "Assignment not found" });
+      }
+      
+      // Students can only access assignments for classes they're enrolled in
+      if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (!student) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        // Get classes the student is enrolled in
+        const studentClasses = await storage.getStudentClasses(student.id);
+        const enrolledClassIds = studentClasses.map(c => c.id);
+        
+        // Also include student's direct classId
+        if (student.classId) {
+          enrolledClassIds.push(student.classId);
+        }
+        
+        // Check if the assignment's class is in the student's enrolled classes
+        if (!assignment.classId || !enrolledClassIds.includes(assignment.classId)) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      // Parents can access their children's assignments
+      if (user.role === 'parent') {
+        const parent = await storage.getParentByUserId(user.id);
+        if (!parent) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+        
+        const children = await storage.getChildrenByParentId(parent.id);
+        const childClassIds: string[] = [];
+        
+        for (const child of children) {
+          const childClasses = await storage.getStudentClasses(child.id);
+          childClasses.forEach(c => childClassIds.push(c.id));
+          if (child.classId) {
+            childClassIds.push(child.classId);
+          }
+        }
+        
+        if (!assignment.classId || !childClassIds.includes(assignment.classId)) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      // Tutors can access assignments they created or from their company
+      if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor || (assignment.createdBy !== user.id && assignment.companyId !== tutor.companyId)) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      // Company admins can access assignments from their company
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== assignment.companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+      
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error fetching assignment:", error);
+      res.status(500).json({ message: "Failed to fetch assignment" });
+    }
+  });
+
   // Update assignment
   app.patch('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
     try {
