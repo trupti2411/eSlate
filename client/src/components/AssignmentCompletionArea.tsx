@@ -497,7 +497,14 @@ export function AssignmentCompletionArea({
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {/* View Document */}
                     <Button
-                      onClick={() => window.open(url, '_blank')}
+                      onClick={() => {
+                        // Use proxy URL to access files through our server
+                        const objectId = url.includes('/uploads/') 
+                          ? url.split('/uploads/').pop()
+                          : url.split('/').pop();
+                        const proxyUrl = `/api/public-objects/uploads/${objectId}`;
+                        window.open(proxyUrl, '_blank');
+                      }}
                       className={`${eInkStyles.button} text-sm`}
                     >
                       <Eye className="h-4 w-4 mr-2" />
