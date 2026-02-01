@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import nodemailer from "nodemailer";
 
 import { storage } from "./storage";
 import { setupCustomAuth, isAuthenticated, sendHomeworkSubmissionEmail } from "./customAuth";
@@ -6292,6 +6293,57 @@ Good luck with your assignment!"
     } catch (error: any) {
       console.error('Error exporting report:', error);
       res.status(500).json({ error: error.message || 'Failed to export report' });
+    }
+  });
+
+  // Contact form email endpoint
+  app.post('/api/contact', async (req: any, res: any) => {
+    try {
+      const { name, email, subject, message } = req.body;
+      
+      if (!name || !email || !subject || !message) {
+        return res.status(400).json({ error: 'All fields are required' });
+      }
+
+      // Check if SMTP credentials are configured
+      if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASSWORD) {
+        console.error('SMTP credentials not configured');
+        return res.status(500).json({ error: 'Email service not configured' });
+      }
+
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: parseInt(process.env.SMTP_PORT || '465'),
+        secure: parseInt(process.env.SMTP_PORT || '465') === 465,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASSWORD,
+        },
+      });
+
+      const mailOptions = {
+        from: process.env.SMTP_USER,
+        to: 'support@eslate.com.au',
+        replyTo: email,
+        subject: `Contact Form: ${subject}`,
+        text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
+        html: `
+          <h3>New Contact Form Submission</h3>
+          <p><strong>Name:</strong> ${name}</p>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Subject:</strong> ${subject}</p>
+          <hr>
+          <p><strong>Message:</strong></p>
+          <p>${message.replace(/\n/g, '<br>')}</p>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      
+      res.json({ success: true, message: 'Email sent successfully' });
+    } catch (error: any) {
+      console.error('Error sending contact email:', error);
+      res.status(500).json({ error: 'Failed to send email. Please try again later.' });
     }
   });
 
