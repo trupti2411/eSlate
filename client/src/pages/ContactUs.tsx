@@ -28,15 +28,23 @@ export default function ContactUs() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const emailBody = `Name: ${formData.name}
+Email: ${formData.email}
+
+Message:
+${formData.message}`;
     
-    toast({
-      title: "Message Sent",
-      description: "Thank you for contacting us. We'll get back to you soon!",
-    });
+    const mailtoLink = `mailto:support@eslate.com.au?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(emailBody)}`;
+    window.location.href = mailtoLink;
     
-    setFormData({ name: "", email: "", subject: "", message: "" });
-    setIsSubmitting(false);
+    setTimeout(() => {
+      toast({
+        title: "Email Client Opened",
+        description: "Please send the email from your email application.",
+      });
+      setFormData({ name: "", email: "", subject: "", message: "" });
+      setIsSubmitting(false);
+    }, 500);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
