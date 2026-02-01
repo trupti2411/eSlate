@@ -7,10 +7,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { 
-  ArrowLeft, 
+  GraduationCap,
   Mail, 
-  Phone, 
-  MapPin, 
   Send,
   Clock,
   MessageSquare
@@ -49,28 +47,37 @@ export default function ContactUs() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b-2 border-black bg-white sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white">
+      <nav className="bg-white/80 backdrop-blur-sm border-b border-gray-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
             <Link href="/">
               <div className="flex items-center gap-2 cursor-pointer">
-                <ArrowLeft className="h-5 w-5" />
-                <span className="font-bold text-xl text-black">eSlate</span>
+                <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl">
+                  <GraduationCap className="h-6 w-6 text-white" />
+                </div>
+                <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">eSlate</span>
               </div>
             </Link>
-            <Link href="/auth">
-              <Button className="bg-black text-white hover:bg-gray-800 border-2 border-black">
-                Sign In
-              </Button>
-            </Link>
+            <div className="flex items-center gap-6">
+              <Link href="/" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
+                Home
+              </Link>
+              <Link href="/auth">
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
+                  Sign In
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
-      </header>
+      </nav>
 
-      <main className="max-w-6xl mx-auto px-4 py-12">
+      <main className="max-w-6xl mx-auto px-4 py-16">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-black mb-4">Contact Us</h1>
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Contact Us
+          </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
             Have questions about eSlate? We'd love to hear from you. Send us a message and we'll respond as soon as possible.
           </p>
@@ -78,14 +85,14 @@ export default function ContactUs() {
 
         <div className="grid lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
-            <Card className="border-2 border-black">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5" />
+            <Card className="border border-gray-200 shadow-xl">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-t-lg">
+                <CardTitle className="flex items-center gap-2 text-gray-800">
+                  <MessageSquare className="h-5 w-5 text-blue-600" />
                   Send us a Message
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -97,7 +104,7 @@ export default function ContactUs() {
                         onChange={handleChange}
                         placeholder="John Smith"
                         required
-                        className="border-2 border-gray-300 focus:border-black"
+                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                       />
                     </div>
                     <div className="space-y-2">
@@ -110,7 +117,7 @@ export default function ContactUs() {
                         onChange={handleChange}
                         placeholder="john@example.com"
                         required
-                        className="border-2 border-gray-300 focus:border-black"
+                        className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                       />
                     </div>
                   </div>
@@ -124,7 +131,7 @@ export default function ContactUs() {
                       onChange={handleChange}
                       placeholder="How can we help?"
                       required
-                      className="border-2 border-gray-300 focus:border-black"
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     />
                   </div>
                   
@@ -138,14 +145,14 @@ export default function ContactUs() {
                       placeholder="Tell us more about your enquiry..."
                       rows={6}
                       required
-                      className="border-2 border-gray-300 focus:border-black resize-none"
+                      className="border-gray-300 focus:border-blue-500 focus:ring-blue-500 resize-none"
                     />
                   </div>
                   
                   <Button 
                     type="submit" 
                     disabled={isSubmitting}
-                    className="w-full bg-black text-white hover:bg-gray-800 border-2 border-black py-6 text-lg"
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-6 text-lg shadow-lg"
                   >
                     {isSubmitting ? (
                       <div className="flex items-center gap-2">
@@ -165,63 +172,43 @@ export default function ContactUs() {
           </div>
 
           <div className="space-y-6">
-            <Card className="border-2 border-black">
+            <Card className="border border-gray-200 shadow-xl">
               <CardContent className="pt-6">
                 <div className="space-y-6">
                   <div className="flex items-start gap-4">
-                    <div className="p-3 bg-gray-100 rounded-lg">
-                      <Mail className="h-5 w-5 text-black" />
+                    <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
+                      <Mail className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-black">Email</h3>
-                      <p className="text-gray-600">support@eslate.edu</p>
-                      <p className="text-gray-600">sales@eslate.edu</p>
+                      <h3 className="font-semibold text-gray-800">Email</h3>
+                      <a 
+                        href="mailto:support@eslate.com.au" 
+                        className="text-blue-600 hover:text-purple-600 transition-colors"
+                      >
+                        support@eslate.com.au
+                      </a>
                     </div>
                   </div>
                   
                   <div className="flex items-start gap-4">
-                    <div className="p-3 bg-gray-100 rounded-lg">
-                      <Phone className="h-5 w-5 text-black" />
+                    <div className="p-3 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg">
+                      <Clock className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="font-semibold text-black">Phone</h3>
-                      <p className="text-gray-600">+44 (0) 20 1234 5678</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-gray-100 rounded-lg">
-                      <MapPin className="h-5 w-5 text-black" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-black">Address</h3>
-                      <p className="text-gray-600">
-                        123 Education Street<br />
-                        London, EC1A 1BB<br />
-                        United Kingdom
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-gray-100 rounded-lg">
-                      <Clock className="h-5 w-5 text-black" />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-black">Business Hours</h3>
+                      <h3 className="font-semibold text-gray-800">Business Hours</h3>
                       <p className="text-gray-600">Monday - Friday</p>
-                      <p className="text-gray-600">9:00 AM - 6:00 PM GMT</p>
+                      <p className="text-gray-600">9:00 AM - 6:00 PM AEST</p>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-2 border-black bg-gray-50">
+            <Card className="border border-gray-200 shadow-xl bg-gradient-to-br from-blue-50 to-purple-50">
               <CardContent className="pt-6">
-                <h3 className="font-semibold text-black mb-2">Quick Response</h3>
+                <h3 className="font-semibold text-gray-800 mb-2">Quick Response</h3>
                 <p className="text-gray-600 text-sm">
-                  We aim to respond to all enquiries within 24 hours during business days. For urgent matters, please call us directly.
+                  We aim to respond to all enquiries within 24 hours during business days.
                 </p>
               </CardContent>
             </Card>
@@ -229,20 +216,29 @@ export default function ContactUs() {
         </div>
       </main>
 
-      <footer className="border-t-2 border-black bg-white mt-16">
-        <div className="max-w-6xl mx-auto px-4 py-8">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-gray-600 text-sm">
-              &copy; {new Date().getFullYear()} eSlate. All rights reserved.
-            </p>
-            <div className="flex gap-6">
-              <Link href="/legal/privacy">
-                <span className="text-gray-600 hover:text-black text-sm cursor-pointer">Privacy Policy</span>
+      <footer className="py-10 px-4 bg-gray-900 mt-16">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl">
+                <GraduationCap className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-lg font-bold text-white">eSlate</span>
+            </div>
+            <div className="flex gap-8 text-sm">
+              <Link href="/" className="text-gray-400 hover:text-white transition-colors">
+                Home
               </Link>
-              <Link href="/legal/terms">
-                <span className="text-gray-600 hover:text-black text-sm cursor-pointer">Terms of Service</span>
+              <Link href="/legal/privacy" className="text-gray-400 hover:text-white transition-colors">
+                Privacy Policy
+              </Link>
+              <Link href="/legal/terms" className="text-gray-400 hover:text-white transition-colors">
+                Terms of Service
               </Link>
             </div>
+            <p className="text-sm text-gray-500">
+              &copy; {new Date().getFullYear()} eSlate. All rights reserved.
+            </p>
           </div>
         </div>
       </footer>
