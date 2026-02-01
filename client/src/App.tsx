@@ -38,6 +38,7 @@ import TermsOfService from "@/pages/legal/TermsOfService";
 import UserAgreement from "@/pages/legal/UserAgreement";
 import HomePage from "@/pages/HomePage";
 import VideoStoryboard from "@/pages/VideoStoryboard";
+import ContactUs from "@/pages/ContactUs";
 
 import NotFound from "@/pages/not-found";
 
@@ -68,6 +69,9 @@ function Router() {
       
       {/* Video storyboard - always accessible */}
       <Route path="/storyboard" component={VideoStoryboard} />
+      
+      {/* Contact page - always accessible */}
+      <Route path="/contact" component={ContactUs} />
 
       {!isAuthenticated ? (
         <>

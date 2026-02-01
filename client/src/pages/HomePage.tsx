@@ -734,6 +734,9 @@ export default function HomePage() {
               <span className="text-lg font-bold text-white">eSlate</span>
             </div>
             <div className="flex gap-8 text-sm">
+              <Link href="/contact" className="text-gray-400 hover:text-white transition-colors">
+                Contact Us
+              </Link>
               <Link href="/legal/privacy" className="text-gray-400 hover:text-white transition-colors">
                 Privacy Policy
               </Link>
