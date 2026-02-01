@@ -90,7 +90,9 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             width: viewport.width,
             height: viewport.height,
             isDrawingMode: false,
-            preserveObjectStacking: true
+            preserveObjectStacking: true,
+            allowTouchScrolling: false,
+            enablePointerEvents: true
           });
           fabricCanvasRefs.current.set(pageNum, fabricCanvas);
         } else {
@@ -137,8 +139,8 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     }
   }, [activeTool]);
 
-  // Add text on click
-  const addText = (e: React.MouseEvent<HTMLCanvasElement>, pageNum: number) => {
+  // Add text on click or touch
+  const addText = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, pageNum: number) => {
     if (activeTool !== 'text') return;
 
     const text = prompt('Enter text:');
@@ -148,8 +150,15 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
     if (!fabricCanvas) return;
 
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x: number, y: number;
+    
+    if ('touches' in e) {
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
 
     const fabricText = new fabric.Text(text, {
       left: x,
@@ -457,9 +466,11 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                           position: 'absolute',
                           top: 0,
                           left: 0,
-                          cursor: activeTool === 'text' ? 'text' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default'
+                          cursor: activeTool === 'text' ? 'text' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
+                          touchAction: activeTool ? 'none' : 'auto'
                         }}
                         onMouseDown={(e) => activeTool === 'text' && addText(e, pageNum)}
+                        onTouchStart={(e) => activeTool === 'text' && addText(e, pageNum)}
                       />
                       <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1">
                         Page {pageNum}/{numPages}

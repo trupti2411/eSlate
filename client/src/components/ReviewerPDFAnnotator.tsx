@@ -136,7 +136,9 @@ function ReviewerPDFAnnotatorContent({
             height: viewport.height,
             isDrawingMode: false,
             preserveObjectStacking: true,
-            selection: !isViewOnly
+            selection: !isViewOnly,
+            allowTouchScrolling: false,
+            enablePointerEvents: true
           });
           fabricCanvasRefs.current.set(pageNum, fabricCanvas);
         } else {
@@ -246,12 +248,20 @@ function ReviewerPDFAnnotatorContent({
     renderAnnotationsOnCanvas();
   }, [annotations, isViewOnly]);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>, pageNum: number) => {
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>, pageNum: number) => {
     if (isViewOnly || !activeTool) return;
 
     const rect = (e.currentTarget as HTMLCanvasElement).getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    let x: number, y: number;
+    
+    if ('touches' in e) {
+      e.preventDefault();
+      x = e.touches[0].clientX - rect.left;
+      y = e.touches[0].clientY - rect.top;
+    } else {
+      x = e.clientX - rect.left;
+      y = e.clientY - rect.top;
+    }
 
     if (activeTool === 'tick') {
       const newAnnotation: ReviewerAnnotation = {
@@ -508,9 +518,11 @@ function ReviewerPDFAnnotatorContent({
                             activeTool === 'tick' ? 'crosshair' : 
                             activeTool === 'cross' ? 'crosshair' : 
                             activeTool === 'comment' ? 'text' :
-                            activeTool === 'freehand' ? 'crosshair' : 'default'
+                            activeTool === 'freehand' ? 'crosshair' : 'default',
+                          touchAction: activeTool ? 'none' : 'auto'
                         }}
                         onMouseDown={(e) => handleCanvasClick(e, pageNum)}
+                        onTouchStart={(e) => handleCanvasClick(e, pageNum)}
                       />
                       <div className="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1">
                         Page {pageNum}/{numPages}
