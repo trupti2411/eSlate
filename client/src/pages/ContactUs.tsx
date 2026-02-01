@@ -28,35 +28,23 @@ export default function ContactUs() {
     e.preventDefault();
     setIsSubmitting(true);
     
-    try {
-      const response = await fetch('/api/contact', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to send message');
-      }
-      
+    const emailBody = `Name: ${formData.name}
+Email: ${formData.email}
+
+Message:
+${formData.message}`;
+    
+    const mailtoLink = `mailto:support@eslate.com.au?subject=${encodeURIComponent(formData.subject)}&body=${encodeURIComponent(emailBody)}`;
+    window.location.href = mailtoLink;
+    
+    setTimeout(() => {
       toast({
-        title: "Message Sent",
-        description: "Thank you for contacting us. We'll get back to you soon!",
+        title: "Email Client Opened",
+        description: "Please send the email from your email application to complete your message.",
       });
       setFormData({ name: "", email: "", subject: "", message: "" });
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to send message. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
       setIsSubmitting(false);
-    }
+    }, 500);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
