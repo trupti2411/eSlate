@@ -250,7 +250,10 @@ export default function HomePage() {
               </div>
               <span className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">eSlate</span>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
+              <Link href="/contact" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
+                Contact Us
+              </Link>
               <Link href="/auth">
                 <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
                   Sign In
