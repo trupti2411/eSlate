@@ -23,7 +23,7 @@ export default function UserAgreement() {
           <CardContent className="prose prose-lg dark:prose-invert max-w-none">
             <h2>eSlate Educational Platform User Agreement</h2>
             <p>
-              This User Agreement ("Agreement") is a binding contract between you ("User," "you," or "your") and eSlate Pty Ltd ABN [ABN Number] ("eSlate," "we," "us," or "our") governing your use of the eSlate educational platform. This Agreement supplements our Terms of Service and Privacy Policy.
+              This User Agreement ("Agreement") is a binding contract between you ("User," "you," or "your") and Creative Arc Infotech Pty Ltd ABN [ABN Number] ("Creative Arc," "we," "us," or "our") governing your use of the eSlate educational platform. eSlate is a product and service provided by Creative Arc Infotech Pty Ltd. This Agreement supplements our Terms of Service and Privacy Policy.
             </p>
             <p>
               By clicking "I Accept," creating an account, or using the eSlate platform, you acknowledge that you have read, understood, and agree to be bound by this Agreement. If you are accepting on behalf of a minor, you confirm you have legal authority to do so.
@@ -309,10 +309,7 @@ export default function UserAgreement() {
             </p>
             <ul>
               <li><strong>Email:</strong> support@eslate.com.au</li>
-              <li><strong>General Inquiries:</strong> nirav@eslate.com.au</li>
-              <li><strong>Privacy Concerns:</strong> privacy@eslate.com.au</li>
-              <li><strong>Legal Matters:</strong> legal@eslate.com.au</li>
-              <li><strong>Mail:</strong> eSlate Pty Ltd, Sydney, NSW, Australia</li>
+              <li><strong>Mail:</strong> Creative Arc Infotech Pty Ltd, Sydney, NSW, Australia</li>
             </ul>
             <p>
               For urgent safeguarding or child safety concerns, please contact the relevant authorities in addition to notifying us.

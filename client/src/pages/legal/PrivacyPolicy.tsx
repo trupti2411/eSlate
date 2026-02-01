@@ -23,7 +23,7 @@ export default function PrivacyPolicy() {
           <CardContent className="prose prose-lg dark:prose-invert max-w-none">
             <h2>1. Introduction</h2>
             <p>
-              eSlate Pty Ltd ABN [ABN Number] ("eSlate," "we," "our," or "us") is committed to protecting the privacy of all users of our educational platform. This Privacy Policy explains how we collect, use, disclose, and safeguard personal information in accordance with the Australian Privacy Principles (APPs) contained in the Privacy Act 1988 (Cth) and other applicable privacy legislation.
+              Creative Arc Infotech Pty Ltd ABN [ABN Number] ("Creative Arc," "we," "our," or "us") operates eSlate, an educational platform, and is committed to protecting the privacy of all users. This Privacy Policy explains how we collect, use, disclose, and safeguard personal information in accordance with the Australian Privacy Principles (APPs) contained in the Privacy Act 1988 (Cth) and other applicable privacy legislation.
             </p>
             <p>
               eSlate provides educational management services to education providers (tutoring centres, learning centres, educational institutions), their tutors, students, and parents/guardians. We understand the sensitive nature of educational data and take our privacy obligations seriously.
@@ -259,10 +259,9 @@ export default function PrivacyPolicy() {
               For privacy-related inquiries, requests, or complaints:
             </p>
             <ul>
-              <li><strong>Email:</strong> privacy@eslate.com.au</li>
-              <li><strong>General Inquiries:</strong> nirav@eslate.com.au</li>
+              <li><strong>Email:</strong> support@eslate.com.au</li>
               <li><strong>Phone:</strong> Contact your Education Provider or use our contact form</li>
-              <li><strong>Mail:</strong> eSlate Pty Ltd, Sydney, NSW, Australia</li>
+              <li><strong>Mail:</strong> Creative Arc Infotech Pty Ltd, Sydney, NSW, Australia</li>
             </ul>
             <p>
               If you are not satisfied with our response, you may lodge a complaint with the Office of the Australian Information Commissioner (OAIC) at <a href="https://www.oaic.gov.au" target="_blank" rel="noopener noreferrer">www.oaic.gov.au</a>.

@@ -23,7 +23,7 @@ export default function TermsOfService() {
           <CardContent className="prose prose-lg dark:prose-invert max-w-none">
             <h2>1. Introduction and Acceptance</h2>
             <p>
-              These Terms of Service ("Terms") constitute a legally binding agreement between you and eSlate Pty Ltd ABN [ABN Number] ("eSlate," "we," "our," or "us") governing your access to and use of the eSlate educational platform, including all websites, applications, and services (collectively, "the Platform").
+              These Terms of Service ("Terms") constitute a legally binding agreement between you and Creative Arc Infotech Pty Ltd ABN [ABN Number] ("Creative Arc," "we," "our," or "us") governing your access to and use of the eSlate educational platform, including all websites, applications, and services (collectively, "the Platform"). eSlate is a product and service provided by Creative Arc Infotech Pty Ltd.
             </p>
             <p>
               By accessing or using the Platform, you agree to be bound by these Terms. If you do not agree, you must not use the Platform. If you are using the Platform on behalf of an organization (such as an education provider), you represent and warrant that you have authority to bind that organization to these Terms.
@@ -322,9 +322,8 @@ export default function TermsOfService() {
               For questions about these Terms, please contact:
             </p>
             <ul>
-              <li><strong>Email:</strong> legal@eslate.com.au</li>
-              <li><strong>General Inquiries:</strong> nirav@eslate.com.au</li>
-              <li><strong>Mail:</strong> eSlate Pty Ltd, Sydney, NSW, Australia</li>
+              <li><strong>Email:</strong> support@eslate.com.au</li>
+              <li><strong>Mail:</strong> Creative Arc Infotech Pty Ltd, Sydney, NSW, Australia</li>
             </ul>
           </CardContent>
         </Card>
