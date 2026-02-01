@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://eslate.com.au/sitemap.xml
+
+# Block crawling of private/authenticated areas
+Disallow: /student/
+Disallow: /parent/
+Disallow: /tutor/
+Disallow: /admin/
+Disallow: /company/
+Disallow: /api/
