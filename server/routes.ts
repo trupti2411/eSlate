@@ -6327,7 +6327,7 @@ Good luck with your assignment!"
 
       const mailOptions = {
         from: process.env.SMTP_USER,
-        to: 'support@eslate.com.au',
+        to: 'nirav@eslate.com.au',
         replyTo: email,
         subject: `Contact Form: ${subject}`,
         text: `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`,
