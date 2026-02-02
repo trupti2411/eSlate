@@ -169,6 +169,7 @@ export const submissions = pgTable("submissions", {
   score: integer("score"), // Grade score (0-100)
   feedback: text("feedback"), // Tutor feedback on the submission
   reviewerAnnotations: text("reviewer_annotations"), // JSON string of tick/cross/comment annotations from tutor/admin/parent
+  annotations: text("annotations"), // JSON string of student annotations (pen strokes, text, highlights)
   gradedBy: varchar("graded_by").references(() => users.id), // Who graded this submission
   gradedAt: timestamp("graded_at"), // When it was graded
   // E-ink device specific fields

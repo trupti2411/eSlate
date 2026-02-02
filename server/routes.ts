@@ -840,7 +840,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "No submission found" });
       }
       
-      res.json(submission);
+      // Parse annotations from JSON string if it exists
+      const response = {
+        ...submission,
+        annotations: submission.annotations ? JSON.parse(submission.annotations) : null
+      };
+      
+      res.json(response);
     } catch (error) {
       console.error("Error fetching student submission:", error);
       res.status(500).json({ message: "Failed to fetch submission" });
@@ -906,7 +912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         assignmentId,
         studentId: student.id,
         documentUrl,
-        annotations: annotations ? JSON.parse(annotations) : null,
+        annotations: annotations || null, // Store as JSON string
         status: status === 'submitted' ? 'submitted' : 'draft',
         submittedAt: status === 'submitted' ? new Date() : undefined
       };
