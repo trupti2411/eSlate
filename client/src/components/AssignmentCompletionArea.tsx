@@ -518,7 +518,7 @@ export function AssignmentCompletionArea({
                           ? url.split('/uploads/').pop()
                           : url.split('/').pop();
                         
-                        const viewerUrl = `/google-docs-viewer?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`;
+                        const viewerUrl = `/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`;
                         window.open(viewerUrl, '_blank');
                       }}
                       className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
