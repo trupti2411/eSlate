@@ -519,7 +519,8 @@ function ReviewerPDFAnnotatorContent({
                             activeTool === 'cross' ? 'crosshair' : 
                             activeTool === 'comment' ? 'text' :
                             activeTool === 'freehand' ? 'crosshair' : 'default',
-                          touchAction: activeTool ? 'none' : 'auto'
+                          touchAction: activeTool ? 'none' : 'auto',
+                          pointerEvents: activeTool ? 'auto' : 'none'
                         }}
                         onMouseDown={(e) => handleCanvasClick(e, pageNum)}
                         onTouchStart={(e) => handleCanvasClick(e, pageNum)}

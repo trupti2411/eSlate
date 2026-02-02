@@ -467,7 +467,8 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                           top: 0,
                           left: 0,
                           cursor: activeTool === 'text' ? 'text' : activeTool === 'pen' || activeTool === 'highlight' ? 'crosshair' : 'default',
-                          touchAction: activeTool ? 'none' : 'auto'
+                          touchAction: activeTool ? 'none' : 'auto',
+                          pointerEvents: activeTool ? 'auto' : 'none'
                         }}
                         onMouseDown={(e) => activeTool === 'text' && addText(e, pageNum)}
                         onTouchStart={(e) => activeTool === 'text' && addText(e, pageNum)}
