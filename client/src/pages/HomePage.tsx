@@ -273,7 +273,7 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto text-center relative">
           <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm border border-gray-100 mb-8">
             <Sparkles className="h-4 w-4 text-amber-500" />
-            <span className="text-sm font-medium text-gray-600">Trusted by education providers worldwide</span>
+            <span className="text-sm font-medium text-gray-600">Where learning meets simplicity</span>
           </div>
           
           <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6 leading-tight">
