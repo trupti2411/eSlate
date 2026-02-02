@@ -35,6 +35,7 @@ export function PDFAnnotatorPage() {
   const [totalPages, setTotalPages] = useState(0);
   
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   
   const { toast } = useToast();
@@ -156,6 +157,7 @@ export function PDFAnnotatorPage() {
     try {
       const page = await pdf.getPage(pageNum);
       const canvas = canvasRef.current;
+      const overlayCanvas = overlayCanvasRef.current;
       const context = canvas.getContext('2d');
       
       if (!context) return;
@@ -169,6 +171,14 @@ export function PDFAnnotatorPage() {
       canvas.style.width = `${viewport.width}px`;
       canvas.style.height = `${viewport.height}px`;
       
+      // Set overlay canvas dimensions to match
+      if (overlayCanvas) {
+        overlayCanvas.width = viewport.width;
+        overlayCanvas.height = viewport.height;
+        overlayCanvas.style.width = `${viewport.width}px`;
+        overlayCanvas.style.height = `${viewport.height}px`;
+      }
+      
       // Clear canvas
       context.clearRect(0, 0, canvas.width, canvas.height);
       
@@ -180,8 +190,14 @@ export function PDFAnnotatorPage() {
       
       await page.render(renderContext).promise;
       
-      // Draw annotations on top
-      drawAnnotations(context);
+      // Draw saved annotations on overlay
+      if (overlayCanvas) {
+        const overlayCtx = overlayCanvas.getContext('2d');
+        if (overlayCtx) {
+          overlayCtx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+          drawAnnotations(overlayCtx);
+        }
+      }
       
       console.log(`Page ${pageNum} rendered at scale ${scale}`);
       
@@ -245,9 +261,9 @@ export function PDFAnnotatorPage() {
 
   // Get coordinates relative to canvas
   const getCanvasCoordinates = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!canvasRef.current) return { x: 0, y: 0 };
+    const canvas = overlayCanvasRef.current || canvasRef.current;
+    if (!canvas) return { x: 0, y: 0 };
     
-    const canvas = canvasRef.current;
     const rect = canvas.getBoundingClientRect();
     
     // For PDF.js rendering, convert to PDF coordinate space
@@ -288,19 +304,14 @@ export function PDFAnnotatorPage() {
     const coords = getCanvasCoordinates(e);
     setCurrentStroke(prev => [...prev, coords]);
     
-    // Draw current stroke in real-time
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext('2d');
-    if (!canvas || !ctx) return;
+    // Draw on overlay canvas (not the PDF canvas)
+    const overlayCanvas = overlayCanvasRef.current;
+    const ctx = overlayCanvas?.getContext('2d');
+    if (!overlayCanvas || !ctx) return;
     
-    // For PDF.js, re-render page first
-    if (pdfDoc) {
-      renderPage(pdfDoc, currentPage);
-    } else {
-      // For iframe fallback, just redraw annotations
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      drawAnnotations(ctx);
-    }
+    // Clear overlay and redraw saved annotations + current stroke
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    drawAnnotations(ctx);
     
     // Draw current stroke
     if (currentStroke.length > 0) {
@@ -491,10 +502,27 @@ export function PDFAnnotatorPage() {
     setIsSubmitting(true);
 
     try {
-      const canvas = canvasRef.current;
-      if (!canvas) throw new Error('No canvas available');
+      const pdfCanvas = canvasRef.current;
+      const overlayCanvas = overlayCanvasRef.current;
+      if (!pdfCanvas) throw new Error('No canvas available');
       
-      canvas.toBlob(async (blob) => {
+      // Create a combined canvas with PDF + annotations
+      const combinedCanvas = document.createElement('canvas');
+      combinedCanvas.width = pdfCanvas.width;
+      combinedCanvas.height = pdfCanvas.height;
+      const ctx = combinedCanvas.getContext('2d');
+      
+      if (!ctx) throw new Error('Failed to create context');
+      
+      // Draw PDF first
+      ctx.drawImage(pdfCanvas, 0, 0);
+      
+      // Draw annotations on top
+      if (overlayCanvas) {
+        ctx.drawImage(overlayCanvas, 0, 0);
+      }
+      
+      combinedCanvas.toBlob(async (blob) => {
         if (!blob) throw new Error('Failed to create image blob');
         
         const formData = new FormData();
@@ -646,21 +674,32 @@ export function PDFAnnotatorPage() {
         {/* PDF Viewer */}
         <div className="flex-1 relative bg-gray-200 overflow-auto" ref={containerRef}>
           {pdfDoc ? (
-            // PDF.js direct rendering
+            // PDF.js direct rendering with overlay canvas
             <div className="flex justify-center items-start p-4">
-              <canvas
-                ref={canvasRef}
-                className="border border-gray-300 bg-white shadow-lg"
-                style={{
-                  cursor: activeTool === 'text' ? 'text' : 'crosshair',
-                  maxWidth: '100%',
-                  maxHeight: '100%'
-                }}
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-              />
+              <div className="relative">
+                {/* PDF Canvas (background) */}
+                <canvas
+                  ref={canvasRef}
+                  className="border border-gray-300 bg-white shadow-lg"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '100%'
+                  }}
+                />
+                {/* Overlay Canvas for annotations (on top) */}
+                <canvas
+                  ref={overlayCanvasRef}
+                  className="absolute top-0 left-0"
+                  style={{
+                    cursor: activeTool === 'text' ? 'text' : 'crosshair',
+                    pointerEvents: 'auto'
+                  }}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                />
+              </div>
             </div>
           ) : (
             // Fallback iframe with simple annotation overlay
