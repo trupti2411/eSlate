@@ -818,6 +818,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get student's own submission for an assignment
+  app.get('/api/assignments/:assignmentId/my-submission', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      
+      if (user.role !== 'student') {
+        return res.status(403).json({ message: "Only students can access their submissions" });
+      }
+      
+      const student = await storage.getStudentByUserId(user.id);
+      if (!student) {
+        return res.status(404).json({ message: "Student profile not found" });
+      }
+      
+      const { assignmentId } = req.params;
+      const submissions = await storage.getStudentSubmissions(student.id);
+      const submission = submissions.find(s => s.assignmentId === assignmentId);
+      
+      if (!submission) {
+        return res.status(404).json({ message: "No submission found" });
+      }
+      
+      res.json(submission);
+    } catch (error) {
+      console.error("Error fetching student submission:", error);
+      res.status(500).json({ message: "Failed to fetch submission" });
+    }
+  });
+
   // Save annotated submission (from PDF annotator)
   app.post('/api/submissions/annotated', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
     try {

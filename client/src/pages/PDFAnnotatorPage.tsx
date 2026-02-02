@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -47,6 +47,29 @@ export function PDFAnnotatorPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const assignmentId = urlParams.get('assignmentId') || '';
   const pdfUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
+
+  // Load existing submission/annotations for this assignment
+  const { data: existingSubmission } = useQuery({
+    queryKey: ['/api/assignments', assignmentId, 'my-submission'],
+    queryFn: async () => {
+      const response = await fetch(`/api/assignments/${assignmentId}/my-submission`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        if (response.status === 404) return null;
+        throw new Error('Failed to fetch submission');
+      }
+      return response.json();
+    },
+    enabled: !!assignmentId
+  });
+
+  // Load saved annotations when submission data is available
+  useEffect(() => {
+    if (existingSubmission?.annotations && Array.isArray(existingSubmission.annotations)) {
+      setAnnotations(existingSubmission.annotations);
+    }
+  }, [existingSubmission]);
 
   useEffect(() => {
     if (!pdfUrl) return;
