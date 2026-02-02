@@ -846,9 +846,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const fileId = crypto.randomUUID();
         const privateDir = objectStorageService.getPrivateObjectDir();
         
-        // Parse bucket name and object path
-        const fullPath = `${privateDir}/uploads/${fileId}`;
-        const pathParts = fullPath.replace('gs://', '').split('/');
+        // Parse the path to get bucket and object name
+        const objectPath = `${privateDir}/uploads/${fileId}`;
+        const pathParts = objectPath.split('/').filter((p: string) => p);
         const bucketName = pathParts[0];
         const objectName = pathParts.slice(1).join('/');
         
