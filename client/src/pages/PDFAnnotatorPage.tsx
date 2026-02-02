@@ -99,7 +99,8 @@ export function PDFAnnotatorPage() {
         overlayCanvas.height = viewport.height;
         
         if (!fabricCanvasRef.current) {
-          fabricCanvasRef.current = new fabric.Canvas(overlayCanvas, {
+          console.log('Creating new Fabric canvas with dimensions:', viewport.width, 'x', viewport.height);
+          const newCanvas = new fabric.Canvas(overlayCanvas, {
             width: viewport.width,
             height: viewport.height,
             isDrawingMode: false,
@@ -107,6 +108,34 @@ export function PDFAnnotatorPage() {
             selection: true,
             allowTouchScrolling: false,
             enablePointerEvents: true
+          });
+          fabricCanvasRef.current = newCanvas;
+          console.log('Fabric canvas created:', !!newCanvas, 'brush:', !!newCanvas.freeDrawingBrush);
+          
+          const wrapper = newCanvas.wrapperEl;
+          console.log('Fabric wrapper:', !!wrapper);
+          if (wrapper) {
+            wrapper.style.position = 'absolute';
+            wrapper.style.top = '0';
+            wrapper.style.left = '0';
+            wrapper.style.zIndex = '10';
+            wrapper.style.pointerEvents = 'none';
+          }
+          
+          newCanvas.on('path:created', (e: any) => {
+            console.log('Path created event fired');
+            const path = e.path;
+            if (!path) return;
+            
+            const newAnnotation: StudentAnnotation = {
+              id: `stroke-${Date.now()}`,
+              type: 'stroke',
+              pageNum: currentPage,
+              toolType: 'pen',
+              fabricJSON: path.toJSON()
+            };
+            
+            setAnnotations(prev => [...prev, newAnnotation]);
           });
         } else {
           fabricCanvasRef.current.setWidth(viewport.width);
@@ -132,28 +161,43 @@ export function PDFAnnotatorPage() {
 
   useEffect(() => {
     const fabricCanvas = fabricCanvasRef.current;
+    console.log('Tool effect - activeTool:', activeTool, 'fabricCanvas exists:', !!fabricCanvas);
     if (!fabricCanvas) return;
 
     if (activeTool === 'pen') {
       fabricCanvas.isDrawingMode = true;
-      fabricCanvas.freeDrawingBrush.color = '#000000';
-      fabricCanvas.freeDrawingBrush.width = 3;
+      console.log('Pen mode - isDrawingMode:', fabricCanvas.isDrawingMode, 'brush:', !!fabricCanvas.freeDrawingBrush);
+      if (fabricCanvas.freeDrawingBrush) {
+        fabricCanvas.freeDrawingBrush.color = '#000000';
+        fabricCanvas.freeDrawingBrush.width = 3;
+      }
     } else if (activeTool === 'highlight') {
       fabricCanvas.isDrawingMode = true;
-      fabricCanvas.freeDrawingBrush.color = 'rgba(255, 255, 0, 0.5)';
-      fabricCanvas.freeDrawingBrush.width = 20;
+      if (fabricCanvas.freeDrawingBrush) {
+        fabricCanvas.freeDrawingBrush.color = 'rgba(255, 255, 0, 0.5)';
+        fabricCanvas.freeDrawingBrush.width = 20;
+      }
     } else if (activeTool === 'eraser') {
       fabricCanvas.isDrawingMode = true;
-      fabricCanvas.freeDrawingBrush.color = '#FFFFFF';
-      fabricCanvas.freeDrawingBrush.width = 20;
+      if (fabricCanvas.freeDrawingBrush) {
+        fabricCanvas.freeDrawingBrush.color = '#FFFFFF';
+        fabricCanvas.freeDrawingBrush.width = 20;
+      }
     } else {
       fabricCanvas.isDrawingMode = false;
     }
     
     const wrapper = fabricCanvas.wrapperEl;
+    console.log('Wrapper element:', !!wrapper, 'setting pointerEvents:', activeTool ? 'auto' : 'none');
     if (wrapper) {
+      wrapper.style.position = 'absolute';
+      wrapper.style.top = '0';
+      wrapper.style.left = '0';
+      wrapper.style.zIndex = '10';
       wrapper.style.pointerEvents = activeTool ? 'auto' : 'none';
     }
+    
+    fabricCanvas.renderAll();
   }, [activeTool]);
 
   useEffect(() => {
