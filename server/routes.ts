@@ -845,13 +845,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const objectStorageService = new ObjectStorageService();
         const fileId = crypto.randomUUID();
         const privateDir = objectStorageService.getPrivateObjectDir();
-        const objectPath = `${privateDir}/uploads/${fileId}`;
         
-        await objectStorageService.putObject(objectPath, req.file.buffer, {
-          contentType: req.file.mimetype || 'image/png',
-          originalName: req.file.originalname,
-          size: req.file.size.toString(),
-          uploadedAt: new Date().toISOString()
+        // Parse bucket name and object path
+        const fullPath = `${privateDir}/uploads/${fileId}`;
+        const pathParts = fullPath.replace('gs://', '').split('/');
+        const bucketName = pathParts[0];
+        const objectName = pathParts.slice(1).join('/');
+        
+        const bucket = objectStorageClient.bucket(bucketName);
+        const gcsFile = bucket.file(objectName);
+        
+        await gcsFile.save(req.file.buffer, {
+          metadata: {
+            contentType: req.file.mimetype || 'image/png',
+            metadata: {
+              originalName: req.file.originalname,
+              size: req.file.size.toString(),
+              uploadedAt: new Date().toISOString()
+            }
+          }
         });
         
         documentUrl = fileId;
