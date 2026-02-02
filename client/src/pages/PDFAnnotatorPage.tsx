@@ -283,10 +283,16 @@ export function PDFAnnotatorPage() {
 
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Only handle drawing tools, allow scroll otherwise
+    if (activeTool !== 'pen' && activeTool !== 'highlight' && activeTool !== 'eraser' && activeTool !== 'text') {
+      return; // Allow default behavior (scrolling)
+    }
+    
     console.log('startDrawing called, buttons:', e.buttons, 'activeTool:', activeTool);
     
     if (activeTool === 'text') {
       addTextAtPosition(e);
+      e.preventDefault();
       return;
     }
     
@@ -296,7 +302,6 @@ export function PDFAnnotatorPage() {
     setCurrentStroke([coords]);
     
     e.preventDefault();
-    e.stopPropagation();
   };
 
   const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -347,7 +352,6 @@ export function PDFAnnotatorPage() {
     ctx.restore();
     
     e.preventDefault();
-    e.stopPropagation();
   };
 
   const stopDrawing = () => {
