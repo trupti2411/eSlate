@@ -27,6 +27,7 @@ import { StudentWorksheets } from "@/pages/student/StudentWorksheets";
 import { AssignmentWorkPage } from "@/pages/student/AssignmentWorkPage";
 import { WorksheetWorkPage } from "@/pages/student/WorksheetWorkPage";
 import GoogleDocsViewer from "@/pages/GoogleDocsViewer";
+import { PDFAnnotatorPage } from "@/pages/PDFAnnotatorPage";
 import SubmittedHomework from "@/pages/company/SubmittedHomework";
 import { WorksheetManagementPage } from "@/pages/admin/WorksheetManagementPage";
 import { WorksheetEditorPage } from "@/pages/admin/WorksheetEditorPage";
@@ -125,7 +126,7 @@ function Router() {
           <Route path="/student/worksheets" component={StudentWorksheets} />
           <Route path="/student/worksheet/:id" component={WorksheetWorkPage} />
           <Route path="/student/assignment/:id" component={AssignmentWorkPage} />
-          <Route path="/pdf-annotator" component={GoogleDocsViewer} />
+          <Route path="/pdf-annotator" component={PDFAnnotatorPage} />
           <Route path="/google-docs-viewer" component={GoogleDocsViewer} />
         </>
       )}

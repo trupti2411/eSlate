@@ -824,9 +824,7 @@ export default function GoogleDocsViewer() {
               backgroundColor: 'transparent',
               pointerEvents: activeTool ? 'auto' : 'none',
               top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%'
+              left: 0
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
