@@ -775,8 +775,8 @@ export default function GoogleDocsViewer() {
         </div>
 
         {/* Document Viewer */}
-        <div className="flex-1 relative overflow-auto" ref={containerRef}>
-          {/* Google Docs Viewer iframe */}
+        <div className="flex-1 relative overflow-hidden" ref={containerRef}>
+          {/* Google Docs Viewer iframe - let it handle its own scrolling */}
           <iframe
             ref={iframeRef}
             src={googleDocsViewerUrl}
@@ -790,8 +790,7 @@ export default function GoogleDocsViewer() {
               top: 0,
               left: 0,
               width: '100%',
-              height: '100%',
-              minHeight: '500vh' // Much larger height to ensure full document loads
+              height: '100%'
             }}
           />
           
@@ -806,19 +805,17 @@ export default function GoogleDocsViewer() {
             </div>
           )}
           
-          {/* Annotation canvas overlay */}
+          {/* Annotation canvas overlay - pointer events disabled to allow iframe scrolling */}
           <canvas
             ref={canvasRef}
             className="absolute"
             style={{
-              cursor: isDrawing || activeTool !== 'text' ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
+              cursor: isDrawing ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
               zIndex: 20,
               backgroundColor: 'transparent',
-              pointerEvents: isDrawing ? 'auto' : 'none', // Only capture events when drawing
+              pointerEvents: 'none', // Always let iframe handle scroll - annotations not supported with Google Docs
               top: 0,
-              left: 0,
-              transform: `translate(${-scrollOffset.x}px, ${-scrollOffset.y}px)`,
-              transformOrigin: 'top left'
+              left: 0
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
@@ -827,74 +824,6 @@ export default function GoogleDocsViewer() {
             onClick={addTextAnnotation}
           />
           
-          {/* Annotation activation overlay - captures initial click to start drawing */}
-          <div
-            className="absolute top-0 left-0 w-full"
-            style={{
-              zIndex: 15,
-              backgroundColor: 'transparent',
-              pointerEvents: viewerReady && !isDrawing ? 'auto' : 'none',
-              height: '5000px', // Match larger canvas height for full document navigation
-              minHeight: '100%'
-            }}
-            onMouseDown={(e) => {
-              // Pass the event to canvas for drawing
-              if (canvasRef.current) {
-                const canvas = canvasRef.current;
-                const rect = canvas.getBoundingClientRect();
-                const syntheticEvent = {
-                  ...e,
-                  currentTarget: canvas,
-                  target: canvas,
-                  clientX: e.clientX,
-                  clientY: e.clientY,
-                  preventDefault: () => e.preventDefault(),
-                  stopPropagation: () => e.stopPropagation(),
-                  buttons: e.buttons
-                } as any;
-                
-                startDrawing(syntheticEvent);
-              }
-            }}
-            onMouseMove={(e) => {
-              if (isDrawing && canvasRef.current) {
-                const canvas = canvasRef.current;
-                const syntheticEvent = {
-                  ...e,
-                  currentTarget: canvas,
-                  target: canvas,
-                  clientX: e.clientX,
-                  clientY: e.clientY,
-                  preventDefault: () => e.preventDefault(),
-                  stopPropagation: () => e.stopPropagation(),
-                  buttons: e.buttons
-                } as any;
-                
-                draw(syntheticEvent);
-              }
-            }}
-            onMouseUp={() => {
-              if (isDrawing) {
-                stopDrawing();
-              }
-            }}
-            onClick={(e) => {
-              if (activeTool === 'text' && canvasRef.current) {
-                const canvas = canvasRef.current;
-                const syntheticEvent = {
-                  ...e,
-                  currentTarget: canvas,
-                  target: canvas,
-                  clientX: e.clientX,
-                  clientY: e.clientY,
-                  preventDefault: () => e.preventDefault(),
-                  stopPropagation: () => e.stopPropagation()
-                } as any;
-                
-                addTextAnnotation(syntheticEvent);
-              }
-            }}
-          />
         </div>
       </div>
 
