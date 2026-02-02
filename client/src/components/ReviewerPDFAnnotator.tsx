@@ -74,6 +74,7 @@ function ReviewerPDFAnnotatorContent({
   
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  const overlayCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const fabricCanvasRefs = useRef<Map<number, fabric.Canvas>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -116,6 +117,7 @@ function ReviewerPDFAnnotatorContent({
       const page = await pdfDocRef.current.getPage(pageNum);
       const viewport = page.getViewport({ scale });
       const pdfCanvas = pageCanvasRefs.current.get(pageNum);
+      const overlayCanvas = overlayCanvasRefs.current.get(pageNum);
 
       if (pdfCanvas) {
         pdfCanvas.width = viewport.width;
@@ -128,10 +130,15 @@ function ReviewerPDFAnnotatorContent({
             canvas: pdfCanvas
           } as any).promise;
         }
+      }
 
+      if (overlayCanvas) {
+        overlayCanvas.width = viewport.width;
+        overlayCanvas.height = viewport.height;
+        
         let fabricCanvas = fabricCanvasRefs.current.get(pageNum);
         if (!fabricCanvas) {
-          fabricCanvas = new fabric.Canvas(null, {
+          fabricCanvas = new fabric.Canvas(overlayCanvas, {
             width: viewport.width,
             height: viewport.height,
             isDrawingMode: false,
@@ -144,6 +151,7 @@ function ReviewerPDFAnnotatorContent({
         } else {
           fabricCanvas.setWidth(viewport.width);
           fabricCanvas.setHeight(viewport.height);
+          fabricCanvas.renderAll();
         }
       }
     } catch (error) {
@@ -152,13 +160,16 @@ function ReviewerPDFAnnotatorContent({
   }, [scale, isViewOnly]);
 
   useEffect(() => {
-    if (!pdfLoaded || !pdfDocRef.current) return;
-    (async () => {
+    if (!pdfLoaded || !pdfDocRef.current || numPages === 0) return;
+    
+    const timer = setTimeout(async () => {
       for (let i = 1; i <= numPages; i++) {
         await renderPDFPage(i);
       }
       renderAnnotationsOnCanvas();
-    })();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [pdfLoaded, numPages, scale, renderPDFPage]);
 
   useEffect(() => {
@@ -172,6 +183,12 @@ function ReviewerPDFAnnotatorContent({
         fabricCanvas.freeDrawingBrush.width = 2;
       } else {
         fabricCanvas.isDrawingMode = false;
+      }
+      
+      // Control pointer events on Fabric's wrapper to enable scrolling in navigate mode
+      const wrapper = fabricCanvas.wrapperEl;
+      if (wrapper) {
+        wrapper.style.pointerEvents = (activeTool || isViewOnly) ? 'auto' : 'none';
       }
     }
   }, [activeTool, isViewOnly]);
@@ -508,8 +525,9 @@ function ReviewerPDFAnnotatorContent({
                       />
                       <canvas
                         ref={(el) => {
-                          if (el) fabricCanvasRefs.current.get(pageNum)?.setElement?.(el);
+                          if (el) overlayCanvasRefs.current.set(pageNum, el);
                         }}
+                        className="annotation-overlay"
                         style={{
                           position: 'absolute',
                           top: 0,

@@ -37,6 +37,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
   const storeKey = `${assignmentId}-${documentUrl || pdfUrl}`;
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
+  const overlayCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const fabricCanvasRefs = useRef<Map<number, fabric.Canvas>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -70,6 +71,7 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
       const page = await pdfDocRef.current.getPage(pageNum);
       const viewport = page.getViewport({ scale });
       const pdfCanvas = pageCanvasRefs.current.get(pageNum);
+      const overlayCanvas = overlayCanvasRefs.current.get(pageNum);
 
       if (pdfCanvas) {
         pdfCanvas.width = viewport.width;
@@ -82,11 +84,16 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             canvas: pdfCanvas
           } as any).promise;
         }
+      }
 
-        // Initialize or update Fabric canvas
+      // Initialize or update Fabric canvas with the actual overlay element
+      if (overlayCanvas) {
+        overlayCanvas.width = viewport.width;
+        overlayCanvas.height = viewport.height;
+        
         let fabricCanvas = fabricCanvasRefs.current.get(pageNum);
         if (!fabricCanvas) {
-          fabricCanvas = new fabric.Canvas(null, {
+          fabricCanvas = new fabric.Canvas(overlayCanvas, {
             width: viewport.width,
             height: viewport.height,
             isDrawingMode: false,
@@ -95,17 +102,18 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
             enablePointerEvents: true
           });
           fabricCanvasRefs.current.set(pageNum, fabricCanvas);
+          
+          // Restore saved objects if they exist
+          const saved = strokeStore.get(storeKey);
+          if (saved && saved[pageNum]) {
+            fabricCanvas.loadFromJSON(saved[pageNum], () => {
+              fabricCanvas.renderAll();
+            });
+          }
         } else {
           fabricCanvas.setWidth(viewport.width);
           fabricCanvas.setHeight(viewport.height);
-        }
-
-        // Restore saved objects if they exist
-        const saved = strokeStore.get(storeKey);
-        if (saved && saved[pageNum]) {
-          fabricCanvas.loadFromJSON(saved[pageNum], () => {
-            fabricCanvas.renderAll();
-          });
+          fabricCanvas.renderAll();
         }
       }
     } catch (error) {
@@ -115,12 +123,16 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
 
   // Render all pages when PDF loads or scale changes
   useEffect(() => {
-    if (!pdfLoaded || !pdfDocRef.current) return;
-    (async () => {
+    if (!pdfLoaded || !pdfDocRef.current || numPages === 0) return;
+    
+    // Wait for canvas elements to be in the DOM
+    const timer = setTimeout(async () => {
       for (let i = 1; i <= numPages; i++) {
         await renderPDFPage(i);
       }
-    })();
+    }, 100);
+    
+    return () => clearTimeout(timer);
   }, [pdfLoaded, numPages, scale, renderPDFPage]);
 
   // Setup drawing on Fabric canvas
@@ -135,6 +147,12 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
         fabricCanvas.freeDrawingBrush.width = activeTool === 'highlight' ? 20 : 3;
       } else {
         fabricCanvas.isDrawingMode = false;
+      }
+      
+      // Control pointer events on Fabric's wrapper to enable scrolling in navigate mode
+      const wrapper = fabricCanvas.wrapperEl;
+      if (wrapper) {
+        wrapper.style.pointerEvents = activeTool ? 'auto' : 'none';
       }
     }
   }, [activeTool]);
@@ -460,8 +478,9 @@ function PDFAnnotatorContent({ pdfUrl, assignmentId, onSave, onClose, isSubmitte
                       />
                       <canvas
                         ref={(el) => {
-                          if (el) fabricCanvasRefs.current.get(pageNum)?.setElement?.(el);
+                          if (el) overlayCanvasRefs.current.set(pageNum, el);
                         }}
+                        className="annotation-overlay"
                         style={{
                           position: 'absolute',
                           top: 0,
