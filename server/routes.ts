@@ -818,6 +818,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Save annotated submission (from PDF annotator)
+  app.post('/api/submissions/annotated', isAuthenticated, upload.single('file'), async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      
+      if (user.role !== 'student') {
+        return res.status(403).json({ message: "Only students can submit" });
+      }
+      
+      const student = await storage.getStudentByUserId(user.id);
+      if (!student) {
+        return res.status(404).json({ message: "Student profile not found" });
+      }
+      
+      const { assignmentId, status, annotations } = req.body;
+      
+      if (!assignmentId) {
+        return res.status(400).json({ message: "Assignment ID is required" });
+      }
+      
+      let documentUrl = null;
+      
+      // Upload the annotated image if provided
+      if (req.file) {
+        const fileId = crypto.randomUUID();
+        const objectPath = `${privateDir}/uploads/${fileId}`;
+        
+        await objectStorageService.putObject(objectPath, req.file.buffer, {
+          contentType: req.file.mimetype || 'image/png',
+          originalName: req.file.originalname,
+          size: req.file.size.toString(),
+          uploadedAt: new Date().toISOString()
+        });
+        
+        documentUrl = fileId;
+      }
+      
+      // Check if submission already exists
+      const existingSubmissions = await storage.getStudentSubmissions(student.id);
+      const existingSubmission = existingSubmissions.find(s => s.assignmentId === assignmentId);
+      
+      const submissionData = {
+        assignmentId,
+        studentId: student.id,
+        documentUrl,
+        annotations: annotations ? JSON.parse(annotations) : null,
+        status: status === 'submitted' ? 'submitted' : 'draft',
+        submittedAt: status === 'submitted' ? new Date() : undefined
+      };
+      
+      let submission;
+      if (existingSubmission) {
+        submission = await storage.updateSubmission(existingSubmission.id, submissionData);
+      } else {
+        const validatedData = insertSubmissionSchema.parse(submissionData);
+        submission = await storage.createSubmission(validatedData);
+      }
+      
+      // Notify parent if submitted
+      if (status === 'submitted') {
+        const submissionTime = submission.submittedAt ? new Date(submission.submittedAt) : new Date();
+        notifyParentOfSubmission(student.id, assignmentId, submissionTime, 'submitted');
+      }
+      
+      res.json(submission);
+    } catch (error) {
+      console.error("Error saving annotated submission:", error);
+      res.status(500).json({ message: "Failed to save submission" });
+    }
+  });
+
   // Update submission
   app.patch('/api/submissions/:id', isAuthenticated, async (req: any, res: any) => {
     try {
