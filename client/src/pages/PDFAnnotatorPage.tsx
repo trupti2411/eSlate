@@ -174,11 +174,14 @@ export function PDFAnnotatorPage() {
     
     const timer = setTimeout(async () => {
       await renderPDFPage(currentPage);
-      renderAnnotationsOnCanvas();
+      // Re-render annotations after canvas is ready
+      setTimeout(() => {
+        renderAnnotationsOnCanvas();
+      }, 50);
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [pdfLoaded, numPages, currentPage, scale, renderPDFPage]);
+  }, [pdfLoaded, numPages, currentPage, scale, renderPDFPage, annotations]);
 
   useEffect(() => {
     const fabricCanvas = fabricCanvasRef.current;
