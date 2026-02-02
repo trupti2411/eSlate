@@ -1,9 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Pen, Highlighter, Eraser, Type, RotateCcw, Save, Send, Download, RefreshCw } from 'lucide-react';
+import { Pen, Highlighter, Eraser, Type, RotateCcw, Save, Send, Download, RefreshCw, Hand } from 'lucide-react';
 
-type Tool = 'pen' | 'highlight' | 'eraser' | 'text';
+type Tool = 'pen' | 'highlight' | 'eraser' | 'text' | null;
 
 interface Annotation {
   type: 'stroke' | 'text';
@@ -19,7 +19,7 @@ interface Annotation {
 }
 
 export default function GoogleDocsViewer() {
-  const [activeTool, setActiveTool] = useState<Tool>('pen');
+  const [activeTool, setActiveTool] = useState<Tool>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -699,10 +699,19 @@ export default function GoogleDocsViewer() {
         {/* Sidebar */}
         <div className="w-64 bg-gray-50 border-r p-4">
           <div className="space-y-6">
-            {/* Drawing Tools */}
+            {/* Navigation & Drawing Tools */}
             <div>
-              <h3 className="font-semibold text-gray-700 mb-3">Drawing Tools</h3>
+              <h3 className="font-semibold text-gray-700 mb-3">Tools</h3>
               <div className="space-y-2">
+                <Button
+                  variant={activeTool === null ? 'default' : 'outline'}
+                  className="w-full justify-start"
+                  onClick={() => setActiveTool(null)}
+                  disabled={!viewerReady}
+                >
+                  <Hand className="h-4 w-4 mr-2" />
+                  Navigate (Scroll)
+                </Button>
                 <Button
                   variant={activeTool === 'pen' ? 'default' : 'outline'}
                   className="w-full justify-start"
@@ -805,17 +814,19 @@ export default function GoogleDocsViewer() {
             </div>
           )}
           
-          {/* Annotation canvas overlay - pointer events disabled to allow iframe scrolling */}
+          {/* Annotation canvas overlay - pointer events enabled only when tool is active */}
           <canvas
             ref={canvasRef}
             className="absolute"
             style={{
-              cursor: isDrawing ? (activeTool === 'text' ? 'text' : 'crosshair') : 'default',
+              cursor: activeTool === 'text' ? 'text' : activeTool ? 'crosshair' : 'default',
               zIndex: 20,
               backgroundColor: 'transparent',
-              pointerEvents: 'none', // Always let iframe handle scroll - annotations not supported with Google Docs
+              pointerEvents: activeTool ? 'auto' : 'none',
               top: 0,
-              left: 0
+              left: 0,
+              width: '100%',
+              height: '100%'
             }}
             onMouseDown={startDrawing}
             onMouseMove={draw}
