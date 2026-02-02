@@ -283,7 +283,7 @@ export function PDFAnnotatorPage() {
 
   // Drawing functions
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (e.buttons !== 1) return;
+    console.log('startDrawing called, buttons:', e.buttons, 'activeTool:', activeTool);
     
     if (activeTool === 'text') {
       addTextAtPosition(e);
@@ -292,6 +292,7 @@ export function PDFAnnotatorPage() {
     
     setIsDrawing(true);
     const coords = getCanvasCoordinates(e);
+    console.log('Starting stroke at:', coords);
     setCurrentStroke([coords]);
     
     e.preventDefault();
@@ -307,6 +308,7 @@ export function PDFAnnotatorPage() {
     // Draw on overlay canvas (not the PDF canvas)
     const overlayCanvas = overlayCanvasRef.current;
     const ctx = overlayCanvas?.getContext('2d');
+    console.log('draw called, overlayCanvas:', overlayCanvas?.width, 'x', overlayCanvas?.height, 'ctx:', !!ctx);
     if (!overlayCanvas || !ctx) return;
     
     // Clear overlay and redraw saved annotations + current stroke
