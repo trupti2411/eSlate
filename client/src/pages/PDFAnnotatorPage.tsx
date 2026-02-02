@@ -23,6 +23,7 @@ interface StudentAnnotation {
   x?: number;
   y?: number;
   toolType: 'pen' | 'highlight' | 'eraser' | 'text';
+  scale?: number; // Scale at which annotation was created
 }
 
 export function PDFAnnotatorPage() {
@@ -153,7 +154,8 @@ export function PDFAnnotatorPage() {
               type: 'stroke',
               pageNum: currentPage,
               toolType: 'pen',
-              fabricJSON: path.toJSON()
+              fabricJSON: path.toJSON(),
+              scale: scale // Store current scale
             };
             
             setAnnotations(prev => [...prev, newAnnotation]);
@@ -260,14 +262,26 @@ export function PDFAnnotatorPage() {
     for (const annotation of pageAnnotations) {
       if (annotation.type === 'stroke' && annotation.fabricJSON) {
         Path.fromObject(annotation.fabricJSON).then((path: any) => {
+          // Scale the path if it was created at a different scale
+          const savedScale = annotation.scale || 1.2; // Default to 1.2 if not saved
+          if (savedScale !== scale) {
+            const scaleRatio = scale / savedScale;
+            path.scaleX = (path.scaleX || 1) * scaleRatio;
+            path.scaleY = (path.scaleY || 1) * scaleRatio;
+            path.left = (path.left || 0) * scaleRatio;
+            path.top = (path.top || 0) * scaleRatio;
+            path.setCoords();
+          }
           fabricCanvas.add(path);
           fabricCanvas.renderAll();
         });
       } else if (annotation.type === 'text' && annotation.text) {
+        const savedScale = annotation.scale || 1.2;
+        const scaleRatio = scale / savedScale;
         const text = new FabricText(annotation.text, {
-          left: annotation.x || 0,
-          top: annotation.y || 0,
-          fontSize: 16,
+          left: (annotation.x || 0) * scaleRatio,
+          top: (annotation.y || 0) * scaleRatio,
+          fontSize: 16 * scaleRatio,
           fill: '#000000',
           fontFamily: 'Arial',
           selectable: true,
@@ -277,7 +291,7 @@ export function PDFAnnotatorPage() {
       }
     }
     fabricCanvas.renderAll();
-  }, [annotations, currentPage]);
+  }, [annotations, currentPage, scale]);
 
   useEffect(() => {
     renderAnnotationsOnCanvas();
