@@ -1,0 +1,109 @@
+Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+PDFAnnotatorPage.tsx:160 Tool effect - activeTool: null fabricCanvas exists: false
+PDFAnnotatorPage.tsx:98 Creating new Fabric canvas with dimensions: 714.528 x 1008.7191599999999
+PDFAnnotatorPage.tsx:144 Error rendering page 1: TypeError: Cannot read properties of undefined (reading 'Canvas')
+    at PDFAnnotatorPage.tsx:99:32
+    at async PDFAnnotatorPage.tsx:151:3
+(anonymous) @ PDFAnnotatorPage.tsx:144
+await in (anonymous)
+(anonymous) @ PDFAnnotatorPage.tsx:151
+setTimeout
+(anonymous) @ PDFAnnotatorPage.tsx:149
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=7f39c171:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=7f39c171:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=7f39c171:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=7f39c171:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=7f39c171:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=7f39c171:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=7f39c171:19447
+(anonymous) @ chunk-RPCDYKBN.js?v=7f39c171:19328
+workLoop @ chunk-RPCDYKBN.js?v=7f39c171:197
+flushWork @ chunk-RPCDYKBN.js?v=7f39c171:176
+performWorkUntilDeadline @ chunk-RPCDYKBN.js?v=7f39c171:384Understand this error
+PDFAnnotatorPage.tsx:160 Tool effect - activeTool: pen fabricCanvas exists: false
+PDFAnnotatorPage.tsx:160 Tool effect - activeTool: null fabricCanvas exists: false
+PDFAnnotatorPage.tsx:98 Creating new Fabric canvas with dimensions: 714.528 x 1075.166964
+PDFAnnotatorPage.tsx:144 Error rendering page 2: TypeError: Cannot read properties of undefined (reading 'Canvas')
+    at PDFAnnotatorPage.tsx:99:32
+    at async PDFAnnotatorPage.tsx:151:3
+(anonymous) @ PDFAnnotatorPage.tsx:144
+await in (anonymous)
+(anonymous) @ PDFAnnotatorPage.tsx:151
+setTimeout
+(anonymous) @ PDFAnnotatorPage.tsx:149
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=7f39c171:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=7f39c171:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=7f39c171:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=7f39c171:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=7f39c171:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=7f39c171:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=7f39c171:19447
+commitRootImpl @ chunk-RPCDYKBN.js?v=7f39c171:19416
+commitRoot @ chunk-RPCDYKBN.js?v=7f39c171:19277
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=7f39c171:18895
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=7f39c171:9119
+(anonymous) @ chunk-RPCDYKBN.js?v=7f39c171:18627Understand this error
+PDFAnnotatorPage.tsx:160 Tool effect - activeTool: pen fabricCanvas exists: false
+PDFAnnotatorPage.tsx:98 Creating new Fabric canvas with dimensions: 714.528 x 1071.068328
+PDFAnnotatorPage.tsx:144 Error rendering page 3: TypeError: Cannot read properties of undefined (reading 'Canvas')
+    at PDFAnnotatorPage.tsx:99:32
+    at async PDFAnnotatorPage.tsx:151:3
+(anonymous) @ PDFAnnotatorPage.tsx:144
+await in (anonymous)
+(anonymous) @ PDFAnnotatorPage.tsx:151
+setTimeout
+(anonymous) @ PDFAnnotatorPage.tsx:149
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=7f39c171:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=7f39c171:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=7f39c171:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=7f39c171:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=7f39c171:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=7f39c171:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=7f39c171:19447
+commitRootImpl @ chunk-RPCDYKBN.js?v=7f39c171:19416
+commitRoot @ chunk-RPCDYKBN.js?v=7f39c171:19277
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=7f39c171:18895
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=7f39c171:9119
+(anonymous) @ chunk-RPCDYKBN.js?v=7f39c171:18627Understand this error
+PDFAnnotatorPage.tsx:98 Creating new Fabric canvas with dimensions: 714.528 x 1143.704292
+PDFAnnotatorPage.tsx:144 Error rendering page 4: TypeError: Cannot read properties of undefined (reading 'Canvas')
+    at PDFAnnotatorPage.tsx:99:32
+    at async PDFAnnotatorPage.tsx:151:3
+(anonymous) @ PDFAnnotatorPage.tsx:144
+await in (anonymous)
+(anonymous) @ PDFAnnotatorPage.tsx:151
+setTimeout
+(anonymous) @ PDFAnnotatorPage.tsx:149
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=7f39c171:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=7f39c171:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=7f39c171:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=7f39c171:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=7f39c171:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=7f39c171:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=7f39c171:19447
+commitRootImpl @ chunk-RPCDYKBN.js?v=7f39c171:19416
+commitRoot @ chunk-RPCDYKBN.js?v=7f39c171:19277
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=7f39c171:18895
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=7f39c171:9119
+(anonymous) @ chunk-RPCDYKBN.js?v=7f39c171:18627Understand this error
+PDFAnnotatorPage.tsx:98 Creating new Fabric canvas with dimensions: 714.528 x 1058.9341439999998
+PDFAnnotatorPage.tsx:144 Error rendering page 5: TypeError: Cannot read properties of undefined (reading 'Canvas')
+    at PDFAnnotatorPage.tsx:99:32
+    at async PDFAnnotatorPage.tsx:151:3
+(anonymous) @ PDFAnnotatorPage.tsx:144
+await in (anonymous)
+(anonymous) @ PDFAnnotatorPage.tsx:151
+setTimeout
+(anonymous) @ PDFAnnotatorPage.tsx:149
+commitHookEffectListMount @ chunk-RPCDYKBN.js?v=7f39c171:16915
+commitPassiveMountOnFiber @ chunk-RPCDYKBN.js?v=7f39c171:18156
+commitPassiveMountEffects_complete @ chunk-RPCDYKBN.js?v=7f39c171:18129
+commitPassiveMountEffects_begin @ chunk-RPCDYKBN.js?v=7f39c171:18119
+commitPassiveMountEffects @ chunk-RPCDYKBN.js?v=7f39c171:18109
+flushPassiveEffectsImpl @ chunk-RPCDYKBN.js?v=7f39c171:19490
+flushPassiveEffects @ chunk-RPCDYKBN.js?v=7f39c171:19447
+commitRootImpl @ chunk-RPCDYKBN.js?v=7f39c171:19416
+commitRoot @ chunk-RPCDYKBN.js?v=7f39c171:19277
+performSyncWorkOnRoot @ chunk-RPCDYKBN.js?v=7f39c171:18895
+flushSyncCallbacks @ chunk-RPCDYKBN.js?v=7f39c171:9119
+(anonymous) @ chunk-RPCDYKBN.js?v=7f39c171:18627Understand this error

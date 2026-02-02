@@ -5,8 +5,7 @@ import { useMutation } from '@tanstack/react-query';
 import { apiRequest } from '@/lib/queryClient';
 import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import * as fabricModule from 'fabric';
-const { fabric } = fabricModule as any;
+import { Canvas as FabricCanvas, Path, Text as FabricText, PencilBrush } from 'fabric';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -100,15 +99,14 @@ export function PDFAnnotatorPage() {
         
         if (!fabricCanvasRef.current) {
           console.log('Creating new Fabric canvas with dimensions:', viewport.width, 'x', viewport.height);
-          const newCanvas = new fabric.Canvas(overlayCanvas, {
+          const newCanvas = new FabricCanvas(overlayCanvas, {
             width: viewport.width,
             height: viewport.height,
             isDrawingMode: false,
             preserveObjectStacking: true,
             selection: true,
-            allowTouchScrolling: false,
-            enablePointerEvents: true
           });
+          newCanvas.freeDrawingBrush = new PencilBrush(newCanvas);
           fabricCanvasRef.current = newCanvas;
           console.log('Fabric canvas created:', !!newCanvas, 'brush:', !!newCanvas.freeDrawingBrush);
           
@@ -235,12 +233,12 @@ export function PDFAnnotatorPage() {
     const pageAnnotations = annotations.filter(a => a.pageNum === currentPage);
     for (const annotation of pageAnnotations) {
       if (annotation.type === 'stroke' && annotation.fabricJSON) {
-        fabric.Path.fromObject(annotation.fabricJSON, (path: any) => {
+        Path.fromObject(annotation.fabricJSON).then((path: any) => {
           fabricCanvas.add(path);
           fabricCanvas.renderAll();
         });
       } else if (annotation.type === 'text' && annotation.text) {
-        const text = new fabric.Text(annotation.text, {
+        const text = new FabricText(annotation.text, {
           left: annotation.x || 0,
           top: annotation.y || 0,
           fontSize: 16,
@@ -271,7 +269,7 @@ export function PDFAnnotatorPage() {
     
     const text = prompt('Enter text:');
     if (text) {
-      const textObj = new fabric.Text(text, {
+      const textObj = new FabricText(text, {
         left: x,
         top: y,
         fontSize: 16,
