@@ -303,62 +303,48 @@ export function PDFAnnotatorPage() {
     if (!isDrawing || e.buttons !== 1) return;
     
     const coords = getCanvasCoordinates(e);
+    const prevCoords = currentStroke.length > 0 ? currentStroke[currentStroke.length - 1] : coords;
     setCurrentStroke(prev => [...prev, coords]);
     
-    // Draw on overlay canvas (not the PDF canvas)
-    const overlayCanvas = overlayCanvasRef.current;
-    const ctx = overlayCanvas?.getContext('2d');
-    console.log('draw called, overlayCanvas:', overlayCanvas?.width, 'x', overlayCanvas?.height, 'ctx:', !!ctx);
-    if (!overlayCanvas || !ctx) return;
-    
-    // Clear overlay and redraw saved annotations + current stroke
-    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-    drawAnnotations(ctx);
+    // Draw directly on the PDF canvas (incremental drawing - no re-render)
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    console.log('draw called, canvas:', canvas?.width, 'x', canvas?.height, 'ctx:', !!ctx);
+    if (!canvas || !ctx) return;
     
     // Draw current stroke
-    if (currentStroke.length > 0) {
-      ctx.save();
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      switch (activeTool) {
-        case 'pen':
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = '#000000';
-          ctx.lineWidth = pdfDoc ? 3 * scale : 3;
-          break;
-        case 'highlight':
-          ctx.globalCompositeOperation = 'multiply';
-          ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
-          ctx.lineWidth = pdfDoc ? 20 * scale : 20;
-          break;
-        case 'eraser':
-          ctx.globalCompositeOperation = 'destination-out';
-          ctx.lineWidth = pdfDoc ? 20 * scale : 20;
-          break;
-      }
-      
-      ctx.beginPath();
-      [...currentStroke, coords].forEach((point, index) => {
-        if (pdfDoc) {
-          const scaledX = point.x * scale;
-          const scaledY = point.y * scale;
-          if (index === 0) {
-            ctx.moveTo(scaledX, scaledY);
-          } else {
-            ctx.lineTo(scaledX, scaledY);
-          }
-        } else {
-          if (index === 0) {
-            ctx.moveTo(point.x, point.y);
-          } else {
-            ctx.lineTo(point.x, point.y);
-          }
-        }
-      });
-      ctx.stroke();
-      ctx.restore();
+    // Draw incrementally - just draw a line from previous point to current point
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    switch (activeTool) {
+      case 'pen':
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = pdfDoc ? 3 * scale : 3;
+        break;
+      case 'highlight':
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.strokeStyle = 'rgba(255, 255, 0, 0.5)';
+        ctx.lineWidth = pdfDoc ? 20 * scale : 20;
+        break;
+      case 'eraser':
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.lineWidth = pdfDoc ? 20 * scale : 20;
+        break;
     }
+    
+    ctx.beginPath();
+    if (pdfDoc) {
+      ctx.moveTo(prevCoords.x * scale, prevCoords.y * scale);
+      ctx.lineTo(coords.x * scale, coords.y * scale);
+    } else {
+      ctx.moveTo(prevCoords.x, prevCoords.y);
+      ctx.lineTo(coords.x, coords.y);
+    }
+    ctx.stroke();
+    ctx.restore();
     
     e.preventDefault();
     e.stopPropagation();
@@ -678,30 +664,20 @@ export function PDFAnnotatorPage() {
           {pdfDoc ? (
             // PDF.js direct rendering with overlay canvas
             <div className="flex justify-center items-start p-4">
-              <div className="relative">
-                {/* PDF Canvas (background) */}
-                <canvas
-                  ref={canvasRef}
-                  className="border border-gray-300 bg-white shadow-lg"
-                  style={{
-                    maxWidth: '100%',
-                    maxHeight: '100%'
-                  }}
-                />
-                {/* Overlay Canvas for annotations (on top) */}
-                <canvas
-                  ref={overlayCanvasRef}
-                  className="absolute top-0 left-0"
-                  style={{
-                    cursor: activeTool === 'text' ? 'text' : 'crosshair',
-                    pointerEvents: 'auto'
-                  }}
-                  onMouseDown={startDrawing}
-                  onMouseMove={draw}
-                  onMouseUp={stopDrawing}
-                  onMouseLeave={stopDrawing}
-                />
-              </div>
+              {/* PDF Canvas with direct drawing */}
+              <canvas
+                ref={canvasRef}
+                className="border border-gray-300 bg-white shadow-lg"
+                style={{
+                  cursor: activeTool === 'text' ? 'text' : 'crosshair',
+                  maxWidth: '100%',
+                  maxHeight: '100%'
+                }}
+                onMouseDown={startDrawing}
+                onMouseMove={draw}
+                onMouseUp={stopDrawing}
+                onMouseLeave={stopDrawing}
+              />
             </div>
           ) : (
             // Fallback iframe with simple annotation overlay
