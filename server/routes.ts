@@ -842,6 +842,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Upload the annotated image if provided
       if (req.file) {
+        const objectStorageService = new ObjectStorageService();
         const fileId = crypto.randomUUID();
         const privateDir = objectStorageService.getPrivateObjectDir();
         const objectPath = `${privateDir}/uploads/${fileId}`;
