@@ -77,6 +77,9 @@ function ReviewerPDFAnnotatorContent({
   const overlayCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const fabricCanvasRefs = useRef<Map<number, fabric.Canvas>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const initialLoadRef = useRef(false);
   
   const { toast } = useToast();
 
@@ -84,12 +87,40 @@ function ReviewerPDFAnnotatorContent({
     if (existingAnnotations) {
       try {
         const parsed = JSON.parse(existingAnnotations);
-        setAnnotations(parsed);
+        if (parsed.length > 0) {
+          setAnnotations(parsed);
+          initialLoadRef.current = true;
+        }
       } catch (e) {
         console.error('Failed to parse existing annotations:', e);
       }
     }
   }, [existingAnnotations]);
+
+  useEffect(() => {
+    if (isViewOnly) return;
+    if (annotations.length === 0) return;
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      return;
+    }
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setAutoSaveStatus('saving');
+        await onSave(JSON.stringify(annotations));
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      } catch {
+        setAutoSaveStatus('idle');
+      }
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [annotations, isViewOnly, onSave]);
 
   useEffect(() => {
     const loadPDF = async () => {
@@ -363,6 +394,11 @@ function ReviewerPDFAnnotatorContent({
             {assignmentTitle && <p className="text-sm text-gray-600">Assignment: {assignmentTitle}</p>}
           </div>
           <div className="flex items-center gap-2">
+            {autoSaveStatus !== 'idle' && (
+              <span className="text-xs text-gray-500">
+                {autoSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
+              </span>
+            )}
             {!isViewOnly && (
               <Button
                 onClick={handleSave}

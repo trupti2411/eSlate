@@ -938,6 +938,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post('/api/submissions/auto-save-annotations', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'student') {
+        return res.status(403).json({ message: "Only students can save annotations" });
+      }
+      const student = await storage.getStudentByUserId(user.id);
+      if (!student) {
+        return res.status(404).json({ message: "Student profile not found" });
+      }
+      const { assignmentId, annotations } = req.body;
+      if (!assignmentId) {
+        return res.status(400).json({ message: "Assignment ID is required" });
+      }
+      const existingSubmissions = await storage.getStudentSubmissions(student.id);
+      const existingSubmission = existingSubmissions.find(s => s.assignmentId === assignmentId);
+      let submission;
+      if (existingSubmission) {
+        submission = await storage.updateSubmission(existingSubmission.id, {
+          annotations: annotations || null,
+        });
+      } else {
+        const submissionData = {
+          assignmentId,
+          studentId: student.id,
+          documentUrl: null,
+          annotations: annotations || null,
+          status: 'draft' as const,
+        };
+        const validatedData = insertSubmissionSchema.parse(submissionData);
+        submission = await storage.createSubmission(validatedData);
+      }
+      res.json(submission);
+    } catch (error) {
+      console.error("Error auto-saving annotations:", error);
+      res.status(500).json({ message: "Failed to auto-save annotations" });
+    }
+  });
+
   // Update submission
   app.patch('/api/submissions/:id', isAuthenticated, async (req: any, res: any) => {
     try {

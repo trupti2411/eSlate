@@ -109,6 +109,9 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
   const penColor = '#000000';
   const penWidth = 2;
   const MIN_DISTANCE = 4;
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const initialLoadRef = useRef(false);
   
   const studentId = providedStudentId || (user?.id ? `student-${user.id}` : '');
 
@@ -147,6 +150,9 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
         }
       });
       setCurrentStrokes(prev => ({ ...prev, ...strokesMap }));
+      if (Object.keys(answersMap).length > 0 || Object.keys(strokesMap).length > 0) {
+        initialLoadRef.current = true;
+      }
       requestAnimationFrame(() => {
         Object.entries(strokesMap).forEach(([qId, strokes]) => {
           const canvas = canvasRefs.current[qId];
@@ -200,6 +206,46 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
       toast({ title: 'Failed to submit worksheet', variant: 'destructive' });
     },
   });
+
+  useEffect(() => {
+    if (!worksheetId || !studentId) return;
+    if (initialLoadRef.current) {
+      initialLoadRef.current = false;
+      return;
+    }
+    const hasContent = Object.values(answers).some(a => a.textAnswer || a.selectedOption) ||
+      Object.values(currentStrokes).some(s => s.length > 0);
+    if (!hasContent) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setAutoSaveStatus('saving');
+        const allQuestions = worksheet?.pages.flatMap(p => p.questions) || [];
+        for (const question of allQuestions) {
+          const answer = answers[question.id];
+          const strokes = currentStrokes[question.id];
+          if (answer?.textAnswer || answer?.selectedOption || (strokes && strokes.length > 0)) {
+            await apiRequest(`/api/worksheets/${worksheetId}/answers`, 'POST', {
+              questionId: question.id,
+              studentId,
+              textAnswer: answer?.textAnswer,
+              selectedOption: answer?.selectedOption,
+              handwritingData: strokes ? JSON.stringify(strokes) : undefined,
+            });
+          }
+        }
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      } catch {
+        setAutoSaveStatus('idle');
+      }
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [answers, currentStrokes, worksheetId, studentId, worksheet]);
 
   const handleSaveAnswer = useCallback(async (questionId: string) => {
     const answer = answers[questionId];
@@ -622,6 +668,11 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {autoSaveStatus !== 'idle' && (
+            <span className="text-xs text-gray-500">
+              {autoSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
+            </span>
+          )}
           <div className="text-xs text-muted-foreground flex items-center gap-1.5">
             <CheckCircle2 className="h-3.5 w-3.5" />
             {progress.answered}/{progress.total} answered

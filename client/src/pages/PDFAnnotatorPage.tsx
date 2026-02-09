@@ -82,6 +82,9 @@ export function PDFAnnotatorPage() {
   const annotationsRef = useRef<StudentAnnotation[]>([]);
   
   annotationsRef.current = annotations;
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const initialLoadRef = useRef(0);
 
   const { toast } = useToast();
 
@@ -124,8 +127,41 @@ export function PDFAnnotatorPage() {
   useEffect(() => {
     if (existingSubmission?.annotations && Array.isArray(existingSubmission.annotations)) {
       setAnnotations(existingSubmission.annotations);
+      initialLoadRef.current = existingSubmission.annotations.length;
     }
   }, [existingSubmission]);
+
+  useEffect(() => {
+    if (annotations.length === 0 || !assignmentId) return;
+    if (initialLoadRef.current > 0) {
+      initialLoadRef.current = 0;
+      return;
+    }
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(async () => {
+      try {
+        setAutoSaveStatus('saving');
+        await fetch('/api/submissions/auto-save-annotations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            assignmentId,
+            annotations: JSON.stringify(annotations),
+          }),
+          credentials: 'include',
+        });
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      } catch {
+        setAutoSaveStatus('idle');
+      }
+    }, 2000);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+  }, [annotations, assignmentId]);
 
   useEffect(() => {
     if (!pdfUrl) return;
@@ -558,6 +594,11 @@ export function PDFAnnotatorPage() {
         )}
 
         <div className="flex items-center gap-1">
+          {autoSaveStatus !== 'idle' && (
+            <span className="text-xs text-gray-500 mr-1">
+              {autoSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
+            </span>
+          )}
           <Button
             variant="outline"
             size="sm"
