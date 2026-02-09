@@ -29,7 +29,7 @@ interface StudentAnnotation {
   type: 'stroke' | 'text';
   pageNum: number;
   stroke?: StrokeData;
-  fabricJSON?: any; // Legacy Fabric.js format for backward compatibility
+  fabricJSON?: any;
   text?: string;
   x?: number;
   y?: number;
@@ -69,6 +69,7 @@ export function PDFAnnotatorPage() {
   const [numPages, setNumPages] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDrawing, setIsDrawing] = useState(false);
+  const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -78,10 +79,12 @@ export function PDFAnnotatorPage() {
   const lastPointRef = useRef<Point | null>(null);
   const rafRef = useRef<number>(0);
   const isDrawingRef = useRef(false);
+  const annotationsRef = useRef<StudentAnnotation[]>([]);
   
+  annotationsRef.current = annotations;
+
   const { toast } = useToast();
 
-  // Window-level pointer up handler to prevent stuck drawing state
   useEffect(() => {
     const handleGlobalPointerUp = () => {
       if (isDrawingRef.current) {
@@ -173,20 +176,20 @@ export function PDFAnnotatorPage() {
     ctx.restore();
   }, []);
 
-  const redrawAnnotations = useCallback(() => {
+  const redrawAnnotations = useCallback((pageNum: number, currentScale: number) => {
     const canvas = drawCanvasRef.current;
-    if (!canvas) return;
+    if (!canvas || canvas.width === 0) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const pageAnnotations = annotations.filter(a => a.pageNum === currentPage);
+    const pageAnnotations = annotationsRef.current.filter(a => a.pageNum === pageNum);
     
     for (const annotation of pageAnnotations) {
       if (annotation.type === 'stroke' && (annotation.stroke || annotation.fabricJSON)) {
         const savedScale = annotation.scale || 1.2;
-        const scaleRatio = scale / savedScale;
+        const scaleRatio = currentScale / savedScale;
         let strokeData = annotation.stroke;
         if (!strokeData && annotation.fabricJSON) {
           strokeData = convertFabricToStroke(annotation.fabricJSON) || undefined;
@@ -196,7 +199,7 @@ export function PDFAnnotatorPage() {
         }
       } else if (annotation.type === 'text' && annotation.text) {
         const savedScale = annotation.scale || 1.2;
-        const scaleRatio = scale / savedScale;
+        const scaleRatio = currentScale / savedScale;
         ctx.save();
         ctx.font = `${16 * scaleRatio}px Arial`;
         ctx.fillStyle = '#000000';
@@ -204,49 +207,53 @@ export function PDFAnnotatorPage() {
         ctx.restore();
       }
     }
-  }, [annotations, currentPage, scale, drawStroke]);
-
-  const renderPDFPage = useCallback(async (pageNum: number) => {
-    if (!pdfDocRef.current) return;
-    
-    try {
-      const page = await pdfDocRef.current.getPage(pageNum);
-      const viewport = page.getViewport({ scale });
-      const pdfCanvas = pdfCanvasRef.current;
-      const drawCanvas = drawCanvasRef.current;
-
-      if (pdfCanvas) {
-        pdfCanvas.width = viewport.width;
-        pdfCanvas.height = viewport.height;
-        const ctx = pdfCanvas.getContext('2d');
-        if (ctx) {
-          await page.render({
-            canvasContext: ctx,
-            viewport: viewport,
-            canvas: pdfCanvas
-          } as any).promise;
-        }
-      }
-
-      if (drawCanvas) {
-        drawCanvas.width = viewport.width;
-        drawCanvas.height = viewport.height;
-      }
-    } catch (error) {
-      console.error(`Error rendering page ${pageNum}:`, error);
-    }
-  }, [scale]);
+  }, [drawStroke]);
 
   useEffect(() => {
     if (!pdfLoaded || !pdfDocRef.current || numPages === 0) return;
     
-    const timer = setTimeout(async () => {
-      await renderPDFPage(currentPage);
-      requestAnimationFrame(() => redrawAnnotations());
-    }, 50);
+    let cancelled = false;
+    const renderPage = async () => {
+      try {
+        const page = await pdfDocRef.current!.getPage(currentPage);
+        const viewport = page.getViewport({ scale });
+        
+        if (cancelled) return;
+        
+        const pdfCanvas = pdfCanvasRef.current;
+        const drawCanvas = drawCanvasRef.current;
+
+        if (pdfCanvas) {
+          pdfCanvas.width = viewport.width;
+          pdfCanvas.height = viewport.height;
+          const ctx = pdfCanvas.getContext('2d');
+          if (ctx) {
+            await page.render({
+              canvasContext: ctx,
+              viewport: viewport,
+              canvas: pdfCanvas
+            } as any).promise;
+          }
+        }
+
+        if (drawCanvas && !cancelled) {
+          drawCanvas.width = viewport.width;
+          drawCanvas.height = viewport.height;
+          setCanvasSize({ width: viewport.width, height: viewport.height });
+        }
+      } catch (error) {
+        if (!cancelled) console.error(`Error rendering page ${currentPage}:`, error);
+      }
+    };
     
-    return () => clearTimeout(timer);
-  }, [pdfLoaded, numPages, currentPage, scale, renderPDFPage, redrawAnnotations]);
+    renderPage();
+    return () => { cancelled = true; };
+  }, [pdfLoaded, numPages, currentPage, scale]);
+
+  useEffect(() => {
+    if (canvasSize.width === 0) return;
+    redrawAnnotations(currentPage, scale);
+  }, [annotations, canvasSize, redrawAnnotations, currentPage, scale]);
 
   const getPointerPos = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = drawCanvasRef.current!;
@@ -275,21 +282,7 @@ export function PDFAnnotatorPage() {
     lastPointRef.current = point;
     isDrawingRef.current = true;
     setIsDrawing(true);
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    
-    const settings = getToolSettings(activeTool);
-    ctx.save();
-    ctx.globalCompositeOperation = settings.compositeOp as GlobalCompositeOperation;
-    ctx.strokeStyle = settings.color;
-    ctx.lineWidth = settings.width;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(point.x, point.y);
-    ctx.restore();
-  }, [activeTool, getPointerPos, getToolSettings]);
+  }, [activeTool, getPointerPos]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !activeTool || activeTool === 'text') return;
@@ -305,6 +298,7 @@ export function PDFAnnotatorPage() {
     if (dx * dx + dy * dy < 4) return;
     
     currentStrokeRef.current.push(point);
+    const prevPoint = lastPoint;
     lastPointRef.current = point;
     
     cancelAnimationFrame(rafRef.current);
@@ -315,6 +309,7 @@ export function PDFAnnotatorPage() {
       if (!ctx) return;
       
       const settings = getToolSettings(activeTool);
+      ctx.save();
       ctx.globalCompositeOperation = settings.compositeOp as GlobalCompositeOperation;
       ctx.strokeStyle = settings.color;
       ctx.lineWidth = settings.width;
@@ -322,9 +317,10 @@ export function PDFAnnotatorPage() {
       ctx.lineJoin = 'round';
       
       ctx.beginPath();
-      ctx.moveTo(lastPoint.x, lastPoint.y);
+      ctx.moveTo(prevPoint.x, prevPoint.y);
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
+      ctx.restore();
     });
   }, [isDrawing, activeTool, getPointerPos, getToolSettings]);
 
@@ -398,11 +394,6 @@ export function PDFAnnotatorPage() {
 
   const clearAnnotations = () => {
     setAnnotations(prev => prev.filter(a => a.pageNum !== currentPage));
-    const canvas = drawCanvasRef.current;
-    if (canvas) {
-      const ctx = canvas.getContext('2d');
-      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
   };
 
   const handleZoomIn = () => setScale(s => Math.min(s + 0.25, 3));
@@ -506,7 +497,6 @@ export function PDFAnnotatorPage() {
 
   return (
     <div className="h-screen flex flex-col bg-white select-none" style={{ touchAction: 'manipulation' }}>
-      {/* Toolbar */}
       <div className="flex items-center justify-between p-2 border-b-2 border-black bg-white">
         <div className="flex items-center gap-1">
           <Button
@@ -593,7 +583,6 @@ export function PDFAnnotatorPage() {
         </div>
       </div>
 
-      {/* PDF + Drawing Canvas */}
       <div
         className="flex-1 overflow-auto bg-gray-100"
         ref={containerRef}
@@ -606,15 +595,21 @@ export function PDFAnnotatorPage() {
         ) : (
           <div className="flex justify-center p-4">
             <div 
-              className="relative inline-block"
+              className="relative inline-block border-2 border-black"
               onClick={handleCanvasClick}
               style={{
                 cursor: activeTool === 'text' ? 'text' : activeTool ? 'crosshair' : 'default',
+                width: canvasSize.width > 0 ? `${canvasSize.width}px` : undefined,
+                height: canvasSize.height > 0 ? `${canvasSize.height}px` : undefined,
               }}
             >
               <canvas
                 ref={pdfCanvasRef}
-                className="border-2 border-black bg-white block"
+                className="bg-white block"
+                style={{
+                  width: '100%',
+                  height: '100%',
+                }}
               />
               <canvas
                 ref={drawCanvasRef}
@@ -622,7 +617,8 @@ export function PDFAnnotatorPage() {
                 style={{
                   touchAction: 'none',
                   pointerEvents: activeTool ? 'auto' : 'none',
-                  willChange: activeTool ? 'contents' : 'auto',
+                  width: '100%',
+                  height: '100%',
                 }}
                 onPointerDown={handlePointerDown}
                 onPointerMove={handlePointerMove}
