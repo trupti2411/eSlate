@@ -102,10 +102,13 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
   const [showSubmitDialog, setShowSubmitDialog] = useState(false);
   const canvasRefs = useRef<Record<string, HTMLCanvasElement | null>>({});
   const [currentStrokes, setCurrentStrokes] = useState<Record<string, Stroke[]>>({});
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
-  const [penColor] = useState('#000000');
-  const [penWidth] = useState(2);
+  const isDrawingRef = useRef(false);
+  const currentStrokeRef = useRef<Stroke | null>(null);
+  const activeQuestionRef = useRef<string | null>(null);
+  const lastPointRef = useRef<Point | null>(null);
+  const penColor = '#000000';
+  const penWidth = 2;
+  const MIN_DISTANCE = 4;
   
   const studentId = providedStudentId || (user?.id ? `student-${user.id}` : '');
 
@@ -132,15 +135,39 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
       setAnswers(answersMap);
       setSavedAnswerIds(savedIds);
       
+      const strokesMap: Record<string, Stroke[]> = {};
       savedAnswers.forEach(answer => {
         if (answer.handwritingData) {
           try {
             const strokes = JSON.parse(answer.handwritingData);
-            setCurrentStrokes(prev => ({ ...prev, [answer.questionId]: strokes }));
+            strokesMap[answer.questionId] = strokes;
           } catch (e) {
             console.error('Failed to parse handwriting data');
           }
         }
+      });
+      setCurrentStrokes(prev => ({ ...prev, ...strokesMap }));
+      requestAnimationFrame(() => {
+        Object.entries(strokesMap).forEach(([qId, strokes]) => {
+          const canvas = canvasRefs.current[qId];
+          if (!canvas) return;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          strokes.forEach(stroke => {
+            if (stroke.points.length < 2) return;
+            ctx.strokeStyle = stroke.color;
+            ctx.lineWidth = stroke.width;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+            for (let i = 1; i < stroke.points.length; i++) {
+              ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+            }
+            ctx.stroke();
+          });
+        });
       });
     }
   }, [savedAnswers]);
@@ -256,70 +283,86 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
     return canvas.getContext('2d');
   };
 
-  const startDrawing = (questionId: string, e: React.MouseEvent | React.TouchEvent) => {
+  const getPointerPos = useCallback((e: React.PointerEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement): Point => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (e.clientX - rect.left) * scaleX,
+      y: (e.clientY - rect.top) * scaleY,
+    };
+  }, []);
+
+  const handlePointerDown = useCallback((questionId: string, e: React.PointerEvent<HTMLCanvasElement>) => {
     if (inputMode !== 'draw') return;
     
     const canvas = canvasRefs.current[questionId];
     if (!canvas) return;
 
-    setIsDrawing(true);
-    
-    const rect = canvas.getBoundingClientRect();
-    const point = 'touches' in e 
-      ? { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top }
-      : { x: e.clientX - rect.left, y: e.clientY - rect.top };
-    
-    setCurrentStroke({
+    e.preventDefault();
+    (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
+
+    const point = getPointerPos(e, canvas);
+    isDrawingRef.current = true;
+    activeQuestionRef.current = questionId;
+    lastPointRef.current = point;
+    currentStrokeRef.current = {
       points: [point],
       color: penColor,
       width: penWidth,
-    });
-  };
+    };
 
-  const draw = (questionId: string, e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || inputMode !== 'draw' || !currentStroke) return;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.strokeStyle = penColor;
+      ctx.lineWidth = penWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+    }
+  }, [inputMode, getPointerPos, penColor, penWidth]);
+
+  const handlePointerMove = useCallback((questionId: string, e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (!isDrawingRef.current || activeQuestionRef.current !== questionId) return;
 
     const canvas = canvasRefs.current[questionId];
     if (!canvas) return;
 
-    const ctx = getCanvasContext(questionId);
-    if (!ctx) return;
+    const point = getPointerPos(e, canvas);
+    const last = lastPointRef.current;
+    if (last) {
+      const dx = point.x - last.x;
+      const dy = point.y - last.y;
+      if (dx * dx + dy * dy < MIN_DISTANCE * MIN_DISTANCE) return;
+    }
 
-    const rect = canvas.getBoundingClientRect();
-    const point = 'touches' in e 
-      ? { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top }
-      : { x: e.clientX - rect.left, y: e.clientY - rect.top };
-
-    const newStroke = {
-      ...currentStroke,
-      points: [...currentStroke.points, point],
-    };
-    setCurrentStroke(newStroke);
-
-    ctx.strokeStyle = penColor;
-    ctx.lineWidth = penWidth;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    if (currentStroke.points.length > 0) {
-      const lastPoint = currentStroke.points[currentStroke.points.length - 1];
+    const ctx = canvas.getContext('2d');
+    if (ctx && last) {
       ctx.beginPath();
-      ctx.moveTo(lastPoint.x, lastPoint.y);
+      ctx.moveTo(last.x, last.y);
       ctx.lineTo(point.x, point.y);
       ctx.stroke();
     }
-  };
 
-  const stopDrawing = (questionId: string) => {
-    if (!isDrawing || !currentStroke) return;
+    lastPointRef.current = point;
+    currentStrokeRef.current?.points.push(point);
+  }, [getPointerPos, MIN_DISTANCE]);
 
-    setIsDrawing(false);
-    setCurrentStrokes(prev => ({
-      ...prev,
-      [questionId]: [...(prev[questionId] || []), currentStroke],
-    }));
-    setCurrentStroke(null);
-  };
+  const handlePointerUp = useCallback((questionId: string) => {
+    if (!isDrawingRef.current || activeQuestionRef.current !== questionId) return;
+
+    isDrawingRef.current = false;
+    activeQuestionRef.current = null;
+    lastPointRef.current = null;
+
+    const stroke = currentStrokeRef.current;
+    if (stroke && stroke.points.length > 0) {
+      setCurrentStrokes(prev => ({
+        ...prev,
+        [questionId]: [...(prev[questionId] || []), stroke],
+      }));
+    }
+    currentStrokeRef.current = null;
+  }, []);
 
   const clearCanvas = (questionId: string) => {
     const canvas = canvasRefs.current[questionId];
@@ -329,38 +372,6 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     setCurrentStrokes(prev => ({ ...prev, [questionId]: [] }));
   };
-
-  const redrawCanvas = useCallback((questionId: string) => {
-    const canvas = canvasRefs.current[questionId];
-    const ctx = getCanvasContext(questionId);
-    if (!canvas || !ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    const strokes = currentStrokes[questionId] || [];
-    strokes.forEach(stroke => {
-      if (stroke.points.length < 2) return;
-      
-      ctx.strokeStyle = stroke.color;
-      ctx.lineWidth = stroke.width;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      ctx.beginPath();
-      ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-      
-      for (let i = 1; i < stroke.points.length; i++) {
-        ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-      }
-      ctx.stroke();
-    });
-  }, [currentStrokes]);
-
-  useEffect(() => {
-    Object.keys(currentStrokes).forEach(questionId => {
-      redrawCanvas(questionId);
-    });
-  }, [currentStrokes, redrawCanvas]);
 
   if (isLoading) {
     return (
@@ -547,14 +558,12 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
                       ref={(el) => { canvasRefs.current[question.id] = el; }}
                       width={600}
                       height={question.questionType === 'long_text' || question.questionType === 'text_image' ? 300 : 150}
-                      className="w-full touch-none cursor-crosshair"
-                      onMouseDown={(e) => startDrawing(question.id, e)}
-                      onMouseMove={(e) => draw(question.id, e)}
-                      onMouseUp={() => stopDrawing(question.id)}
-                      onMouseLeave={() => stopDrawing(question.id)}
-                      onTouchStart={(e) => { e.preventDefault(); startDrawing(question.id, e); }}
-                      onTouchMove={(e) => { e.preventDefault(); draw(question.id, e); }}
-                      onTouchEnd={() => stopDrawing(question.id)}
+                      className="w-full cursor-crosshair"
+                      style={{ touchAction: 'none' }}
+                      onPointerDown={(e) => handlePointerDown(question.id, e)}
+                      onPointerMove={(e) => handlePointerMove(question.id, e)}
+                      onPointerUp={() => handlePointerUp(question.id)}
+                      onPointerCancel={() => handlePointerUp(question.id)}
                       data-testid={`canvas-answer-${question.id}`}
                     />
                   </div>
