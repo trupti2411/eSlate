@@ -23,7 +23,7 @@ interface StudentAnnotation {
   x?: number;
   y?: number;
   toolType: 'pen' | 'highlight' | 'eraser' | 'text';
-  scale?: number; // Scale at which annotation was created
+  scale?: number;
 }
 
 export function PDFAnnotatorPage() {
@@ -42,14 +42,22 @@ export function PDFAnnotatorPage() {
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const fabricCanvasRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const annotationsRef = useRef<StudentAnnotation[]>([]);
+  const scaleRef = useRef(scale);
+  const currentPageRef = useRef(currentPage);
+  const activeToolRef = useRef<Tool>(null);
   
   const { toast } = useToast();
+
+  useEffect(() => { annotationsRef.current = annotations; }, [annotations]);
+  useEffect(() => { scaleRef.current = scale; }, [scale]);
+  useEffect(() => { currentPageRef.current = currentPage; }, [currentPage]);
+  useEffect(() => { activeToolRef.current = activeTool; }, [activeTool]);
 
   const urlParams = new URLSearchParams(window.location.search);
   const assignmentId = urlParams.get('assignmentId') || '';
   const pdfUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
 
-  // Load existing submission/annotations for this assignment
   const { data: existingSubmission } = useQuery({
     queryKey: ['/api/assignments', assignmentId, 'my-submission'],
     queryFn: async () => {
@@ -65,7 +73,6 @@ export function PDFAnnotatorPage() {
     enabled: !!assignmentId
   });
 
-  // Load saved annotations when submission data is available
   useEffect(() => {
     if (existingSubmission?.annotations && Array.isArray(existingSubmission.annotations)) {
       setAnnotations(existingSubmission.annotations);
@@ -122,40 +129,53 @@ export function PDFAnnotatorPage() {
         overlayCanvas.height = viewport.height;
         
         if (!fabricCanvasRef.current) {
-          console.log('Creating new Fabric canvas with dimensions:', viewport.width, 'x', viewport.height);
           const newCanvas = new FabricCanvas(overlayCanvas, {
             width: viewport.width,
             height: viewport.height,
             isDrawingMode: false,
             preserveObjectStacking: true,
-            selection: true,
+            selection: false,
+            renderOnAddRemove: false,
+            enableRetinaScaling: false,
           });
-          newCanvas.freeDrawingBrush = new PencilBrush(newCanvas);
+
+          const brush = new PencilBrush(newCanvas);
+          brush.decimate = 4;
+          brush.strokeLineCap = 'round';
+          brush.strokeLineJoin = 'round';
+          newCanvas.freeDrawingBrush = brush;
+          
           fabricCanvasRef.current = newCanvas;
-          console.log('Fabric canvas created:', !!newCanvas, 'brush:', !!newCanvas.freeDrawingBrush);
           
           const wrapper = newCanvas.wrapperEl;
-          console.log('Fabric wrapper:', !!wrapper);
           if (wrapper) {
             wrapper.style.position = 'absolute';
             wrapper.style.top = '0';
             wrapper.style.left = '0';
             wrapper.style.zIndex = '10';
             wrapper.style.pointerEvents = 'none';
+            wrapper.style.touchAction = 'none';
+          }
+
+          const upperCanvas = newCanvas.upperCanvasEl;
+          if (upperCanvas) {
+            upperCanvas.style.touchAction = 'none';
+            upperCanvas.style.willChange = 'transform';
           }
           
           newCanvas.on('path:created', (e: any) => {
-            console.log('Path created event fired');
             const path = e.path;
             if (!path) return;
             
+            path.objectCaching = false;
+
             const newAnnotation: StudentAnnotation = {
               id: `stroke-${Date.now()}`,
               type: 'stroke',
-              pageNum: currentPage,
-              toolType: 'pen',
+              pageNum: currentPageRef.current,
+              toolType: activeToolRef.current as 'pen' | 'highlight' | 'eraser' || 'pen',
               fabricJSON: path.toJSON(),
-              scale: scale // Store current scale
+              scale: scaleRef.current
             };
             
             setAnnotations(prev => [...prev, newAnnotation]);
@@ -163,7 +183,7 @@ export function PDFAnnotatorPage() {
         } else {
           fabricCanvasRef.current.setWidth(viewport.width);
           fabricCanvasRef.current.setHeight(viewport.height);
-          fabricCanvasRef.current.renderAll();
+          fabricCanvasRef.current.requestRenderAll();
         }
       }
     } catch (error) {
@@ -176,7 +196,6 @@ export function PDFAnnotatorPage() {
     
     const timer = setTimeout(async () => {
       await renderPDFPage(currentPage);
-      // Re-render annotations after canvas is ready
       setTimeout(() => {
         renderAnnotationsOnCanvas();
       }, 50);
@@ -187,70 +206,53 @@ export function PDFAnnotatorPage() {
 
   useEffect(() => {
     const fabricCanvas = fabricCanvasRef.current;
-    console.log('Tool effect - activeTool:', activeTool, 'fabricCanvas exists:', !!fabricCanvas);
     if (!fabricCanvas) return;
 
     if (activeTool === 'pen') {
       fabricCanvas.isDrawingMode = true;
-      console.log('Pen mode - isDrawingMode:', fabricCanvas.isDrawingMode, 'brush:', !!fabricCanvas.freeDrawingBrush);
+      fabricCanvas.selection = false;
       if (fabricCanvas.freeDrawingBrush) {
         fabricCanvas.freeDrawingBrush.color = '#000000';
-        fabricCanvas.freeDrawingBrush.width = 3;
+        fabricCanvas.freeDrawingBrush.width = 2;
+        fabricCanvas.freeDrawingBrush.decimate = 4;
       }
     } else if (activeTool === 'highlight') {
       fabricCanvas.isDrawingMode = true;
+      fabricCanvas.selection = false;
       if (fabricCanvas.freeDrawingBrush) {
         fabricCanvas.freeDrawingBrush.color = 'rgba(255, 255, 0, 0.5)';
-        fabricCanvas.freeDrawingBrush.width = 20;
+        fabricCanvas.freeDrawingBrush.width = 16;
+        fabricCanvas.freeDrawingBrush.decimate = 6;
       }
     } else if (activeTool === 'eraser') {
       fabricCanvas.isDrawingMode = true;
+      fabricCanvas.selection = false;
       if (fabricCanvas.freeDrawingBrush) {
         fabricCanvas.freeDrawingBrush.color = '#FFFFFF';
-        fabricCanvas.freeDrawingBrush.width = 20;
+        fabricCanvas.freeDrawingBrush.width = 16;
+        fabricCanvas.freeDrawingBrush.decimate = 6;
       }
     } else {
       fabricCanvas.isDrawingMode = false;
     }
     
     const wrapper = fabricCanvas.wrapperEl;
-    console.log('Wrapper element:', !!wrapper, 'setting pointerEvents:', activeTool ? 'auto' : 'none');
     if (wrapper) {
       wrapper.style.position = 'absolute';
       wrapper.style.top = '0';
       wrapper.style.left = '0';
       wrapper.style.zIndex = '10';
       wrapper.style.pointerEvents = activeTool ? 'auto' : 'none';
+      wrapper.style.touchAction = activeTool ? 'none' : 'auto';
+    }
+
+    const upperCanvas = fabricCanvas.upperCanvasEl;
+    if (upperCanvas) {
+      upperCanvas.style.touchAction = activeTool ? 'none' : 'auto';
     }
     
-    fabricCanvas.renderAll();
+    fabricCanvas.requestRenderAll();
   }, [activeTool]);
-
-  useEffect(() => {
-    const fabricCanvas = fabricCanvasRef.current;
-    if (!fabricCanvas) return;
-
-    const handlePathCreated = (e: any) => {
-      const path = e.path;
-      if (!path) return;
-      
-      const newAnnotation: StudentAnnotation = {
-        id: `stroke-${Date.now()}`,
-        type: 'stroke',
-        pageNum: currentPage,
-        toolType: activeTool as 'pen' | 'highlight' | 'eraser',
-        fabricJSON: path.toJSON()
-      };
-      
-      setAnnotations(prev => [...prev, newAnnotation]);
-    };
-
-    fabricCanvas.on('path:created', handlePathCreated);
-    
-    return () => {
-      fabricCanvas.off('path:created', handlePathCreated);
-    };
-  }, [currentPage, activeTool]);
 
   const renderAnnotationsOnCanvas = useCallback(() => {
     const fabricCanvas = fabricCanvasRef.current;
@@ -259,11 +261,17 @@ export function PDFAnnotatorPage() {
     fabricCanvas.clear();
     
     const pageAnnotations = annotations.filter(a => a.pageNum === currentPage);
+    let pending = pageAnnotations.length;
+    
+    if (pending === 0) {
+      fabricCanvas.requestRenderAll();
+      return;
+    }
+
     for (const annotation of pageAnnotations) {
       if (annotation.type === 'stroke' && annotation.fabricJSON) {
         Path.fromObject(annotation.fabricJSON).then((path: any) => {
-          // Scale the path if it was created at a different scale
-          const savedScale = annotation.scale || 1.2; // Default to 1.2 if not saved
+          const savedScale = annotation.scale || 1.2;
           if (savedScale !== scale) {
             const scaleRatio = scale / savedScale;
             path.scaleX = (path.scaleX || 1) * scaleRatio;
@@ -272,8 +280,10 @@ export function PDFAnnotatorPage() {
             path.top = (path.top || 0) * scaleRatio;
             path.setCoords();
           }
+          path.objectCaching = false;
           fabricCanvas.add(path);
-          fabricCanvas.renderAll();
+          pending--;
+          if (pending <= 0) fabricCanvas.requestRenderAll();
         });
       } else if (annotation.type === 'text' && annotation.text) {
         const savedScale = annotation.scale || 1.2;
@@ -284,13 +294,15 @@ export function PDFAnnotatorPage() {
           fontSize: 16 * scaleRatio,
           fill: '#000000',
           fontFamily: 'Arial',
-          selectable: true,
-          evented: true
+          selectable: false,
+          evented: false,
+          objectCaching: false
         });
         fabricCanvas.add(text);
+        pending--;
+        if (pending <= 0) fabricCanvas.requestRenderAll();
       }
     }
-    fabricCanvas.renderAll();
   }, [annotations, currentPage, scale]);
 
   useEffect(() => {
@@ -315,11 +327,12 @@ export function PDFAnnotatorPage() {
         fontSize: 16,
         fill: '#000000',
         fontFamily: 'Arial',
-        selectable: true,
-        evented: true
+        selectable: false,
+        evented: false,
+        objectCaching: false
       });
       fabricCanvas.add(textObj);
-      fabricCanvas.renderAll();
+      fabricCanvas.requestRenderAll();
       
       const newAnnotation: StudentAnnotation = {
         id: `text-${Date.now()}`,
@@ -328,7 +341,8 @@ export function PDFAnnotatorPage() {
         text,
         x,
         y,
-        toolType: 'text'
+        toolType: 'text',
+        scale: scale
       };
       setAnnotations(prev => [...prev, newAnnotation]);
     }
@@ -441,115 +455,127 @@ export function PDFAnnotatorPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-white">
-      {/* Toolbar */}
-      <div className="flex items-center justify-between p-3 border-b bg-gray-50">
-        <div className="flex items-center gap-2">
+    <div className="h-screen flex flex-col bg-white" style={{ touchAction: 'manipulation' }}>
+      {/* Toolbar - larger touch targets for e-ink devices */}
+      <div className="flex items-center justify-between p-2 border-b-2 border-black bg-white">
+        <div className="flex items-center gap-1">
           <Button
             variant={activeTool === 'pen' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveTool(activeTool === 'pen' ? null : 'pen')}
+            className="min-w-[44px] min-h-[44px]"
             title="Pen"
           >
-            <Pen className="h-4 w-4" />
+            <Pen className="h-5 w-5" />
           </Button>
           <Button
             variant={activeTool === 'highlight' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveTool(activeTool === 'highlight' ? null : 'highlight')}
+            className="min-w-[44px] min-h-[44px]"
             title="Highlighter"
           >
-            <Highlighter className="h-4 w-4" />
+            <Highlighter className="h-5 w-5" />
           </Button>
           <Button
             variant={activeTool === 'eraser' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveTool(activeTool === 'eraser' ? null : 'eraser')}
+            className="min-w-[44px] min-h-[44px]"
             title="Eraser"
           >
-            <Eraser className="h-4 w-4" />
+            <Eraser className="h-5 w-5" />
           </Button>
           <Button
             variant={activeTool === 'text' ? 'default' : 'outline'}
             size="sm"
             onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')}
+            className="min-w-[44px] min-h-[44px]"
             title="Text"
           >
-            <Type className="h-4 w-4" />
+            <Type className="h-5 w-5" />
           </Button>
-          <div className="w-px h-6 bg-gray-300 mx-2" />
-          <Button variant="outline" size="sm" onClick={handleZoomOut} title="Zoom Out">
-            <ZoomOut className="h-4 w-4" />
+          <div className="w-px h-8 bg-black mx-1" />
+          <Button variant="outline" size="sm" onClick={handleZoomOut} title="Zoom Out" className="min-w-[44px] min-h-[44px]">
+            <ZoomOut className="h-5 w-5" />
           </Button>
-          <span className="text-sm text-gray-600 min-w-[50px] text-center">{Math.round(scale * 100)}%</span>
-          <Button variant="outline" size="sm" onClick={handleZoomIn} title="Zoom In">
-            <ZoomIn className="h-4 w-4" />
+          <span className="text-sm font-bold text-black min-w-[50px] text-center">{Math.round(scale * 100)}%</span>
+          <Button variant="outline" size="sm" onClick={handleZoomIn} title="Zoom In" className="min-w-[44px] min-h-[44px]">
+            <ZoomIn className="h-5 w-5" />
           </Button>
-          <div className="w-px h-6 bg-gray-300 mx-2" />
-          <Button variant="outline" size="sm" onClick={clearAnnotations} title="Clear Page">
-            <RotateCcw className="h-4 w-4" />
+          <div className="w-px h-8 bg-black mx-1" />
+          <Button variant="outline" size="sm" onClick={clearAnnotations} title="Clear Page" className="min-w-[44px] min-h-[44px]">
+            <RotateCcw className="h-5 w-5" />
           </Button>
         </div>
 
-        {/* Page Navigation */}
         {numPages > 1 && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={currentPage === 1}>
-              <ChevronLeft className="h-4 w-4" />
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={currentPage === 1} className="min-w-[44px] min-h-[44px]">
+              <ChevronLeft className="h-5 w-5" />
             </Button>
-            <span className="text-sm">Page {currentPage} of {numPages}</span>
-            <Button variant="outline" size="sm" onClick={goToNextPage} disabled={currentPage === numPages}>
-              <ChevronRight className="h-4 w-4" />
+            <span className="text-sm font-bold">Page {currentPage}/{numPages}</span>
+            <Button variant="outline" size="sm" onClick={goToNextPage} disabled={currentPage === numPages} className="min-w-[44px] min-h-[44px]">
+              <ChevronRight className="h-5 w-5" />
             </Button>
           </div>
         )}
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
           <Button
             variant="outline"
             size="sm"
             onClick={() => saveSubmission.mutate('draft')}
             disabled={isSaving || isSubmitting}
+            className="min-w-[44px] min-h-[44px]"
           >
-            <Save className="h-4 w-4 mr-1" />
-            {isSaving ? 'Saving...' : 'Save Draft'}
+            <Save className="h-5 w-5 mr-1" />
+            {isSaving ? 'Saving...' : 'Save'}
           </Button>
           <Button
             size="sm"
             onClick={() => saveSubmission.mutate('submitted')}
             disabled={isSaving || isSubmitting}
+            className="min-w-[44px] min-h-[44px]"
           >
-            <Send className="h-4 w-4 mr-1" />
-            {isSubmitting ? 'Submitting...' : 'Submit'}
+            <Send className="h-5 w-5 mr-1" />
+            {isSubmitting ? '...' : 'Submit'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleClose}>
-            <X className="h-4 w-4" />
+          <Button variant="ghost" size="sm" onClick={handleClose} className="min-w-[44px] min-h-[44px]">
+            <X className="h-5 w-5" />
           </Button>
         </div>
       </div>
 
       {/* PDF Viewer with Fabric.js Overlay */}
-      <div className="flex-1 overflow-auto bg-gray-200" ref={containerRef}>
+      <div
+        className="flex-1 overflow-auto bg-gray-100"
+        ref={containerRef}
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {!pdfLoaded ? (
           <div className="flex items-center justify-center h-full">
-            <p className="text-gray-600">Loading PDF...</p>
+            <p className="text-black font-bold">Loading PDF...</p>
           </div>
         ) : (
           <div className="flex justify-center p-4">
             <div 
               className="relative inline-block"
               onClick={handleCanvasClick}
-              style={{ cursor: activeTool === 'text' ? 'text' : activeTool ? 'crosshair' : 'default' }}
+              style={{
+                cursor: activeTool === 'text' ? 'text' : activeTool ? 'crosshair' : 'default',
+                touchAction: activeTool ? 'none' : 'auto'
+              }}
             >
-              {/* PDF Canvas (background) */}
               <canvas
                 ref={pdfCanvasRef}
-                className="border border-gray-300 bg-white shadow-lg block"
+                className="border-2 border-black bg-white block"
+                style={{ touchAction: 'none' }}
               />
-              {/* Fabric.js Overlay Canvas */}
               <canvas
                 ref={overlayCanvasRef}
                 className="absolute top-0 left-0"
+                style={{ touchAction: 'none' }}
               />
             </div>
           </div>
