@@ -4804,41 +4804,35 @@ Good luck with your assignment!"
     try {
       const { assignmentId } = req.params;
       
-      // Get assignment to find the PDF URL
       const assignment = await storage.getAssignment(assignmentId);
       if (!assignment) {
         return res.status(404).json({ error: 'Assignment not found' });
       }
       
-      // Get the first attachment URL (assuming it's the PDF)
       const pdfUrl = assignment.attachmentUrls?.[0];
       if (!pdfUrl) {
         return res.status(404).json({ error: 'No PDF attachment found' });
       }
       
-      // Extract object path from Google Cloud Storage URL
-      const match = pdfUrl.match(/googleapis\.com\/([^\/]+)\/(.+)$/);
-      if (!match) {
-        return res.status(400).json({ error: 'Invalid PDF URL format' });
-      }
-      
-      const bucketName = match[1];
-      const objectName = match[2];
-      
-      console.log(`Serving PDF: gs://${bucketName}/${objectName}`);
-      
       try {
-        // Get the file from Google Cloud Storage using the authenticated client
-        const bucket = objectStorageClient.bucket(bucketName);
-        const file = bucket.file(objectName);
+        const objectStorageService = new ObjectStorageService();
+        let file;
         
-        // Check if file exists
-        const [exists] = await file.exists();
-        if (!exists) {
-          return res.status(404).json({ error: 'PDF file not found in storage' });
+        if (pdfUrl.startsWith('/objects/')) {
+          file = await objectStorageService.getObjectEntityFile(pdfUrl);
+        } else {
+          const match = pdfUrl.match(/googleapis\.com\/([^\/]+)\/(.+)$/);
+          if (!match) {
+            return res.status(400).json({ error: 'Invalid PDF URL format' });
+          }
+          const bucket = objectStorageClient.bucket(match[1]);
+          file = bucket.file(match[2]);
+          const [exists] = await file.exists();
+          if (!exists) {
+            return res.status(404).json({ error: 'PDF file not found in storage' });
+          }
         }
         
-        // Get file metadata
         const [metadata] = await file.getMetadata();
         
         // Set appropriate headers
