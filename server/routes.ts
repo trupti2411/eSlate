@@ -3498,6 +3498,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/admin/company-settings', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Company admin access required" });
+      }
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
+      
+      const [company] = await db.select({
+        tutorChatEnabled: tutoringCompanies.tutorChatEnabled,
+      }).from(tutoringCompanies).where(eq(tutoringCompanies.id, companyAdmin.companyId));
+      
+      res.json(company || { tutorChatEnabled: true });
+    } catch (error) {
+      console.error("Error fetching company settings:", error);
+      res.status(500).json({ message: "Failed to fetch company settings" });
+    }
+  });
+
   app.patch('/api/admin/company-settings', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
@@ -3557,10 +3577,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
       if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
       
-      const { userId, roleLabel } = req.body;
+      const { email, userId, roleLabel } = req.body;
+      let targetUserId = userId;
+      
+      if (email && !userId) {
+        const targetUser = await storage.getUserByEmail(email);
+        if (!targetUser) {
+          return res.status(404).json({ message: "No user found with that email address. The staff member must have an account first." });
+        }
+        targetUserId = targetUser.id;
+      }
+      
+      if (!targetUserId) {
+        return res.status(400).json({ message: "Please provide an email or userId" });
+      }
+
+      const existing = await db.select().from(companySupportContacts)
+        .where(eq(companySupportContacts.companyId, companyAdmin.companyId));
+      if (existing.some(c => c.userId === targetUserId)) {
+        return res.status(400).json({ message: "This person is already a support contact." });
+      }
+      
       const [contact] = await db.insert(companySupportContacts).values({
         companyId: companyAdmin.companyId,
-        userId,
+        userId: targetUserId,
         roleLabel: roleLabel || 'Support',
       }).returning();
       

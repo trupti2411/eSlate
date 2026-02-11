@@ -16,7 +16,7 @@ import { StudentProfileDialog } from "@/components/StudentProfileDialog";
 import { CompanyCalendarDashboard } from "@/components/calendar";
 import AcademicManagement from "./AcademicManagement";
 import { AssignmentManagement } from "@/pages/assignments/AssignmentManagement";
-import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3, Download, AlertCircle, ClipboardCheck, Pencil } from "lucide-react";
+import { Building2, Users, Plus, GraduationCap, CheckCircle, UserPlus, Eye, Mail, Phone, MapPin, BookOpen, Calendar, Edit, FileText, ArrowRight, Home, LayoutDashboard, Trash2, X, Clock, TrendingUp, Activity, Target, Award, ChevronDown, ChevronRight, Layers, Settings, Bell, BarChart3, Download, AlertCircle, ClipboardCheck, Pencil, MessageCircle, ToggleLeft, ToggleRight, Shield, UserCheck, Loader2 } from "lucide-react";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import { ReviewerPDFAnnotator } from "@/components/ReviewerPDFAnnotator";
 import { WorksheetReviewer } from "@/components/WorksheetReviewer";
@@ -174,6 +174,219 @@ const reportIcons: Record<string, any> = {
   tutor_workload: Users,
   enrollment_trends: TrendingUp,
 };
+
+function ChatSettingsSection({ companyId, tutors }: { companyId?: string; tutors?: CompanyTutor[] }) {
+  const { toast } = useToast();
+  const [addContactEmail, setAddContactEmail] = useState("");
+  const [addContactRole, setAddContactRole] = useState("");
+
+  const { data: companySettings } = useQuery<{ tutorChatEnabled: boolean }>({
+    queryKey: ['/api/admin/company-settings', companyId],
+    enabled: !!companyId,
+  });
+
+  const { data: supportContacts, isLoading: contactsLoading } = useQuery<any[]>({
+    queryKey: ['/api/admin/support-contacts'],
+    enabled: !!companyId,
+  });
+
+  const toggleChatMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const res = await apiRequest("PATCH", "/api/admin/company-settings", { tutorChatEnabled: enabled });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/company-settings', companyId] });
+      toast({ title: "Updated", description: "Tutor chat setting updated successfully." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update setting.", variant: "destructive" });
+    },
+  });
+
+  const addContactMutation = useMutation({
+    mutationFn: async (data: { email: string; roleLabel: string }) => {
+      const res = await apiRequest("POST", "/api/admin/support-contacts", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/support-contacts'] });
+      setAddContactEmail("");
+      setAddContactRole("");
+      toast({ title: "Added", description: "Support contact added successfully." });
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to add contact.", variant: "destructive" });
+    },
+  });
+
+  const removeContactMutation = useMutation({
+    mutationFn: async (contactId: string) => {
+      const res = await apiRequest("DELETE", `/api/admin/support-contacts/${contactId}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/support-contacts'] });
+      toast({ title: "Removed", description: "Support contact removed." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove contact.", variant: "destructive" });
+    },
+  });
+
+  const chatEnabled = companySettings?.tutorChatEnabled !== false;
+
+  if (!companyId) return null;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <MessageCircle className="h-6 w-6" />
+          Chat & Communication Settings
+        </h2>
+        <p className="text-gray-600 mt-1">Control how parents communicate with tutors and support staff</p>
+      </div>
+
+      <Card className="border-2 border-gray-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Shield className="h-5 w-5" />
+            Tutor Chat Availability
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border">
+            <div className="flex-1">
+              <h4 className="font-semibold text-gray-900">Allow Parents to Chat with Tutors</h4>
+              <p className="text-sm text-gray-600 mt-1">
+                {chatEnabled
+                  ? "Parents can send messages directly to tutors assigned to their children."
+                  : "Parent-to-tutor chat is disabled. Parents will see a message to contact the coaching centre instead."}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="lg"
+              onClick={() => toggleChatMutation.mutate(!chatEnabled)}
+              disabled={toggleChatMutation.isPending}
+              className={`ml-4 min-w-[120px] ${chatEnabled ? 'bg-green-50 border-green-300 text-green-700 hover:bg-green-100' : 'bg-red-50 border-red-300 text-red-700 hover:bg-red-100'}`}
+            >
+              {toggleChatMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : chatEnabled ? (
+                <ToggleRight className="h-5 w-5 mr-2" />
+              ) : (
+                <ToggleLeft className="h-5 w-5 mr-2" />
+              )}
+              {chatEnabled ? "Enabled" : "Disabled"}
+            </Button>
+          </div>
+          {!chatEnabled && (
+            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-sm text-amber-800">
+                <AlertCircle className="h-4 w-4 inline mr-1" />
+                Parents will see "Tutor is not available for chat - please contact the coaching centre" when they try to message a tutor.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-2 border-gray-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <UserCheck className="h-5 w-5" />
+            Support Contacts for Parents
+          </CardTitle>
+          <p className="text-sm text-gray-500">
+            Add admin or support staff who will be available to chat with parents. These contacts appear in the parent messaging panel.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-3 items-end">
+            <div className="flex-1">
+              <Label htmlFor="contact-email" className="text-sm font-medium">Staff Email</Label>
+              <Input
+                id="contact-email"
+                placeholder="Enter staff member's email address"
+                value={addContactEmail}
+                onChange={(e) => setAddContactEmail(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <div className="w-48">
+              <Label htmlFor="contact-role" className="text-sm font-medium">Role Label</Label>
+              <Input
+                id="contact-role"
+                placeholder="e.g. Admin, Support"
+                value={addContactRole}
+                onChange={(e) => setAddContactRole(e.target.value)}
+                className="mt-1"
+              />
+            </div>
+            <Button
+              onClick={() => {
+                if (!addContactEmail.trim() || !addContactRole.trim()) {
+                  toast({ title: "Missing info", description: "Please enter both email and role.", variant: "destructive" });
+                  return;
+                }
+                addContactMutation.mutate({ email: addContactEmail.trim(), roleLabel: addContactRole.trim() });
+              }}
+              disabled={addContactMutation.isPending}
+              className="bg-black text-white hover:bg-gray-800"
+            >
+              {addContactMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4 mr-1" />}
+              Add
+            </Button>
+          </div>
+
+          {contactsLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
+            </div>
+          ) : supportContacts && supportContacts.length > 0 ? (
+            <div className="border rounded-lg divide-y">
+              {supportContacts.map((contact: any) => (
+                <div key={contact.id} className="flex items-center justify-between p-3 hover:bg-gray-50">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <UserCheck className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-900">{contact.firstName} {contact.lastName}</p>
+                      <p className="text-sm text-gray-500">{contact.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                      {contact.roleLabel}
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeContactMutation.mutate(contact.id)}
+                      disabled={removeContactMutation.isPending}
+                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+              <UserCheck className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+              <p className="font-medium">No support contacts added yet</p>
+              <p className="text-sm mt-1">Add staff members who should be available to chat with parents</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function ReportsSection({ companyId, company }: { companyId: string; company?: TutoringCompany | null }) {
   const { toast } = useToast();
@@ -2780,7 +2993,10 @@ export default function CompanyDashboard() {
 
       {mainTab === 'settings' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <NotificationSettings userRole="company_admin" />
+          <div className="space-y-8">
+            <ChatSettingsSection companyId={companyAdmin?.companyId} tutors={tutors} />
+            <NotificationSettings userRole="company_admin" />
+          </div>
         </div>
       )}
 
