@@ -92,8 +92,8 @@ export default function MessageCenter() {
 
   // Get potential contacts based on user role
   const { data: contacts, isLoading: contactsLoading } = useQuery({
-    queryKey: ["/api/students"],
-    enabled: !!user && (user.role === 'tutor' || user.role === 'parent'),
+    queryKey: ["/api/messaging/contacts"],
+    enabled: !!user,
   });
 
   // Get messages with selected contact
@@ -199,18 +199,21 @@ export default function MessageCenter() {
               {contacts.map((contact: any) => (
                 <button
                   key={contact.id}
-                  onClick={() => setSelectedContact(contact.userId)}
+                  onClick={() => setSelectedContact(contact.id)}
                   className={`w-full p-3 text-left border-2 rounded transition-colors ${
-                    selectedContact === contact.userId
+                    selectedContact === contact.id
                       ? 'bg-black text-white border-black'
                       : 'bg-white text-black border-black hover:bg-gray-50'
                   }`}
                 >
                   <div className="font-semibold">
-                    {contact.user?.firstName} {contact.user?.lastName}
+                    {contact.firstName} {contact.lastName}
+                  </div>
+                  <div className="text-xs opacity-75">
+                    {contact.label}
                   </div>
                   <div className="text-sm opacity-75">
-                    {contact.user?.email}
+                    {contact.email}
                   </div>
                 </button>
               ))}

@@ -18,7 +18,8 @@ import {
 import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { assignments, submissions } from "@shared/schema";
+import { eq } from "drizzle-orm";
+import { assignments, submissions, students, parents, tutors, users } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Report generation helper functions
@@ -1503,6 +1504,106 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error serving file:", error);
       res.status(500).json({ message: "Failed to serve file" });
+    }
+  });
+
+  // Messaging contacts - role-appropriate contact list
+  app.get('/api/messaging/contacts', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const contacts: any[] = [];
+
+      if (user.role === 'parent') {
+        const parent = await storage.getParentByUserId(user.id);
+        if (parent) {
+          const children = await storage.getParentChildrenWithProgress(parent.id);
+          const seenTutorUserIds = new Set<string>();
+          for (const child of children) {
+            if (child.tutorInfo && child.tutorInfo.userId && !seenTutorUserIds.has(child.tutorInfo.userId)) {
+              seenTutorUserIds.add(child.tutorInfo.userId);
+              contacts.push({
+                id: child.tutorInfo.userId,
+                firstName: child.tutorInfo.firstName,
+                lastName: child.tutorInfo.lastName,
+                email: child.tutorInfo.email,
+                role: 'tutor',
+                label: `Tutor - ${child.tutorInfo.specialization || 'General'}`,
+              });
+            }
+          }
+        }
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (tutor) {
+          const tutorStudents = await db.select({
+            userId: students.userId,
+            parentId: students.parentId,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+          })
+          .from(students)
+          .leftJoin(users, eq(students.userId, users.id))
+          .where(eq(students.tutorId, tutor.id));
+
+          const seenIds = new Set<string>();
+          for (const s of tutorStudents) {
+            if (s.userId && !seenIds.has(s.userId)) {
+              seenIds.add(s.userId);
+              contacts.push({
+                id: s.userId,
+                firstName: s.firstName,
+                lastName: s.lastName,
+                email: s.email,
+                role: 'student',
+                label: 'Student',
+              });
+            }
+            if (s.parentId) {
+              const parentRecord = await db.select({
+                userId: parents.userId,
+              }).from(parents).where(eq(parents.id, s.parentId));
+              if (parentRecord[0]?.userId && !seenIds.has(parentRecord[0].userId)) {
+                seenIds.add(parentRecord[0].userId);
+                const parentUser = await storage.getUser(parentRecord[0].userId);
+                if (parentUser) {
+                  contacts.push({
+                    id: parentUser.id,
+                    firstName: parentUser.firstName,
+                    lastName: parentUser.lastName,
+                    email: parentUser.email,
+                    role: 'parent',
+                    label: `Parent of ${s.firstName} ${s.lastName}`,
+                  });
+                }
+              }
+            }
+          }
+        }
+      } else if (user.role === 'student') {
+        const student = await storage.getStudentByUserId(user.id);
+        if (student && student.tutorId) {
+          const tutor = await storage.getTutor(student.tutorId);
+          if (tutor) {
+            const tutorUser = await storage.getUser(tutor.userId);
+            if (tutorUser) {
+              contacts.push({
+                id: tutorUser.id,
+                firstName: tutorUser.firstName,
+                lastName: tutorUser.lastName,
+                email: tutorUser.email,
+                role: 'tutor',
+                label: `Tutor - ${tutor.specialization || 'General'}`,
+              });
+            }
+          }
+        }
+      }
+
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching messaging contacts:", error);
+      res.status(500).json({ message: "Failed to fetch contacts" });
     }
   });
 
