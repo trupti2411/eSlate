@@ -95,7 +95,7 @@ import {
   type InsertReportExport,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, or, desc, isNull, sql, arrayContains, inArray, ne } from "drizzle-orm";
+import { eq, and, or, desc, asc, gt, isNull, sql, arrayContains, inArray, ne } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (supports both Replit Auth and Custom Auth)
@@ -574,7 +574,6 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getParentChildrenWithProgress(parentId: string): Promise<any[]> {
-    // Get all students linked to this parent with user info
     const studentData = await db.select({
       id: students.id,
       userId: students.userId,
@@ -596,21 +595,58 @@ export class DatabaseStorage implements IStorage {
     .leftJoin(users, eq(students.userId, users.id))
     .where(eq(students.parentId, parentId));
 
-    // For each student, get their assignments and submissions
     const childrenWithProgress = await Promise.all(
       studentData.map(async (student) => {
-        // Get class info if assigned
         let classInfo = null;
         if (student.classId) {
           const [classData] = await db.select({
             id: classes.id,
             name: classes.name,
             subject: classes.subject,
+            description: classes.description,
+            location: classes.location,
+            startTime: classes.startTime,
+            endTime: classes.endTime,
+            daysOfWeek: classes.daysOfWeek,
+            dayOfWeek: classes.dayOfWeek,
+            maxStudents: classes.maxStudents,
           }).from(classes).where(eq(classes.id, student.classId));
-          classInfo = classData;
+          classInfo = classData || null;
         }
 
-        // Get assignments for this student's class
+        let tutorInfo = null;
+        if (student.tutorId) {
+          const tutorData = await db.select({
+            id: tutors.id,
+            userId: tutors.userId,
+            specialization: tutors.specialization,
+            qualifications: tutors.qualifications,
+            branch: tutors.branch,
+            subjectsTeaching: tutors.subjectsTeaching,
+            firstName: users.firstName,
+            lastName: users.lastName,
+            email: users.email,
+            profileImageUrl: users.profileImageUrl,
+          })
+          .from(tutors)
+          .leftJoin(users, eq(tutors.userId, users.id))
+          .where(eq(tutors.id, student.tutorId));
+          tutorInfo = tutorData[0] || null;
+        }
+
+        let companyInfo = null;
+        if (student.companyId) {
+          const [companyData] = await db.select({
+            id: tutoringCompanies.id,
+            name: tutoringCompanies.name,
+            description: tutoringCompanies.description,
+            contactEmail: tutoringCompanies.contactEmail,
+            contactPhone: tutoringCompanies.contactPhone,
+            address: tutoringCompanies.address,
+          }).from(tutoringCompanies).where(eq(tutoringCompanies.id, student.companyId));
+          companyInfo = companyData || null;
+        }
+
         const studentAssignments = student.classId 
           ? await db.select({
               id: assignments.id,
@@ -627,40 +663,96 @@ export class DatabaseStorage implements IStorage {
             .orderBy(desc(assignments.createdAt))
           : [];
 
-        // Get all submissions for this student
         const studentSubmissions = await db.select({
           id: submissions.id,
           assignmentId: submissions.assignmentId,
           status: submissions.status,
           submittedAt: submissions.submittedAt,
           isLate: submissions.isLate,
+          score: submissions.score,
+          feedback: submissions.feedback,
+          gradedAt: submissions.gradedAt,
           createdAt: submissions.createdAt,
         })
         .from(submissions)
         .where(eq(submissions.studentId, student.id))
         .orderBy(desc(submissions.createdAt));
 
-        // Calculate progress stats
         const totalAssignments = studentAssignments.length;
         const submittedCount = studentSubmissions.filter(s => s.status !== 'draft').length;
         const gradedCount = studentSubmissions.filter(s => s.status === 'graded' || s.status === 'parent_verified').length;
         const pendingCount = totalAssignments - submittedCount;
 
-        // Enrich assignments with submission status
         const assignmentsWithStatus = studentAssignments.map(assignment => {
           const submission = studentSubmissions.find(s => s.assignmentId === assignment.id);
           return {
             ...assignment,
-            submission: submission || null,
+            submission: submission ? {
+              id: submission.id,
+              status: submission.status,
+              submittedAt: submission.submittedAt,
+              isLate: submission.isLate,
+              score: submission.score,
+              feedback: submission.feedback,
+              gradedAt: submission.gradedAt,
+            } : null,
             submissionStatus: submission?.status || 'not_started',
           };
         });
 
+        const pastTestAttempts = await db.select({
+          id: testAttempts.id,
+          testId: testAttempts.testId,
+          status: testAttempts.status,
+          totalScore: testAttempts.totalScore,
+          percentageScore: testAttempts.percentageScore,
+          isPassed: testAttempts.isPassed,
+          feedback: testAttempts.feedback,
+          submittedAt: testAttempts.submittedAt,
+          gradedAt: testAttempts.gradedAt,
+          testTitle: tests.title,
+          testSubject: tests.subject,
+          testTotalPoints: tests.totalPoints,
+          testPassingScore: tests.passingScore,
+        })
+        .from(testAttempts)
+        .leftJoin(tests, eq(testAttempts.testId, tests.id))
+        .where(eq(testAttempts.studentId, student.id))
+        .orderBy(desc(testAttempts.submittedAt));
+
+        let upcomingTests: any[] = [];
+        if (student.classId) {
+          const now = new Date();
+          upcomingTests = await db.select({
+            id: tests.id,
+            title: tests.title,
+            subject: tests.subject,
+            description: tests.description,
+            dueDate: tests.dueDate,
+            duration: tests.duration,
+            totalPoints: tests.totalPoints,
+            passingScore: tests.passingScore,
+          })
+          .from(tests)
+          .where(
+            and(
+              eq(tests.classId, student.classId),
+              eq(tests.status, 'published'),
+              gt(tests.dueDate, now)
+            )
+          )
+          .orderBy(asc(tests.dueDate));
+        }
+
         return {
           ...student,
           classInfo,
+          tutorInfo,
+          companyInfo,
           assignments: assignmentsWithStatus,
           submissions: studentSubmissions,
+          testResults: pastTestAttempts,
+          upcomingTests,
           progress: {
             totalAssignments,
             submittedCount,
@@ -1506,7 +1598,10 @@ export class DatabaseStorage implements IStorage {
       if (classInfo.tutorId) {
         const tutor = await this.getTutor(classInfo.tutorId);
         if (tutor) {
-          tutorName = `${tutor.firstName} ${tutor.lastName}`;
+          const tutorUser = await this.getUser(tutor.userId);
+          if (tutorUser) {
+            tutorName = `${tutorUser.firstName} ${tutorUser.lastName}`;
+          }
         }
       }
       return { ...classInfo, tutorName };
