@@ -99,14 +99,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   // Update student mutation
   const updateStudentMutation = useMutation({
     mutationFn: async (data: Partial<Student>) => {
-      console.log("Sending PATCH request with data:", data);
-      const response = await apiRequest("PATCH", `/api/students/${studentId}`, data);
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Update failed:", response.status, errorText);
-        throw new Error(`Failed to update: ${response.status} ${errorText}`);
-      }
-      return response.json();
+      return await apiRequest(`/api/students/${studentId}`, "PATCH", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });

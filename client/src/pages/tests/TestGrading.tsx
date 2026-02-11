@@ -60,7 +60,7 @@ export default function TestGrading() {
         isCorrect: grade.pointsAwarded > 0,
       }));
       
-      return apiRequest("POST", `/api/tests/attempts/${attemptId}/grade`, {
+      return apiRequest(`/api/tests/attempts/${attemptId}/grade`, "POST", {
         answerGrades: grades,
         feedback: overallFeedback,
       });

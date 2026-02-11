@@ -110,8 +110,7 @@ export default function MessageCenter() {
 
   const sendMessageMutation = useMutation({
     mutationFn: async (messageData: { receiverId: string; content: string }) => {
-      const response = await apiRequest("POST", "/api/messages", messageData);
-      return await response.json();
+      return await apiRequest("/api/messages", "POST", messageData);
     },
     onSuccess: (newMessage) => {
       setMessageContent("");

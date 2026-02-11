@@ -126,7 +126,7 @@ export default function TestManagement() {
   // Create test mutation
   const createTestMutation = useMutation({
     mutationFn: async (data: TestFormData) => {
-      return apiRequest("POST", `/api/companies/${companyId}/tests`, data);
+      return apiRequest(`/api/companies/${companyId}/tests`, "POST", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'tests'] });
@@ -142,7 +142,7 @@ export default function TestManagement() {
   // Update test mutation
   const updateTestMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<TestFormData> }) => {
-      return apiRequest("PATCH", `/api/tests/${id}`, data);
+      return apiRequest(`/api/tests/${id}`, "PATCH", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'tests'] });
@@ -159,7 +159,7 @@ export default function TestManagement() {
   // Delete test mutation
   const deleteTestMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/tests/${id}`);
+      return apiRequest(`/api/tests/${id}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'tests'] });
@@ -173,7 +173,7 @@ export default function TestManagement() {
   // Create question mutation
   const createQuestionMutation = useMutation({
     mutationFn: async (data: QuestionFormData) => {
-      return apiRequest("POST", `/api/tests/${selectedTest?.id}/questions`, data);
+      return apiRequest(`/api/tests/${selectedTest?.id}/questions`, "POST", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tests', selectedTest?.id] });
@@ -200,7 +200,7 @@ export default function TestManagement() {
   // Update question mutation
   const updateQuestionMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<QuestionFormData> }) => {
-      return apiRequest("PATCH", `/api/tests/questions/${id}`, data);
+      return apiRequest(`/api/tests/questions/${id}`, "PATCH", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tests', selectedTest?.id] });
@@ -216,7 +216,7 @@ export default function TestManagement() {
   // Delete question mutation
   const deleteQuestionMutation = useMutation({
     mutationFn: async (id: string) => {
-      return apiRequest("DELETE", `/api/tests/questions/${id}`);
+      return apiRequest(`/api/tests/questions/${id}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tests', selectedTest?.id] });
@@ -230,7 +230,7 @@ export default function TestManagement() {
   // Assign test mutation
   const assignTestMutation = useMutation({
     mutationFn: async ({ testId, studentIds, classId, dueDate }: { testId: string; studentIds?: string[]; classId?: string; dueDate?: string }) => {
-      return apiRequest("POST", `/api/tests/${testId}/assign`, { studentIds, classId, dueDate });
+      return apiRequest(`/api/tests/${testId}/assign`, "POST", { studentIds, classId, dueDate });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tests', selectedTest?.id, 'assignments'] });

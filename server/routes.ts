@@ -3046,6 +3046,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get tutor profile by userId
+  app.get('/api/tutors/:userId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { userId } = req.params;
+      const tutor = await storage.getTutorByUserId(userId);
+      if (!tutor) {
+        return res.status(404).json({ message: "Tutor not found" });
+      }
+      res.json(tutor);
+    } catch (error) {
+      console.error("Error fetching tutor:", error);
+      res.status(500).json({ message: "Failed to fetch tutor" });
+    }
+  });
+
   // Update tutor endpoint
   app.patch('/api/tutors/:tutorId', isAuthenticated, async (req: any, res: any) => {
     try {

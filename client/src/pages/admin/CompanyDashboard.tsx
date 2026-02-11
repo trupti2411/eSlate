@@ -192,8 +192,7 @@ function ChatSettingsSection({ companyId, tutors }: { companyId?: string; tutors
 
   const toggleChatMutation = useMutation({
     mutationFn: async (enabled: boolean) => {
-      const res = await apiRequest("PATCH", "/api/admin/company-settings", { tutorChatEnabled: enabled });
-      return res.json();
+      return await apiRequest("/api/admin/company-settings", "PATCH", { tutorChatEnabled: enabled });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/company-settings', companyId] });
@@ -206,8 +205,7 @@ function ChatSettingsSection({ companyId, tutors }: { companyId?: string; tutors
 
   const addContactMutation = useMutation({
     mutationFn: async (data: { email: string; roleLabel: string }) => {
-      const res = await apiRequest("POST", "/api/admin/support-contacts", data);
-      return res.json();
+      return await apiRequest("/api/admin/support-contacts", "POST", data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/support-contacts'] });
@@ -222,8 +220,7 @@ function ChatSettingsSection({ companyId, tutors }: { companyId?: string; tutors
 
   const removeContactMutation = useMutation({
     mutationFn: async (contactId: string) => {
-      const res = await apiRequest("DELETE", `/api/admin/support-contacts/${contactId}`);
-      return res.json();
+      return await apiRequest(`/api/admin/support-contacts/${contactId}`, "DELETE");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/support-contacts'] });
@@ -406,8 +403,7 @@ function ReportsSection({ companyId, company }: { companyId: string; company?: T
 
   const runReportMutation = useMutation({
     mutationFn: async (data: { companyId: string; reportType: string; name: string; parameters?: any }) => {
-      const response = await apiRequest('POST', '/api/reports/run', data);
-      return response.json();
+      return await apiRequest('/api/reports/run', 'POST', data);
     },
     onSuccess: (data) => {
       toast({ title: 'Report generated successfully' });
