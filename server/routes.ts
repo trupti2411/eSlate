@@ -19,7 +19,7 @@ import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
 import { eq } from "drizzle-orm";
-import { assignments, submissions, students, parents, tutors, users } from "@shared/schema";
+import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Report generation helper functions
@@ -1518,7 +1518,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (parent) {
           const children = await storage.getParentChildrenWithProgress(parent.id);
           const seenTutorUserIds = new Set<string>();
+          const seenCompanyIds = new Set<string>();
           for (const child of children) {
+            const chatEnabled = child.companyInfo?.tutorChatEnabled !== false;
             if (child.tutorInfo && child.tutorInfo.userId && !seenTutorUserIds.has(child.tutorInfo.userId)) {
               seenTutorUserIds.add(child.tutorInfo.userId);
               contacts.push({
@@ -1528,7 +1530,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 email: child.tutorInfo.email,
                 role: 'tutor',
                 label: `Tutor - ${child.tutorInfo.specialization || 'General'}`,
+                chatEnabled,
               });
+            }
+            if (child.companyId && !seenCompanyIds.has(child.companyId)) {
+              seenCompanyIds.add(child.companyId);
+              const supportContacts = await db.select({
+                id: companySupportContacts.id,
+                userId: companySupportContacts.userId,
+                roleLabel: companySupportContacts.roleLabel,
+                firstName: users.firstName,
+                lastName: users.lastName,
+                email: users.email,
+              })
+              .from(companySupportContacts)
+              .leftJoin(users, eq(companySupportContacts.userId, users.id))
+              .where(eq(companySupportContacts.companyId, child.companyId));
+              
+              for (const sc of supportContacts) {
+                if (sc.userId && !seenTutorUserIds.has(sc.userId)) {
+                  seenTutorUserIds.add(sc.userId);
+                  contacts.push({
+                    id: sc.userId,
+                    firstName: sc.firstName,
+                    lastName: sc.lastName,
+                    email: sc.email,
+                    role: 'support',
+                    label: sc.roleLabel || 'Support',
+                    chatEnabled: true,
+                  });
+                }
+              }
             }
           }
         }
@@ -1626,6 +1658,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const senderId = user.id;
+
+      if (user.role === 'parent') {
+        const receiverId = req.body.receiverId;
+        const receiverTutor = await storage.getTutorByUserId(receiverId);
+        if (receiverTutor && receiverTutor.companyId) {
+          const [company] = await db.select({ tutorChatEnabled: tutoringCompanies.tutorChatEnabled })
+            .from(tutoringCompanies).where(eq(tutoringCompanies.id, receiverTutor.companyId));
+          if (company && company.tutorChatEnabled === false) {
+            return res.status(403).json({ message: "Tutor chat has been disabled by the coaching centre. Please contact them directly." });
+          }
+        }
+      }
 
       const validatedData = insertMessageSchema.parse({
         ...req.body,
@@ -3451,6 +3495,101 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching company admin:", error);
       res.status(500).json({ message: "Failed to fetch company admin" });
+    }
+  });
+
+  app.patch('/api/admin/company-settings', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Company admin access required" });
+      }
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
+      
+      const { tutorChatEnabled } = req.body;
+      await db.update(tutoringCompanies)
+        .set({ tutorChatEnabled, updatedAt: new Date() })
+        .where(eq(tutoringCompanies.id, companyAdmin.companyId));
+      
+      res.json({ message: "Settings updated" });
+    } catch (error) {
+      console.error("Error updating company settings:", error);
+      res.status(500).json({ message: "Failed to update settings" });
+    }
+  });
+
+  app.get('/api/admin/support-contacts', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Company admin access required" });
+      }
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
+      
+      const contacts = await db.select({
+        id: companySupportContacts.id,
+        userId: companySupportContacts.userId,
+        roleLabel: companySupportContacts.roleLabel,
+        isActive: companySupportContacts.isActive,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        email: users.email,
+      })
+      .from(companySupportContacts)
+      .leftJoin(users, eq(companySupportContacts.userId, users.id))
+      .where(eq(companySupportContacts.companyId, companyAdmin.companyId));
+      
+      res.json(contacts);
+    } catch (error) {
+      console.error("Error fetching support contacts:", error);
+      res.status(500).json({ message: "Failed to fetch support contacts" });
+    }
+  });
+
+  app.post('/api/admin/support-contacts', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Company admin access required" });
+      }
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
+      
+      const { userId, roleLabel } = req.body;
+      const [contact] = await db.insert(companySupportContacts).values({
+        companyId: companyAdmin.companyId,
+        userId,
+        roleLabel: roleLabel || 'Support',
+      }).returning();
+      
+      res.json(contact);
+    } catch (error) {
+      console.error("Error creating support contact:", error);
+      res.status(500).json({ message: "Failed to create support contact" });
+    }
+  });
+
+  app.delete('/api/admin/support-contacts/:id', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Company admin access required" });
+      }
+      const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+      if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
+      
+      const [contact] = await db.select().from(companySupportContacts)
+        .where(eq(companySupportContacts.id, req.params.id));
+      if (!contact || contact.companyId !== companyAdmin.companyId) {
+        return res.status(404).json({ message: "Support contact not found" });
+      }
+      await db.delete(companySupportContacts).where(eq(companySupportContacts.id, req.params.id));
+      res.json({ message: "Support contact removed" });
+    } catch (error) {
+      console.error("Error deleting support contact:", error);
+      res.status(500).json({ message: "Failed to delete support contact" });
     }
   });
 

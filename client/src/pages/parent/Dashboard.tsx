@@ -16,9 +16,9 @@ import MessageCenter from "@/components/MessageCenter";
 import { 
   Users, CheckCircle, BookOpen, TrendingUp, Home, 
   Calendar, Clock, AlertCircle, GraduationCap, FileText,
-  User, Eye, Settings, Sparkles, Lightbulb,
+  User, Settings, Sparkles, Lightbulb,
   MapPin, Phone, Mail, MessageCircle, Building2,
-  Award, ClipboardList, Timer, Target, Star
+  Award, ClipboardList, Timer, Target, Star, ShieldAlert
 } from "lucide-react";
 import { format, isPast, differenceInDays } from "date-fns";
 
@@ -42,6 +42,7 @@ interface CompanyInfo {
   contactEmail: string | null;
   contactPhone: string | null;
   address: string | null;
+  tutorChatEnabled?: boolean;
 }
 
 interface ClassInfo {
@@ -182,10 +183,10 @@ export default function ParentDashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
         <div className="text-center">
-          <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-black">Loading...</p>
+          <div className="w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">Loading your dashboard...</p>
         </div>
       </div>
     );
@@ -193,27 +194,31 @@ export default function ParentDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <p className="text-black mb-4">Please log in to access the Parent Portal</p>
-          <Button onClick={() => window.location.href = "/api/login"}>
-            Log In
-          </Button>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+        <Card className="max-w-sm w-full mx-4 shadow-lg border-0">
+          <CardContent className="py-10 text-center">
+            <p className="text-slate-700 mb-4">Please log in to access the Parent Portal</p>
+            <Button onClick={() => window.location.href = "/api/login"} className="bg-blue-600 hover:bg-blue-700 text-white">
+              Log In
+            </Button>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (user?.role !== 'parent') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-black mb-4">This portal is only accessible to parent accounts.</p>
-          <Link href="/">
-            <Button>Go Home</Button>
-          </Link>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-blue-50">
+        <Card className="max-w-sm w-full mx-4 shadow-lg border-0">
+          <CardContent className="py-10 text-center">
+            <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+            <p className="text-slate-700 mb-4">This portal is only accessible to parent accounts.</p>
+            <Link href="/">
+              <Button className="bg-blue-600 hover:bg-blue-700 text-white">Go Home</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -227,19 +232,19 @@ export default function ParentDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'submitted':
-        return <Badge className="bg-blue-100 text-blue-800 border-blue-300">Submitted</Badge>;
+        return <Badge className="bg-blue-50 text-blue-700 border border-blue-200 font-medium">Submitted</Badge>;
       case 'graded':
-        return <Badge className="bg-green-100 text-green-800 border-green-300">Graded</Badge>;
+        return <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">Graded</Badge>;
       case 'parent_verified':
-        return <Badge className="bg-purple-100 text-purple-800 border-purple-300">Verified</Badge>;
+        return <Badge className="bg-violet-50 text-violet-700 border border-violet-200 font-medium">Verified</Badge>;
       case 'draft':
-        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">In Progress</Badge>;
+        return <Badge className="bg-amber-50 text-amber-700 border border-amber-200 font-medium">In Progress</Badge>;
       case 'late':
-        return <Badge className="bg-red-100 text-red-800 border-red-300">Late</Badge>;
+        return <Badge className="bg-red-50 text-red-700 border border-red-200 font-medium">Late</Badge>;
       case 'not_started':
-        return <Badge className="bg-gray-100 text-gray-800 border-gray-300">Not Started</Badge>;
+        return <Badge className="bg-slate-50 text-slate-600 border border-slate-200 font-medium">Not Started</Badge>;
       default:
-        return <Badge variant="outline">{status}</Badge>;
+        return <Badge variant="outline" className="font-medium">{status}</Badge>;
     }
   };
 
@@ -249,103 +254,105 @@ export default function ParentDashboard() {
     const daysUntil = differenceInDays(deadline, now);
     
     if (isPast(deadline)) {
-      return { text: 'Overdue', color: 'text-red-600' };
+      return { text: 'Overdue', color: 'text-red-500' };
     } else if (daysUntil === 0) {
-      return { text: 'Due today', color: 'text-orange-600' };
+      return { text: 'Due today', color: 'text-orange-500' };
     } else if (daysUntil <= 3) {
-      return { text: `Due in ${daysUntil} days`, color: 'text-yellow-600' };
+      return { text: `Due in ${daysUntil} days`, color: 'text-amber-500' };
     } else {
-      return { text: `Due ${format(deadline, 'MMM d')}`, color: 'text-gray-600' };
+      return { text: `Due ${format(deadline, 'MMM d')}`, color: 'text-slate-500' };
     }
   };
 
   return (
-    <div className="min-h-screen max-h-screen bg-gray-50 flex flex-col overflow-hidden">
-      <div className="bg-white border-b-2 border-black sticky top-0 z-10 flex-shrink-0">
-        <div className="max-w-[1400px] mx-auto px-4 py-2">
+    <div className="min-h-screen max-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex flex-col overflow-hidden">
+      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10 flex-shrink-0 shadow-sm">
+        <div className="max-w-[1400px] mx-auto px-4 py-2.5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link href="/parent">
-                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm" data-testid="button-home">
-                  <Home className="h-3 w-3 mr-1" />
-                  Home
-                </Button>
+                <div className="flex items-center gap-2 cursor-pointer" data-testid="button-home">
+                  <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center">
+                    <GraduationCap className="h-4 w-4 text-white" />
+                  </div>
+                  <span className="font-bold text-slate-800 hidden sm:block">eSlate</span>
+                </div>
               </Link>
-              <div className="h-5 w-px bg-gray-300" />
-              <div className="flex items-center gap-0.5">
+              <div className="h-6 w-px bg-slate-200" />
+              <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
                 <Button
-                  variant={mainTab === 'overview' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setMainTab('overview')}
-                  className={`h-8 px-3 text-sm ${mainTab === 'overview' ? 'bg-black text-white' : ''}`}
+                  className={`h-8 px-3 text-sm rounded-md transition-all ${mainTab === 'overview' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-800'}`}
                   data-testid="tab-overview"
                 >
                   <BookOpen className="h-3.5 w-3.5 mr-1.5" />
                   Overview
                 </Button>
                 <Button
-                  variant={mainTab === 'calendar' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setMainTab('calendar')}
-                  className={`h-8 px-3 text-sm ${mainTab === 'calendar' ? 'bg-black text-white' : ''}`}
+                  className={`h-8 px-3 text-sm rounded-md transition-all ${mainTab === 'calendar' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-800'}`}
                   data-testid="tab-calendar"
                 >
                   <Calendar className="h-3.5 w-3.5 mr-1.5" />
                   Calendar
                 </Button>
                 <Button
-                  variant={mainTab === 'messages' ? 'default' : 'ghost'}
+                  variant="ghost"
                   size="sm"
                   onClick={() => setMainTab('messages')}
-                  className={`h-8 px-3 text-sm ${mainTab === 'messages' ? 'bg-black text-white' : ''}`}
+                  className={`h-8 px-3 text-sm rounded-md transition-all ${mainTab === 'messages' ? 'bg-white text-blue-700 shadow-sm font-semibold' : 'text-slate-600 hover:text-slate-800'}`}
                   data-testid="tab-messages"
                 >
                   <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
                   Messages
                 </Button>
               </div>
-              <div className="h-5 w-px bg-gray-300" />
-              <div>
-                <h1 className="text-lg font-bold text-black">Parent Portal</h1>
-                <p className="text-gray-500 text-xs">Monitor your children's progress</p>
-              </div>
             </div>
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm"
+                className="text-slate-600 hover:text-slate-800 hover:bg-slate-100 h-8 px-3 text-sm"
                 onClick={() => setShowSettings(!showSettings)}
                 data-testid="button-settings"
               >
                 <Settings className="h-3.5 w-3.5 mr-1" />
-                Settings
+                <span className="hidden sm:inline">Settings</span>
               </Button>
-              <Badge className="bg-black text-white px-3 py-1 text-xs" data-testid="text-username">
-                {user?.firstName} {user?.lastName}
-              </Badge>
+              <div className="flex items-center gap-2 bg-slate-100 rounded-full pl-1 pr-3 py-1">
+                <div className="h-6 w-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">
+                  {user?.firstName?.[0]}
+                </div>
+                <span className="text-sm font-medium text-slate-700 hidden sm:block" data-testid="text-username">
+                  {user?.firstName} {user?.lastName}
+                </span>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {showSettings && (
-        <div className="bg-gray-50 border-b-2 border-black flex-shrink-0">
+        <div className="bg-white/90 backdrop-blur border-b border-slate-200 flex-shrink-0">
           <div className="max-w-[1400px] mx-auto px-4 py-3">
-            <Card className="border-2 border-black">
+            <Card className="border border-slate-200 shadow-sm bg-white">
               <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <Sparkles className="h-4 w-4 text-purple-600" />
+                <CardTitle className="flex items-center gap-2 text-base text-slate-800">
+                  <Sparkles className="h-4 w-4 text-violet-500" />
                   AI Learning Features
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 pb-3">
-                <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
+                <div className="flex items-center justify-between p-3 bg-amber-50/80 rounded-xl border border-amber-100">
                   <div className="flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-amber-600" />
+                    <Lightbulb className="h-4 w-4 text-amber-500" />
                     <div>
-                      <Label className="text-sm font-medium">AI Hints</Label>
-                      <p className="text-xs text-gray-600">Allow hints when stuck on questions</p>
+                      <Label className="text-sm font-medium text-slate-800">AI Hints</Label>
+                      <p className="text-xs text-slate-500">Allow hints when stuck on questions</p>
                     </div>
                   </div>
                   <Switch
@@ -369,89 +376,96 @@ export default function ParentDashboard() {
           ) : mainTab === 'messages' ? (
             <MessageCenter />
           ) : childrenLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <div className="w-10 h-10 border-3 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                <p className="text-slate-500">Loading your children's progress...</p>
+              </div>
             </div>
           ) : error ? (
-            <Card className="border-2 border-red-300 bg-red-50">
+            <Card className="border border-red-200 bg-red-50/50 shadow-sm">
               <CardContent className="py-8 text-center">
-                <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-                <p className="text-red-700">Failed to load children data. Please try again.</p>
+                <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
+                <p className="text-red-600">Failed to load children data. Please try again.</p>
               </CardContent>
             </Card>
           ) : !children || children.length === 0 ? (
-            <Card className="border-2 border-black">
+            <Card className="border border-slate-200 shadow-sm">
               <CardContent className="py-12 text-center">
-                <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-black mb-2">No Children Linked</h3>
-                <p className="text-gray-600 mb-4">
+                <Users className="h-16 w-16 text-slate-300 mx-auto mb-4" />
+                <h3 className="text-xl font-semibold text-slate-700 mb-2">No Children Linked</h3>
+                <p className="text-slate-500 mb-4">
                   No children are currently linked to your account. Please contact your tutoring center to link your children.
                 </p>
               </CardContent>
             </Card>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-                <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow" data-testid="card-children-count">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2 text-gray-600">
-                      <Users className="h-4 w-4" />
-                      Children
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-black">{totalChildren}</div>
-                    <p className="text-xs text-gray-500 mt-1">Under your care</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                <Card className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow" data-testid="card-children-count">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+                        <Users className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-slate-800">{totalChildren}</div>
+                        <p className="text-xs text-slate-500">Children</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow" data-testid="card-assignments-count">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2 text-gray-600">
-                      <BookOpen className="h-4 w-4" />
-                      Total Assignments
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-black">{totalAssignments}</div>
-                    <p className="text-xs text-gray-500 mt-1">Across all children</p>
+                <Card className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow" data-testid="card-assignments-count">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+                        <BookOpen className="h-5 w-5 text-indigo-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-slate-800">{totalAssignments}</div>
+                        <p className="text-xs text-slate-500">Assignments</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow" data-testid="card-submitted-count">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2 text-gray-600">
-                      <CheckCircle className="h-4 w-4" />
-                      Submitted
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-green-600">{totalSubmitted}</div>
-                    <p className="text-xs text-gray-500 mt-1">{totalGraded} graded</p>
+                <Card className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow" data-testid="card-submitted-count">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+                        <CheckCircle className="h-5 w-5 text-emerald-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-emerald-600">{totalSubmitted}</div>
+                        <p className="text-xs text-slate-500">Submitted</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
-                <Card className="border-2 border-black bg-white hover:shadow-lg transition-shadow" data-testid="card-completion-rate">
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm flex items-center gap-2 text-gray-600">
-                      <TrendingUp className="h-4 w-4" />
-                      Completion Rate
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-black">{overallCompletionRate}%</div>
-                    <Progress value={overallCompletionRate} className="mt-2 h-2" />
+                <Card className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow" data-testid="card-completion-rate">
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+                        <TrendingUp className="h-5 w-5 text-violet-600" />
+                      </div>
+                      <div>
+                        <div className="text-2xl font-bold text-slate-800">{overallCompletionRate}%</div>
+                        <p className="text-xs text-slate-500">Complete</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
               </div>
 
               <Tabs defaultValue={children[0]?.id} onValueChange={setSelectedChild} className="space-y-4">
-                <TabsList className="grid w-full bg-white border-2 border-black rounded-xl p-2 gap-2" style={{ gridTemplateColumns: `repeat(${Math.min(children.length, 4)}, 1fr)` }}>
+                <TabsList className="grid w-full bg-white shadow-sm border border-slate-200 rounded-xl p-1.5 gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(children.length, 4)}, 1fr)` }}>
                   {children.map((child) => (
                     <TabsTrigger 
                       key={child.id}
                       value={child.id}
-                      className="flex items-center justify-center gap-2 data-[state=active]:bg-black data-[state=active]:text-white rounded-md py-2.5 font-medium transition-all"
+                      className="flex items-center justify-center gap-2 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-600 data-[state=active]:to-indigo-600 data-[state=active]:text-white data-[state=active]:shadow-md rounded-lg py-2.5 font-medium transition-all text-slate-600"
                       data-testid={`tab-child-${child.id}`}
                     >
                       <User className="h-4 w-4 shrink-0" />
@@ -490,90 +504,94 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
     ? Math.round(gradedAssignments.reduce((sum, a) => sum + (a.submission?.score || 0), 0) / gradedAssignments.length) 
     : null;
 
+  const tutorChatEnabled = child.companyInfo?.tutorChatEnabled !== false;
+
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="border-2 border-black" data-testid={`card-child-profile-${child.id}`}>
+        <Card className="border border-slate-200 shadow-sm bg-white" data-testid={`card-child-profile-${child.id}`}>
           <CardHeader className="pb-3">
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-full bg-black text-white flex items-center justify-center text-xl font-bold shrink-0">
+              <div className="h-14 w-14 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white flex items-center justify-center text-xl font-bold shrink-0 shadow-md">
                 {child.user?.firstName?.[0]}{child.user?.lastName?.[0]}
               </div>
               <div className="flex-1 min-w-0">
-                <CardTitle className="text-lg">
+                <CardTitle className="text-lg text-slate-800">
                   {child.user?.firstName} {child.user?.lastName}
                 </CardTitle>
-                <CardDescription className="mt-0.5">
-                  Grade {child.gradeLevel || 'N/A'} {child.schoolName ? `• ${child.schoolName}` : ''}
+                <CardDescription className="mt-0.5 text-slate-500">
+                  Grade {child.gradeLevel || 'N/A'} {child.schoolName ? `at ${child.schoolName}` : ''}
                 </CardDescription>
               </div>
               <div className="text-right shrink-0">
-                <div className="text-2xl font-bold text-black">{child.progress.completionRate}%</div>
-                <p className="text-xs text-gray-600">Complete</p>
+                <div className="text-2xl font-bold text-blue-600">{child.progress.completionRate}%</div>
+                <p className="text-xs text-slate-500">Complete</p>
               </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0">
-            <div className="grid grid-cols-4 gap-3">
-              <div className="text-center p-2 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="text-xl font-bold text-black">{child.progress.totalAssignments}</div>
-                <p className="text-xs text-gray-600">Total</p>
+            <div className="grid grid-cols-4 gap-2">
+              <div className="text-center p-2.5 bg-slate-50 rounded-xl">
+                <div className="text-lg font-bold text-slate-800">{child.progress.totalAssignments}</div>
+                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">Total</p>
               </div>
-              <div className="text-center p-2 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="text-xl font-bold text-blue-600">{child.progress.submittedCount}</div>
-                <p className="text-xs text-gray-600">Submitted</p>
+              <div className="text-center p-2.5 bg-blue-50 rounded-xl">
+                <div className="text-lg font-bold text-blue-600">{child.progress.submittedCount}</div>
+                <p className="text-[10px] text-blue-500 font-medium uppercase tracking-wide">Sent</p>
               </div>
-              <div className="text-center p-2 bg-green-50 rounded-lg border border-green-200">
-                <div className="text-xl font-bold text-green-600">{child.progress.gradedCount}</div>
-                <p className="text-xs text-gray-600">Graded</p>
+              <div className="text-center p-2.5 bg-emerald-50 rounded-xl">
+                <div className="text-lg font-bold text-emerald-600">{child.progress.gradedCount}</div>
+                <p className="text-[10px] text-emerald-500 font-medium uppercase tracking-wide">Graded</p>
               </div>
-              <div className="text-center p-2 bg-yellow-50 rounded-lg border border-yellow-200">
-                <div className="text-xl font-bold text-yellow-600">{child.progress.pendingCount}</div>
-                <p className="text-xs text-gray-600">Pending</p>
+              <div className="text-center p-2.5 bg-amber-50 rounded-xl">
+                <div className="text-lg font-bold text-amber-600">{child.progress.pendingCount}</div>
+                <p className="text-[10px] text-amber-500 font-medium uppercase tracking-wide">Pending</p>
               </div>
             </div>
             {avgScore !== null && (
-              <div className="mt-3 flex items-center gap-2 p-2 bg-green-50 rounded-lg border border-green-200">
-                <Star className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium text-green-800">Average Score: {avgScore}%</span>
+              <div className="mt-3 flex items-center gap-2 p-2.5 bg-emerald-50 rounded-xl">
+                <Star className="h-4 w-4 text-emerald-500" />
+                <span className="text-sm font-semibold text-emerald-700">Average Score: {avgScore}%</span>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <div className="space-y-4">
+        <div className="space-y-3">
           {child.companyInfo && (
-            <Card className="border-2 border-black" data-testid="card-company-info">
+            <Card className="border border-slate-200 shadow-sm bg-white" data-testid="card-company-info">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <Building2 className="h-4 w-4" />
+                <CardTitle className="text-sm flex items-center gap-2 text-slate-700">
+                  <div className="h-6 w-6 rounded-lg bg-indigo-50 flex items-center justify-center">
+                    <Building2 className="h-3.5 w-3.5 text-indigo-600" />
+                  </div>
                   Coaching Centre
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-2 pt-0">
-                <h3 className="font-semibold text-base">{child.companyInfo.name}</h3>
+                <h3 className="font-semibold text-base text-slate-800">{child.companyInfo.name}</h3>
                 {child.companyInfo.description && (
-                  <p className="text-xs text-gray-600">{child.companyInfo.description}</p>
+                  <p className="text-xs text-slate-500 leading-relaxed">{child.companyInfo.description}</p>
                 )}
                 <div className="space-y-1.5">
                   {child.companyInfo.address && (
                     <div className="flex items-start gap-2 text-sm">
-                      <MapPin className="h-3.5 w-3.5 mt-0.5 text-gray-500 shrink-0" />
-                      <span className="text-gray-700">{child.companyInfo.address}</span>
+                      <MapPin className="h-3.5 w-3.5 mt-0.5 text-slate-400 shrink-0" />
+                      <span className="text-slate-600">{child.companyInfo.address}</span>
                     </div>
                   )}
                   {child.companyInfo.contactPhone && (
                     <div className="flex items-center gap-2 text-sm">
-                      <Phone className="h-3.5 w-3.5 text-gray-500 shrink-0" />
-                      <a href={`tel:${child.companyInfo.contactPhone}`} className="text-blue-600 hover:underline">
+                      <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <a href={`tel:${child.companyInfo.contactPhone}`} className="text-blue-600 hover:text-blue-700 hover:underline">
                         {child.companyInfo.contactPhone}
                       </a>
                     </div>
                   )}
                   {child.companyInfo.contactEmail && (
                     <div className="flex items-center gap-2 text-sm">
-                      <Mail className="h-3.5 w-3.5 text-gray-500 shrink-0" />
-                      <a href={`mailto:${child.companyInfo.contactEmail}`} className="text-blue-600 hover:underline">
+                      <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <a href={`mailto:${child.companyInfo.contactEmail}`} className="text-blue-600 hover:text-blue-700 hover:underline">
                         {child.companyInfo.contactEmail}
                       </a>
                     </div>
@@ -584,46 +602,48 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
           )}
 
           {child.classInfo && (
-            <Card className="border-2 border-black" data-testid="card-class-info">
+            <Card className="border border-slate-200 shadow-sm bg-white" data-testid="card-class-info">
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4" />
+                <CardTitle className="text-sm flex items-center gap-2 text-slate-700">
+                  <div className="h-6 w-6 rounded-lg bg-violet-50 flex items-center justify-center">
+                    <GraduationCap className="h-3.5 w-3.5 text-violet-600" />
+                  </div>
                   Class Details
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-0">
-                <h3 className="font-semibold text-base">{child.classInfo.name}</h3>
+                <h3 className="font-semibold text-base text-slate-800">{child.classInfo.name}</h3>
                 {child.classInfo.subject && (
-                  <p className="text-xs text-gray-500 mt-0.5">Subject: {child.classInfo.subject}</p>
+                  <p className="text-xs text-slate-500 mt-0.5">Subject: {child.classInfo.subject}</p>
                 )}
                 {child.classInfo.description && (
-                  <p className="text-xs text-gray-600 mt-1">{child.classInfo.description}</p>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{child.classInfo.description}</p>
                 )}
                 <div className="mt-2 space-y-1">
                   {(child.classInfo.startTime || child.classInfo.endTime) && (
                     <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-3.5 w-3.5 text-gray-500" />
-                      <span className="text-gray-700">
+                      <Clock className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-slate-600">
                         {child.classInfo.startTime} - {child.classInfo.endTime}
                       </span>
                     </div>
                   )}
                   {child.classInfo.daysOfWeek && child.classInfo.daysOfWeek.length > 0 && (
                     <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-3.5 w-3.5 text-gray-500" />
-                      <span className="text-gray-700">{child.classInfo.daysOfWeek.join(', ')}</span>
+                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-slate-600">{child.classInfo.daysOfWeek.join(', ')}</span>
                     </div>
                   )}
                   {child.classInfo.dayOfWeek != null && (
                     <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-3.5 w-3.5 text-gray-500" />
-                      <span className="text-gray-700">{DAY_NAMES[child.classInfo.dayOfWeek] || `Day ${child.classInfo.dayOfWeek}`}</span>
+                      <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-slate-600">{DAY_NAMES[child.classInfo.dayOfWeek] || `Day ${child.classInfo.dayOfWeek}`}</span>
                     </div>
                   )}
                   {child.classInfo.location && (
                     <div className="flex items-center gap-2 text-sm">
-                      <MapPin className="h-3.5 w-3.5 text-gray-500" />
-                      <span className="text-gray-700">{child.classInfo.location}</span>
+                      <MapPin className="h-3.5 w-3.5 text-slate-400" />
+                      <span className="text-slate-600">{child.classInfo.location}</span>
                     </div>
                   )}
                 </div>
@@ -634,46 +654,54 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
       </div>
 
       {child.tutorInfo && (
-        <Card className="border-2 border-black" data-testid="card-tutor-info">
+        <Card className="border border-slate-200 shadow-sm bg-white" data-testid="card-tutor-info">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <User className="h-4 w-4" />
+              <CardTitle className="text-sm flex items-center gap-2 text-slate-700">
+                <div className="h-6 w-6 rounded-lg bg-teal-50 flex items-center justify-center">
+                  <User className="h-3.5 w-3.5 text-teal-600" />
+                </div>
                 Tutor
               </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                className="border-2 border-black h-8 text-sm"
-                onClick={onChatWithTutor}
-                data-testid="btn-chat-tutor"
-              >
-                <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
-                Chat with Tutor
-              </Button>
+              {tutorChatEnabled ? (
+                <Button
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-sm shadow-sm"
+                  onClick={onChatWithTutor}
+                  data-testid="btn-chat-tutor"
+                >
+                  <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
+                  Chat with Tutor
+                </Button>
+              ) : (
+                <Badge className="bg-slate-100 text-slate-500 border border-slate-200 font-normal text-xs">
+                  <ShieldAlert className="h-3 w-3 mr-1" />
+                  Chat unavailable
+                </Badge>
+              )}
             </div>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="flex items-center gap-4">
-              <div className="h-12 w-12 rounded-full bg-gray-200 text-black flex items-center justify-center text-lg font-bold shrink-0">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-teal-400 to-emerald-500 text-white flex items-center justify-center text-lg font-bold shrink-0 shadow-sm">
                 {child.tutorInfo.firstName?.[0]}{child.tutorInfo.lastName?.[0]}
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="font-semibold text-base">
+                <h3 className="font-semibold text-base text-slate-800">
                   {child.tutorInfo.firstName} {child.tutorInfo.lastName}
                 </h3>
                 {child.tutorInfo.specialization && (
-                  <p className="text-xs text-gray-600">{child.tutorInfo.specialization}</p>
+                  <p className="text-xs text-slate-500">{child.tutorInfo.specialization}</p>
                 )}
                 {child.tutorInfo.qualifications && (
-                  <p className="text-xs text-gray-500">{child.tutorInfo.qualifications}</p>
+                  <p className="text-xs text-slate-400">{child.tutorInfo.qualifications}</p>
                 )}
               </div>
               <div className="text-right shrink-0 space-y-1">
                 {child.tutorInfo.email && (
-                  <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                    <Mail className="h-3 w-3" />
-                    <a href={`mailto:${child.tutorInfo.email}`} className="text-blue-600 hover:underline">
+                  <div className="flex items-center gap-1.5 text-xs">
+                    <Mail className="h-3 w-3 text-slate-400" />
+                    <a href={`mailto:${child.tutorInfo.email}`} className="text-blue-600 hover:text-blue-700 hover:underline">
                       {child.tutorInfo.email}
                     </a>
                   </div>
@@ -681,28 +709,53 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                 {child.tutorInfo.subjectsTeaching && child.tutorInfo.subjectsTeaching.length > 0 && (
                   <div className="flex flex-wrap gap-1 justify-end">
                     {child.tutorInfo.subjectsTeaching.map((subject, i) => (
-                      <Badge key={i} variant="outline" className="text-xs">{subject}</Badge>
+                      <Badge key={i} variant="outline" className="text-xs border-slate-200 text-slate-600">{subject}</Badge>
                     ))}
                   </div>
                 )}
               </div>
             </div>
+            {!tutorChatEnabled && child.companyInfo && (
+              <div className="mt-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                <div className="flex items-start gap-2">
+                  <ShieldAlert className="h-4 w-4 text-amber-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-800">Tutor chat is currently not available</p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Please contact the coaching centre directly:
+                      {child.companyInfo.contactPhone && (
+                        <span className="block mt-0.5">
+                          Phone: <a href={`tel:${child.companyInfo.contactPhone}`} className="text-blue-600 hover:underline">{child.companyInfo.contactPhone}</a>
+                        </span>
+                      )}
+                      {child.companyInfo.contactEmail && (
+                        <span className="block mt-0.5">
+                          Email: <a href={`mailto:${child.companyInfo.contactEmail}`} className="text-blue-600 hover:underline">{child.companyInfo.contactEmail}</a>
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="border-2 border-black" data-testid={`card-child-assignments-${child.id}`}>
+        <Card className="border border-slate-200 shadow-sm bg-white" data-testid={`card-child-assignments-${child.id}`}>
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm">
-              <FileText className="h-4 w-4" />
+            <CardTitle className="flex items-center gap-2 text-sm text-slate-700">
+              <div className="h-6 w-6 rounded-lg bg-blue-50 flex items-center justify-center">
+                <FileText className="h-3.5 w-3.5 text-blue-600" />
+              </div>
               Assignments ({child.assignments.length})
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0">
             {child.assignments.length === 0 ? (
-              <div className="text-center py-6 text-gray-500">
-                <BookOpen className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+              <div className="text-center py-8 text-slate-400">
+                <BookOpen className="h-10 w-10 mx-auto mb-2 text-slate-300" />
                 <p className="text-sm">No assignments yet</p>
               </div>
             ) : (
@@ -712,18 +765,18 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                   return (
                     <div 
                       key={assignment.id} 
-                      className="p-3 border-2 border-gray-200 rounded-lg hover:border-black transition-colors"
+                      className="p-3 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/30 transition-all"
                       data-testid={`assignment-row-${assignment.id}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <h4 className="font-semibold text-sm text-black truncate">{assignment.title}</h4>
-                            <Badge variant="outline" className="text-xs shrink-0">
+                            <h4 className="font-semibold text-sm text-slate-800 truncate">{assignment.title}</h4>
+                            <Badge variant="outline" className="text-[10px] shrink-0 border-slate-200 text-slate-500">
                               {assignment.assignmentKind === 'worksheet' ? 'Worksheet' : 'File Upload'}
                             </Badge>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-gray-600">
+                          <div className="flex items-center gap-3 text-xs text-slate-500">
                             <span className="flex items-center gap-1">
                               <GraduationCap className="h-3 w-3" />
                               {assignment.subject}
@@ -736,7 +789,7 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {assignment.submission?.score != null && (
-                            <Badge className="bg-green-50 text-green-700 border-green-300 text-xs">
+                            <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
                               {assignment.submission.score}%
                             </Badge>
                           )}
@@ -744,7 +797,7 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                         </div>
                       </div>
                       {assignment.submission?.feedback && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800 border border-blue-200">
+                        <div className="mt-2 p-2.5 bg-blue-50 rounded-lg text-xs text-blue-700 border border-blue-100">
                           <span className="font-medium">Feedback:</span> {assignment.submission.feedback}
                         </div>
                       )}
@@ -757,27 +810,29 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
         </Card>
 
         <div className="space-y-4">
-          <Card className="border-2 border-black" data-testid="card-test-results">
+          <Card className="border border-slate-200 shadow-sm bg-white" data-testid="card-test-results">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Award className="h-4 w-4" />
+              <CardTitle className="flex items-center gap-2 text-sm text-slate-700">
+                <div className="h-6 w-6 rounded-lg bg-amber-50 flex items-center justify-center">
+                  <Award className="h-3.5 w-3.5 text-amber-600" />
+                </div>
                 Past Test Results ({child.testResults?.length || 0})
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
               {!child.testResults || child.testResults.length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                  <ClipboardList className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                <div className="text-center py-6 text-slate-400">
+                  <ClipboardList className="h-10 w-10 mx-auto mb-2 text-slate-300" />
                   <p className="text-sm">No test results yet</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
                   {child.testResults.map((result) => (
-                    <div key={result.id} className="p-3 border-2 border-gray-200 rounded-lg">
+                    <div key={result.id} className="p-3 border border-slate-100 rounded-xl">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-black truncate">{result.testTitle || 'Test'}</h4>
-                          <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5">
+                          <h4 className="font-semibold text-sm text-slate-800 truncate">{result.testTitle || 'Test'}</h4>
+                          <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                             {result.testSubject && (
                               <span className="flex items-center gap-1">
                                 <GraduationCap className="h-3 w-3" />
@@ -794,28 +849,28 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           {result.percentageScore != null && (
-                            <span className={`text-lg font-bold ${result.isPassed ? 'text-green-600' : 'text-red-600'}`}>
+                            <span className={`text-lg font-bold ${result.isPassed ? 'text-emerald-600' : 'text-red-500'}`}>
                               {result.percentageScore}%
                             </span>
                           )}
                           {result.isPassed != null && (
-                            <Badge className={result.isPassed ? 'bg-green-100 text-green-800 border-green-300' : 'bg-red-100 text-red-800 border-red-300'}>
+                            <Badge className={result.isPassed ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'}>
                               {result.isPassed ? 'Passed' : 'Failed'}
                             </Badge>
                           )}
                           {result.status === 'submitted' && (
-                            <Badge className="bg-yellow-100 text-yellow-800 border-yellow-300">Pending Grade</Badge>
+                            <Badge className="bg-amber-50 text-amber-700 border border-amber-200">Pending Grade</Badge>
                           )}
                         </div>
                       </div>
                       {result.totalScore != null && result.testTotalPoints != null && (
-                        <div className="mt-1 text-xs text-gray-500">
+                        <div className="mt-1 text-xs text-slate-400">
                           Score: {result.totalScore}/{result.testTotalPoints}
                           {result.testPassingScore != null && ` (Pass: ${result.testPassingScore})`}
                         </div>
                       )}
                       {result.feedback && (
-                        <div className="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-800 border border-blue-200">
+                        <div className="mt-2 p-2.5 bg-blue-50 rounded-lg text-xs text-blue-700 border border-blue-100">
                           <span className="font-medium">Feedback:</span> {result.feedback}
                         </div>
                       )}
@@ -826,27 +881,29 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-black" data-testid="card-upcoming-tests">
+          <Card className="border border-slate-200 shadow-sm bg-white" data-testid="card-upcoming-tests">
             <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Target className="h-4 w-4" />
+              <CardTitle className="flex items-center gap-2 text-sm text-slate-700">
+                <div className="h-6 w-6 rounded-lg bg-orange-50 flex items-center justify-center">
+                  <Target className="h-3.5 w-3.5 text-orange-600" />
+                </div>
                 Upcoming Tests/Exams ({child.upcomingTests?.length || 0})
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0">
               {!child.upcomingTests || child.upcomingTests.length === 0 ? (
-                <div className="text-center py-6 text-gray-500">
-                  <Calendar className="h-10 w-10 mx-auto mb-2 text-gray-300" />
+                <div className="text-center py-6 text-slate-400">
+                  <Calendar className="h-10 w-10 mx-auto mb-2 text-slate-300" />
                   <p className="text-sm">No upcoming tests</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[180px] overflow-y-auto pr-1">
                   {child.upcomingTests.map((test) => (
-                    <div key={test.id} className="p-3 border-2 border-orange-200 bg-orange-50 rounded-lg">
+                    <div key={test.id} className="p-3 border border-orange-100 bg-orange-50/50 rounded-xl">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-semibold text-sm text-black truncate">{test.title}</h4>
-                          <div className="flex items-center gap-2 text-xs text-gray-600 mt-0.5">
+                          <h4 className="font-semibold text-sm text-slate-800 truncate">{test.title}</h4>
+                          <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                             {test.subject && (
                               <span className="flex items-center gap-1">
                                 <GraduationCap className="h-3 w-3" />
@@ -863,20 +920,20 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                         </div>
                         <div className="text-right shrink-0 space-y-0.5">
                           {test.duration && (
-                            <div className="flex items-center gap-1 text-xs text-gray-600">
+                            <div className="flex items-center gap-1 text-xs text-slate-500">
                               <Timer className="h-3 w-3" />
                               {test.duration} min
                             </div>
                           )}
                           {test.totalPoints != null && (
-                            <div className="text-xs text-gray-600">
+                            <div className="text-xs text-slate-500">
                               {test.totalPoints} pts
                             </div>
                           )}
                         </div>
                       </div>
                       {test.description && (
-                        <p className="mt-1 text-xs text-gray-600">{test.description}</p>
+                        <p className="mt-1 text-xs text-slate-500">{test.description}</p>
                       )}
                     </div>
                   ))}

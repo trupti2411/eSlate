@@ -643,6 +643,7 @@ export class DatabaseStorage implements IStorage {
             contactEmail: tutoringCompanies.contactEmail,
             contactPhone: tutoringCompanies.contactPhone,
             address: tutoringCompanies.address,
+            tutorChatEnabled: tutoringCompanies.tutorChatEnabled,
           }).from(tutoringCompanies).where(eq(tutoringCompanies.id, student.companyId));
           companyInfo = companyData || null;
         }

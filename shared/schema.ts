@@ -92,9 +92,19 @@ export const tutoringCompanies = pgTable("tutoring_companies", {
   contactEmail: varchar("contact_email"),
   contactPhone: varchar("contact_phone"),
   address: text("address"),
+  tutorChatEnabled: boolean("tutor_chat_enabled").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const companySupportContacts = pgTable("company_support_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
+  userId: varchar("user_id").notNull().references(() => users.id),
+  roleLabel: varchar("role_label").notNull().default('Support'),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Company Admins table
@@ -264,6 +274,18 @@ export const parentsRelations = relations(parents, ({ one, many }) => ({
 export const tutoringCompaniesRelations = relations(tutoringCompanies, ({ many }) => ({
   admins: many(companyAdmins),
   tutors: many(tutors),
+  supportContacts: many(companySupportContacts),
+}));
+
+export const companySupportContactsRelations = relations(companySupportContacts, ({ one }) => ({
+  company: one(tutoringCompanies, {
+    fields: [companySupportContacts.companyId],
+    references: [tutoringCompanies.id],
+  }),
+  user: one(users, {
+    fields: [companySupportContacts.userId],
+    references: [users.id],
+  }),
 }));
 
 export const companyAdminsRelations = relations(companyAdmins, ({ one }) => ({
@@ -441,6 +463,12 @@ export const insertTutoringCompanySchema = createInsertSchema(tutoringCompanies)
 });
 
 export const insertCompanyAdminSchema = createInsertSchema(companyAdmins).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type CompanySupportContact = typeof companySupportContacts.$inferSelect;
+export const insertCompanySupportContactSchema = createInsertSchema(companySupportContacts).omit({
   id: true,
   createdAt: true,
 });
