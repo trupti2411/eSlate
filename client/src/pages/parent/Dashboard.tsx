@@ -16,7 +16,7 @@ import MessageCenter from "@/components/MessageCenter";
 import { 
   Users, CheckCircle, BookOpen, TrendingUp, Home, 
   Calendar, Clock, AlertCircle, GraduationCap, FileText,
-  User, Settings, Sparkles, Lightbulb,
+  User, Settings, Sparkles, Lightbulb, LogOut,
   MapPin, Phone, Mail, MessageCircle, Building2,
   Award, ClipboardList, Timer, Target, Star, ShieldAlert
 } from "lucide-react";
@@ -331,6 +331,23 @@ export default function ParentDashboard() {
                   {user?.firstName} {user?.lastName}
                 </span>
               </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-3 text-sm"
+                onClick={async () => {
+                  try {
+                    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                  } catch (e) {}
+                  localStorage.removeItem('token');
+                  localStorage.removeItem('user');
+                  window.location.href = '/auth';
+                }}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-3.5 w-3.5 mr-1" />
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
             </div>
           </div>
         </div>
