@@ -1,14 +1,17 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { securityHeaders, auditMiddleware } from "./security";
 
 const app = express();
 
 // Initialize global file storage
 global.uploadedFiles = global.uploadedFiles || new Map();
 
+app.use(securityHeaders);
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+app.use(auditMiddleware);
 
 app.use((req, res, next) => {
   const start = Date.now();

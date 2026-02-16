@@ -2,6 +2,14 @@
 
 eSlate is a secure educational platform designed for e-ink devices and high-contrast displays. It functions as a comprehensive learning management system supporting students, parents, tutors, and administrators. Key features include homework management, real-time messaging, progress tracking, and calendar scheduling, all optimized for accessibility and readability on e-ink displays. The platform aims to provide a robust and inclusive educational experience.
 
+## Security Features
+The platform includes comprehensive security hardening:
+- **Rate Limiting**: Login attempts limited to 5 per 15-minute window per email. After 5 failed attempts, account is locked for 15 minutes. Uses `login_attempts` DB table.
+- **CSRF Protection**: Token-based CSRF protection via `/api/auth/csrf-token` endpoint. Tokens stored in session.
+- **Security Headers**: X-Content-Type-Options, X-Frame-Options (DENY), X-XSS-Protection, Referrer-Policy, Permissions-Policy, Strict-Transport-Security, Content-Security-Policy.
+- **Audit Logging**: All mutating API calls (POST/PATCH/PUT/DELETE) logged to `audit_logs` table with userId, action, IP address, user agent, status, and timestamp. Login/logout events explicitly logged. Viewable by admins at GET `/api/admin/audit-logs`.
+- **Security Files**: `server/security.ts` contains rate limiting, CSRF, security headers, and audit logging middleware.
+
 ## AI Features (Powered by Google Gemini)
 The platform includes AI-powered features using Google Gemini (free tier) to enhance the learning experience:
 - **AI Question Generator** (Tutors): Generate multiple questions at once in WorksheetEditor

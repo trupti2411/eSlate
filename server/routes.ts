@@ -18,8 +18,8 @@ import {
 import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
-import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies } from "@shared/schema";
+import { eq, desc, inArray } from "drizzle-orm";
+import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Report generation helper functions
@@ -6796,6 +6796,49 @@ Good luck with your assignment!"
     } catch (error: any) {
       console.error('Error sending contact email:', error);
       res.status(500).json({ error: 'Failed to send email. Please try again later.' });
+    }
+  });
+
+  // Audit logs endpoint - admin only
+  app.get('/api/admin/audit-logs', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const limit = Math.min(parseInt(req.query.limit || '50'), 200);
+      const offset = parseInt(req.query.offset || '0');
+
+      if (user.role === 'company_admin') {
+        if (!user.companyId) {
+          return res.status(403).json({ message: "Company admin must be associated with a company" });
+        }
+        const companyUserIds = await db.select({ id: users.id })
+          .from(users)
+          .where(eq(users.companyId, user.companyId));
+        const userIds = companyUserIds.map((u: any) => u.id);
+
+        const logs = await db.select()
+          .from(auditLogs)
+          .where(inArray(auditLogs.userId, userIds))
+          .orderBy(desc(auditLogs.createdAt))
+          .limit(limit)
+          .offset(offset);
+
+        return res.json(logs);
+      }
+
+      const logs = await db.select()
+        .from(auditLogs)
+        .orderBy(desc(auditLogs.createdAt))
+        .limit(limit)
+        .offset(offset);
+
+      res.json(logs);
+    } catch (error) {
+      console.error("Error fetching audit logs:", error);
+      res.status(500).json({ message: "Failed to fetch audit logs" });
     }
   });
 

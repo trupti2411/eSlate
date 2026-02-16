@@ -8,6 +8,7 @@ import session from 'express-session';
 import connectPg from 'connect-pg-simple';
 import type { RegisterData, LoginData } from '@shared/schema';
 import type { User } from '@shared/schema';
+import { checkLoginRateLimit, recordLoginAttempt, logAudit, getCsrfTokenEndpoint, csrfProtection } from './security';
 
 // Session configuration
 export function getSession() {
@@ -250,6 +251,8 @@ export async function isAuthenticated(req: AuthenticatedRequest, res: Response, 
 export function setupCustomAuth(app: Express) {
   app.use(getSession());
 
+  app.use(csrfProtection);
+
   // Register endpoint
   app.post('/api/auth/register', async (req: Request, res: Response) => {
     try {
@@ -290,27 +293,55 @@ export function setupCustomAuth(app: Express) {
     }
   });
 
-  // Login endpoint
+  // CSRF token endpoint
+  app.get('/api/auth/csrf-token', getCsrfTokenEndpoint);
+
+  // Login endpoint with rate limiting
   app.post('/api/auth/login', async (req: Request, res: Response) => {
     try {
       const { email, password } = req.body as LoginData;
+      const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+
+      // Check rate limit
+      const rateLimit = await checkLoginRateLimit(email, clientIp);
+      if (!rateLimit.allowed) {
+        const minutesLeft = rateLimit.lockoutUntil
+          ? Math.ceil((rateLimit.lockoutUntil.getTime() - Date.now()) / 60000)
+          : 15;
+        return res.status(429).json({
+          message: `Too many login attempts. Please try again in ${minutesLeft} minutes.`,
+          lockoutUntil: rateLimit.lockoutUntil,
+        });
+      }
 
       // Find user by email
       const user = await storage.getUserByEmail(email);
       if (!user || !user.password) {
-        return res.status(401).json({ message: 'Invalid email or password' });
+        await recordLoginAttempt(email, clientIp, false);
+        return res.status(401).json({
+          message: 'Invalid email or password',
+          remainingAttempts: rateLimit.remainingAttempts - 1,
+        });
       }
 
       // Verify password
       const isValidPassword = await comparePassword(password, user.password);
       if (!isValidPassword) {
-        return res.status(401).json({ message: 'Invalid email or password' });
+        await recordLoginAttempt(email, clientIp, false);
+        return res.status(401).json({
+          message: 'Invalid email or password',
+          remainingAttempts: rateLimit.remainingAttempts - 1,
+        });
       }
 
       // Check if user is active
       if (!user.isActive || user.isDeleted) {
+        await recordLoginAttempt(email, clientIp, false);
         return res.status(401).json({ message: 'Account is inactive' });
       }
+
+      // Record successful login
+      await recordLoginAttempt(email, clientIp, true);
 
       // Update last login
       await storage.updateUserLastLogin(user.id);
@@ -336,6 +367,10 @@ export function setupCustomAuth(app: Express) {
 
   // Logout endpoint
   app.post('/api/auth/logout', (req: Request, res: Response) => {
+    const userId = (req as any).session?.userId || (req as any).user?.id;
+    const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || 'unknown';
+    logAudit({ userId, action: 'logout', resource: 'auth', ipAddress: clientIp });
+
     (req as any).session.destroy((err: any) => {
       if (err) {
         return res.status(500).json({ message: 'Logout failed' });

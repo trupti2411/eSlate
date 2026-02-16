@@ -107,6 +107,29 @@ export const companySupportContacts = pgTable("company_support_contacts", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Audit Log table - tracks security-relevant user actions
+export const auditLogs = pgTable("audit_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
+  action: varchar("action").notNull(),
+  resource: varchar("resource"),
+  resourceId: varchar("resource_id"),
+  ipAddress: varchar("ip_address"),
+  userAgent: text("user_agent"),
+  details: jsonb("details"),
+  status: varchar("status").notNull().default('success'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Login Attempts table - tracks failed login attempts for rate limiting
+export const loginAttempts = pgTable("login_attempts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: varchar("email").notNull(),
+  ipAddress: varchar("ip_address"),
+  success: boolean("success").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Company Admins table
 export const companyAdmins = pgTable("company_admins", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
