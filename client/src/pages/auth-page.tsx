@@ -430,16 +430,15 @@ export default function AuthPage() {
             <GraduationCap className="w-16 h-16 text-blue-600 dark:text-blue-400" />
           </div>
           <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
-            Education Optimized for E-ink
+            Your Learning, Simplified
           </h2>
           <p className="text-gray-600 dark:text-gray-300 text-lg leading-relaxed">
-            eSlate provides a comprehensive learning management system designed specifically for e-ink devices, 
-            offering clear readability and efficient learning experiences for students, parents, and tutors.
+            eSlate brings students, parents, and tutors together on one platform — making it easy to manage assignments, track progress, and stay connected.
           </p>
           <div className="mt-8 space-y-4">
             <div className="flex items-center justify-center space-x-3">
               <CheckCircle className="w-5 h-5 text-green-600" />
-              <span className="text-gray-700 dark:text-gray-300">Homework management</span>
+              <span className="text-gray-700 dark:text-gray-300">Homework and assignment management</span>
             </div>
             <div className="flex items-center justify-center space-x-3">
               <CheckCircle className="w-5 h-5 text-green-600" />
