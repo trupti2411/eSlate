@@ -713,33 +713,6 @@ export default function ParentDashboard() {
                 </CardContent>
               </Card>
             )}
-
-            <Card className="border border-slate-200 shadow-sm bg-white">
-              <CardHeader className="pb-2">
-                <CardTitle className="flex items-center gap-2 text-base text-slate-800">
-                  <Sparkles className="h-4 w-4 text-violet-500" />
-                  AI Learning Features
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 pb-3">
-                <div className="flex items-center justify-between p-3 bg-amber-50/80 rounded-xl border border-amber-100">
-                  <div className="flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-amber-500" />
-                    <div>
-                      <Label className="text-sm font-medium text-slate-800">AI Hints</Label>
-                      <p className="text-xs text-slate-500">Allow hints when stuck on questions</p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={parentSettings?.aiHintsEnabled ?? true}
-                    onCheckedChange={(checked) => {
-                      updateSettingsMutation.mutate({ aiHintsEnabled: checked });
-                    }}
-                    data-testid="switch-ai-hints"
-                  />
-                </div>
-              </CardContent>
-            </Card>
           </div>
         </div>
       )}
