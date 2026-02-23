@@ -615,7 +615,105 @@ export default function ParentDashboard() {
 
       {showSettings && (
         <div className="bg-white/90 backdrop-blur border-b border-slate-200 flex-shrink-0">
-          <div className="max-w-[1400px] mx-auto px-4 py-3">
+          <div className="max-w-[1400px] mx-auto px-4 py-4 space-y-4">
+            <Card className="border border-slate-200 shadow-sm bg-white">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-base text-slate-800">
+                  <User className="h-4 w-4 text-blue-500" />
+                  Parent Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500 mb-1">Name</p>
+                    <p className="text-sm font-medium text-slate-800">{user?.firstName} {user?.lastName}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500 mb-1">Email</p>
+                    <p className="text-sm font-medium text-slate-800">{user?.email}</p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-lg">
+                    <p className="text-xs text-slate-500 mb-1">Role</p>
+                    <p className="text-sm font-medium text-slate-800 capitalize">{user?.role?.replace('_', ' ')}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {children && children.length > 0 && (
+              <Card className="border border-slate-200 shadow-sm bg-white">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base text-slate-800">
+                    <Users className="h-4 w-4 text-emerald-500" />
+                    Children ({children.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {children.map((child) => (
+                      <div key={child.id} className="p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center text-white text-sm font-bold">
+                              {child.user.firstName?.[0]}{child.user.lastName?.[0]}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-slate-800">{child.user.firstName} {child.user.lastName}</p>
+                              <p className="text-xs text-slate-500">{child.user.email}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <Badge variant="outline" className="text-xs">{child.gradeLevel || 'N/A'}</Badge>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3">
+                          <div className="text-xs">
+                            <span className="text-slate-400">School</span>
+                            <p className="font-medium text-slate-700 mt-0.5">{child.schoolName || '-'}</p>
+                          </div>
+                          {child.classInfo && (
+                            <div className="text-xs">
+                              <span className="text-slate-400">Class</span>
+                              <p className="font-medium text-slate-700 mt-0.5">{child.classInfo.name}</p>
+                            </div>
+                          )}
+                          {child.tutorInfo && (
+                            <div className="text-xs">
+                              <span className="text-slate-400">Tutor</span>
+                              <p className="font-medium text-slate-700 mt-0.5">{child.tutorInfo.firstName} {child.tutorInfo.lastName}</p>
+                            </div>
+                          )}
+                          {child.companyInfo && (
+                            <div className="text-xs">
+                              <span className="text-slate-400">Centre</span>
+                              <p className="font-medium text-slate-700 mt-0.5">{child.companyInfo.name}</p>
+                            </div>
+                          )}
+                        </div>
+                        {child.progress && (
+                          <div className="flex items-center gap-4 mt-3 pt-2 border-t border-slate-100 text-xs text-slate-500">
+                            <span className="flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              {child.progress.totalAssignments ?? 0} assignments
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <CheckCircle className="h-3 w-3 text-emerald-500" />
+                              {child.progress.submittedCount ?? 0} submitted
+                            </span>
+                            <span className="flex items-center gap-1">
+                              <TrendingUp className="h-3 w-3 text-blue-500" />
+                              {child.progress.completionRate ?? 0}% complete
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card className="border border-slate-200 shadow-sm bg-white">
               <CardHeader className="pb-2">
                 <CardTitle className="flex items-center gap-2 text-base text-slate-800">
