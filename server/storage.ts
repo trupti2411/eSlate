@@ -597,8 +597,19 @@ export class DatabaseStorage implements IStorage {
 
     const childrenWithProgress = await Promise.all(
       studentData.map(async (student) => {
+        const enrolledClassesForInfo = await db.select({
+          classId: studentClassAssignments.classId,
+        })
+        .from(studentClassAssignments)
+        .where(and(
+          eq(studentClassAssignments.studentId, student.id),
+          eq(studentClassAssignments.isActive, true),
+        ));
+
+        const primaryClassId = student.classId || (enrolledClassesForInfo.length > 0 ? enrolledClassesForInfo[0].classId : null);
+
         let classInfo = null;
-        if (student.classId) {
+        if (primaryClassId) {
           const [classData] = await db.select({
             id: classes.id,
             name: classes.name,
@@ -610,7 +621,7 @@ export class DatabaseStorage implements IStorage {
             daysOfWeek: classes.daysOfWeek,
             dayOfWeek: classes.dayOfWeek,
             maxStudents: classes.maxStudents,
-          }).from(classes).where(eq(classes.id, student.classId));
+          }).from(classes).where(eq(classes.id, primaryClassId));
           classInfo = classData || null;
         }
 
@@ -648,7 +659,12 @@ export class DatabaseStorage implements IStorage {
           companyInfo = companyData || null;
         }
 
-        const studentAssignments = student.classId 
+        const classIds = enrolledClassesForInfo.map(e => e.classId);
+        if (student.classId && !classIds.includes(student.classId)) {
+          classIds.push(student.classId);
+        }
+
+        const studentAssignments = classIds.length > 0
           ? await db.select({
               id: assignments.id,
               title: assignments.title,
@@ -663,7 +679,7 @@ export class DatabaseStorage implements IStorage {
               createdAt: assignments.createdAt,
             })
             .from(assignments)
-            .where(eq(assignments.classId, student.classId))
+            .where(inArray(assignments.classId, classIds))
             .orderBy(desc(assignments.createdAt))
           : [];
 
