@@ -657,6 +657,8 @@ export class DatabaseStorage implements IStorage {
               submissionDate: assignments.submissionDate,
               status: assignments.status,
               assignmentKind: assignments.assignmentKind,
+              solutionText: assignments.solutionText,
+              solutionFileUrls: assignments.solutionFileUrls,
               createdAt: assignments.createdAt,
             })
             .from(assignments)
@@ -673,6 +675,7 @@ export class DatabaseStorage implements IStorage {
           score: submissions.score,
           feedback: submissions.feedback,
           gradedAt: submissions.gradedAt,
+          fileUrls: submissions.fileUrls,
           createdAt: submissions.createdAt,
         })
         .from(submissions)
@@ -696,6 +699,7 @@ export class DatabaseStorage implements IStorage {
               score: submission.score,
               feedback: submission.feedback,
               gradedAt: submission.gradedAt,
+              fileUrls: submission.fileUrls,
             } : null,
             submissionStatus: submission?.status || 'not_started',
           };

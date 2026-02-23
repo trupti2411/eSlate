@@ -112,6 +112,8 @@ interface ChildData {
     submissionDate: string;
     status: string;
     assignmentKind: string;
+    solutionText: string | null;
+    solutionFileUrls: string[] | null;
     createdAt: string;
     submission: {
       id: string;
@@ -121,6 +123,7 @@ interface ChildData {
       score: number | null;
       feedback: string | null;
       gradedAt: string | null;
+      fileUrls: string[] | null;
     } | null;
     submissionStatus: string;
   }>;
@@ -816,6 +819,65 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                       {assignment.submission?.feedback && (
                         <div className="mt-2 p-2.5 bg-blue-50 rounded-lg text-xs text-blue-700 border border-blue-100">
                           <span className="font-medium">Feedback:</span> {assignment.submission.feedback}
+                        </div>
+                      )}
+                      {assignment.submission?.fileUrls && assignment.submission.fileUrls.length > 0 && (
+                        <div className="mt-2 p-2.5 bg-slate-50 rounded-lg text-xs border border-slate-200">
+                          <span className="font-medium text-slate-700 flex items-center gap-1 mb-1">
+                            <FileText className="h-3 w-3" />
+                            Submitted Files ({assignment.submission.fileUrls.length})
+                          </span>
+                          <div className="space-y-1">
+                            {assignment.submission.fileUrls.map((url, idx) => {
+                              const filename = url.split('/').pop() || `File ${idx + 1}`;
+                              return (
+                                <button
+                                  key={idx}
+                                  onClick={() => {
+                                    const objectPath = url.includes('/uploads/')
+                                      ? url.split('/uploads/').pop()
+                                      : url.split('/').pop();
+                                    window.open(`/objects/uploads/${objectPath}`, '_blank');
+                                  }}
+                                  className="text-blue-600 hover:underline block text-left truncate w-full"
+                                >
+                                  {filename}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {(assignment.solutionText || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0)) && (
+                        <div className="mt-2 p-2.5 bg-amber-50 rounded-lg text-xs border border-amber-200">
+                          <span className="font-medium text-amber-800 flex items-center gap-1 mb-1">
+                            <Lightbulb className="h-3 w-3" />
+                            Solution
+                          </span>
+                          {assignment.solutionText && (
+                            <p className="text-amber-700 whitespace-pre-wrap">{assignment.solutionText}</p>
+                          )}
+                          {assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0 && (
+                            <div className="mt-1 space-y-1">
+                              {assignment.solutionFileUrls.map((url, idx) => {
+                                const filename = url.split('/').pop() || `Solution File ${idx + 1}`;
+                                return (
+                                  <button
+                                    key={idx}
+                                    onClick={() => {
+                                      const objectPath = url.includes('/uploads/')
+                                        ? url.split('/uploads/').pop()
+                                        : url.split('/').pop();
+                                      window.open(`/objects/uploads/${objectPath}`, '_blank');
+                                    }}
+                                    className="text-amber-700 hover:underline block text-left truncate w-full"
+                                  >
+                                    {filename}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>

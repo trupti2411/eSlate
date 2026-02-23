@@ -16,7 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { apiRequest } from "@/lib/queryClient";
 import { insertAssignmentSchema, type Assignment, type Class } from "@shared/schema";
-import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload, FileQuestion, BookOpen, HelpCircle, CheckCircle, ClipboardList, GraduationCap } from "lucide-react";
+import { Plus, FileText, Calendar, Users, Edit, Trash2, Upload, FileQuestion, BookOpen, HelpCircle, CheckCircle, ClipboardList, GraduationCap, Lightbulb, Eye } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { WorksheetEditor } from "@/components/WorksheetEditor";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -114,13 +114,15 @@ function AssignmentHierarchy({
   academicYears, 
   academicTerms, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onManageSolution 
 }: {
   assignments: Assignment[];
   academicYears: any[];
   academicTerms: any[];
   onEdit: (assignment: Assignment) => void;
   onDelete: (assignment: Assignment) => void;
+  onManageSolution: (assignment: Assignment) => void;
 }) {
   // Group assignments by academic year, term, subject, and week
   const groupedAssignments = React.useMemo(() => {
@@ -182,6 +184,9 @@ function AssignmentHierarchy({
                           </div>
                         </div>
                         <div className="flex space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => onManageSolution(assignment)} title="Manage Solution">
+                            <Lightbulb className={`w-4 h-4 ${(assignment as any).solutionText || ((assignment as any).solutionFileUrls && (assignment as any).solutionFileUrls.length > 0) ? 'text-amber-500' : ''}`} />
+                          </Button>
                           <Button variant="outline" size="sm" onClick={() => onEdit(assignment)}>
                             <Edit className="w-4 h-4" />
                           </Button>
@@ -222,6 +227,136 @@ function AssignmentHierarchy({
   );
 }
 
+function SolutionManager({ assignment, onClose }: { assignment: Assignment; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const companyId = (assignment as any).companyId;
+  const [solutionText, setSolutionText] = useState((assignment as any).solutionText || '');
+  const [solutionFileUrls, setSolutionFileUrls] = useState<string[]>((assignment as any).solutionFileUrls || []);
+  const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(solutionFileUrls);
+
+  const saveSolutionMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest(`/api/assignments/${assignment.id}`, 'PATCH', {
+        solutionText: solutionText || null,
+        solutionFileUrls,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/companies', companyId, 'assignments'] });
+      toast({ title: "Solution saved", description: "The solution has been saved successfully." });
+      onClose();
+    },
+    onError: (error: any) => {
+      toast({ title: "Error", description: error?.message || "Failed to save solution", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+          <Lightbulb className="h-4 w-4 text-amber-500" />
+          Solution Text / Explanation
+        </label>
+        <Textarea
+          placeholder="Enter the solution explanation, worked examples, or answer key..."
+          rows={6}
+          value={solutionText}
+          onChange={(e) => setSolutionText(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Visible to tutors, business admins, and parents. Not visible to students.
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Solution Files</label>
+        <p className="text-xs text-muted-foreground mb-2">
+          Upload solution PDFs, documents, or images. Accepted formats: PDF, DOC, DOCX, PNG, JPEG (Max 30MB)
+        </p>
+        <ObjectUploader
+          maxNumberOfFiles={5}
+          maxFileSize={31457280}
+          onGetUploadParameters={async () => {
+            const response = await apiRequest('/api/objects/upload', 'POST');
+            return { method: 'PUT' as const, url: response.uploadURL };
+          }}
+          onComplete={async (result) => {
+            if (result.successful && result.successful.length > 0) {
+              for (const file of result.successful) {
+                try {
+                  await apiRequest('/api/objects/metadata', 'POST', {
+                    uploadURL: file.uploadURL,
+                    originalFileName: file.name
+                  });
+                } catch (error) {
+                  console.error("Failed to set file metadata:", error);
+                }
+              }
+              const uploadedUrls = result.successful.map((file: any) => file.uploadURL);
+              setSolutionFileUrls(prev => [...prev, ...uploadedUrls]);
+              toast({ title: "Uploaded", description: `${result.successful.length} solution file(s) uploaded` });
+            }
+          }}
+          buttonClassName="w-full"
+        >
+          <Upload className="w-4 h-4 mr-2" />
+          Upload Solution Files
+        </ObjectUploader>
+
+        {solutionFileUrls.length > 0 && (
+          <div className="space-y-2 mt-3">
+            <p className="text-sm font-medium">Uploaded Solution Files:</p>
+            {solutionFileUrls.map((url, index) => {
+              const metadata = fileMetadata?.[index];
+              const displayFilename = getDisplayFilename(url, metadata, index);
+              return (
+                <div key={index} className="flex items-center justify-between bg-muted p-2 rounded">
+                  <span className="text-sm">
+                    {isLoadingMetadata ? `Loading file ${index + 1}...` : displayFilename}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const objectPath = url.includes('/uploads/')
+                          ? url.split('/uploads/').pop()
+                          : url.split('/').pop();
+                        window.open(`/objects/uploads/${objectPath}`, '_blank');
+                      }}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSolutionFileUrls(prev => prev.filter((_, i) => i !== index))}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end space-x-2 pt-4 border-t">
+        <Button variant="outline" onClick={onClose}>Cancel</Button>
+        <Button onClick={() => saveSolutionMutation.mutate()} disabled={saveSolutionMutation.isPending}>
+          {saveSolutionMutation.isPending ? 'Saving...' : 'Save Solution'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function AssignmentManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -234,6 +369,7 @@ export function AssignmentManagement() {
   const [showWorksheetEditor, setShowWorksheetEditor] = useState(false);
   const [editingWorksheetId, setEditingWorksheetId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'assignments' | 'worksheets' | 'tests' | 'homework'>('assignments');
+  const [solutionAssignment, setSolutionAssignment] = useState<Assignment | null>(null);
 
   // Get user's company ID from roleData
   const companyId = (user as any)?.roleData?.companyId;
@@ -1059,6 +1195,7 @@ export function AssignmentManagement() {
           academicTerms={academicTerms}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onManageSolution={(assignment) => setSolutionAssignment(assignment)}
         />
       )}
       </>
@@ -1089,6 +1226,27 @@ export function AssignmentManagement() {
               {deleteAssignmentMutation.isPending ? 'Deleting...' : 'Delete'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Solution Manager Dialog */}
+      <Dialog open={!!solutionAssignment} onOpenChange={(open) => { if (!open) setSolutionAssignment(null); }}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5 text-amber-500" />
+              Manage Solution - {solutionAssignment?.title}
+            </DialogTitle>
+            <DialogDescription>
+              Add or update the solution for this assignment. Solutions are visible to tutors, business admins, and parents only.
+            </DialogDescription>
+          </DialogHeader>
+          {solutionAssignment && (
+            <SolutionManager 
+              assignment={solutionAssignment} 
+              onClose={() => setSolutionAssignment(null)} 
+            />
+          )}
         </DialogContent>
       </Dialog>
 

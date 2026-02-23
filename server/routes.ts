@@ -339,8 +339,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get assignments by class
   app.get('/api/classes/:classId/assignments', isAuthenticated, async (req: any, res: any) => {
     try {
+      const user = req.user!;
       const classId = req.params.classId;
       const assignments = await storage.getAssignmentsByClass(classId);
+      
+      // Strip solution fields for students
+      if (user.role === 'student') {
+        const safeAssignments = assignments.map((a: any) => {
+          const { solutionText, solutionFileUrls, correctAnswer, ...safe } = a;
+          return safe;
+        });
+        return res.json(safeAssignments);
+      }
+      
       res.json(assignments);
     } catch (error) {
       console.error("Error fetching class assignments:", error);
@@ -532,6 +543,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Strip solution fields from student responses
+      if (user.role === 'student') {
+        const { solutionText, solutionFileUrls, correctAnswer, ...safeAssignment } = assignment;
+        return res.json(safeAssignment);
+      }
+      
       res.json(assignment);
     } catch (error) {
       console.error("Error fetching assignment:", error);
@@ -544,6 +561,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const user = req.user!;
       const assignmentId = req.params.id;
+      
+      // Only tutors, company admins, and system admins can update assignments
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
       
       // Verify user created this assignment or is company admin
       const existingAssignment = await storage.getAssignment(assignmentId);
@@ -719,8 +741,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return assignment;
       }));
       
-      // Filter out correctAnswer field - students should not see this
-      const safeAssignments = enrichedAssignments.map(({ correctAnswer, ...assignment }) => assignment);
+      // Filter out solution and correctAnswer fields - students should not see these
+      const safeAssignments = enrichedAssignments.map(({ correctAnswer, solutionText, solutionFileUrls, ...assignment }) => assignment);
       
       res.json(safeAssignments);
     } catch (error) {
