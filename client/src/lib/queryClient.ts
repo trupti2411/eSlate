@@ -7,12 +7,34 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+let cachedCsrfToken: string | null = null;
+
+async function getCsrfToken(): Promise<string> {
+  if (cachedCsrfToken) return cachedCsrfToken;
+  const res = await fetch('/api/auth/csrf-token', { credentials: 'include' });
+  if (res.ok) {
+    const data = await res.json();
+    cachedCsrfToken = data.csrfToken;
+    return cachedCsrfToken!;
+  }
+  return '';
+}
+
 export async function apiRequest(endpoint: string, method: string = "GET", data?: any) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
+    const csrfToken = await getCsrfToken();
+    if (csrfToken) {
+      headers['x-csrf-token'] = csrfToken;
+    }
+  }
+
   const config: RequestInit = {
     method,
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers,
     credentials: "include",
   };
 
@@ -20,11 +42,19 @@ export async function apiRequest(endpoint: string, method: string = "GET", data?
     config.body = JSON.stringify(data);
   }
 
-  const response = await fetch(endpoint, config);
+  let response = await fetch(endpoint, config);
+
+  if (response.status === 403 && !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
+    cachedCsrfToken = null;
+    const freshToken = await getCsrfToken();
+    if (freshToken) {
+      (config.headers as Record<string, string>)['x-csrf-token'] = freshToken;
+      response = await fetch(endpoint, config);
+    }
+  }
 
   if (!response.ok) {
     if (response.status === 401) {
-      // Clear any cached auth state and redirect to login
       window.location.href = "/auth";
       return null;
     }
