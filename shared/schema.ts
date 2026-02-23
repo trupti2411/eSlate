@@ -178,6 +178,7 @@ export const assignments = pgTable("assignments", {
   
   solutionText: text("solution_text"), // Tutor-provided solution text/explanation
   solutionFileUrls: text("solution_file_urls").array().default([]), // Tutor-uploaded solution files (PDF, doc, images)
+  solutionNotes: text("solution_notes"), // Additional notes about solution files (e.g., descriptions, instructions)
   
   attachmentUrls: text("attachment_urls").array().default([]), // Files uploaded by admin/tutor
   allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg']), // Specified file types

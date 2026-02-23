@@ -116,8 +116,8 @@ export function AssignmentCompletionArea({
   const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(attachmentUrls);
 
   // Upload functions
-  const getUploadParameters = async () => {
-    const response = await apiRequest("/api/objects/upload", "POST");
+  const getUploadParameters = async (file?: { name: string; type?: string }) => {
+    const response = await apiRequest("/api/objects/upload", "POST", { contentType: file?.type });
     return {
       method: "PUT" as const,
       url: response.uploadURL,

@@ -658,6 +658,7 @@ export class DatabaseStorage implements IStorage {
               status: assignments.status,
               assignmentKind: assignments.assignmentKind,
               solutionText: assignments.solutionText,
+              solutionNotes: assignments.solutionNotes,
               solutionFileUrls: assignments.solutionFileUrls,
               createdAt: assignments.createdAt,
             })

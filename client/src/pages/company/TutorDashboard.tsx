@@ -396,7 +396,7 @@ export default function TutorDashboard() {
   };
 
   // File upload handlers
-  const handleGetUploadParameters = async () => {
+  const handleGetUploadParameters = async (file?: { name: string; type?: string }) => {
     try {
       console.log("Getting upload parameters...");
       const response = await fetch('/api/homework/upload', {
@@ -405,6 +405,7 @@ export default function TutorDashboard() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
         },
+        body: JSON.stringify({ contentType: file?.type }),
       });
 
       console.log("Server response status:", response.status);

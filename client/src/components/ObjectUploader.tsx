@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 interface ObjectUploaderProps {
   maxNumberOfFiles?: number;
   maxFileSize?: number;
-  onGetUploadParameters: () => Promise<{
+  onGetUploadParameters: (file?: { name: string; type?: string }) => Promise<{
     method: "PUT";
     url: string;
   }>;
@@ -20,43 +20,17 @@ interface ObjectUploaderProps {
   ) => void;
   buttonClassName?: string;
   children: ReactNode;
+  allowedFileTypes?: string[];
 }
 
-/**
- * A file upload component that renders as a button and provides a modal interface for
- * file management.
- * 
- * Features:
- * - Renders as a customizable button that opens a file upload modal
- * - Provides a modal interface for:
- *   - File selection
- *   - File preview
- *   - Upload progress tracking
- *   - Upload status display
- * 
- * The component uses Uppy under the hood to handle all file upload functionality.
- * All file management features are automatically handled by the Uppy dashboard modal.
- * 
- * @param props - Component props
- * @param props.maxNumberOfFiles - Maximum number of files allowed to be uploaded
- *   (default: 1)
- * @param props.maxFileSize - Maximum file size in bytes (default: 10MB)
- * @param props.onGetUploadParameters - Function to get upload parameters (method and URL).
- *   Typically used to fetch a presigned URL from the backend server for direct-to-S3
- *   uploads.
- * @param props.onComplete - Callback function called when upload is complete. Typically
- *   used to make post-upload API calls to update server state and set object ACL
- *   policies.
- * @param props.buttonClassName - Optional CSS class name for the button
- * @param props.children - Content to be rendered inside the button
- */
 export function ObjectUploader({
   maxNumberOfFiles = 1,
-  maxFileSize = 31457280, // 30MB default
+  maxFileSize = 31457280,
   onGetUploadParameters,
   onComplete,
   buttonClassName,
   children,
+  allowedFileTypes = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpeg', '.jpg'],
 }: ObjectUploaderProps) {
   const [showModal, setShowModal] = useState(false);
   const [uppy] = useState(() =>
@@ -64,13 +38,25 @@ export function ObjectUploader({
       restrictions: {
         maxNumberOfFiles,
         maxFileSize,
-        allowedFileTypes: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpeg', '.jpg'],
+        allowedFileTypes,
       },
       autoProceed: false,
     })
       .use(AwsS3, {
         shouldUseMultipart: false,
-        getUploadParameters: onGetUploadParameters,
+        getUploadParameters: async (file: any) => {
+          const result = await onGetUploadParameters({
+            name: file.name,
+            type: file.type,
+          });
+          return {
+            method: result.method,
+            url: result.url,
+            headers: {
+              'Content-Type': file.type || 'application/octet-stream',
+            },
+          };
+        },
       })
       .on("complete", (result) => {
         onComplete?.(result);

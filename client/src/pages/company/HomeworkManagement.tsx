@@ -163,8 +163,8 @@ export default function HomeworkManagement() {
     },
   });
 
-  const handleGetUploadParameters = async () => {
-    const response = await apiRequest("/api/homework/upload", "POST");
+  const handleGetUploadParameters = async (file?: { name: string; type?: string }) => {
+    const response = await apiRequest("/api/homework/upload", "POST", { contentType: file?.type });
     const data = await response.json();
     return {
       method: "PUT" as const,

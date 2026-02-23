@@ -232,6 +232,7 @@ function SolutionManager({ assignment, onClose }: { assignment: Assignment; onCl
   const queryClient = useQueryClient();
   const companyId = (assignment as any).companyId;
   const [solutionText, setSolutionText] = useState((assignment as any).solutionText || '');
+  const [solutionNotes, setSolutionNotes] = useState((assignment as any).solutionNotes || '');
   const [solutionFileUrls, setSolutionFileUrls] = useState<string[]>((assignment as any).solutionFileUrls || []);
   const { data: fileMetadata, isLoading: isLoadingMetadata } = useMultipleFileMetadata(solutionFileUrls);
 
@@ -239,6 +240,7 @@ function SolutionManager({ assignment, onClose }: { assignment: Assignment; onCl
     mutationFn: async () => {
       return apiRequest(`/api/assignments/${assignment.id}`, 'PATCH', {
         solutionText: solutionText || null,
+        solutionNotes: solutionNotes || null,
         solutionFileUrls,
       });
     },
@@ -271,6 +273,22 @@ function SolutionManager({ assignment, onClose }: { assignment: Assignment; onCl
       </div>
 
       <div>
+        <label className="block text-sm font-medium mb-2 flex items-center gap-2">
+          <FileText className="h-4 w-4" />
+          Additional Notes
+        </label>
+        <Textarea
+          placeholder="Add any additional notes about the solution files, marking criteria, or instructions for reviewers..."
+          rows={3}
+          value={solutionNotes}
+          onChange={(e) => setSolutionNotes(e.target.value)}
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          Use this to describe what each uploaded file contains or provide extra context.
+        </p>
+      </div>
+
+      <div>
         <label className="block text-sm font-medium mb-2">Solution Files</label>
         <p className="text-xs text-muted-foreground mb-2">
           Upload solution PDFs, documents, or images. Accepted formats: PDF, DOC, DOCX, PNG, JPEG (Max 30MB)
@@ -278,8 +296,8 @@ function SolutionManager({ assignment, onClose }: { assignment: Assignment; onCl
         <ObjectUploader
           maxNumberOfFiles={5}
           maxFileSize={31457280}
-          onGetUploadParameters={async () => {
-            const response = await apiRequest('/api/objects/upload', 'POST');
+          onGetUploadParameters={async (file) => {
+            const response = await apiRequest('/api/objects/upload', 'POST', { contentType: file?.type });
             return { method: 'PUT' as const, url: response.uploadURL };
           }}
           onComplete={async (result) => {
@@ -1036,8 +1054,8 @@ export function AssignmentManagement() {
                     <ObjectUploader
                       maxNumberOfFiles={5}
                       maxFileSize={31457280} // 30MB
-                      onGetUploadParameters={async () => {
-                        const response = await apiRequest('/api/objects/upload', 'POST');
+                      onGetUploadParameters={async (file) => {
+                        const response = await apiRequest('/api/objects/upload', 'POST', { contentType: file?.type });
                         return {
                           method: 'PUT' as const,
                           url: response.uploadURL,

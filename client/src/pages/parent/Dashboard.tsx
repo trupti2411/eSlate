@@ -113,6 +113,7 @@ interface ChildData {
     status: string;
     assignmentKind: string;
     solutionText: string | null;
+    solutionNotes: string | null;
     solutionFileUrls: string[] | null;
     createdAt: string;
     submission: {
@@ -848,7 +849,7 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                           </div>
                         </div>
                       )}
-                      {(assignment.solutionText || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0)) && (
+                      {(assignment.solutionText || assignment.solutionNotes || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0)) && (
                         <div className="mt-2 p-2.5 bg-amber-50 rounded-lg text-xs border border-amber-200">
                           <span className="font-medium text-amber-800 flex items-center gap-1 mb-1">
                             <Lightbulb className="h-3 w-3" />
@@ -856,6 +857,9 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                           </span>
                           {assignment.solutionText && (
                             <p className="text-amber-700 whitespace-pre-wrap">{assignment.solutionText}</p>
+                          )}
+                          {assignment.solutionNotes && (
+                            <p className="text-amber-600 italic mt-1 whitespace-pre-wrap">{assignment.solutionNotes}</p>
                           )}
                           {assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0 && (
                             <div className="mt-1 space-y-1">

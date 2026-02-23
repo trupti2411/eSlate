@@ -346,7 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Strip solution fields for students
       if (user.role === 'student') {
         const safeAssignments = assignments.map((a: any) => {
-          const { solutionText, solutionFileUrls, correctAnswer, ...safe } = a;
+          const { solutionText, solutionFileUrls, solutionNotes, correctAnswer, ...safe } = a;
           return safe;
         });
         return res.json(safeAssignments);
@@ -545,7 +545,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Strip solution fields from student responses
       if (user.role === 'student') {
-        const { solutionText, solutionFileUrls, correctAnswer, ...safeAssignment } = assignment;
+        const { solutionText, solutionFileUrls, solutionNotes, correctAnswer, ...safeAssignment } = assignment;
         return res.json(safeAssignment);
       }
       
@@ -742,7 +742,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }));
       
       // Filter out solution and correctAnswer fields - students should not see these
-      const safeAssignments = enrichedAssignments.map(({ correctAnswer, solutionText, solutionFileUrls, ...assignment }) => assignment);
+      const safeAssignments = enrichedAssignments.map(({ correctAnswer, solutionText, solutionFileUrls, solutionNotes, ...assignment }) => assignment);
       
       res.json(safeAssignments);
     } catch (error) {
@@ -4600,8 +4600,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Object storage upload endpoint
   app.post('/api/objects/upload', isAuthenticated, async (req: any, res: any) => {
     try {
+      const contentType = req.body?.contentType || undefined;
       const objectStorageService = new ObjectStorageService();
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL(contentType);
       res.json({ uploadURL });
     } catch (error) {
       console.error("Error generating upload URL:", error);
