@@ -18,7 +18,8 @@ import {
   Calendar, Clock, AlertCircle, GraduationCap, FileText,
   User, Settings, Sparkles, Lightbulb, LogOut,
   MapPin, Phone, Mail, MessageCircle, Building2,
-  Award, ClipboardList, Timer, Target, Star, ShieldAlert
+  Award, ClipboardList, Timer, Target, Star, ShieldAlert,
+  ExternalLink, Download, ChevronDown, ChevronUp, Eye, Link2, Paperclip
 } from "lucide-react";
 import { format, isPast, differenceInDays } from "date-fns";
 
@@ -780,108 +781,141 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                 <p className="text-sm">No assignments yet</p>
               </div>
             ) : (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                {child.assignments.map((assignment) => {
+              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                {child.assignments.map((assignment, index) => {
                   const deadlineInfo = getDeadlineInfo(assignment.submissionDate);
+                  const hasSolution = assignment.solutionText || assignment.solutionNotes || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0);
+                  const hasSubmission = assignment.submission && assignment.submission.status !== 'draft';
+                  const hasFiles = assignment.submission?.fileUrls && assignment.submission.fileUrls.length > 0;
+
                   return (
                     <div 
                       key={assignment.id} 
-                      className="p-3 border border-slate-100 rounded-xl hover:border-blue-200 hover:bg-blue-50/30 transition-all"
+                      className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm"
                       data-testid={`assignment-row-${assignment.id}`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <h4 className="font-semibold text-sm text-slate-800 truncate">{assignment.title}</h4>
-                            <Badge variant="outline" className="text-[10px] shrink-0 border-slate-200 text-slate-500">
-                              {assignment.assignmentKind === 'worksheet' ? 'Worksheet' : 'File Upload'}
-                            </Badge>
+                      <div className="p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
+                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
+                              assignment.submissionStatus === 'graded' ? 'bg-emerald-100 text-emerald-700' :
+                              assignment.submissionStatus === 'submitted' ? 'bg-blue-100 text-blue-700' :
+                              assignment.submissionStatus === 'late' ? 'bg-red-100 text-red-700' :
+                              'bg-slate-100 text-slate-600'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="font-semibold text-sm text-slate-800 leading-tight">{assignment.title}</h4>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                                <span className="text-xs text-slate-500 flex items-center gap-1">
+                                  <GraduationCap className="h-3 w-3" />
+                                  {assignment.subject}
+                                </span>
+                                <span className={`text-xs flex items-center gap-1 ${deadlineInfo.color}`}>
+                                  <Calendar className="h-3 w-3" />
+                                  {deadlineInfo.text}
+                                </span>
+                                <span className="text-xs text-slate-400 flex items-center gap-1">
+                                  <Paperclip className="h-3 w-3" />
+                                  {assignment.assignmentKind === 'worksheet' ? 'Worksheet' : 'File Upload'}
+                                </span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-3 text-xs text-slate-500">
-                            <span className="flex items-center gap-1">
-                              <GraduationCap className="h-3 w-3" />
-                              {assignment.subject}
-                            </span>
-                            <span className={`flex items-center gap-1 ${deadlineInfo.color}`}>
-                              <Calendar className="h-3 w-3" />
-                              {deadlineInfo.text}
-                            </span>
+                          <div className="flex flex-col items-end gap-1 shrink-0">
+                            {getStatusBadge(assignment.submissionStatus)}
+                            {assignment.submission?.score != null && (
+                              <span className="text-lg font-bold text-emerald-600">{assignment.submission.score}%</span>
+                            )}
                           </div>
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                          {assignment.submission?.score != null && (
-                            <Badge className="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-semibold">
-                              {assignment.submission.score}%
-                            </Badge>
-                          )}
-                          {getStatusBadge(assignment.submissionStatus)}
                         </div>
                       </div>
-                      {assignment.submission?.feedback && (
-                        <div className="mt-2 p-2.5 bg-blue-50 rounded-lg text-xs text-blue-700 border border-blue-100">
-                          <span className="font-medium">Feedback:</span> {assignment.submission.feedback}
-                        </div>
-                      )}
-                      {assignment.submission?.fileUrls && assignment.submission.fileUrls.length > 0 && (
-                        <div className="mt-2 p-2.5 bg-slate-50 rounded-lg text-xs border border-slate-200">
-                          <span className="font-medium text-slate-700 flex items-center gap-1 mb-1">
-                            <FileText className="h-3 w-3" />
-                            Submitted Files ({assignment.submission.fileUrls.length})
-                          </span>
-                          <div className="space-y-1">
-                            {assignment.submission.fileUrls.map((url, idx) => {
-                              const filename = url.split('/').pop() || `File ${idx + 1}`;
-                              return (
-                                <button
-                                  key={idx}
-                                  onClick={() => {
-                                    const objectPath = url.includes('/uploads/')
-                                      ? url.split('/uploads/').pop()
-                                      : url.split('/').pop();
-                                    window.open(`/objects/uploads/${objectPath}`, '_blank');
-                                  }}
-                                  className="text-blue-600 hover:underline block text-left truncate w-full"
-                                >
-                                  {filename}
-                                </button>
-                              );
-                            })}
+
+                      {(hasSubmission || hasSolution || assignment.submission?.feedback) && (
+                        <div className="border-t border-slate-100 bg-slate-50/50">
+                          <div className="p-3 space-y-2">
+                            {assignment.submission?.feedback && (
+                              <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-lg">
+                                <MessageCircle className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                                <div className="text-xs">
+                                  <span className="font-semibold text-blue-700">Tutor Feedback</span>
+                                  <p className="text-blue-600 mt-0.5">{assignment.submission.feedback}</p>
+                                </div>
+                              </div>
+                            )}
+
+                            {hasFiles && (
+                              <div className="flex items-start gap-2 p-2 bg-white rounded-lg border border-slate-100">
+                                <FileText className="h-3.5 w-3.5 text-slate-500 mt-0.5 shrink-0" />
+                                <div className="text-xs flex-1 min-w-0">
+                                  <span className="font-semibold text-slate-700">Submitted Work</span>
+                                  <div className="mt-1 flex flex-wrap gap-1.5">
+                                    {assignment.submission!.fileUrls!.map((url, idx) => {
+                                      const filename = url.split('/').pop() || `File ${idx + 1}`;
+                                      const ext = filename.split('.').pop()?.toLowerCase() || '';
+                                      const isPdf = ext === 'pdf';
+                                      return (
+                                        <button
+                                          key={idx}
+                                          onClick={() => {
+                                            const objectPath = url.includes('/uploads/')
+                                              ? url.split('/uploads/').pop()
+                                              : url.split('/').pop();
+                                            window.open(`/objects/uploads/${objectPath}`, '_blank');
+                                          }}
+                                          className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-md transition-colors truncate max-w-[200px]"
+                                          title={filename}
+                                        >
+                                          {isPdf ? <FileText className="h-3 w-3 shrink-0" /> : <Download className="h-3 w-3 shrink-0" />}
+                                          <span className="truncate">{filename}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {hasSolution && (
+                              <div className="flex items-start gap-2 p-2 bg-amber-50 rounded-lg border border-amber-100">
+                                <Lightbulb className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                                <div className="text-xs flex-1 min-w-0">
+                                  <span className="font-semibold text-amber-700">Solution</span>
+                                  {assignment.solutionText && (
+                                    <p className="text-amber-700 mt-1 whitespace-pre-wrap leading-relaxed">{assignment.solutionText}</p>
+                                  )}
+                                  {assignment.solutionNotes && (
+                                    <p className="text-amber-600 mt-1 italic">{assignment.solutionNotes}</p>
+                                  )}
+                                  {assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0 && (
+                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                      {assignment.solutionFileUrls.map((url, idx) => {
+                                        const filename = url.split('/').pop() || `Solution ${idx + 1}`;
+                                        return (
+                                          <button
+                                            key={idx}
+                                            onClick={() => {
+                                              const objectPath = url.includes('/uploads/')
+                                                ? url.split('/uploads/').pop()
+                                                : url.split('/').pop();
+                                              window.open(`/objects/uploads/${objectPath}`, '_blank');
+                                            }}
+                                            className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-md transition-colors truncate max-w-[220px]"
+                                            title={filename}
+                                          >
+                                            <Eye className="h-3 w-3 shrink-0" />
+                                            <span className="truncate">{filename}</span>
+                                            <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-60" />
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      )}
-                      {(assignment.solutionText || assignment.solutionNotes || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0)) && (
-                        <div className="mt-2 p-2.5 bg-amber-50 rounded-lg text-xs border border-amber-200">
-                          <span className="font-medium text-amber-800 flex items-center gap-1 mb-1">
-                            <Lightbulb className="h-3 w-3" />
-                            Solution
-                          </span>
-                          {assignment.solutionText && (
-                            <p className="text-amber-700 whitespace-pre-wrap">{assignment.solutionText}</p>
-                          )}
-                          {assignment.solutionNotes && (
-                            <p className="text-amber-600 italic mt-1 whitespace-pre-wrap">{assignment.solutionNotes}</p>
-                          )}
-                          {assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0 && (
-                            <div className="mt-1 space-y-1">
-                              {assignment.solutionFileUrls.map((url, idx) => {
-                                const filename = url.split('/').pop() || `Solution File ${idx + 1}`;
-                                return (
-                                  <button
-                                    key={idx}
-                                    onClick={() => {
-                                      const objectPath = url.includes('/uploads/')
-                                        ? url.split('/uploads/').pop()
-                                        : url.split('/').pop();
-                                      window.open(`/objects/uploads/${objectPath}`, '_blank');
-                                    }}
-                                    className="text-amber-700 hover:underline block text-left truncate w-full"
-                                  >
-                                    {filename}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
                         </div>
                       )}
                     </div>
