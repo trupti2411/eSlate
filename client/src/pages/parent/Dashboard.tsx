@@ -156,6 +156,131 @@ interface ParentSettings {
 
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
+function FormattedSolutionText({ text }: { text: string }) {
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  
+  const lines = text.split('\n');
+  
+  return (
+    <div className="space-y-1">
+      {lines.map((line, lineIdx) => {
+        const trimmed = line.trim();
+        if (!trimmed) return <div key={lineIdx} className="h-1.5" />;
+
+        const isUrl = urlRegex.test(trimmed);
+        urlRegex.lastIndex = 0;
+
+        if (isUrl && trimmed.match(/^https?:\/\//)) {
+          return (
+            <a
+              key={lineIdx}
+              href={trimmed}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-2 py-1.5 bg-amber-100/60 hover:bg-amber-200/80 rounded-md text-amber-800 transition-colors group"
+            >
+              <Link2 className="h-3 w-3 shrink-0 text-amber-500" />
+              <span className="truncate flex-1">{trimmed}</span>
+              <ExternalLink className="h-3 w-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" />
+            </a>
+          );
+        }
+
+        const parts = trimmed.split(urlRegex);
+        urlRegex.lastIndex = 0;
+        
+        const isHeading = /^(Question \d+|Answer:|Video Link:|Materials|Solutions|URL Links|Homework Help|Writing Homework)/i.test(trimmed);
+
+        return (
+          <p key={lineIdx} className={isHeading ? 'font-semibold text-amber-800 mt-1' : 'text-amber-700'}>
+            {parts.map((part, partIdx) => {
+              if (urlRegex.test(part)) {
+                urlRegex.lastIndex = 0;
+                return (
+                  <a
+                    key={partIdx}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 underline underline-offset-2 inline-flex items-center gap-0.5"
+                  >
+                    {part.length > 50 ? part.slice(0, 50) + '...' : part}
+                    <ExternalLink className="h-2.5 w-2.5 inline" />
+                  </a>
+                );
+              }
+              return <span key={partIdx}>{part}</span>;
+            })}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+function CollapsibleSolution({ assignment }: { assignment: any }) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const hasSolution = assignment.solutionText || assignment.solutionNotes || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0);
+  
+  if (!hasSolution) return null;
+
+  return (
+    <div className="bg-amber-50 rounded-lg border border-amber-100 overflow-hidden">
+      <button
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between gap-2 p-2.5 hover:bg-amber-100/50 transition-colors text-left"
+      >
+        <span className="flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+          <Lightbulb className="h-3.5 w-3.5 text-amber-500" />
+          Solution & Resources
+        </span>
+        <ChevronDown className={`h-3.5 w-3.5 text-amber-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+      </button>
+      {isExpanded && (
+        <div className="px-2.5 pb-2.5 text-xs space-y-2">
+          {assignment.solutionText && (
+            <FormattedSolutionText text={assignment.solutionText} />
+          )}
+          {assignment.solutionNotes && (
+            <div className="p-2 bg-amber-100/40 rounded-md">
+              <span className="font-semibold text-amber-700 text-[11px] uppercase tracking-wide">Notes</span>
+              <p className="text-amber-600 mt-0.5 italic">{assignment.solutionNotes}</p>
+            </div>
+          )}
+          {assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0 && (
+            <div>
+              <span className="font-semibold text-amber-700 text-[11px] uppercase tracking-wide">Attached Files</span>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {assignment.solutionFileUrls.map((url: string, idx: number) => {
+                  const filename = url.split('/').pop() || `Solution ${idx + 1}`;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const objectPath = url.includes('/uploads/')
+                          ? url.split('/uploads/').pop()
+                          : url.split('/').pop();
+                        window.open(`/objects/uploads/${objectPath}`, '_blank');
+                      }}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-md transition-colors"
+                      title={filename}
+                    >
+                      <Eye className="h-3 w-3 shrink-0" />
+                      <span className="truncate max-w-[180px]">{filename}</span>
+                      <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-60" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ParentDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -878,42 +1003,7 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
                             )}
 
                             {hasSolution && (
-                              <div className="flex items-start gap-2 p-2 bg-amber-50 rounded-lg border border-amber-100">
-                                <Lightbulb className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
-                                <div className="text-xs flex-1 min-w-0">
-                                  <span className="font-semibold text-amber-700">Solution</span>
-                                  {assignment.solutionText && (
-                                    <p className="text-amber-700 mt-1 whitespace-pre-wrap leading-relaxed">{assignment.solutionText}</p>
-                                  )}
-                                  {assignment.solutionNotes && (
-                                    <p className="text-amber-600 mt-1 italic">{assignment.solutionNotes}</p>
-                                  )}
-                                  {assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0 && (
-                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                      {assignment.solutionFileUrls.map((url, idx) => {
-                                        const filename = url.split('/').pop() || `Solution ${idx + 1}`;
-                                        return (
-                                          <button
-                                            key={idx}
-                                            onClick={() => {
-                                              const objectPath = url.includes('/uploads/')
-                                                ? url.split('/uploads/').pop()
-                                                : url.split('/').pop();
-                                              window.open(`/objects/uploads/${objectPath}`, '_blank');
-                                            }}
-                                            className="inline-flex items-center gap-1 px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-800 rounded-md transition-colors truncate max-w-[220px]"
-                                            title={filename}
-                                          >
-                                            <Eye className="h-3 w-3 shrink-0" />
-                                            <span className="truncate">{filename}</span>
-                                            <ExternalLink className="h-2.5 w-2.5 shrink-0 opacity-60" />
-                                          </button>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
+                              <CollapsibleSolution assignment={assignment} />
                             )}
                           </div>
                         </div>
