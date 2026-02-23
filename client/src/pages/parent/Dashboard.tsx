@@ -281,6 +281,136 @@ function CollapsibleSolution({ assignment }: { assignment: any }) {
   );
 }
 
+function AssignmentTableRow({ assignment, index, deadlineInfo, hasSolution, hasSubmission, hasFiles, getStatusBadge }: {
+  assignment: any;
+  index: number;
+  deadlineInfo: { text: string; color: string };
+  hasSolution: boolean;
+  hasSubmission: boolean;
+  hasFiles: boolean;
+  getStatusBadge: (status: string) => JSX.Element;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const hasDetails = hasSolution || hasSubmission || hasFiles || assignment.submission?.feedback;
+
+  return (
+    <>
+      <tr
+        className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/40'}`}
+        data-testid={`assignment-row-${assignment.id}`}
+      >
+        <td className="py-2.5 px-3">
+          <span className="font-medium text-slate-800 text-sm">{assignment.title}</span>
+        </td>
+        <td className="py-2.5 px-3">
+          <span className="text-slate-600 text-xs flex items-center gap-1">
+            <GraduationCap className="h-3 w-3" />
+            {assignment.subject}
+          </span>
+        </td>
+        <td className="py-2.5 px-3">
+          <span className={`text-xs flex items-center gap-1 ${deadlineInfo.color}`}>
+            <Calendar className="h-3 w-3" />
+            {assignment.submissionDate ? format(new Date(assignment.submissionDate), 'dd/MM/yyyy') : '-'}
+          </span>
+        </td>
+        <td className="py-2.5 px-3 text-center">
+          {getStatusBadge(assignment.submissionStatus)}
+        </td>
+        <td className="py-2.5 px-3 text-center">
+          {assignment.submission?.score != null ? (
+            <span className="text-sm font-bold text-emerald-600">{assignment.submission.score}%</span>
+          ) : (
+            <span className="text-xs text-slate-400">-</span>
+          )}
+        </td>
+        <td className="py-2.5 px-3">
+          <div className="flex items-center justify-center gap-1">
+            {hasSolution && (
+              <button
+                onClick={() => setExpanded(prev => !prev)}
+                className="h-7 w-7 rounded-full bg-amber-50 hover:bg-amber-100 flex items-center justify-center transition-colors border border-amber-200"
+                title="View Solution"
+              >
+                <Lightbulb className="h-3.5 w-3.5 text-amber-600" />
+              </button>
+            )}
+            {hasFiles && (
+              <button
+                onClick={() => setExpanded(prev => !prev)}
+                className="h-7 w-7 rounded-full bg-blue-50 hover:bg-blue-100 flex items-center justify-center transition-colors border border-blue-200"
+                title="View Submission"
+              >
+                <FileText className="h-3.5 w-3.5 text-blue-600" />
+              </button>
+            )}
+            {hasDetails && (
+              <button
+                onClick={() => setExpanded(prev => !prev)}
+                className="h-7 w-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors border border-slate-200"
+                title={expanded ? "Collapse" : "Expand Details"}
+              >
+                <ChevronDown className={`h-3.5 w-3.5 text-slate-600 transition-transform ${expanded ? 'rotate-180' : ''}`} />
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+      {expanded && hasDetails && (
+        <tr>
+          <td colSpan={6} className="p-0">
+            <div className="bg-slate-50 border-b border-slate-200 px-4 py-3 space-y-2">
+              {assignment.submission?.feedback && (
+                <div className="flex items-start gap-2 p-2.5 bg-blue-50 rounded-lg border border-blue-100">
+                  <MessageCircle className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                  <div className="text-xs">
+                    <span className="font-semibold text-blue-700">Tutor Feedback</span>
+                    <p className="text-blue-600 mt-0.5">{assignment.submission.feedback}</p>
+                  </div>
+                </div>
+              )}
+
+              {hasFiles && (
+                <div className="flex items-start gap-2 p-2.5 bg-white rounded-lg border border-slate-100">
+                  <FileText className="h-3.5 w-3.5 text-slate-500 mt-0.5 shrink-0" />
+                  <div className="text-xs flex-1 min-w-0">
+                    <span className="font-semibold text-slate-700">Submitted Work</span>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {assignment.submission!.fileUrls!.map((url: string, idx: number) => {
+                        const filename = url.split('/').pop() || `File ${idx + 1}`;
+                        return (
+                          <button
+                            key={idx}
+                            onClick={() => {
+                              const objectPath = url.includes('/uploads/')
+                                ? url.split('/uploads/').pop()
+                                : url.split('/').pop();
+                              window.open(`/objects/uploads/${objectPath}`, '_blank');
+                            }}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-md transition-colors text-xs"
+                            title={filename}
+                          >
+                            <Download className="h-3 w-3 shrink-0" />
+                            <span className="truncate max-w-[180px]">{filename}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {hasSolution && (
+                <CollapsibleSolution assignment={assignment} />
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 export default function ParentDashboard() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -889,133 +1019,62 @@ function ChildOverview({ child, getStatusBadge, getDeadlineInfo, onChatWithTutor
         </Card>
       )}
 
+      <Card className="border border-slate-200 shadow-sm bg-white" data-testid={`card-child-assignments-${child.id}`}>
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm text-slate-700">
+            <div className="h-6 w-6 rounded-lg bg-blue-50 flex items-center justify-center">
+              <FileText className="h-3.5 w-3.5 text-blue-600" />
+            </div>
+            Assignments ({child.assignments.length})
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {child.assignments.length === 0 ? (
+            <div className="text-center py-8 text-slate-400">
+              <BookOpen className="h-10 w-10 mx-auto mb-2 text-slate-300" />
+              <p className="text-sm">No assignments yet</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-700 text-white text-xs">
+                    <th className="text-left py-2.5 px-3 font-semibold rounded-tl-lg">TITLE</th>
+                    <th className="text-left py-2.5 px-3 font-semibold">SUBJECT</th>
+                    <th className="text-left py-2.5 px-3 font-semibold">DUE DATE</th>
+                    <th className="text-center py-2.5 px-3 font-semibold">STATUS</th>
+                    <th className="text-center py-2.5 px-3 font-semibold">SCORE</th>
+                    <th className="text-center py-2.5 px-3 font-semibold rounded-tr-lg">ACTIONS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {child.assignments.map((assignment, index) => {
+                    const deadlineInfo = getDeadlineInfo(assignment.submissionDate);
+                    const hasSolution = !!(assignment.solutionText || assignment.solutionNotes || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0));
+                    const hasSubmission = !!(assignment.submission && assignment.submission.status !== 'draft');
+                    const hasFiles = !!(assignment.submission?.fileUrls && assignment.submission.fileUrls.length > 0);
+
+                    return (
+                      <AssignmentTableRow
+                        key={assignment.id}
+                        assignment={assignment}
+                        index={index}
+                        deadlineInfo={deadlineInfo}
+                        hasSolution={hasSolution}
+                        hasSubmission={hasSubmission}
+                        hasFiles={hasFiles}
+                        getStatusBadge={getStatusBadge}
+                      />
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card className="border border-slate-200 shadow-sm bg-white" data-testid={`card-child-assignments-${child.id}`}>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-sm text-slate-700">
-              <div className="h-6 w-6 rounded-lg bg-blue-50 flex items-center justify-center">
-                <FileText className="h-3.5 w-3.5 text-blue-600" />
-              </div>
-              Assignments ({child.assignments.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-0">
-            {child.assignments.length === 0 ? (
-              <div className="text-center py-8 text-slate-400">
-                <BookOpen className="h-10 w-10 mx-auto mb-2 text-slate-300" />
-                <p className="text-sm">No assignments yet</p>
-              </div>
-            ) : (
-              <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
-                {child.assignments.map((assignment, index) => {
-                  const deadlineInfo = getDeadlineInfo(assignment.submissionDate);
-                  const hasSolution = assignment.solutionText || assignment.solutionNotes || (assignment.solutionFileUrls && assignment.solutionFileUrls.length > 0);
-                  const hasSubmission = assignment.submission && assignment.submission.status !== 'draft';
-                  const hasFiles = assignment.submission?.fileUrls && assignment.submission.fileUrls.length > 0;
-
-                  return (
-                    <div 
-                      key={assignment.id} 
-                      className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm"
-                      data-testid={`assignment-row-${assignment.id}`}
-                    >
-                      <div className="p-3">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-2.5 flex-1 min-w-0">
-                            <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold ${
-                              assignment.submissionStatus === 'graded' ? 'bg-emerald-100 text-emerald-700' :
-                              assignment.submissionStatus === 'submitted' ? 'bg-blue-100 text-blue-700' :
-                              assignment.submissionStatus === 'late' ? 'bg-red-100 text-red-700' :
-                              'bg-slate-100 text-slate-600'
-                            }`}>
-                              {index + 1}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="font-semibold text-sm text-slate-800 leading-tight">{assignment.title}</h4>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                                <span className="text-xs text-slate-500 flex items-center gap-1">
-                                  <GraduationCap className="h-3 w-3" />
-                                  {assignment.subject}
-                                </span>
-                                <span className={`text-xs flex items-center gap-1 ${deadlineInfo.color}`}>
-                                  <Calendar className="h-3 w-3" />
-                                  {deadlineInfo.text}
-                                </span>
-                                <span className="text-xs text-slate-400 flex items-center gap-1">
-                                  <Paperclip className="h-3 w-3" />
-                                  {assignment.assignmentKind === 'worksheet' ? 'Worksheet' : 'File Upload'}
-                                </span>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-1 shrink-0">
-                            {getStatusBadge(assignment.submissionStatus)}
-                            {assignment.submission?.score != null && (
-                              <span className="text-lg font-bold text-emerald-600">{assignment.submission.score}%</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {(hasSubmission || hasSolution || assignment.submission?.feedback) && (
-                        <div className="border-t border-slate-100 bg-slate-50/50">
-                          <div className="p-3 space-y-2">
-                            {assignment.submission?.feedback && (
-                              <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-lg">
-                                <MessageCircle className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
-                                <div className="text-xs">
-                                  <span className="font-semibold text-blue-700">Tutor Feedback</span>
-                                  <p className="text-blue-600 mt-0.5">{assignment.submission.feedback}</p>
-                                </div>
-                              </div>
-                            )}
-
-                            {hasFiles && (
-                              <div className="flex items-start gap-2 p-2 bg-white rounded-lg border border-slate-100">
-                                <FileText className="h-3.5 w-3.5 text-slate-500 mt-0.5 shrink-0" />
-                                <div className="text-xs flex-1 min-w-0">
-                                  <span className="font-semibold text-slate-700">Submitted Work</span>
-                                  <div className="mt-1 flex flex-wrap gap-1.5">
-                                    {assignment.submission!.fileUrls!.map((url, idx) => {
-                                      const filename = url.split('/').pop() || `File ${idx + 1}`;
-                                      const ext = filename.split('.').pop()?.toLowerCase() || '';
-                                      const isPdf = ext === 'pdf';
-                                      return (
-                                        <button
-                                          key={idx}
-                                          onClick={() => {
-                                            const objectPath = url.includes('/uploads/')
-                                              ? url.split('/uploads/').pop()
-                                              : url.split('/').pop();
-                                            window.open(`/objects/uploads/${objectPath}`, '_blank');
-                                          }}
-                                          className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-blue-100 text-slate-700 hover:text-blue-700 rounded-md transition-colors truncate max-w-[200px]"
-                                          title={filename}
-                                        >
-                                          {isPdf ? <FileText className="h-3 w-3 shrink-0" /> : <Download className="h-3 w-3 shrink-0" />}
-                                          <span className="truncate">{filename}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {hasSolution && (
-                              <CollapsibleSolution assignment={assignment} />
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         <div className="space-y-4">
           <Card className="border border-slate-200 shadow-sm bg-white" data-testid="card-test-results">
             <CardHeader className="pb-2">
