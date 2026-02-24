@@ -104,12 +104,19 @@ export function AssignmentCompletionArea({
     enabled: !isPDFAnnotatorOpen, // Disable query while annotator is open to prevent re-renders
   });
 
-  // Helper function to check if a specific document is completed
   const isDocumentCompleted = (documentUrl: string) => {
     return allSubmissions.some(sub => 
       sub.documentUrl === documentUrl && sub.status === 'submitted'
     );
   };
+
+  const isAssignmentDraft = submission?.status === 'draft' || allSubmissions.some(sub =>
+    sub.assignmentId === assignment.id && sub.status === 'draft'
+  );
+
+  const isAssignmentSubmitted = submission?.status === 'submitted' || allSubmissions.some(sub =>
+    sub.assignmentId === assignment.id && sub.status === 'submitted'
+  );
 
   // Fetch metadata for assignment files
   const attachmentUrls = assignment.attachmentUrls || [];
@@ -488,8 +495,8 @@ export function AssignmentCompletionArea({
                         </span>
                       </div>
                     </div>
-                    <Badge className={`${eInkStyles.badge} ${isCompleted ? 'bg-green-100 text-green-800 border-green-300' : ''}`}>
-                      {isCompleted ? 'Submitted' : 'Pending'}
+                    <Badge className={`${eInkStyles.badge} ${isCompleted ? 'bg-green-100 text-green-800 border-green-300' : isAssignmentDraft ? 'bg-yellow-100 text-yellow-800 border-yellow-300' : ''}`}>
+                      {isCompleted ? 'Submitted' : isAssignmentDraft ? 'In Progress' : 'Pending'}
                     </Badge>
                   </div>
                   
@@ -511,7 +518,6 @@ export function AssignmentCompletionArea({
                       View Document
                     </Button>
                     
-                    {/* Complete Online */}
                     <Button
                       onClick={() => {
                         const objectPath = url.includes('/uploads/') 
@@ -525,7 +531,7 @@ export function AssignmentCompletionArea({
                       disabled={isCompleted}
                     >
                       <PenTool className="h-4 w-4 mr-2" />
-                      Complete Online
+                      {isCompleted ? 'Completed' : isAssignmentDraft ? 'Resume Online' : 'Complete Online'}
                     </Button>
                     
                     {/* Upload Completed */}

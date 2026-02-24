@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
+import { apiRequest, getCsrfToken } from '@/lib/queryClient';
 import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -142,14 +143,9 @@ export function PDFAnnotatorPage() {
     autoSaveTimerRef.current = setTimeout(async () => {
       try {
         setAutoSaveStatus('saving');
-        await fetch('/api/submissions/auto-save-annotations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            assignmentId,
-            annotations: JSON.stringify(annotations),
-          }),
-          credentials: 'include',
+        await apiRequest('/api/submissions/auto-save-annotations', 'POST', {
+          assignmentId,
+          annotations: JSON.stringify(annotations),
         });
         setAutoSaveStatus('saved');
         setTimeout(() => setAutoSaveStatus('idle'), 2000);
@@ -472,8 +468,10 @@ export function PDFAnnotatorPage() {
       formData.append('status', status);
       formData.append('annotations', JSON.stringify(annotations));
 
+      const csrfToken = await getCsrfToken();
       const response = await fetch('/api/submissions/annotated', {
         method: 'POST',
+        headers: csrfToken ? { 'x-csrf-token': csrfToken } : {},
         body: formData,
         credentials: 'include'
       });
