@@ -41,6 +41,7 @@ import HomePage from "@/pages/HomePage";
 import VideoStoryboard from "@/pages/VideoStoryboard";
 import ContactUs from "@/pages/ContactUs";
 import DesignPreview from "@/pages/DesignPreview";
+import EinkPreview from "@/pages/EinkPreview";
 
 import NotFound from "@/pages/not-found";
 
@@ -77,6 +78,7 @@ function Router() {
 
       {/* Design preview - always accessible */}
       <Route path="/design-preview" component={DesignPreview} />
+      <Route path="/eink-preview" component={EinkPreview} />
 
       {!isAuthenticated ? (
         <>
