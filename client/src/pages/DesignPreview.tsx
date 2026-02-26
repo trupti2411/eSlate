@@ -1,13 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import {
   BookOpen, CheckSquare, BarChart2, MessageCircle, Users,
   Clock, AlertCircle, ChevronRight, Bell, Star,
   ArrowRight, Play, ChevronLeft, Pen, Highlighter,
-  Eraser, Type, Save, Send, RotateCcw, ZoomIn, ZoomOut,
-  Check, X, Info
+  Eraser, Type, Save, Send, RotateCcw,
+  Check, Info, Calendar, FileText, Award,
+  ClipboardList, UserCheck, TrendingUp, Building,
+  Settings, GraduationCap, ThumbsUp, ThumbsDown,
+  Plus, Eye, Download, Filter, MoreHorizontal
 } from 'lucide-react';
 
-type View = 'student' | 'parent';
+type View = 'student' | 'parent' | 'tutor' | 'admin';
 type StudentTab = 'classes' | 'assignments' | 'results';
 type ParentTab = 'children' | 'messages' | 'homework';
 type StudentScreen = 'home' | 'assignment-detail' | 'pdf-annotator' | 'submitted';
@@ -759,70 +762,616 @@ function ParentScreen() {
   );
 }
 
+type TutorTab = 'today' | 'mark' | 'messages';
+type TutorScreen = 'home' | 'mark-detail' | 'mark-done';
+
+function TutorScreen() {
+  const [tab, setTab] = useState<TutorTab>('today');
+  const [screen, setTutorScreen] = useState<TutorScreen>('home');
+  const [rollCallDone, setRollCallDone] = useState<Record<string, boolean | null>>({});
+  const [selectedStudent, setSelectedStudent] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState('');
+  const [grade, setGrade] = useState('');
+
+  const tabs: { key: TutorTab; icon: typeof Calendar; label: string }[] = [
+    { key: 'today', icon: Calendar, label: 'Today' },
+    { key: 'mark', icon: ClipboardList, label: 'To mark' },
+    { key: 'messages', icon: MessageCircle, label: 'Messages' },
+  ];
+
+  const students = [
+    { name: 'Jacob C.', emoji: '👦', present: null },
+    { name: 'Priya S.', emoji: '👧', present: null },
+    { name: 'Tom W.', emoji: '🧒', present: null },
+    { name: 'Aisha M.', emoji: '👩', present: null },
+    { name: 'Leo K.', emoji: '👦', present: null },
+  ];
+
+  const submissions = [
+    { name: 'Jacob Citizen', subject: 'Fractions Worksheet', submitted: '2h ago', emoji: '👦', pages: 2 },
+    { name: 'Priya Singh', subject: 'Reading Comprehension', submitted: 'Yesterday', emoji: '👧', pages: 3 },
+    { name: 'Tom Wright', subject: 'Fractions Worksheet', submitted: 'Yesterday', emoji: '🧒', pages: 2 },
+  ];
+
+  const currentSub = submissions.find(s => s.name === selectedStudent);
+
+  if (screen === 'mark-detail' && currentSub) {
+    return (
+      <div className="flex flex-col h-full bg-gray-50">
+        <div className="bg-white border-b border-gray-100 px-3 pt-2 pb-3 flex items-center gap-2">
+          <button onClick={() => setTutorScreen('home')} className="w-9 h-9 rounded-xl bg-gray-100 flex items-center justify-center">
+            <ChevronLeft size={20} className="text-gray-700" />
+          </button>
+          <div className="flex-1">
+            <p className="font-bold text-gray-900 text-sm">{currentSub.name}</p>
+            <p className="text-xs text-gray-400">{currentSub.subject}</p>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {/* Simulated submitted PDF */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="bg-gray-50 border-b border-gray-100 px-4 py-2 flex items-center justify-between">
+              <p className="text-xs font-bold text-gray-500">Student's submitted work</p>
+              <span className="text-xs text-gray-400">{currentSub.pages} pages</span>
+            </div>
+            <div className="p-4 pointer-events-none select-none">
+              <p className="text-center font-bold text-gray-800 text-sm mb-1">Year 5 Mathematics</p>
+              <p className="text-center text-gray-400 text-xs mb-3">Fractions — Adding & Subtracting</p>
+              <div className="space-y-4">
+                {[
+                  { q: '1.  ½  +  ¼  =', ans: '¾', correct: true },
+                  { q: '2.  ¾  −  ⅛  =', ans: '⅝', correct: true },
+                  { q: '3.  ⅓  +  ⅙  =', ans: '½', correct: true },
+                  { q: '4.  ⅔  −  ⅓  =', ans: '½ ✓', correct: false },
+                ].map(({ q, ans, correct }) => (
+                  <div key={q} className="border-b border-dashed border-gray-100 pb-3">
+                    <p className="text-sm font-semibold text-gray-700 mb-1">{q}</p>
+                    <div className={`rounded px-2 py-1 text-sm font-bold inline-block ${correct ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'}`}>
+                      {ans}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Grade */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Mark out of 20</p>
+            <div className="flex gap-2 flex-wrap">
+              {['14', '15', '16', '17', '18', '19', '20'].map(g => (
+                <button
+                  key={g}
+                  onClick={() => setGrade(g)}
+                  className={`w-12 h-12 rounded-xl font-bold text-sm border-2 transition-all ${grade === g ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-200'}`}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Feedback */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Feedback to student</p>
+            <textarea
+              value={feedback}
+              onChange={e => setFeedback(e.target.value)}
+              placeholder="Great work on questions 1–3! For Q4, remember to simplify your answer..."
+              className="w-full h-24 text-sm text-gray-700 border border-gray-200 rounded-xl p-3 resize-none focus:outline-none focus:border-indigo-300"
+            />
+            <div className="flex gap-2 mt-2">
+              {['Good effort!', 'Well done!', 'Check your working'].map(q => (
+                <button key={q} onClick={() => setFeedback(q)} className="text-xs bg-gray-100 text-gray-600 rounded-lg px-2 py-1 font-medium">
+                  {q}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white border-t border-gray-100 p-4 flex gap-3">
+          <button className="flex-1 py-3.5 border-2 border-gray-200 rounded-2xl font-bold text-gray-700 text-sm flex items-center justify-center gap-2">
+            <ThumbsDown size={16} /> Needs revision
+          </button>
+          <button
+            onClick={() => setTutorScreen('mark-done')}
+            className="flex-1 py-3.5 bg-green-600 rounded-2xl font-bold text-white text-sm flex items-center justify-center gap-2"
+          >
+            <ThumbsUp size={16} /> Submit grade
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (screen === 'mark-done') {
+    return (
+      <div className="flex flex-col h-full bg-gray-50 items-center justify-center p-8">
+        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mb-6">
+          <Award size={48} className="text-green-600 stroke-[2]" />
+        </div>
+        <p className="text-2xl font-black text-gray-900 text-center mb-2">Graded!</p>
+        <p className="text-sm text-gray-500 text-center mb-6">
+          {currentSub?.name} has been notified with their mark and your feedback.
+        </p>
+        <div className="bg-white border border-gray-100 rounded-2xl p-4 w-full shadow-sm mb-8">
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-500">Student</span>
+            <span className="font-semibold text-gray-900">{currentSub?.name}</span>
+          </div>
+          <div className="flex justify-between text-sm mb-2">
+            <span className="text-gray-500">Mark</span>
+            <span className="font-bold text-indigo-600">{grade || '17'}/20</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-500">Parent notified</span>
+            <span className="text-green-600 font-semibold">Yes ✓</span>
+          </div>
+        </div>
+        <button onClick={() => { setTutorScreen('home'); setTab('mark'); }} className="w-full py-4 bg-gray-900 rounded-2xl font-bold text-white">
+          Back to marking
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50">
+      <div className="bg-white px-5 pt-3 pb-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-400 font-medium">Tutor dashboard</p>
+            <p className="text-xl font-bold text-gray-900">Mr. Harrison</p>
+          </div>
+          <div className="relative">
+            <div className="w-11 h-11 rounded-full bg-teal-100 flex items-center justify-center">
+              <Bell size={20} className="text-teal-600" />
+            </div>
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center">3</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'today' && (
+          <div className="p-4 space-y-3">
+            {/* Today's class card */}
+            <div className="bg-teal-600 rounded-2xl p-4 text-white shadow-sm">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <p className="text-teal-100 text-xs font-semibold">Next class</p>
+                  <p className="font-black text-xl">Mathematics</p>
+                  <p className="text-teal-100 text-sm">Year 5 · Room 3 · 4:00 PM</p>
+                </div>
+                <div className="bg-white/20 rounded-xl px-3 py-1">
+                  <p className="text-xs font-bold">In 2 hrs</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 bg-white/20 rounded-xl px-3 py-2">
+                <Users size={14} />
+                <span className="text-sm font-semibold">5 students enrolled</span>
+              </div>
+            </div>
+
+            {/* Roll call */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Roll call</p>
+                <button
+                  onClick={() => {
+                    const all: Record<string, boolean | null> = {};
+                    students.forEach(s => { all[s.name] = true; });
+                    setRollCallDone(all);
+                  }}
+                  className="text-xs font-bold text-teal-600 bg-teal-50 border border-teal-200 px-3 py-1 rounded-lg"
+                >
+                  Mark all present
+                </button>
+              </div>
+              <div className="space-y-2">
+                {students.map(s => (
+                  <div key={s.name} className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-lg flex-shrink-0">{s.emoji}</div>
+                    <p className="flex-1 text-sm font-semibold text-gray-800">{s.name}</p>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setRollCallDone(r => ({ ...r, [s.name]: true }))}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${rollCallDone[s.name] === true ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'}`}
+                      >
+                        <Check size={15} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        onClick={() => setRollCallDone(r => ({ ...r, [s.name]: false }))}
+                        className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${rollCallDone[s.name] === false ? 'bg-red-500 text-white' : 'bg-gray-100 text-gray-400'}`}
+                      >
+                        <AlertCircle size={15} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {Object.keys(rollCallDone).length > 0 && (
+                <button className="w-full mt-3 py-2.5 bg-teal-600 rounded-xl font-bold text-white text-sm">
+                  Save attendance
+                </button>
+              )}
+            </div>
+
+            {/* Quick stats */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center">
+                <p className="text-2xl font-black text-amber-600">3</p>
+                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">To mark</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center">
+                <p className="text-2xl font-black text-green-600">12</p>
+                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Graded</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 text-center">
+                <p className="text-2xl font-black text-indigo-600">92%</p>
+                <p className="text-[10px] text-gray-400 font-semibold mt-0.5">Attendance</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {tab === 'mark' && (
+          <div className="p-4 space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Waiting to mark</p>
+            {submissions.map(s => (
+              <button
+                key={s.name}
+                onClick={() => { setSelectedStudent(s.name); setTutorScreen('mark-detail'); }}
+                className="w-full bg-white rounded-2xl border border-amber-200 shadow-sm p-4 flex items-center gap-3 text-left"
+              >
+                <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center text-2xl flex-shrink-0">
+                  {s.emoji}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-gray-900">{s.name}</p>
+                  <p className="text-sm text-gray-500 truncate">{s.subject}</p>
+                  <p className="text-xs text-amber-500 font-semibold mt-0.5">Submitted {s.submitted}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 font-bold px-2 py-0.5 rounded-full">Needs marking</span>
+                  <ChevronRight size={16} className="text-gray-300" />
+                </div>
+              </button>
+            ))}
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1 pt-2">Recently graded</p>
+            {[
+              { name: 'Aisha M.', subject: 'Number Patterns', mark: '18/20', emoji: '👩' },
+              { name: 'Leo K.', subject: 'Fractions Worksheet', mark: '16/20', emoji: '👦' },
+            ].map(s => (
+              <div key={s.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3 opacity-70">
+                <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center text-2xl">{s.emoji}</div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900">{s.name}</p>
+                  <p className="text-sm text-gray-500">{s.subject}</p>
+                </div>
+                <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-1.5 text-center">
+                  <p className="font-black text-green-700 text-sm">{s.mark}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'messages' && (
+          <div className="p-4 space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Messages</p>
+            {[
+              { from: 'Mary Citizen', role: "Jacob's parent", msg: "Hi Mr. Harrison, Jacob was unwell yesterday — is there catch-up work?", time: '1h ago', unread: true, avatar: '👩' },
+              { from: 'Admin — MathMasters', role: 'Company admin', msg: "Please submit your term report by Friday.", time: '3h ago', unread: true, avatar: '🏫' },
+              { from: 'Priya Singh', role: 'Student', msg: "I'm having trouble with question 3 on the fractions sheet.", time: 'Yesterday', unread: false, avatar: '👧' },
+            ].map(m => (
+              <div key={m.from} className={`bg-white rounded-2xl border shadow-sm p-4 ${m.unread ? 'border-teal-200' : 'border-gray-100'}`}>
+                <div className="flex items-start gap-3">
+                  <div className="w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center text-xl flex-shrink-0">{m.avatar}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <p className="font-bold text-gray-900 truncate">{m.from}</p>
+                      <p className="text-xs text-gray-400 whitespace-nowrap">{m.time}</p>
+                    </div>
+                    <p className="text-xs text-gray-400 mb-1">{m.role}</p>
+                    <p className="text-sm text-gray-600 line-clamp-2">{m.msg}</p>
+                  </div>
+                  {m.unread && <div className="w-2.5 h-2.5 rounded-full bg-teal-500 mt-1 flex-shrink-0" />}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-6">
+        <div className="flex justify-around">
+          {tabs.map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex flex-col items-center gap-1 flex-1 py-1 rounded-xl transition-all ${tab === key ? 'text-teal-600' : 'text-gray-400'}`}
+            >
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${tab === key ? 'bg-teal-100' : ''}`}>
+                <Icon size={24} strokeWidth={tab === key ? 2.5 : 1.5} />
+              </div>
+              <span className={`text-xs font-semibold ${tab === key ? 'text-teal-600' : 'text-gray-400'}`}>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type AdminTab = 'overview' | 'students' | 'reports';
+
+function AdminScreen() {
+  const [tab, setTab] = useState<AdminTab>('overview');
+
+  const tabs: { key: AdminTab; icon: typeof Building; label: string }[] = [
+    { key: 'overview', icon: TrendingUp, label: 'Overview' },
+    { key: 'students', icon: Users, label: 'Students' },
+    { key: 'reports', icon: FileText, label: 'Reports' },
+  ];
+
+  const students = [
+    { name: 'Jacob Citizen', year: 'Year 1', tutor: 'Ms. Chen', emoji: '👦', status: 'ok', attendance: 95 },
+    { name: 'Sophie Citizen', year: 'Year 3', tutor: 'Ms. Chen', emoji: '👧', status: 'overdue', attendance: 88 },
+    { name: 'Oliver Citizen', year: 'Year 5', tutor: 'Mr. Harrison', emoji: '🧒', status: 'ok', attendance: 92 },
+    { name: 'Priya Singh', year: 'Year 5', tutor: 'Mr. Harrison', emoji: '👧', status: 'ok', attendance: 100 },
+    { name: 'Tom Wright', year: 'Year 3', tutor: 'Ms. Chen', emoji: '🧒', status: 'absent', attendance: 72 },
+    { name: 'Aisha Malik', year: 'Year 4', tutor: 'Mr. Harrison', emoji: '👩', status: 'ok', attendance: 98 },
+  ];
+
+  return (
+    <div className="flex flex-col h-full bg-gray-50">
+      <div className="bg-white px-5 pt-3 pb-4 border-b border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs text-gray-400 font-medium">Company admin</p>
+            <p className="text-xl font-bold text-gray-900">Homework & Study</p>
+          </div>
+          <div className="relative">
+            <div className="w-11 h-11 rounded-full bg-violet-100 flex items-center justify-center">
+              <Bell size={20} className="text-violet-600" />
+            </div>
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-white text-[10px] font-bold flex items-center justify-center">5</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto">
+        {tab === 'overview' && (
+          <div className="p-4 space-y-3">
+            {/* Key stats */}
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { label: 'Active students', value: '24', icon: GraduationCap, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-100' },
+                { label: 'Tutors', value: '3', icon: Users, color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-100' },
+                { label: 'Pending marking', value: '7', icon: ClipboardList, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
+                { label: 'Avg attendance', value: '91%', icon: UserCheck, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-100' },
+              ].map(s => (
+                <div key={s.label} className={`${s.bg} border ${s.border} rounded-2xl p-4`}>
+                  <s.icon size={20} className={`${s.color} mb-2`} />
+                  <p className={`text-2xl font-black ${s.color}`}>{s.value}</p>
+                  <p className="text-xs text-gray-500 font-semibold mt-0.5">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Alerts */}
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Alerts</p>
+            <div className="bg-white rounded-2xl border border-red-200 shadow-sm overflow-hidden">
+              <div className="bg-red-500 px-4 py-1"><p className="text-white text-xs font-bold">ACTION NEEDED</p></div>
+              <div className="divide-y divide-gray-50">
+                <div className="p-3 flex items-center gap-3">
+                  <AlertCircle size={16} className="text-red-500 flex-shrink-0" />
+                  <p className="text-sm text-gray-700">Sophie Citizen has 1 overdue assignment</p>
+                </div>
+                <div className="p-3 flex items-center gap-3">
+                  <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+                  <p className="text-sm text-gray-700">Tom Wright's attendance below 75%</p>
+                </div>
+                <div className="p-3 flex items-center gap-3">
+                  <AlertCircle size={16} className="text-amber-500 flex-shrink-0" />
+                  <p className="text-sm text-gray-700">7 submissions waiting for marking</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Recent activity */}
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Recent activity</p>
+            {[
+              { text: 'Jacob Citizen submitted Fractions Worksheet', time: '2h ago', dot: 'bg-green-400' },
+              { text: 'Mr. Harrison graded Priya S. — 18/20', time: '4h ago', dot: 'bg-indigo-400' },
+              { text: 'New message from Mary Citizen (parent)', time: 'Yesterday', dot: 'bg-blue-400' },
+            ].map(a => (
+              <div key={a.text} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-start gap-3">
+                <div className={`w-2.5 h-2.5 rounded-full ${a.dot} mt-1.5 flex-shrink-0`} />
+                <div className="flex-1">
+                  <p className="text-sm text-gray-700">{a.text}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{a.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tab === 'students' && (
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                <Filter size={14} className="text-gray-400" />
+                <span className="text-sm text-gray-400">Search students...</span>
+              </div>
+              <button className="w-10 h-10 bg-violet-600 rounded-xl flex items-center justify-center">
+                <Plus size={18} className="text-white" />
+              </button>
+            </div>
+            <div className="space-y-2">
+              {students.map(s => (
+                <div key={s.name} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3 flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xl flex-shrink-0">{s.emoji}</div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-gray-900 text-sm">{s.name}</p>
+                    <p className="text-xs text-gray-400">{s.year} · {s.tutor}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    {s.status === 'overdue' && <span className="text-[10px] bg-red-100 text-red-600 border border-red-200 font-bold px-1.5 py-0.5 rounded-full">Overdue</span>}
+                    {s.status === 'absent' && <span className="text-[10px] bg-amber-100 text-amber-600 border border-amber-200 font-bold px-1.5 py-0.5 rounded-full">Low attend.</span>}
+                    {s.status === 'ok' && <span className="text-[10px] bg-green-100 text-green-600 border border-green-200 font-bold px-1.5 py-0.5 rounded-full">On track</span>}
+                    <span className="text-[10px] text-gray-400 font-medium">{s.attendance}% attend.</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {tab === 'reports' && (
+          <div className="p-4 space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-1">Quick reports</p>
+            {[
+              { title: 'Term 1 — All students', subtitle: 'Grades, attendance & submissions', icon: '📊', ready: true },
+              { title: 'Attendance summary', subtitle: 'February 2026 · All classes', icon: '📅', ready: true },
+              { title: 'Outstanding submissions', subtitle: '7 students · Needs attention', icon: '⚠️', ready: false },
+              { title: 'Tutor activity log', subtitle: 'Marking & messaging activity', icon: '👨‍🏫', ready: true },
+            ].map(r => (
+              <div key={r.title} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-violet-50 border border-violet-100 flex items-center justify-center text-2xl flex-shrink-0">
+                  {r.icon}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-gray-900 text-sm">{r.title}</p>
+                  <p className="text-xs text-gray-500">{r.subtitle}</p>
+                </div>
+                {r.ready ? (
+                  <button className="w-9 h-9 bg-violet-600 rounded-xl flex items-center justify-center">
+                    <Download size={15} className="text-white" />
+                  </button>
+                ) : (
+                  <button className="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <Eye size={15} className="text-amber-600" />
+                  </button>
+                )}
+              </div>
+            ))}
+
+            <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 flex items-start gap-3 mt-2">
+              <Info size={18} className="text-violet-600 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-violet-700">Custom date-range reports can be generated from the full desktop dashboard.</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white border-t border-gray-100 px-4 pt-3 pb-6">
+        <div className="flex justify-around">
+          {tabs.map(({ key, icon: Icon, label }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`flex flex-col items-center gap-1 flex-1 py-1 rounded-xl transition-all ${tab === key ? 'text-violet-600' : 'text-gray-400'}`}
+            >
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${tab === key ? 'bg-violet-100' : ''}`}>
+                <Icon size={24} strokeWidth={tab === key ? 2.5 : 1.5} />
+              </div>
+              <span className={`text-xs font-semibold ${tab === key ? 'text-violet-600' : 'text-gray-400'}`}>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function DesignPreview() {
   const [view, setView] = useState<View>('student');
 
   return (
     <div className="min-h-screen bg-gray-100">
       <div className="bg-white border-b border-gray-200 sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h1 className="text-xl font-black text-gray-900">eSlate — Redesign Preview</h1>
-            <p className="text-sm text-gray-400">Simplified mobile-first · Tap to interact · Full assignment flow included</p>
+            <p className="text-sm text-gray-400">All 4 roles · Tap to interact · Full flows included</p>
           </div>
-          <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-            <button onClick={() => setView('student')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'student' ? 'bg-white shadow text-indigo-600' : 'text-gray-500'}`}>
-              Student view
-            </button>
-            <button onClick={() => setView('parent')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === 'parent' ? 'bg-white shadow text-rose-500' : 'text-gray-500'}`}>
-              Parent view
-            </button>
+          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl flex-wrap">
+            {([
+              { key: 'student', label: 'Student', color: 'text-indigo-600' },
+              { key: 'parent', label: 'Parent', color: 'text-rose-500' },
+              { key: 'tutor', label: 'Tutor', color: 'text-teal-600' },
+              { key: 'admin', label: 'Admin', color: 'text-violet-600' },
+            ] as { key: View; label: string; color: string }[]).map(v => (
+              <button
+                key={v.key}
+                onClick={() => setView(v.key)}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === v.key ? `bg-white shadow ${v.color}` : 'text-gray-500'}`}
+              >
+                {v.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-6 py-12">
-        <div className="flex flex-col lg:flex-row gap-16 items-start justify-center">
-          {view === 'student' ? (
-            <PhoneMockup label="New simplified student app">
-              <StudentScreen />
-            </PhoneMockup>
-          ) : (
-            <PhoneMockup label="New simplified parent app">
-              <ParentScreen />
-            </PhoneMockup>
-          )}
+      <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="flex flex-col lg:flex-row gap-12 items-start justify-center">
+          {view === 'student' && <PhoneMockup label="Student app"><StudentScreen /></PhoneMockup>}
+          {view === 'parent'  && <PhoneMockup label="Parent app"><ParentScreen /></PhoneMockup>}
+          {view === 'tutor'   && <PhoneMockup label="Tutor app"><TutorScreen /></PhoneMockup>}
+          {view === 'admin'   && <PhoneMockup label="Admin app"><AdminScreen /></PhoneMockup>}
 
           <div className="flex-1 max-w-md">
             <h2 className="text-2xl font-black text-gray-900 mb-6">
-              {view === 'student' ? 'Assignment flow' : 'What changed'}
+              {view === 'student' ? 'Student — full assignment flow' :
+               view === 'parent'  ? 'Parent — what changed' :
+               view === 'tutor'   ? 'Tutor — daily workflow' :
+                                    'Admin — centre at a glance'}
             </h2>
             <div className="space-y-4">
-              {view === 'student' ? (
-                <>
-                  <Change icon="1️⃣" title="Homework tab" desc="Student sees their overdue Fractions Worksheet highlighted in red. Tap it to begin." />
-                  <Change icon="2️⃣" title="Assignment details" desc="Clear instructions from the tutor, how to complete it, and a big 'Open worksheet' button." />
-                  <Change icon="3️⃣" title="PDF + drawing tools" desc="The worksheet opens with pen, highlighter, eraser and text tools. Students write directly on it with their stylus." />
-                  <Change icon="4️⃣" title="Auto-save" desc="Work saves automatically every 30 seconds — shown in the top bar. No lost work." />
-                  <Change icon="5️⃣" title="Submit with confirmation" desc="A confirmation sheet appears before submitting so students don't accidentally send incomplete work." />
-                  <Change icon="6️⃣" title="Success screen" desc="Clear confirmation with assignment details. Tutor is notified automatically." />
-                </>
-              ) : (
-                <>
-                  <Change icon="📱" title="3 tabs only" desc="My Kids, Homework, Messages — everything a parent needs, nothing extra." />
-                  <Change icon="👧" title="All children on one screen" desc="Each child shows their status at a glance — overdue work flagged immediately." />
-                  <Change icon="🔄" title="Quick child switcher" desc="Tap a child's name on the Homework tab to switch between kids instantly." />
-                  <Change icon="💬" title="Messages front and centre" desc="Tutor messages in one clean list — no portal login, no missed notes." />
-                  <Change icon="⚠️" title="Overdue alerts are impossible to miss" desc="Red banners highlight overdue work so parents can act immediately." />
-                  <Change icon="👆" title="Mobile-first layout" desc="Designed for a phone — works while driving pickup or waiting at school." />
-                </>
-              )}
+              {view === 'student' && <>
+                <Change icon="1️⃣" title="Homework tab" desc="Overdue work shown in red. Tap it to start." />
+                <Change icon="2️⃣" title="Assignment details" desc="Tutor instructions, clear 'Open worksheet' button." />
+                <Change icon="3️⃣" title="PDF + drawing tools" desc="Pen, highlighter, eraser, text — write directly with stylus." />
+                <Change icon="4️⃣" title="Auto-save" desc="Saves every 30 seconds, shown in the top bar." />
+                <Change icon="5️⃣" title="Submit with confirmation" desc="Confirmation sheet prevents accidental submissions." />
+                <Change icon="6️⃣" title="Success screen" desc="Tutor and parent both notified instantly." />
+              </>}
+              {view === 'parent' && <>
+                <Change icon="📱" title="3 tabs only" desc="My Kids, Homework, Messages — nothing extra." />
+                <Change icon="👧" title="All children on one screen" desc="Overdue work flagged immediately per child." />
+                <Change icon="🔄" title="Quick child switcher" desc="Tap name on Homework tab to switch between kids." />
+                <Change icon="💬" title="Messages front and centre" desc="Tutor notes in one list — no missed messages." />
+                <Change icon="⚠️" title="Overdue alerts are obvious" desc="Red banners — impossible to miss." />
+              </>}
+              {view === 'tutor' && <>
+                <Change icon="📅" title="Today tab" desc="Next class shown at the top with a countdown. Roll call directly on this screen — tap ✓ or ✗ per student, or 'Mark all present' in one tap." />
+                <Change icon="📋" title="To mark tab" desc="All submitted work waiting for review. Tap a student to open their worksheet." />
+                <Change icon="🎯" title="Marking screen" desc="See the student's submitted PDF, pick a mark out of 20, write feedback or use quick-replies, then submit grade." />
+                <Change icon="🔔" title="Parent notified automatically" desc="Once graded, parent and student both receive a notification — no separate step needed." />
+                <Change icon="💬" title="Messages tab" desc="Parent and student messages in one place — sorted by unread." />
+              </>}
+              {view === 'admin' && <>
+                <Change icon="📊" title="Overview tab" desc="4 key numbers at a glance: students, tutors, pending marking, attendance. Below that: live alerts and recent activity." />
+                <Change icon="⚠️" title="Alerts surface problems instantly" desc="Overdue assignments, low attendance, and ungraded work all flagged with no digging needed." />
+                <Change icon="👥" title="Students tab" desc="Full student roster with status badges — On track, Overdue, Low attendance. Search and add new students." />
+                <Change icon="📄" title="Reports tab" desc="One-tap download of term reports, attendance summaries, tutor activity logs. Custom ranges available on desktop." />
+              </>}
             </div>
 
             {view === 'student' && (
               <div className="mt-6 p-4 bg-indigo-50 border border-indigo-200 rounded-2xl">
                 <p className="text-sm font-bold text-indigo-800 mb-1">Try the full flow</p>
-                <p className="text-sm text-indigo-700">On the Homework tab, tap the red overdue card → read the details → tap "Open worksheet" → draw on the PDF → tap Submit → confirm.</p>
+                <p className="text-sm text-indigo-700">Homework tab → tap red card → details → Open worksheet → draw → Submit → confirm.</p>
+              </div>
+            )}
+            {view === 'tutor' && (
+              <div className="mt-6 p-4 bg-teal-50 border border-teal-200 rounded-2xl">
+                <p className="text-sm font-bold text-teal-800 mb-1">Try the marking flow</p>
+                <p className="text-sm text-teal-700">Today tab → do roll call → switch to "To mark" tab → tap a student → pick a grade → write feedback → Submit grade.</p>
               </div>
             )}
 
