@@ -2,6 +2,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { securityHeaders, auditMiddleware } from "./security";
+import { execSync } from "child_process";
 
 const app = express();
 
@@ -43,6 +44,39 @@ app.use((req, res, next) => {
   next();
 });
 
+// Graceful shutdown handlers
+process.on("SIGTERM", () => {
+  log("Received SIGTERM, shutting down gracefully");
+  process.exit(0);
+});
+
+process.on("SIGINT", () => {
+  log("Received SIGINT, shutting down gracefully");
+  process.exit(0);
+});
+
+// Catch unhandled promise rejections to prevent silent crashes
+process.on("unhandledRejection", (reason, promise) => {
+  log(`Unhandled rejection at: ${promise}, reason: ${reason}`);
+});
+
+function freePort(port: number) {
+  try {
+    const pids = execSync(`lsof -ti:${port}`, { encoding: "utf8" }).trim();
+    if (pids) {
+      pids.split("\n").forEach((pid) => {
+        const pidNum = parseInt(pid.trim(), 10);
+        if (pidNum && pidNum !== process.pid) {
+          try {
+            process.kill(pidNum, "SIGKILL");
+            log(`Killed stale process ${pidNum} on port ${port}`);
+          } catch {}
+        }
+      });
+    }
+  } catch {}
+}
+
 (async () => {
   const server = await registerRoutes(app);
 
@@ -67,7 +101,24 @@ app.use((req, res, next) => {
   // Other ports are firewalled. Default to 80 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || '5000', 10);
+  const port = parseInt(process.env.PORT || "5000", 10);
+
+  server.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      log(`Port ${port} in use — clearing stale process and retrying...`);
+      freePort(port);
+      setTimeout(() => {
+        server.close();
+        server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+          log(`serving on port ${port}`);
+        });
+      }, 1000);
+    } else {
+      log(`Server error: ${err.message}`);
+      throw err;
+    }
+  });
+
   server.listen({
     port,
     host: "0.0.0.0",
