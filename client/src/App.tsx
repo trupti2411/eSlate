@@ -40,6 +40,7 @@ import UserAgreement from "@/pages/legal/UserAgreement";
 import HomePage from "@/pages/HomePage";
 import VideoStoryboard from "@/pages/VideoStoryboard";
 import ContactUs from "@/pages/ContactUs";
+import DesignPreview from "@/pages/DesignPreview";
 
 import NotFound from "@/pages/not-found";
 
@@ -73,6 +74,9 @@ function Router() {
       
       {/* Contact page - always accessible */}
       <Route path="/contact" component={ContactUs} />
+
+      {/* Design preview - always accessible */}
+      <Route path="/design-preview" component={DesignPreview} />
 
       {!isAuthenticated ? (
         <>
