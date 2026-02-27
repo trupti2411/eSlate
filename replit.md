@@ -2,6 +2,23 @@
 
 eSlate is a secure educational platform designed for e-ink devices and high-contrast displays. It functions as a comprehensive learning management system supporting students, parents, tutors, and administrators. Key features include homework management, real-time messaging, progress tracking, and calendar scheduling, all optimized for accessibility and readability on e-ink displays. The platform aims to provide a robust and inclusive educational experience.
 
+## Dual-Design System (Option B)
+The platform supports two dashboard designs, toggled via a persistent preference stored in `localStorage`:
+
+### Design Toggle Architecture
+- **`useDesignPreference` hook** (`client/src/hooks/useDesignPreference.ts`): Reads/writes `eslate_design` ('classic'|'new') and `eslate_banner_seen` from localStorage.
+- **`DesignSwitchBanner`** (`client/src/components/DesignSwitchBanner.tsx`): Shown on all authenticated classic pages. First visit: dismissible indigo banner at the bottom. After dismiss: compact floating pill button (bottom-right). Also exports `DesignNavToggle` used inside new dashboard nav bars.
+- **App.tsx routing**: Home route (`/`) checks `design` state. 'new' → new dashboard; 'classic' → existing dashboard.
+
+### New Design Dashboards
+- **Student** (indigo): `client/src/pages/student/NewStudentDashboard.tsx` — Homework/Classes/Results tabs with real API data
+- **Parent** (rose): `client/src/pages/parent/NewParentDashboard.tsx` — My Children/Homework/Messages tabs
+- **Company Admin/Tutor** (teal): `client/src/pages/company/NewTutorDashboard.tsx` — Today/To Mark/Students/Messages tabs with inline marking UI
+- Admin role: No new design (kept classic only)
+
+### Classic Dashboards (unchanged)
+All existing dashboards remain the default and are fully functional. Users can switch back from new to classic using the nav toggle in any new dashboard.
+
 ## Security Features
 The platform includes comprehensive security hardening:
 - **Rate Limiting**: Login attempts limited to 5 per 15-minute window per email. After 5 failed attempts, account is locked for 15 minutes. Uses `login_attempts` DB table.

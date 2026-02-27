@@ -4,13 +4,18 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth, AuthProvider } from "@/hooks/useAuth.tsx";
+import { useDesignPreference } from "@/hooks/useDesignPreference";
+import { DesignSwitchBanner } from "@/components/DesignSwitchBanner";
 import AuthPage from "@/pages/auth-page";
 import SimpleRegistration from "@/pages/simple-registration";
 import StudentDashboard from "@/pages/student/Dashboard";
 import StudentHome from "@/pages/student/StudentHome";
+import NewStudentDashboard from "@/pages/student/NewStudentDashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
+import NewParentDashboard from "@/pages/parent/NewParentDashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
 import CompanyTutorDashboard from "@/pages/company/TutorDashboard";
+import NewTutorDashboard from "@/pages/company/NewTutorDashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
 import Users from "@/pages/admin/Users";
@@ -48,6 +53,7 @@ import NotFound from "@/pages/not-found";
 
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();
+  const { design, setDesign, bannerSeen, dismissBanner } = useDesignPreference();
 
   if (isLoading) {
     return (
@@ -99,12 +105,25 @@ function Router() {
         </>
       ) : (
         <>
+          {design === 'classic' && (
+            <DesignSwitchBanner
+              bannerSeen={bannerSeen}
+              onDismiss={dismissBanner}
+              onSwitch={() => setDesign('new')}
+            />
+          )}
           <Route path="/">
-            {user?.role === 'student' && <StudentHome />}
-            {user?.role === 'parent' && <ParentDashboard />}
+            {user?.role === 'student' && (
+              design === 'new' ? <NewStudentDashboard setDesign={setDesign} /> : <StudentHome />
+            )}
+            {user?.role === 'parent' && (
+              design === 'new' ? <NewParentDashboard setDesign={setDesign} /> : <ParentDashboard />
+            )}
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
-            {user?.role === 'company_admin' && <CompanyDashboard />}
+            {user?.role === 'company_admin' && (
+              design === 'new' ? <NewTutorDashboard setDesign={setDesign} /> : <CompanyDashboard />
+            )}
           </Route>
           <Route path="/student" component={StudentHome} />
           <Route path="/student/home" component={StudentHome} />
