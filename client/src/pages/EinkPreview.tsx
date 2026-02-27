@@ -33,11 +33,45 @@ const eink = {
 };
 
 // ─── DEVICE FRAME ─────────────────────────────────────────────────────────────
-function EinkDeviceMockup({ children, label }: { children: React.ReactNode; label: string }) {
+function EinkDeviceMockup({ children, label, isLandscape }: { children: React.ReactNode; label: string; isLandscape: boolean }) {
+  if (isLandscape) {
+    return (
+      <div className="flex flex-col items-center gap-3 flex-shrink-0">
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest">{label} — Landscape</p>
+        <div
+          className="flex rounded-2xl shadow-2xl overflow-hidden"
+          style={{
+            height: 544,
+            background: '#1a1a1a',
+            padding: '14px',
+            border: '2px solid #0a0a0a',
+            gap: 12,
+          }}
+        >
+          {/* Left — camera / sensor column */}
+          <div className="flex flex-col items-center justify-center gap-3 flex-shrink-0" style={{ width: 20 }}>
+            <div className="w-3 h-3 rounded-full bg-gray-800 border border-gray-700" />
+            <div className="w-px flex-1 rounded-full bg-gray-800 opacity-40" />
+          </div>
+          {/* Screen */}
+          <div
+            className="rounded-lg overflow-hidden flex-1"
+            style={{ background: eink.bg, border: '1px solid #555' }}
+          >
+            {children}
+          </div>
+          {/* Right — home bar column */}
+          <div className="flex flex-col items-center justify-center flex-shrink-0" style={{ width: 20 }}>
+            <div className="w-1.5 h-20 rounded-full bg-gray-600" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center gap-3 flex-shrink-0">
-      <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest">{label}</p>
-      {/* Outer device bezel */}
+      <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest">{label} — Portrait</p>
       <div
         className="relative rounded-2xl shadow-2xl overflow-hidden"
         style={{
@@ -47,23 +81,15 @@ function EinkDeviceMockup({ children, label }: { children: React.ReactNode; labe
           border: '2px solid #0a0a0a',
         }}
       >
-        {/* Camera/sensor bar */}
         <div className="flex items-center justify-center mb-3">
           <div className="w-4 h-4 rounded-full bg-gray-800 border border-gray-700" />
         </div>
-        {/* Screen area */}
         <div
           className="rounded-lg overflow-hidden"
-          style={{
-            width: '100%',
-            height: 710,
-            background: eink.bg,
-            border: '1px solid #555',
-          }}
+          style={{ width: '100%', height: 710, background: eink.bg, border: '1px solid #555' }}
         >
           {children}
         </div>
-        {/* Home bar */}
         <div className="flex justify-center mt-4">
           <div className="w-24 h-1.5 rounded-full bg-gray-600" />
         </div>
@@ -792,6 +818,7 @@ function AdminEink() {
 // ─── MAIN PAGE ────────────────────────────────────────────────────────────────
 export default function EinkPreview() {
   const [role, setRole] = useState<Role>('student');
+  const [isLandscape, setIsLandscape] = useState(false);
 
   const roles: { key: Role; label: string; accent: string }[] = [
     { key: 'student', label: 'Student', accent: 'text-blue-700' },
@@ -849,24 +876,33 @@ export default function EinkPreview() {
             <h1 className="text-xl font-black text-gray-900">eSlate — E-Ink Device Preview</h1>
             <p className="text-sm text-gray-400">ONYX Air 3C · 10.3" · Kaleido 3 colour simulation · Tap to interact</p>
           </div>
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
-            {roles.map(r => (
-              <button
-                key={r.key}
-                onClick={() => setRole(r.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${role === r.key ? `bg-white shadow ${r.accent}` : 'text-gray-500'}`}
-              >
-                {r.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setIsLandscape(l => !l)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-bold transition-all ${isLandscape ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300'}`}
+            >
+              <span style={{ display: 'inline-block', transform: isLandscape ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>⬜</span>
+              {isLandscape ? 'Landscape' : 'Portrait'}
+            </button>
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
+              {roles.map(r => (
+                <button
+                  key={r.key}
+                  onClick={() => setRole(r.key)}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${role === r.key ? `bg-white shadow ${r.accent}` : 'text-gray-500'}`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-screen-xl mx-auto px-6 py-10">
-        <div className="flex flex-col xl:flex-row gap-12 items-start justify-center">
+        <div className={`flex gap-12 items-start justify-center ${isLandscape ? 'flex-col' : 'flex-col xl:flex-row'}`}>
           {/* Device mockup */}
-          <EinkDeviceMockup label={`${role.charAt(0).toUpperCase() + role.slice(1)} · ONYX Air 3C`}>
+          <EinkDeviceMockup label={`${role.charAt(0).toUpperCase() + role.slice(1)} · ONYX Air 3C`} isLandscape={isLandscape}>
             {role === 'student' && <StudentEink />}
             {role === 'parent'  && <ParentEink />}
             {role === 'tutor'   && <TutorEink />}

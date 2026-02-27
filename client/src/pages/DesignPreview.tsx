@@ -16,10 +16,31 @@ type ParentTab = 'children' | 'messages' | 'homework';
 type StudentScreen = 'home' | 'assignment-detail' | 'pdf-annotator' | 'submitted';
 type Tool = 'pen' | 'highlighter' | 'eraser' | 'text';
 
-function PhoneMockup({ children, label }: { children: React.ReactNode; label: string }) {
+function PhoneMockup({ children, label, isLandscape }: { children: React.ReactNode; label: string; isLandscape: boolean }) {
+  if (isLandscape) {
+    return (
+      <div className="flex flex-col items-center gap-3 flex-shrink-0">
+        <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest">{label} — Landscape</p>
+        {/* Landscape phone: wide & short with left-side notch */}
+        <div
+          className="relative rounded-[40px] border-[8px] border-gray-900 shadow-2xl bg-white overflow-hidden"
+          style={{ width: 780, height: 390 }}
+        >
+          {/* Left notch (camera island) */}
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-5 h-20 bg-gray-900 rounded-r-2xl z-10" />
+          {/* Right home indicator */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-12 rounded-full bg-gray-300 z-10" />
+          <div className="pl-8 h-full">
+            {children}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center gap-3">
-      <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest">{label}</p>
+      <p className="text-sm font-semibold text-gray-500 uppercase tracking-widest">{label} — Portrait</p>
       <div className="relative w-[390px] rounded-[40px] border-[8px] border-gray-900 shadow-2xl bg-white overflow-hidden" style={{ minHeight: 780 }}>
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-28 h-6 bg-gray-900 rounded-b-2xl z-10" />
         <div className="pt-8 h-full">
@@ -1289,6 +1310,7 @@ function AdminScreen() {
 
 export default function DesignPreview() {
   const [view, setView] = useState<View>('student');
+  const [isLandscape, setIsLandscape] = useState(false);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -1298,31 +1320,40 @@ export default function DesignPreview() {
             <h1 className="text-xl font-black text-gray-900">eSlate — Redesign Preview</h1>
             <p className="text-sm text-gray-400">All 4 roles · Tap to interact · Full flows included</p>
           </div>
-          <div className="flex gap-1 bg-gray-100 p-1 rounded-xl flex-wrap">
-            {([
-              { key: 'student', label: 'Student', color: 'text-indigo-600' },
-              { key: 'parent', label: 'Parent', color: 'text-rose-500' },
-              { key: 'tutor', label: 'Tutor', color: 'text-teal-600' },
-              { key: 'admin', label: 'Admin', color: 'text-violet-600' },
-            ] as { key: View; label: string; color: string }[]).map(v => (
-              <button
-                key={v.key}
-                onClick={() => setView(v.key)}
-                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === v.key ? `bg-white shadow ${v.color}` : 'text-gray-500'}`}
-              >
-                {v.label}
-              </button>
-            ))}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={() => setIsLandscape(l => !l)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl border-2 text-sm font-bold transition-all ${isLandscape ? 'bg-gray-900 text-white border-gray-900' : 'bg-white text-gray-700 border-gray-300'}`}
+            >
+              <span style={{ display: 'inline-block', transform: isLandscape ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>📱</span>
+              {isLandscape ? 'Landscape' : 'Portrait'}
+            </button>
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-xl flex-wrap">
+              {([
+                { key: 'student', label: 'Student', color: 'text-indigo-600' },
+                { key: 'parent', label: 'Parent', color: 'text-rose-500' },
+                { key: 'tutor', label: 'Tutor', color: 'text-teal-600' },
+                { key: 'admin', label: 'Admin', color: 'text-violet-600' },
+              ] as { key: View; label: string; color: string }[]).map(v => (
+                <button
+                  key={v.key}
+                  onClick={() => setView(v.key)}
+                  className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${view === v.key ? `bg-white shadow ${v.color}` : 'text-gray-500'}`}
+                >
+                  {v.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-12">
-        <div className="flex flex-col lg:flex-row gap-12 items-start justify-center">
-          {view === 'student' && <PhoneMockup label="Student app"><StudentScreen /></PhoneMockup>}
-          {view === 'parent'  && <PhoneMockup label="Parent app"><ParentScreen /></PhoneMockup>}
-          {view === 'tutor'   && <PhoneMockup label="Tutor app"><TutorScreen /></PhoneMockup>}
-          {view === 'admin'   && <PhoneMockup label="Admin app"><AdminScreen /></PhoneMockup>}
+        <div className={`flex gap-12 items-start justify-center ${isLandscape ? 'flex-col' : 'flex-col lg:flex-row'}`}>
+          {view === 'student' && <PhoneMockup label="Student app" isLandscape={isLandscape}><StudentScreen /></PhoneMockup>}
+          {view === 'parent'  && <PhoneMockup label="Parent app" isLandscape={isLandscape}><ParentScreen /></PhoneMockup>}
+          {view === 'tutor'   && <PhoneMockup label="Tutor app" isLandscape={isLandscape}><TutorScreen /></PhoneMockup>}
+          {view === 'admin'   && <PhoneMockup label="Admin app" isLandscape={isLandscape}><AdminScreen /></PhoneMockup>}
 
           <div className="flex-1 max-w-md">
             <h2 className="text-2xl font-black text-gray-900 mb-6">
