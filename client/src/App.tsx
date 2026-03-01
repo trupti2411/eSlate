@@ -39,6 +39,7 @@ import { WorksheetEditorPage } from "@/pages/admin/WorksheetEditorPage";
 import TestManagement from "@/pages/tests/TestManagement";
 import TestGrading from "@/pages/tests/TestGrading";
 import Reports from "@/pages/company/Reports";
+import { MarkingPage } from "@/pages/company/MarkingPage";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import UserAgreement from "@/pages/legal/UserAgreement";
@@ -146,6 +147,7 @@ function Router() {
           <Route path="/company/academic" component={() => <CompanyAcademicManagement />} />
           <Route path="/company/assignments" component={AssignmentManagement} />
           <Route path="/company/homework" component={SubmittedHomework} />
+          <Route path="/company/marking" component={MarkingPage} />
           <Route path="/company/worksheets" component={WorksheetManagementPage} />
           <Route path="/company/worksheet/edit/:worksheetId" component={WorksheetEditorPage} />
           <Route path="/company/tests" component={TestManagement} />

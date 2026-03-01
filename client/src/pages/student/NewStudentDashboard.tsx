@@ -144,6 +144,25 @@ export default function NewStudentDashboard({ setDesign }: Props) {
                 ))}
               </div>
 
+              {/* Progress bar */}
+              {allWork.length > 0 && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">Term progress</span>
+                    <span className="text-xs font-bold text-gray-700">{done.length} / {allWork.length} complete</span>
+                  </div>
+                  <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-indigo-500 rounded-full transition-all duration-500"
+                      style={{ width: `${allWork.length > 0 ? Math.round((done.length / allWork.length) * 100) : 0}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    {allWork.length > 0 ? Math.round((done.length / allWork.length) * 100) : 0}% submitted this term
+                  </p>
+                </div>
+              )}
+
               {aLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map(i => <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}

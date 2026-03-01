@@ -1,11 +1,8 @@
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link, useRoute } from 'wouter';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import { useRoute } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { WorksheetAnswerer } from '@/components/WorksheetAnswerer';
-import { AlertCircle, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft } from 'lucide-react';
 
 interface WorksheetAssignment {
   assignment: {
@@ -41,25 +38,16 @@ export function WorksheetWorkPage() {
 
   const worksheetAssignment = worksheets.find(w => w.assignment.id === worksheetAssignmentId);
 
-  const handleClose = () => {
-    window.close();
-  };
-
-  const handleComplete = () => {
-    window.close();
-  };
+  const handleBack = () => window.history.back();
 
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="border-2 border-black p-8 text-center">
-          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-          <h2 className="text-xl font-bold mb-2">Authentication Required</h2>
-          <p className="text-gray-600 mb-4">Please log in to access your worksheets.</p>
-          <Link href="/student">
-            <Button className="bg-black text-white">Go to Login</Button>
-          </Link>
-        </Card>
+        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center max-w-sm">
+          <AlertCircle className="h-10 w-10 mx-auto mb-3 text-red-500" />
+          <h2 className="font-black text-lg mb-2">Not logged in</h2>
+          <a href="/" className="text-indigo-600 font-semibold text-sm">Go to login →</a>
+        </div>
       </div>
     );
   }
@@ -68,8 +56,8 @@ export function WorksheetWorkPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading worksheet...</p>
+          <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+          <p className="text-gray-500 text-sm">Loading worksheet…</p>
         </div>
       </div>
     );
@@ -78,27 +66,39 @@ export function WorksheetWorkPage() {
   if (error || !worksheetAssignment) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Card className="border-2 border-black p-8 text-center max-w-md">
-          <AlertCircle className="h-12 w-12 mx-auto mb-4 text-red-500" />
-          <h2 className="text-xl font-bold mb-2">Worksheet Not Found</h2>
-          <p className="text-gray-600 mb-4">The worksheet you're looking for doesn't exist or you don't have access to it.</p>
-          <Button onClick={handleClose} className="bg-black text-white">
-            Close Tab
-          </Button>
-        </Card>
+        <div className="bg-white border border-gray-200 rounded-2xl p-8 text-center max-w-sm">
+          <AlertCircle className="h-10 w-10 mx-auto mb-3 text-red-500" />
+          <h2 className="font-black text-lg mb-2">Worksheet not found</h2>
+          <button onClick={handleBack} className="text-indigo-600 font-semibold text-sm">← Go back</button>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <WorksheetAnswerer
-        worksheetId={worksheetAssignment.worksheet.id}
-        studentId={studentDbId}
-        assignmentId={worksheetAssignment.assignment.id}
-        onClose={handleClose}
-        onComplete={handleComplete}
-      />
+    <div className="min-h-screen flex flex-col bg-gray-50">
+      <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3 flex-shrink-0">
+        <button
+          onClick={handleBack}
+          className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center flex-shrink-0 transition-colors"
+          aria-label="Back"
+        >
+          <ArrowLeft size={16} />
+        </button>
+        <div className="flex-1 min-w-0">
+          <p className="font-black text-sm truncate">{worksheetAssignment.worksheet.title}</p>
+          <p className="text-xs text-indigo-200 truncate">{worksheetAssignment.worksheet.subject || 'Worksheet'}</p>
+        </div>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        <WorksheetAnswerer
+          worksheetId={worksheetAssignment.worksheet.id}
+          studentId={studentDbId}
+          assignmentId={worksheetAssignment.assignment.id}
+          onClose={handleBack}
+          onComplete={handleBack}
+        />
+      </div>
     </div>
   );
 }

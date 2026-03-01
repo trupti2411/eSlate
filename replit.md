@@ -2,6 +2,13 @@
 
 eSlate is a secure educational platform designed for e-ink devices and high-contrast displays. It functions as a comprehensive learning management system supporting students, parents, tutors, and administrators. Key features include homework management, real-time messaging, progress tracking, and calendar scheduling, all optimized for accessibility and readability on e-ink displays. The platform aims to provide a robust and inclusive educational experience.
 
+## Assignment Workflow (Updated)
+- **Student Assignment Work Page** (`client/src/pages/student/AssignmentWorkPage.tsx`): Full rewrite with clean indigo nav bar, `window.history.back()` navigation, simplified upload-then-submit flow for assignments without attachment docs, PDF annotation flow kept for attachment-based assignments.
+- **Worksheet Work Page** (`client/src/pages/student/WorksheetWorkPage.tsx`): Navigation fixed from `window.close()` to `window.history.back()`, matching indigo nav bar.
+- **Student Progress Bar**: `NewStudentDashboard.tsx` homework tab now shows a "Term progress" bar card (done/total count + filled bar with percentage).
+- **Tutor Marking Page** (`client/src/pages/company/MarkingPage.tsx`): New dedicated marking page at `/company/marking` — swipe-through submissions, quick grade presets (Excellent 20, Good 16, OK 12, Needs work 8), feedback textarea, auto-advance on save.
+- **SubmittedHomework**: "Start marking (N)" teal button in header navigates to `/company/marking` when submissions are pending.
+
 ## Dual-Design System (Option B)
 The platform supports two dashboard designs, toggled via a persistent preference stored in `localStorage`:
 

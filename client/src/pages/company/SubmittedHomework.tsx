@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +20,8 @@ import {
   Search,
   Filter,
   GraduationCap,
-  Paperclip
+  Paperclip,
+  PenLine
 } from "lucide-react";
 import { format } from "date-fns";
 import { type Submission } from "@shared/schema";
@@ -126,6 +128,7 @@ function SubmittedFilesSection({ submission, eInkStyles }: { submission: Submiss
 }
 
 export default function SubmittedHomework() {
+  const [, navigate] = useLocation();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedSubmission, setSelectedSubmission] = useState<SubmissionWithDetails | null>(null);
@@ -185,9 +188,20 @@ export default function SubmittedHomework() {
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Submitted Homework</h1>
             <p className="text-gray-600 dark:text-gray-300 mt-1">Review and grade student submissions</p>
           </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{submissions.length}</div>
-            <div className="text-sm text-gray-600 dark:text-gray-300">Total Submissions</div>
+          <div className="flex items-center gap-3">
+            {submissions.filter(s => s.status === 'submitted').length > 0 && (
+              <Button
+                onClick={() => navigate('/company/marking')}
+                className="bg-teal-600 hover:bg-teal-700 text-white font-bold flex items-center gap-2"
+              >
+                <PenLine className="h-4 w-4" />
+                Start marking ({submissions.filter(s => s.status === 'submitted').length})
+              </Button>
+            )}
+            <div className="text-right">
+              <div className="text-2xl font-bold text-gray-900 dark:text-white">{submissions.length}</div>
+              <div className="text-sm text-gray-600 dark:text-gray-300">Total Submissions</div>
+            </div>
           </div>
         </div>
 
