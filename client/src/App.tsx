@@ -48,6 +48,7 @@ import ContactUs from "@/pages/ContactUs";
 import DesignPreview from "@/pages/DesignPreview";
 import EinkPreview from "@/pages/EinkPreview";
 import SwitchPreview from "@/pages/SwitchPreview";
+import AssignmentPreview from "@/pages/AssignmentPreview";
 
 import NotFound from "@/pages/not-found";
 
@@ -87,6 +88,7 @@ function Router() {
       <Route path="/design-preview" component={DesignPreview} />
       <Route path="/eink-preview" component={EinkPreview} />
       <Route path="/switch-preview" component={SwitchPreview} />
+      <Route path="/assignment-preview" component={AssignmentPreview} />
 
       {!isAuthenticated ? (
         <>
