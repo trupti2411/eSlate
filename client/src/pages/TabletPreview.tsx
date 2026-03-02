@@ -3,11 +3,12 @@ import {
   CheckSquare, BookOpen, BarChart2, Bell, LogOut,
   AlertCircle, Check, ChevronRight, Upload, Send,
   User, Clock, FileText, CheckCircle, Eye,
-  ClipboardList, PenLine, ChevronLeft
+  ClipboardList, PenLine, ChevronLeft, Pen,
+  Highlighter, Eraser, Type, Undo2, Save, Paperclip
 } from 'lucide-react';
 
 type Tab = 'homework' | 'classes' | 'results';
-type DemoView = 'student' | 'marking' | 'assignment' | 'flow';
+type DemoView = 'student' | 'marking' | 'assignment' | 'flow' | 'pdf-flow';
 
 const SAMPLE_HOMEWORK = [
   { id: 1, title: 'Algebra — Quadratic Equations', subject: 'Maths', due: 'Tomorrow', kind: 'assignment', status: 'overdue' },
@@ -797,6 +798,341 @@ function AssignmentFlow() {
   );
 }
 
+/* ── PDF / COMPLETE-ONLINE FLOW ── */
+const PDF_FLOW_STEPS = [
+  { id: 1, label: 'Homework list',     desc: 'PDF assignment visible' },
+  { id: 2, label: 'Assignment opens',  desc: 'Attached worksheet shown' },
+  { id: 3, label: 'Annotator opens',   desc: 'PDF loads with tools' },
+  { id: 4, label: 'Student annotates', desc: 'Writing on PDF' },
+  { id: 5, label: 'Submitted!',        desc: 'Annotated PDF sent' },
+];
+
+const TOOL_PALETTE = [
+  { id: 'pen',    Icon: Pen,         label: 'Pen',    color: 'text-indigo-700', bg: 'bg-indigo-50', border: 'border-indigo-200' },
+  { id: 'hi',     Icon: Highlighter, label: 'Yellow', color: 'text-amber-700',  bg: 'bg-amber-50',  border: 'border-amber-200' },
+  { id: 'erase',  Icon: Eraser,      label: 'Erase',  color: 'text-gray-700',   bg: 'bg-gray-50',   border: 'border-gray-200' },
+  { id: 'text',   Icon: Type,        label: 'Text',   color: 'text-teal-700',   bg: 'bg-teal-50',   border: 'border-teal-200' },
+];
+
+function SimPDF({ annotated }: { annotated: boolean }) {
+  return (
+    <div className="relative w-full h-full bg-white rounded-lg overflow-hidden shadow-inner border border-gray-200">
+      {/* Fake PDF content */}
+      <div className="absolute inset-0 p-4 space-y-2 pointer-events-none">
+        <div className="text-center mb-3">
+          <p className="text-xs font-black text-gray-800">Year 5 English — Essay Worksheet</p>
+          <p className="text-xs text-gray-400">Shakespeare's Use of Language</p>
+        </div>
+        {[
+          { w: 'full', t: 'Read the extract below and answer the questions.' },
+          { w: '11/12', t: '' },
+          { w: 'full', t: '1.  Identify two examples of personification in the extract.' },
+          { w: '3/4',  t: '' },
+          { w: '1/2',  t: '' },
+          { w: 'full', t: '2.  Explain how Shakespeare creates tension in Act III.' },
+          { w: '5/6',  t: '' },
+          { w: '2/3',  t: '' },
+          { w: 'full', t: '3.  In your own words, describe the character of Macbeth.' },
+          { w: '3/4',  t: '' },
+          { w: '1/2',  t: '' },
+        ].map((l, i) => (
+          l.t
+            ? <p key={i} className="text-xs text-gray-700 font-semibold">{l.t}</p>
+            : <div key={i} className={`h-3 bg-gray-100 rounded w-${l.w}`} />
+        ))}
+      </div>
+
+      {/* Annotation overlay — only shown when annotated */}
+      {annotated && (
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 400 300">
+          {/* Q1 answer — pen strokes */}
+          <path d="M 80 95 Q 90 90 110 93 Q 130 96 150 92 Q 160 90 175 94" stroke="#4338ca" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          <path d="M 80 103 Q 100 100 130 103 Q 155 105 180 102" stroke="#4338ca" strokeWidth="1.5" fill="none" strokeLinecap="round" />
+          {/* Q1 highlight */}
+          <rect x="74" y="62" width="220" height="9" fill="#fde68a" opacity="0.5" rx="2" />
+          {/* Q2 answer text */}
+          <text x="80" y="155" fontSize="8" fill="#0f766e" fontStyle="italic">Shakespeare uses dramatic irony and short sentences to build tension…</text>
+          <text x="80" y="165" fontSize="8" fill="#0f766e" fontStyle="italic">The witches' prophecy creates a sense of inevitable doom.</text>
+          {/* Q3 arrow / tick mark */}
+          <text x="80" y="215" fontSize="8" fill="#4338ca">Macbeth is ambitious but conflicted — driven by power yet haunted</text>
+          <text x="80" y="225" fontSize="8" fill="#4338ca">by guilt. He transforms from hero to tyrant.</text>
+          {/* Small check on Q1 */}
+          <text x="356" y="75" fontSize="11" fill="#16a34a" fontWeight="bold">✓</text>
+        </svg>
+      )}
+    </div>
+  );
+}
+
+function PDFFlow() {
+  const [step, setStep] = useState(1);
+  const [activeTool, setActiveTool] = useState('pen');
+
+  const homework = [
+    { id: 1, title: 'Shakespeare Essay Worksheet', subject: 'English', due: 'Tomorrow', kind: 'worksheet', hasPdf: true, status: step === 5 ? 'done' : 'pending' },
+    { id: 2, title: 'Algebra — Quadratic Equations', subject: 'Maths', due: 'Overdue', kind: 'assignment', hasPdf: false, status: 'overdue' },
+    { id: 3, title: 'Periodic Table Quiz', subject: 'Chemistry', due: 'Wed 12 Mar', kind: 'worksheet', hasPdf: false, status: 'pending' },
+    { id: 4, title: 'Fractions Practice', subject: 'Maths', due: 'Done', kind: 'worksheet', hasPdf: false, status: 'done' },
+  ];
+  const done = homework.filter(h => h.status === 'done').length;
+
+  return (
+    <div className="flex h-full bg-gray-50">
+      {/* Sidebar */}
+      <div className="w-52 bg-indigo-600 flex flex-col flex-shrink-0">
+        <div className="px-4 pt-5 pb-4">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center">
+              <span className="text-white text-xs font-black">eS</span>
+            </div>
+            <span className="font-black text-white">eSlate</span>
+          </div>
+          <p className="text-xs text-indigo-300 pl-9">Oliver · Year 5</p>
+        </div>
+        <nav className="flex-1 px-3 space-y-1">
+          {[
+            { label: 'Homework', Icon: CheckSquare, active: true },
+            { label: 'My Classes', Icon: BookOpen, active: false },
+            { label: 'Results', Icon: BarChart2, active: false },
+          ].map(t => (
+            <div key={t.label} className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold ${t.active ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-300'}`}>
+              <t.Icon size={15} />
+              {t.label}
+            </div>
+          ))}
+        </nav>
+        <div className="px-3 pb-4 text-indigo-300">
+          <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold"><LogOut size={14} /> Sign out</div>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+
+        {/* Step 1: Homework list */}
+        {step === 1 && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div>
+              <h2 className="text-xl font-black text-gray-900">Homework</h2>
+              <p className="text-sm text-gray-400">Assignments with a PDF can be completed online</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+              <div className="flex justify-between mb-2">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Term progress</span>
+                <span className="text-xs font-bold text-gray-700">{done} / {homework.length} complete</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full"><div className="h-full bg-indigo-400 rounded-full" style={{ width: `${Math.round(done / homework.length * 100)}%` }} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {homework.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => a.id === 1 && setStep(2)}
+                  className={`text-left bg-white rounded-2xl border overflow-hidden shadow-sm transition-all ${
+                    a.id === 1 ? 'border-indigo-300 ring-2 ring-indigo-400 ring-offset-1 hover:shadow-md cursor-pointer' : 'border-gray-100'
+                  }`}
+                >
+                  <div className="px-3 py-2.5 flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-base flex-shrink-0">
+                      {a.kind === 'worksheet' ? '📝' : '📚'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1">
+                        <p className="font-bold text-xs text-gray-900 truncate">{a.title}</p>
+                        {a.hasPdf && <Paperclip size={9} className="text-indigo-400 flex-shrink-0" />}
+                      </div>
+                      <p className="text-xs text-gray-400">{a.subject}</p>
+                    </div>
+                    {a.status === 'done'    && <Check size={14} className="text-green-500 flex-shrink-0" strokeWidth={3} />}
+                    {a.status === 'overdue' && <AlertCircle size={13} className="text-red-400 flex-shrink-0" />}
+                    {a.id === 1            && <ChevronRight size={14} className="text-indigo-500 flex-shrink-0" />}
+                  </div>
+                  {a.id === 1 && (
+                    <div className="bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-600 border-t border-indigo-100 flex items-center gap-1">
+                      <Paperclip size={9} /> PDF attached — tap to complete online
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <p className="text-center text-xs text-indigo-500 font-bold animate-pulse">👆 Tap "Shakespeare Essay Worksheet" to open it</p>
+          </div>
+        )}
+
+        {/* Step 2: Assignment with PDF preview + action buttons */}
+        {step === 2 && (
+          <div className="flex flex-1 overflow-hidden">
+            {/* Instructions */}
+            <div className="w-2/5 flex flex-col border-r border-gray-100 bg-white">
+              <div className="bg-indigo-600 text-white px-4 py-2.5 flex items-center gap-2">
+                <button onClick={() => setStep(1)} className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <ChevronLeft size={14} />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-xs truncate">Shakespeare Essay Worksheet</p>
+                  <p className="text-xs text-indigo-200">English · Due Tomorrow</p>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1.5">Instructions</p>
+                <p className="text-xs text-gray-700 leading-relaxed">
+                  Read each question carefully and write your answers directly on the worksheet. 
+                  Use full sentences where asked.
+                </p>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5">
+                  <p className="text-xs font-bold text-amber-700 mb-0.5">💡 Tip</p>
+                  <p className="text-xs text-amber-700">You can use the pen or type — your choice. Use the highlighter to mark key phrases first.</p>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-2.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Paperclip size={11} className="text-indigo-600" />
+                    <p className="text-xs font-bold text-indigo-700">Attached worksheet</p>
+                  </div>
+                  <p className="text-xs text-indigo-600">ShakespeareEssay_Y5.pdf</p>
+                  <p className="text-xs text-gray-400 mt-0.5">4 pages · 320 KB</p>
+                </div>
+              </div>
+            </div>
+            {/* PDF preview + buttons */}
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="p-3 border-b border-gray-100 bg-white flex items-center gap-2">
+                <p className="text-sm font-black text-gray-800 flex-1">ShakespeareEssay_Y5.pdf</p>
+                <button
+                  onClick={() => setStep(3)}
+                  className="flex items-center gap-1.5 bg-indigo-600 text-white text-xs font-black px-3.5 py-2 rounded-xl hover:bg-indigo-700 transition-colors shadow-md shadow-indigo-200"
+                >
+                  <PenLine size={13} /> Complete Online
+                </button>
+                <button className="flex items-center gap-1.5 bg-gray-100 text-gray-600 text-xs font-bold px-3 py-2 rounded-xl hover:bg-gray-200 transition-colors">
+                  <Upload size={12} /> Upload instead
+                </button>
+              </div>
+              <div className="flex-1 overflow-hidden p-3 bg-gray-100">
+                <SimPDF annotated={false} />
+              </div>
+              <p className="text-center text-xs text-indigo-500 font-bold p-2 animate-pulse">👆 Tap "Complete Online" to open the annotator</p>
+            </div>
+          </div>
+        )}
+
+        {/* Steps 3 + 4: PDF annotator */}
+        {(step === 3 || step === 4) && (
+          <div className="flex-1 flex flex-col overflow-hidden bg-gray-800">
+            {/* Annotator toolbar */}
+            <div className="bg-indigo-700 px-3 py-2 flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => setStep(2)} className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                <ChevronLeft size={13} className="text-white" />
+              </button>
+              <span className="text-white text-xs font-black flex-1 truncate">ShakespeareEssay_Y5.pdf — Page 1 of 4</span>
+              {/* Tools */}
+              <div className="flex items-center gap-1 bg-indigo-800 rounded-xl p-1">
+                {TOOL_PALETTE.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setActiveTool(t.id)}
+                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                      activeTool === t.id
+                        ? `${t.bg} ${t.color} shadow-sm`
+                        : 'text-indigo-300 hover:text-white'
+                    }`}
+                    title={t.label}
+                  >
+                    <t.Icon size={13} />
+                  </button>
+                ))}
+                <div className="w-px h-5 bg-indigo-600 mx-1" />
+                <button className="w-7 h-7 rounded-lg flex items-center justify-center text-indigo-300 hover:text-white">
+                  <Undo2 size={13} />
+                </button>
+              </div>
+              {/* Colour dots */}
+              <div className="flex gap-1">
+                {['#4338ca','#dc2626','#16a34a','#000000'].map(c => (
+                  <div key={c} className="w-5 h-5 rounded-full border-2 border-white/40 cursor-pointer" style={{ background: c }} />
+                ))}
+              </div>
+              {/* Save/submit */}
+              <button
+                onClick={() => setStep(4)}
+                className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-2.5 py-1.5 rounded-lg transition-colors"
+              >
+                <Save size={12} /> Save
+              </button>
+              <button
+                onClick={() => step === 4 && setStep(5)}
+                className={`flex items-center gap-1.5 text-xs font-black px-3 py-1.5 rounded-lg transition-all ${
+                  step === 4
+                    ? 'bg-green-500 hover:bg-green-400 text-white shadow-lg shadow-green-800/40'
+                    : 'bg-white/10 text-white/50 cursor-not-allowed'
+                }`}
+              >
+                <Send size={12} /> {step === 4 ? 'Submit →' : 'Annotate first'}
+              </button>
+            </div>
+
+            {/* PDF page */}
+            <div className="flex-1 flex items-center justify-center p-4 overflow-hidden">
+              <div className="bg-white rounded shadow-2xl overflow-hidden" style={{ height: '100%', aspectRatio: '0.77' }}>
+                <SimPDF annotated={step === 4} />
+              </div>
+            </div>
+
+            {step === 3 && (
+              <div className="bg-indigo-900/80 text-center py-1.5">
+                <p className="text-xs text-indigo-200 font-bold animate-pulse">✏️ Write answers with your stylus — tap "Save" when done</p>
+              </div>
+            )}
+            {step === 4 && (
+              <div className="bg-green-900/80 text-center py-1.5">
+                <p className="text-xs text-green-200 font-bold">✅ Saved! Tap "Submit →" to send your work to the tutor</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Step 5: Success */}
+        {step === 5 && (
+          <div className="flex flex-1 overflow-hidden">
+            {/* Updated list */}
+            <div className="w-2/5 overflow-y-auto p-4 space-y-3 border-r border-gray-100 bg-white">
+              <p className="text-sm font-black text-gray-700">Homework</p>
+              <div className="space-y-2">
+                {homework.map(a => (
+                  <div key={a.id} className={`bg-white rounded-xl border px-3 py-2.5 flex items-center gap-2.5 shadow-sm ${a.id === 1 ? 'border-green-200 bg-green-50' : 'border-gray-100'}`}>
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${a.id === 1 || a.status === 'done' ? 'bg-green-100' : 'bg-indigo-100'}`}>
+                      {a.id === 1 || a.status === 'done' ? <Check size={14} className="text-green-600" strokeWidth={3} /> : <span className="text-sm">{a.kind === 'worksheet' ? '📝' : '📚'}</span>}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-bold truncate ${a.id === 1 || a.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{a.title}</p>
+                      <p className="text-xs text-gray-400">{a.id === 1 ? 'Submitted ✓' : a.due}</p>
+                    </div>
+                    {a.id === 1 && <span className="text-xs font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full border border-green-200 flex-shrink-0">Done</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Success */}
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <div className="w-20 h-20 rounded-3xl bg-green-100 flex items-center justify-center mb-4">
+                <CheckCircle size={40} className="text-green-600" />
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 mb-1">Submitted! 🎉</h2>
+              <p className="text-sm text-gray-500 mb-4">Your annotated worksheet has been sent to your tutor.</p>
+              <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4 text-left max-w-xs mb-6">
+                <p className="text-xs font-bold text-indigo-700 mb-1">📄 Sent: ShakespeareEssay_Y5.pdf</p>
+                <p className="text-xs text-gray-600">Your tutor will mark your annotations and give feedback in the Results tab.</p>
+              </div>
+              <button onClick={() => setStep(1)} className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-black px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors">
+                <ChevronLeft size={14} /> Back to homework
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── MAIN PREVIEW PAGE ── */
 export default function TabletPreview() {
   const [view, setView] = useState<DemoView>('student');
@@ -816,10 +1152,11 @@ export default function TabletPreview() {
         <span className="text-xs text-gray-500">Showing how the app looks on a 10–13" tablet (landscape)</span>
         <div className="ml-auto flex gap-2">
           {[
-            { key: 'flow',       label: '▶ Assignment flow' },
+            { key: 'flow',       label: '▶ Upload flow' },
+            { key: 'pdf-flow',   label: '✏️ Complete online' },
             { key: 'student',    label: '🎒 Dashboard' },
             { key: 'assignment', label: '📚 Assignment page' },
-            { key: 'marking',    label: '✏️ Marking page' },
+            { key: 'marking',    label: '📋 Marking page' },
           ].map(v => (
             <button
               key={v.key}
@@ -842,7 +1179,8 @@ export default function TabletPreview() {
           {/* Screen label */}
           <div className="flex items-center gap-3 mb-3">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              {view === 'flow'       && 'Complete Assignment Journey — click through all 5 steps'}
+              {view === 'flow'       && 'Upload flow — student photographs/scans their work and submits'}
+              {view === 'pdf-flow'   && 'Complete Online flow — student writes on PDF with stylus'}
               {view === 'student'    && 'Student Dashboard — sidebar navigation, 2-column cards'}
               {view === 'assignment' && 'Assignment Work Page — instructions left, upload right'}
               {view === 'marking'    && 'Tutor Marking Page — submission list left, grading right'}
@@ -851,10 +1189,10 @@ export default function TabletPreview() {
             <span className="text-xs text-gray-400">~1024×768</span>
           </div>
 
-          {/* Step tracker (flow only) */}
-          {view === 'flow' && (
+          {/* Step tracker (flow views only) */}
+          {(view === 'flow' || view === 'pdf-flow') && (
             <div className="flex items-center gap-1 mb-3">
-              {FLOW_STEPS.map((s, i) => (
+              {(view === 'flow' ? FLOW_STEPS : PDF_FLOW_STEPS).map((s, i) => (
                 <div key={s.id} className="flex items-center gap-1 flex-1">
                   <div className="flex flex-col items-center flex-1">
                     <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
@@ -879,6 +1217,7 @@ export default function TabletPreview() {
             style={{ aspectRatio: '4/3' }}
           >
             {view === 'flow'       && <AssignmentFlow />}
+            {view === 'pdf-flow'   && <PDFFlow />}
             {view === 'student'    && <StudentTablet tab={tab} setTab={setTab} />}
             {view === 'assignment' && <AssignmentTablet />}
             {view === 'marking'    && <MarkingTablet />}
@@ -886,7 +1225,7 @@ export default function TabletPreview() {
 
           {/* Note */}
           <p className="text-center text-xs text-gray-400 mt-4">
-            {view === 'flow'
+            {(view === 'flow' || view === 'pdf-flow')
               ? 'Interactive walkthrough — tap the highlighted elements to progress through each step.'
               : 'Live interactive preview — click around to try it out. Say "build it" and I\'ll apply this to the real app.'}
           </p>
