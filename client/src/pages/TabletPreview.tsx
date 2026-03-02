@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 
 type Tab = 'homework' | 'classes' | 'results';
-type DemoView = 'student' | 'marking' | 'assignment';
+type DemoView = 'student' | 'marking' | 'assignment' | 'flow';
 
 const SAMPLE_HOMEWORK = [
   { id: 1, title: 'Algebra — Quadratic Equations', subject: 'Maths', due: 'Tomorrow', kind: 'assignment', status: 'overdue' },
@@ -487,6 +487,316 @@ function MarkingTablet() {
   );
 }
 
+/* ── FULL ASSIGNMENT FLOW ── */
+const FLOW_STEPS = [
+  { id: 1, label: 'Homework list',    desc: 'Student sees assignments' },
+  { id: 2, label: 'Assignment opens', desc: 'Instructions on left' },
+  { id: 3, label: 'Upload files',     desc: 'Student picks work to upload' },
+  { id: 4, label: 'Ready to submit',  desc: 'Files uploaded, submit active' },
+  { id: 5, label: 'Submitted!',       desc: 'Confirmation + back to list' },
+];
+
+function AssignmentFlow() {
+  const [step, setStep] = useState(1);
+
+  const homework = [
+    { id: 1, title: 'Algebra — Quadratic Equations', subject: 'Maths', due: 'Overdue', kind: 'assignment', status: step === 5 ? 'done' : 'overdue', active: step >= 2 && step <= 5 },
+    { id: 2, title: 'Shakespeare Essay Draft',        subject: 'English',   due: 'Mon 10 Mar', kind: 'assignment', status: 'pending', active: false },
+    { id: 3, title: 'Periodic Table Quiz',           subject: 'Chemistry', due: 'Wed 12 Mar', kind: 'worksheet', status: 'pending', active: false },
+    { id: 4, title: 'Fractions Practice',            subject: 'Maths',     due: 'Submitted',  kind: 'worksheet', status: 'done', active: false },
+  ];
+
+  const done = homework.filter(h => h.status === 'done' || (h.id === 1 && step === 5)).length;
+  const total = homework.length;
+  const pct = Math.round((done / total) * 100);
+
+  return (
+    <div className="flex h-full bg-gray-50">
+      {/* ── Left panel: always the sidebar / list ── */}
+      <div className="w-52 bg-indigo-600 flex flex-col flex-shrink-0">
+        <div className="px-4 pt-5 pb-4">
+          <div className="flex items-center gap-2 mb-1">
+            <div className="w-7 h-7 rounded-xl bg-white/20 flex items-center justify-center">
+              <span className="text-white text-xs font-black">eS</span>
+            </div>
+            <span className="font-black text-white">eSlate</span>
+          </div>
+          <p className="text-xs text-indigo-300 pl-9">Oliver · Year 5</p>
+        </div>
+        <nav className="flex-1 px-3 space-y-1">
+          {[
+            { label: 'Homework', icon: CheckSquare, active: true, badge: step < 5 ? 1 : 0 },
+            { label: 'My Classes', icon: BookOpen, active: false },
+            { label: 'Results', icon: BarChart2, active: false },
+          ].map(t => (
+            <div
+              key={t.label}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold ${
+                t.active ? 'bg-white text-indigo-700 shadow-sm' : 'text-indigo-300'
+              }`}
+            >
+              <t.icon size={15} />
+              {t.label}
+              {t.badge ? (
+                <span className="ml-auto text-xs font-black bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center">{t.badge}</span>
+              ) : null}
+            </div>
+          ))}
+        </nav>
+        <div className="px-3 pb-4 text-indigo-300">
+          <div className="flex items-center gap-2 px-3 py-2 text-xs font-semibold"><LogOut size={14} /> Sign out</div>
+        </div>
+      </div>
+
+      {/* ── Right area ── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+
+        {/* Step 1: Homework list */}
+        {step === 1 && (
+          <div className="flex-1 overflow-y-auto p-5 space-y-4">
+            <div>
+              <h2 className="text-xl font-black text-gray-900">Homework</h2>
+              <p className="text-sm text-gray-400">Tap an assignment to open it</p>
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-3">
+              <div className="flex justify-between mb-2">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Term progress</span>
+                <span className="text-xs font-bold text-gray-700">{done} / {total} complete</span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full"><div className="h-full bg-indigo-400 rounded-full" style={{ width: `${pct}%` }} /></div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {homework.map(a => (
+                <button
+                  key={a.id}
+                  onClick={() => a.id === 1 && setStep(2)}
+                  className={`text-left bg-white rounded-2xl border overflow-hidden shadow-sm transition-all ${
+                    a.id === 1 ? 'border-red-300 ring-2 ring-indigo-400 ring-offset-1 hover:shadow-md cursor-pointer' : 'border-gray-100'
+                  }`}
+                >
+                  {a.status === 'overdue' && (
+                    <div className="px-3 py-1 bg-red-50 flex items-center gap-1">
+                      <AlertCircle size={10} className="text-red-600" />
+                      <span className="text-xs font-bold text-red-700">OVERDUE — tap to open</span>
+                    </div>
+                  )}
+                  <div className="px-3 py-2.5 flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-indigo-100 flex items-center justify-center text-base flex-shrink-0">
+                      {a.kind === 'worksheet' ? '📝' : '📚'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-xs text-gray-900 truncate">{a.title}</p>
+                      <p className="text-xs text-gray-400">{a.subject}</p>
+                    </div>
+                    {a.status === 'done' && <Check size={14} className="text-green-500 flex-shrink-0" strokeWidth={3} />}
+                    {a.status === 'overdue' && <ChevronRight size={14} className="text-indigo-500 flex-shrink-0" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+            <p className="text-center text-xs text-indigo-500 font-bold animate-pulse">👆 Tap "Algebra — Quadratics" to continue</p>
+          </div>
+        )}
+
+        {/* Steps 2–4: Split assignment view */}
+        {step >= 2 && step <= 4 && (
+          <div className="flex flex-1 overflow-hidden">
+            {/* Instructions panel */}
+            <div className="w-2/5 flex flex-col border-r border-gray-100 bg-white">
+              <div className="bg-indigo-600 text-white px-4 py-2.5 flex items-center gap-2">
+                <button onClick={() => setStep(1)} className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                  <ChevronLeft size={14} />
+                </button>
+                <div className="flex-1 min-w-0">
+                  <p className="font-black text-xs truncate">Algebra — Quadratic Equations</p>
+                  <p className="text-xs text-indigo-200">Maths · Overdue</p>
+                </div>
+                <span className="text-xs font-bold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Overdue</span>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1.5">Instructions</p>
+                  <p className="text-xs text-gray-700 leading-relaxed">
+                    Complete questions 1–10 from Chapter 4. Show all working out clearly. 
+                    Take a clear photo or scan your pages and upload below.
+                  </p>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-2.5">
+                  <p className="text-xs font-bold text-amber-700 mb-0.5">💡 Tutor hint</p>
+                  <p className="text-xs text-amber-700">Use the discriminant (b²−4ac) first to check for real solutions.</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-2.5">
+                  <p className="text-xs font-bold text-gray-600 mb-1">📎 Resources</p>
+                  <p className="text-xs text-indigo-600 underline cursor-pointer">Chapter 4 Notes.pdf</p>
+                  <p className="text-xs text-indigo-600 underline cursor-pointer mt-0.5">Formula Sheet.pdf</p>
+                </div>
+                <div className="bg-white border border-gray-100 rounded-xl p-2.5">
+                  <p className="text-xs font-bold text-gray-500 mb-0.5">Due date</p>
+                  <p className="text-xs font-bold text-red-700">Yesterday — please submit ASAP</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Upload panel */}
+            <div className="flex-1 flex flex-col">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                <div>
+                  <p className="text-base font-black text-gray-900">Upload your work</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {step === 2 && 'Tap the area below to pick your files'}
+                    {step === 3 && 'Selecting file…'}
+                    {step === 4 && '2 files ready — hit Submit!'}
+                  </p>
+                </div>
+
+                {step === 2 && (
+                  <button
+                    onClick={() => setStep(3)}
+                    className="w-full rounded-2xl border-2 border-dashed border-gray-300 bg-white hover:border-indigo-300 hover:bg-indigo-50/30 p-8 text-center cursor-pointer transition-all"
+                  >
+                    <div className="w-14 h-14 rounded-2xl bg-indigo-100 flex items-center justify-center mx-auto mb-2">
+                      <Upload size={24} className="text-indigo-600" />
+                    </div>
+                    <p className="font-black text-gray-700 text-sm">Tap to upload your work</p>
+                    <p className="text-xs text-gray-400 mt-1">Photo · PDF · Up to 5 files</p>
+                    <div className="mt-2 text-xs text-indigo-600 font-bold bg-indigo-100 rounded-lg px-3 py-1 inline-block">Browse files</div>
+                  </button>
+                )}
+
+                {step === 3 && (
+                  <div className="space-y-2">
+                    <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-4">
+                      <p className="text-xs font-bold text-indigo-700 mb-2">📂 File picker open…</p>
+                      {['algebra_page1.jpg', 'algebra_page2.jpg'].map((f, i) => (
+                        <button
+                          key={f}
+                          onClick={() => setStep(4)}
+                          className="w-full flex items-center gap-2 bg-white rounded-xl px-3 py-2 mb-1.5 border border-indigo-100 hover:border-indigo-400 transition-all"
+                        >
+                          <FileText size={14} className="text-indigo-500" />
+                          <span className="text-xs font-semibold text-gray-700 flex-1 text-left">{f}</span>
+                          <span className="text-xs text-indigo-500 font-bold">Select</span>
+                        </button>
+                      ))}
+                      <p className="text-center text-xs text-indigo-400 mt-1">👆 Tap a file to select it</p>
+                    </div>
+                  </div>
+                )}
+
+                {step === 4 && (
+                  <div className="space-y-2">
+                    {['algebra_page1.jpg', 'algebra_page2.jpg'].map((f, i) => (
+                      <div key={f} className="bg-white rounded-xl border border-green-200 px-3 py-2.5 flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
+                          <CheckCircle size={14} className="text-green-600" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-gray-700">{f}</p>
+                          <p className="text-xs text-gray-400">Uploaded ✓</p>
+                        </div>
+                        <Eye size={13} className="text-gray-400" />
+                      </div>
+                    ))}
+                    <button onClick={() => setStep(3)} className="text-xs text-indigo-500 font-semibold ml-1">+ Add more files</button>
+                    <div>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Note for tutor</p>
+                      <textarea
+                        className="w-full h-14 text-xs border border-gray-200 rounded-xl p-2.5 resize-none focus:outline-none focus:border-indigo-400 bg-white"
+                        defaultValue="Sorry for the late submission, I was ill this week."
+                        readOnly
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Submit bar */}
+              <div className="bg-white border-t border-gray-100 px-4 py-3">
+                <button
+                  onClick={() => step === 4 && setStep(5)}
+                  disabled={step !== 4}
+                  className={`w-full py-3 rounded-xl font-black text-sm flex items-center justify-center gap-2 transition-all ${
+                    step === 4
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700'
+                      : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  <Send size={14} />
+                  {step === 4 ? 'Submit 2 files to tutor →' : 'Upload your work first'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Step 5: Success + back to list */}
+        {step === 5 && (
+          <div className="flex flex-1 overflow-hidden">
+            {/* Left: updated homework list */}
+            <div className="w-2/5 overflow-y-auto p-4 space-y-3 border-r border-gray-100 bg-white">
+              <p className="text-sm font-black text-gray-700">Homework</p>
+              <div className="bg-white rounded-2xl border border-gray-100 px-3 py-2 shadow-sm">
+                <div className="flex justify-between mb-1.5">
+                  <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Term progress</span>
+                  <span className="text-xs font-bold text-gray-700">2 / 4 done</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full">
+                  <div className="h-full bg-indigo-400 rounded-full transition-all duration-700" style={{ width: '50%' }} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                {homework.map(a => (
+                  <div
+                    key={a.id}
+                    className={`bg-white rounded-xl border px-3 py-2.5 flex items-center gap-2.5 shadow-sm ${
+                      a.id === 1 ? 'border-green-200 bg-green-50' : 'border-gray-100'
+                    }`}
+                  >
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                      a.id === 1 || a.status === 'done' ? 'bg-green-100' : 'bg-indigo-100'
+                    }`}>
+                      {a.id === 1 || a.status === 'done'
+                        ? <Check size={14} className="text-green-600" strokeWidth={3} />
+                        : <span className="text-sm">{a.kind === 'worksheet' ? '📝' : '📚'}</span>
+                      }
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-xs font-bold truncate ${a.id === 1 || a.status === 'done' ? 'text-gray-400 line-through' : 'text-gray-800'}`}>
+                        {a.title}
+                      </p>
+                      <p className="text-xs text-gray-400">{a.id === 1 ? 'Submitted ✓' : a.due}</p>
+                    </div>
+                    {a.id === 1 && <span className="text-xs font-bold bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full border border-green-200 flex-shrink-0">Done</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Right: success */}
+            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+              <div className="w-20 h-20 rounded-3xl bg-green-100 flex items-center justify-center mb-4">
+                <CheckCircle size={40} className="text-green-600" />
+              </div>
+              <h2 className="text-2xl font-black text-gray-900 mb-1">Submitted! 🎉</h2>
+              <p className="text-sm text-gray-500 mb-2">Your tutor will mark it soon.</p>
+              <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-left max-w-xs mb-6">
+                <p className="text-xs font-bold text-green-700 mb-1">What happens next</p>
+                <p className="text-xs text-gray-600">Your tutor will review your 2 files and add a grade + feedback. You'll see it in your Results tab.</p>
+              </div>
+              <button
+                onClick={() => setStep(1)}
+                className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-black px-5 py-2.5 rounded-xl hover:bg-indigo-700 transition-colors"
+              >
+                <ChevronLeft size={14} /> Back to homework
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ── MAIN PREVIEW PAGE ── */
 export default function TabletPreview() {
   const [view, setView] = useState<DemoView>('student');
@@ -506,9 +816,10 @@ export default function TabletPreview() {
         <span className="text-xs text-gray-500">Showing how the app looks on a 10–13" tablet (landscape)</span>
         <div className="ml-auto flex gap-2">
           {[
-            { key: 'student', label: '🎒 Student dashboard' },
+            { key: 'flow',       label: '▶ Assignment flow' },
+            { key: 'student',    label: '🎒 Dashboard' },
             { key: 'assignment', label: '📚 Assignment page' },
-            { key: 'marking', label: '✏️ Marking page' },
+            { key: 'marking',    label: '✏️ Marking page' },
           ].map(v => (
             <button
               key={v.key}
@@ -531,27 +842,53 @@ export default function TabletPreview() {
           {/* Screen label */}
           <div className="flex items-center gap-3 mb-3">
             <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-              {view === 'student' && 'Student Dashboard — sidebar navigation, 2-column cards'}
+              {view === 'flow'       && 'Complete Assignment Journey — click through all 5 steps'}
+              {view === 'student'    && 'Student Dashboard — sidebar navigation, 2-column cards'}
               {view === 'assignment' && 'Assignment Work Page — instructions left, upload right'}
-              {view === 'marking' && 'Tutor Marking Page — submission list left, grading right'}
+              {view === 'marking'    && 'Tutor Marking Page — submission list left, grading right'}
             </span>
             <div className="flex-1 h-px bg-gray-200" />
             <span className="text-xs text-gray-400">~1024×768</span>
           </div>
+
+          {/* Step tracker (flow only) */}
+          {view === 'flow' && (
+            <div className="flex items-center gap-1 mb-3">
+              {FLOW_STEPS.map((s, i) => (
+                <div key={s.id} className="flex items-center gap-1 flex-1">
+                  <div className="flex flex-col items-center flex-1">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                      s.id < 1 ? 'bg-indigo-600 border-indigo-600 text-white'
+                      : 'bg-gray-100 border-gray-300 text-gray-500'
+                    }`}>
+                      {s.id}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5 text-center leading-tight">{s.label}</p>
+                  </div>
+                  {i < FLOW_STEPS.length - 1 && (
+                    <div className="h-px bg-gray-200 flex-1 mb-4" />
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Simulated tablet screen */}
           <div
             className="rounded-3xl overflow-hidden shadow-2xl"
             style={{ aspectRatio: '4/3' }}
           >
-            {view === 'student' && <StudentTablet tab={tab} setTab={setTab} />}
+            {view === 'flow'       && <AssignmentFlow />}
+            {view === 'student'    && <StudentTablet tab={tab} setTab={setTab} />}
             {view === 'assignment' && <AssignmentTablet />}
-            {view === 'marking' && <MarkingTablet />}
+            {view === 'marking'    && <MarkingTablet />}
           </div>
 
           {/* Note */}
           <p className="text-center text-xs text-gray-400 mt-4">
-            This is a live interactive preview — click around to try it out. Say "build it" and I'll apply this layout to the real app.
+            {view === 'flow'
+              ? 'Interactive walkthrough — tap the highlighted elements to progress through each step.'
+              : 'Live interactive preview — click around to try it out. Say "build it" and I\'ll apply this to the real app.'}
           </p>
         </div>
       </div>
