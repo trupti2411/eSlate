@@ -78,6 +78,7 @@ export function PDFAnnotatorPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const currentStrokeRef = useRef<Point[]>([]);
   const lastPointRef = useRef<Point | null>(null);
+  const prevPrevPointRef = useRef<Point | null>(null);
   const rafRef = useRef<number>(0);
   const isDrawingRef = useRef(false);
   const annotationsRef = useRef<StudentAnnotation[]>([]);
@@ -96,6 +97,7 @@ export function PDFAnnotatorPage() {
         isDrawingRef.current = false;
         setIsDrawing(false);
         lastPointRef.current = null;
+        prevPrevPointRef.current = null;
         currentStrokeRef.current = [];
       }
     };
@@ -329,6 +331,7 @@ export function PDFAnnotatorPage() {
     const point = getPointerPos(e);
     currentStrokeRef.current = [point];
     lastPointRef.current = point;
+    prevPrevPointRef.current = null;
     isDrawingRef.current = true;
     setIsDrawing(true);
   }, [activeTool, getPointerPos]);
@@ -348,8 +351,12 @@ export function PDFAnnotatorPage() {
     if (dx * dx + dy * dy < 9) return;
 
     currentStrokeRef.current.push(point);
-    const prevPoint = lastPoint;
-    lastPointRef.current = point;
+    // Capture current A→B→C triple before updating refs
+    const A = prevPrevPointRef.current;
+    const B = lastPoint;
+    const C = point;
+    prevPrevPointRef.current = B;
+    lastPointRef.current = C;
 
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
@@ -365,13 +372,23 @@ export function PDFAnnotatorPage() {
       ctx.lineWidth = settings.width * DPR;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-
-      // Bézier curve: draw from prevPoint to midpoint using prevPoint as control
-      const midX = (prevPoint.x + point.x) / 2;
-      const midY = (prevPoint.y + point.y) / 2;
       ctx.beginPath();
-      ctx.moveTo(prevPoint.x * DPR, prevPoint.y * DPR);
-      ctx.quadraticCurveTo(prevPoint.x * DPR, prevPoint.y * DPR, midX * DPR, midY * DPR);
+
+      if (A) {
+        // Proper midpoint bézier: start=mid(A,B), control=B, end=mid(B,C)
+        // This creates a smooth curve that visually passes through B
+        const startX = (A.x + B.x) / 2 * DPR;
+        const startY = (A.y + B.y) / 2 * DPR;
+        const endX   = (B.x + C.x) / 2 * DPR;
+        const endY   = (B.y + C.y) / 2 * DPR;
+        ctx.moveTo(startX, startY);
+        ctx.quadraticCurveTo(B.x * DPR, B.y * DPR, endX, endY);
+      } else {
+        // First segment — simple line to midpoint
+        ctx.moveTo(B.x * DPR, B.y * DPR);
+        ctx.lineTo((B.x + C.x) / 2 * DPR, (B.y + C.y) / 2 * DPR);
+      }
+
       ctx.stroke();
       ctx.restore();
     });
@@ -384,7 +401,8 @@ export function PDFAnnotatorPage() {
     isDrawingRef.current = false;
     setIsDrawing(false);
     lastPointRef.current = null;
-    
+    prevPrevPointRef.current = null;
+
     const points = currentStrokeRef.current;
     if (points.length < 2) {
       currentStrokeRef.current = [];
