@@ -1,14 +1,15 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRoute, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { Assignment, Submission } from '@shared/schema';
-import { AssignmentCompletionArea } from '@/components/AssignmentCompletionArea';
 import { ObjectUploader } from '@/components/ObjectUploader';
+import { AssignmentCompletionArea } from '@/components/AssignmentCompletionArea';
+import { useMultipleFileMetadata, getDisplayFilename } from '@/hooks/useFileMetadata';
 import {
-  ArrowLeft, Upload, CheckCircle, AlertCircle, Send, FileText, Eye, Paperclip, PenLine
+  ArrowLeft, Upload, CheckCircle, AlertCircle, Send, FileText, Eye, PenLine, ChevronRight
 } from 'lucide-react';
 import { format, isPast, differenceInDays } from 'date-fns';
 
@@ -117,8 +118,23 @@ export function AssignmentWorkPage() {
   const isOverdue = isPast(dueDate) && !['submitted', 'graded', 'parent_verified'].includes(currentSubmission?.status ?? '');
   const daysUntilDue = differenceInDays(dueDate, new Date());
   const isSubmitted = ['submitted', 'graded', 'parent_verified'].includes(currentSubmission?.status ?? '');
-  const hasAttachments = (assignment.attachmentUrls || []).length > 0;
+  const attachmentUrls = assignment.attachmentUrls || [];
+  const hasAttachments = attachmentUrls.length > 0;
   const isWorksheet = assignment.assignmentKind === 'worksheet' && assignment.worksheetId;
+
+  const { data: attachmentMetadata } = useMultipleFileMetadata(attachmentUrls);
+
+  const openAnnotator = (url: string, index: number, meta?: any) => {
+    const objectPath = url.includes('/uploads/') ? url.split('/uploads/').pop() : url.split('/').pop();
+    const filename = meta?.originalName || url.split('/').pop() || `document-${index + 1}.pdf`;
+    navigate(`/pdf-annotator?assignmentId=${assignment!.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`);
+  };
+
+  useEffect(() => {
+    if (!isWorksheet && attachmentUrls.length === 1 && !isSubmitted && assignment) {
+      openAnnotator(attachmentUrls[0], 0, attachmentMetadata?.[0]);
+    }
+  }, [assignment?.id, isSubmitted, isWorksheet]);
 
   const statusColor = isSubmitted
     ? 'bg-green-100 text-green-700 border-green-200'
@@ -177,7 +193,7 @@ export function AssignmentWorkPage() {
         </div>
       )}
 
-      {/* ── WORKSHEET type: uses AssignmentCompletionArea ── */}
+      {/* ── WORKSHEET type ── */}
       {isWorksheet ? (
         <div className="flex-1 overflow-y-auto">
           <AssignmentCompletionArea
@@ -186,15 +202,81 @@ export function AssignmentWorkPage() {
             onSubmissionUpdate={handleSubmissionUpdate}
           />
         </div>
+      ) : hasAttachments && isSubmitted ? (
+        /* ── SUBMITTED with attachments ── */
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-20 h-20 rounded-3xl bg-green-100 flex items-center justify-center mb-4">
+            <CheckCircle size={40} className="text-green-600" />
+          </div>
+          <h2 className="text-xl font-black text-gray-900 mb-1">Submitted!</h2>
+          <p className="text-sm text-gray-500 mb-4">Your annotated work has been sent to your tutor.</p>
+          {currentSubmission?.status === 'graded' && currentSubmission.score !== null && (
+            <div className="bg-green-50 border border-green-200 rounded-2xl p-4 max-w-xs text-left mb-4">
+              <p className="text-xs font-bold text-green-700 mb-1">Your result</p>
+              <p className="text-2xl font-black text-green-700">{currentSubmission.score}/20</p>
+              {currentSubmission.feedback && (
+                <p className="text-sm text-gray-600 mt-2 italic">"{currentSubmission.feedback}"</p>
+              )}
+            </div>
+          )}
+          <button onClick={handleBack} className="flex items-center gap-2 text-sm font-bold text-indigo-600">
+            <ArrowLeft size={14} /> Back to homework
+          </button>
+        </div>
+      ) : hasAttachments && attachmentUrls.length === 1 ? (
+        /* ── SINGLE DOC: auto-redirecting to annotator ── */
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-sm text-gray-500">Opening worksheet…</p>
+          </div>
+        </div>
       ) : hasAttachments ? (
-        /* ── PDF ANNOTATION flow ── */
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-4 py-4">
-            <AssignmentCompletionArea
-              assignment={assignment}
-              submission={currentSubmission}
-              onSubmissionUpdate={handleSubmissionUpdate}
-            />
+        /* ── MULTI-DOC: split-panel with document list ── */
+        <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+          {/* Left: instructions */}
+          <div className="md:w-2/5 md:border-r md:border-gray-100 md:bg-white md:overflow-y-auto p-5 space-y-4 flex-shrink-0">
+            {(assignment.description || assignment.instructions) && (
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Instructions</p>
+                <p className="text-sm text-gray-700 leading-relaxed">{assignment.description || assignment.instructions}</p>
+              </div>
+            )}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">Due date</span>
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${statusColor}`}>{statusLabel}</span>
+              </div>
+              <p className="text-sm font-semibold text-gray-700">{format(dueDate, 'EEEE d MMMM yyyy')}</p>
+            </div>
+          </div>
+          {/* Right: document list */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-3">
+            <p className="text-xs font-bold uppercase tracking-widest text-gray-400">
+              {attachmentUrls.length} document{attachmentUrls.length > 1 ? 's' : ''} — tap to complete
+            </p>
+            {attachmentUrls.map((url, i) => {
+              const meta = attachmentMetadata?.[i];
+              const filename = getDisplayFilename(url, meta, i);
+              return (
+                <button
+                  key={i}
+                  onClick={() => openAnnotator(url, i, meta)}
+                  className="w-full text-left bg-white rounded-2xl border border-indigo-100 px-4 py-3.5 flex items-center gap-3 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all"
+                >
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <FileText size={18} className="text-indigo-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-sm text-gray-900 truncate">{filename}</p>
+                    <p className="text-xs text-indigo-600 font-semibold mt-0.5 flex items-center gap-1">
+                      <PenLine size={10} /> Tap to complete online
+                    </p>
+                  </div>
+                  <ChevronRight size={16} className="text-indigo-400 flex-shrink-0" />
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : (
