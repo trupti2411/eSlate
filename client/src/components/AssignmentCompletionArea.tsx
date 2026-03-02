@@ -27,6 +27,7 @@ import { format } from "date-fns";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLocation } from "wouter";
 
 // Component to display submitted files with original filenames
 function SubmittedFilesDisplay({ fileUrls, eInkStyles }: { fileUrls: string[]; eInkStyles: any }) {
@@ -94,6 +95,7 @@ export function AssignmentCompletionArea({
   
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
 
   // Fetch all submissions for this assignment to check per-document completion
   // Disable while annotator is open to prevent re-renders that clear annotations
@@ -525,7 +527,7 @@ export function AssignmentCompletionArea({
                           : url.split('/').pop();
                         
                         const viewerUrl = `/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`;
-                        window.open(viewerUrl, '_blank');
+                        navigate(viewerUrl);
                       }}
                       className="bg-blue-600 hover:bg-blue-700 text-white text-sm"
                       disabled={isCompleted}

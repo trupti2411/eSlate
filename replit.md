@@ -2,6 +2,25 @@
 
 eSlate is a secure educational platform designed for e-ink devices and high-contrast displays. It functions as a comprehensive learning management system supporting students, parents, tutors, and administrators. Key features include homework management, real-time messaging, progress tracking, and calendar scheduling, all optimized for accessibility and readability on e-ink displays. The platform aims to provide a robust and inclusive educational experience.
 
+## Tablet-Optimised Layout (Implemented)
+All three key pages now use responsive split-panel / sidebar layouts optimised for landscape tablet use (ONYX Air 3C, iPad, etc.):
+
+### Student Dashboard (`NewStudentDashboard.tsx`)
+- **Tablet (md+)**: Fixed indigo sidebar (w-56) on the left with Homework/My Classes/Results nav; overdue badge on Homework item. Main content scrolls on the right. Homework, Classes, and Results cards use a 2-column grid.
+- **Mobile**: Top tab bar (unchanged behaviour).
+
+### Assignment Work Page (`AssignmentWorkPage.tsx`)
+- **Tablet (md+)**: Two-panel layout — LEFT panel (40%) shows assignment instructions and due date; RIGHT panel (60%) shows the upload zone + sticky submit bar.
+- **Mobile**: Single-column stacked layout.
+- PDF annotation and worksheet flows are unchanged (handled by AssignmentCompletionArea).
+
+### Marking Page (`MarkingPage.tsx`)
+- **Tablet (md+)**: LEFT panel (w-72) lists all pending submissions with student name, assignment title, and time; clicking a row loads it on the right. RIGHT panel shows the full grading form (quick presets, score input, feedback). Progress bar in nav bar.
+- **Mobile**: Arrow-based swipe-through (unchanged behaviour).
+
+### PDF Annotator Navigation Fix (`AssignmentCompletionArea.tsx`)
+- "Complete Online" button now navigates in the **same tab** via `navigate()` instead of opening a new tab (`window.open()`).
+
 ## Assignment Workflow (Updated)
 - **Student Assignment Work Page** (`client/src/pages/student/AssignmentWorkPage.tsx`): Full rewrite with clean indigo nav bar, `window.history.back()` navigation, simplified upload-then-submit flow for assignments without attachment docs, PDF annotation flow kept for attachment-based assignments.
 - **Worksheet Work Page** (`client/src/pages/student/WorksheetWorkPage.tsx`): Navigation fixed from `window.close()` to `window.history.back()`, matching indigo nav bar.
