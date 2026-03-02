@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, getCsrfToken } from '@/lib/queryClient';
-import { Save, Send, X, Pen, Highlighter, Eraser, Type, RotateCcw, ZoomIn, ZoomOut, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, Send, X, Eraser, RotateCcw, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -60,7 +60,8 @@ function convertFabricToStroke(fabricJSON: any): StrokeData | null {
 }
 
 export function PDFAnnotatorPage() {
-  const [activeTool, setActiveTool] = useState<Tool>(null);
+  const [activeTool, setActiveTool] = useState<Tool>('pen');
+  const [pinchTransform, setPinchTransform] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pdfLoaded, setPdfLoaded] = useState(false);
@@ -91,6 +92,12 @@ export function PDFAnnotatorPage() {
   currentPageRef.current = currentPage;
   scaleRef.current = scale;
 
+  const touchPointsRef = useRef<Map<number, Point>>(new Map());
+  const initialTouchDistRef = useRef(0);
+  const initialScaleRef = useRef(1.2);
+  const pinchScaleRef = useRef(1);
+  const lastScrollRef = useRef<Point | null>(null);
+
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const initialLoadRef = useRef(0);
@@ -99,7 +106,20 @@ export function PDFAnnotatorPage() {
   const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
   useEffect(() => {
-    const handleGlobalPointerUp = () => {
+    const handleGlobalPointerUp = (e: PointerEvent) => {
+      if (e.pointerType === 'touch') {
+        touchPointsRef.current.delete(e.pointerId);
+        if (touchPointsRef.current.size === 0) {
+          if (pinchScaleRef.current !== 1) {
+            const newScale = Math.min(3, Math.max(0.5, initialScaleRef.current * pinchScaleRef.current));
+            setScale(newScale);
+            setPinchTransform(1);
+            pinchScaleRef.current = 1;
+          }
+          lastScrollRef.current = null;
+        }
+        return;
+      }
       if (isDrawingRef.current) {
         isDrawingRef.current = false;
         setIsDrawing(false);
@@ -325,27 +345,57 @@ export function PDFAnnotatorPage() {
   }, []);
 
   const handlePointerDown = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!activeTool || activeTool === 'text') return;
-    
+    if (e.pointerType === 'touch') {
+      e.preventDefault();
+      touchPointsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (touchPointsRef.current.size === 1) {
+        lastScrollRef.current = { x: e.clientX, y: e.clientY };
+      } else if (touchPointsRef.current.size === 2) {
+        const pts = Array.from(touchPointsRef.current.values());
+        initialTouchDistRef.current = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        initialScaleRef.current = scaleRef.current;
+        pinchScaleRef.current = 1;
+        lastScrollRef.current = null;
+      }
+      return;
+    }
+
     e.preventDefault();
     e.stopPropagation();
-    
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
-    
+
     (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
-    
     const point = getPointerPos(e);
     currentStrokeRef.current = [point];
     lastPointRef.current = point;
     smoothPointRef.current = point;
     isDrawingRef.current = true;
     setIsDrawing(true);
-  }, [activeTool, getPointerPos]);
+  }, [getPointerPos]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    // Use refs — NOT React state — to avoid stale-closure misses between renders
-    if (!isDrawingRef.current || !activeToolRef.current || activeToolRef.current === 'text') return;
+    if (e.pointerType === 'touch') {
+      e.preventDefault();
+      touchPointsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const container = containerRef.current;
+      if (touchPointsRef.current.size === 1 && container && lastScrollRef.current) {
+        const dx = lastScrollRef.current.x - e.clientX;
+        const dy = lastScrollRef.current.y - e.clientY;
+        container.scrollLeft += dx;
+        container.scrollTop += dy;
+        lastScrollRef.current = { x: e.clientX, y: e.clientY };
+      } else if (touchPointsRef.current.size === 2 && initialTouchDistRef.current > 0) {
+        const pts = Array.from(touchPointsRef.current.values());
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        const ratio = dist / initialTouchDistRef.current;
+        pinchScaleRef.current = ratio;
+        setPinchTransform(ratio);
+      }
+      return;
+    }
+
+    if (!isDrawingRef.current || !activeToolRef.current) return;
 
     e.preventDefault();
 
@@ -417,8 +467,26 @@ export function PDFAnnotatorPage() {
   }, [drawStroke, getToolSettings, DPR]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !activeTool || activeTool === 'text') return;
-    
+    if (e.pointerType === 'touch') {
+      e.preventDefault();
+      touchPointsRef.current.delete(e.pointerId);
+      if (touchPointsRef.current.size === 0) {
+        if (pinchScaleRef.current !== 1) {
+          const newScale = Math.min(3, Math.max(0.5, initialScaleRef.current * pinchScaleRef.current));
+          setScale(newScale);
+          setPinchTransform(1);
+          pinchScaleRef.current = 1;
+        }
+        lastScrollRef.current = null;
+      } else if (touchPointsRef.current.size === 1) {
+        const remaining = Array.from(touchPointsRef.current.values())[0];
+        lastScrollRef.current = remaining;
+      }
+      return;
+    }
+
+    if (!isDrawing || !activeTool) return;
+
     e.preventDefault();
     isDrawingRef.current = false;
     setIsDrawing(false);
@@ -495,8 +563,20 @@ export function PDFAnnotatorPage() {
     setAnnotations(prev => prev.filter(a => a.pageNum !== currentPage));
   };
 
-  const handleZoomIn = () => setScale(s => Math.min(s + 0.25, 3));
-  const handleZoomOut = () => setScale(s => Math.max(s - 0.25, 0.5));
+  const handleUndo = () => {
+    setAnnotations(prev => {
+      const pageAnns = prev.filter(a => a.pageNum === currentPage);
+      if (pageAnns.length === 0) return prev;
+      const lastId = pageAnns[pageAnns.length - 1].id;
+      return prev.filter(a => a.id !== lastId);
+    });
+  };
+
+  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
+    if (!e.ctrlKey && !e.metaKey) return;
+    e.preventDefault();
+    setScale(s => Math.min(3, Math.max(0.5, s - e.deltaY * 0.001)));
+  }, []);
   const goToPrevPage = () => setCurrentPage(p => Math.max(p - 1, 1));
   const goToNextPage = () => setCurrentPage(p => Math.min(p + 1, numPages));
 
@@ -599,51 +679,28 @@ export function PDFAnnotatorPage() {
   return (
     <div className="h-screen flex flex-col bg-white select-none" style={{ touchAction: 'manipulation' }}>
       <div className="flex items-center justify-between p-2 border-b-2 border-black bg-white">
+
         <div className="flex items-center gap-1">
-          <Button
-            variant={activeTool === 'pen' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTool(activeTool === 'pen' ? null : 'pen')}
-            className={toolBtnClass}
-          >
-            <Pen className="h-5 w-5" />
-          </Button>
-          <Button
-            variant={activeTool === 'highlight' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTool(activeTool === 'highlight' ? null : 'highlight')}
-            className={toolBtnClass}
-          >
-            <Highlighter className="h-5 w-5" />
-          </Button>
           <Button
             variant={activeTool === 'eraser' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setActiveTool(activeTool === 'eraser' ? null : 'eraser')}
+            onClick={() => setActiveTool(activeTool === 'eraser' ? 'pen' : 'eraser')}
             className={toolBtnClass}
+            title={activeTool === 'eraser' ? 'Switch to pen' : 'Switch to eraser'}
           >
             <Eraser className="h-5 w-5" />
           </Button>
-          <Button
-            variant={activeTool === 'text' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setActiveTool(activeTool === 'text' ? null : 'text')}
-            className={toolBtnClass}
-          >
-            <Type className="h-5 w-5" />
+          <Button variant="outline" size="sm" onClick={handleUndo} className={toolBtnClass} title="Undo last stroke">
+            <Undo2 className="h-5 w-5" />
           </Button>
-          <div className="w-px h-8 bg-black mx-1" />
-          <Button variant="outline" size="sm" onClick={handleZoomOut} className={toolBtnClass}>
-            <ZoomOut className="h-5 w-5" />
-          </Button>
-          <span className="text-sm font-bold text-black min-w-[50px] text-center">{Math.round(scale * 100)}%</span>
-          <Button variant="outline" size="sm" onClick={handleZoomIn} className={toolBtnClass}>
-            <ZoomIn className="h-5 w-5" />
-          </Button>
-          <div className="w-px h-8 bg-black mx-1" />
-          <Button variant="outline" size="sm" onClick={clearAnnotations} className={toolBtnClass}>
+          <Button variant="outline" size="sm" onClick={clearAnnotations} className={toolBtnClass} title="Clear page">
             <RotateCcw className="h-5 w-5" />
           </Button>
+          <div className="w-px h-8 bg-black mx-1" />
+          <span className="text-xs font-medium text-gray-600 px-1">
+            {activeTool === 'eraser' ? 'Erasing' : 'Writing'}
+          </span>
+          <span className="text-xs text-gray-400">{Math.round(scale * 100)}%</span>
         </div>
 
         {numPages > 1 && (
@@ -692,6 +749,7 @@ export function PDFAnnotatorPage() {
       <div
         className="flex-1 overflow-auto bg-gray-100"
         ref={containerRef}
+        onWheel={handleWheel}
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         {!pdfLoaded ? (
@@ -702,11 +760,12 @@ export function PDFAnnotatorPage() {
           <div className="flex justify-center p-4">
             <div 
               className="relative inline-block border-2 border-black"
-              onClick={handleCanvasClick}
               style={{
-                cursor: activeTool === 'text' ? 'text' : activeTool ? 'crosshair' : 'default',
+                cursor: activeTool === 'eraser' ? 'cell' : 'crosshair',
                 width: canvasSize.width > 0 ? `${canvasSize.width}px` : undefined,
                 height: canvasSize.height > 0 ? `${canvasSize.height}px` : undefined,
+                transform: pinchTransform !== 1 ? `scale(${pinchTransform})` : undefined,
+                transformOrigin: 'center top',
               }}
             >
               <canvas
@@ -722,7 +781,7 @@ export function PDFAnnotatorPage() {
                 className="absolute top-0 left-0"
                 style={{
                   touchAction: 'none',
-                  pointerEvents: activeTool ? 'auto' : 'none',
+                  pointerEvents: 'auto',
                   width: '100%',
                   height: '100%',
                 }}
