@@ -374,10 +374,6 @@ export function PDFAnnotatorPage() {
       const lastPoint = lastPointRef.current;
       if (!lastPoint) continue;
 
-      const dx = smoothX - lastPoint.x;
-      const dy = smoothY - lastPoint.y;
-      if (dx * dx + dy * dy < 4) continue;   // skip sub-2px moves
-
       currentStrokeRef.current.push({ x: smoothX, y: smoothY });
       lastPointRef.current = { x: smoothX, y: smoothY };
     }
@@ -430,6 +426,13 @@ export function PDFAnnotatorPage() {
     smoothPointRef.current = null;
 
     const points = currentStrokeRef.current;
+
+    // Single tap (dot) — no movement recorded; duplicate the point so drawStroke
+    // renders a round-capped zero-length line which appears as a filled circle
+    if (points.length === 1) {
+      points.push({ ...points[0] });
+    }
+
     if (points.length < 2) {
       currentStrokeRef.current = [];
       return;
