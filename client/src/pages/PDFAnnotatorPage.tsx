@@ -88,6 +88,7 @@ export function PDFAnnotatorPage() {
   const initialLoadRef = useRef(0);
 
   const { toast } = useToast();
+  const DPR = Math.min(window.devicePixelRatio || 1, 3);
 
   useEffect(() => {
     const handleGlobalPointerUp = () => {
@@ -189,24 +190,33 @@ export function PDFAnnotatorPage() {
 
   const drawStroke = useCallback((ctx: CanvasRenderingContext2D, stroke: StrokeData, scaleRatio: number = 1) => {
     if (stroke.points.length < 2) return;
-    
+    const S = DPR * scaleRatio;
+
     ctx.save();
     ctx.globalCompositeOperation = stroke.compositeOp as GlobalCompositeOperation;
     ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = stroke.width * scaleRatio;
+    ctx.lineWidth = stroke.width * S;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
-    
+
+    const pts = stroke.points;
     ctx.beginPath();
-    ctx.moveTo(stroke.points[0].x * scaleRatio, stroke.points[0].y * scaleRatio);
-    
-    for (let i = 1; i < stroke.points.length; i++) {
-      ctx.lineTo(stroke.points[i].x * scaleRatio, stroke.points[i].y * scaleRatio);
+    ctx.moveTo(pts[0].x * S, pts[0].y * S);
+
+    if (pts.length === 2) {
+      ctx.lineTo(pts[1].x * S, pts[1].y * S);
+    } else {
+      for (let i = 1; i < pts.length - 1; i++) {
+        const mx = (pts[i].x + pts[i + 1].x) / 2 * S;
+        const my = (pts[i].y + pts[i + 1].y) / 2 * S;
+        ctx.quadraticCurveTo(pts[i].x * S, pts[i].y * S, mx, my);
+      }
+      ctx.lineTo(pts[pts.length - 1].x * S, pts[pts.length - 1].y * S);
     }
-    
+
     ctx.stroke();
     ctx.restore();
-  }, []);
+  }, [DPR]);
 
   const redrawAnnotations = useCallback((pageNum: number, currentScale: number) => {
     const canvas = drawCanvasRef.current;
@@ -232,10 +242,11 @@ export function PDFAnnotatorPage() {
       } else if (annotation.type === 'text' && annotation.text) {
         const savedScale = annotation.scale || 1.2;
         const scaleRatio = currentScale / savedScale;
+        const S = DPR * scaleRatio;
         ctx.save();
-        ctx.font = `${16 * scaleRatio}px Arial`;
+        ctx.font = `${16 * S}px Arial`;
         ctx.fillStyle = '#000000';
-        ctx.fillText(annotation.text, (annotation.x || 0) * scaleRatio, (annotation.y || 0) * scaleRatio);
+        ctx.fillText(annotation.text, (annotation.x || 0) * S, (annotation.y || 0) * S);
         ctx.restore();
       }
     }
@@ -248,16 +259,21 @@ export function PDFAnnotatorPage() {
     const renderPage = async () => {
       try {
         const page = await pdfDocRef.current!.getPage(currentPage);
-        const viewport = page.getViewport({ scale });
-        
+        // Render at physical pixel resolution for crisp text and lines
+        const viewport = page.getViewport({ scale: scale * DPR });
+        const logicalW = Math.round(viewport.width / DPR);
+        const logicalH = Math.round(viewport.height / DPR);
+
         if (cancelled) return;
-        
+
         const pdfCanvas = pdfCanvasRef.current;
         const drawCanvas = drawCanvasRef.current;
 
         if (pdfCanvas) {
-          pdfCanvas.width = viewport.width;
+          pdfCanvas.width = viewport.width;   // physical pixels
           pdfCanvas.height = viewport.height;
+          pdfCanvas.style.width = `${logicalW}px`;
+          pdfCanvas.style.height = `${logicalH}px`;
           const ctx = pdfCanvas.getContext('2d');
           if (ctx) {
             await page.render({
@@ -269,9 +285,11 @@ export function PDFAnnotatorPage() {
         }
 
         if (drawCanvas && !cancelled) {
-          drawCanvas.width = viewport.width;
+          drawCanvas.width = viewport.width;   // physical pixels
           drawCanvas.height = viewport.height;
-          setCanvasSize({ width: viewport.width, height: viewport.height });
+          drawCanvas.style.width = `${logicalW}px`;
+          drawCanvas.style.height = `${logicalH}px`;
+          setCanvasSize({ width: logicalW, height: logicalH });
         }
       } catch (error) {
         if (!cancelled) console.error(`Error rendering page ${currentPage}:`, error);
@@ -290,11 +308,10 @@ export function PDFAnnotatorPage() {
   const getPointerPos = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = drawCanvasRef.current!;
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
+    // Return logical (CSS) coordinates — DPR is applied when drawing
     return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
     };
   }, []);
 
@@ -318,43 +335,47 @@ export function PDFAnnotatorPage() {
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !activeTool || activeTool === 'text') return;
-    
+
     e.preventDefault();
-    
+
     const point = getPointerPos(e);
     const lastPoint = lastPointRef.current;
     if (!lastPoint) return;
-    
+
     const dx = point.x - lastPoint.x;
     const dy = point.y - lastPoint.y;
-    if (dx * dx + dy * dy < 4) return;
-    
+    // Ignore tiny movements — filters stylus wobble (threshold: 3px)
+    if (dx * dx + dy * dy < 9) return;
+
     currentStrokeRef.current.push(point);
     const prevPoint = lastPoint;
     lastPointRef.current = point;
-    
+
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
       const canvas = drawCanvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
-      
+
       const settings = getToolSettings(activeTool);
       ctx.save();
       ctx.globalCompositeOperation = settings.compositeOp as GlobalCompositeOperation;
       ctx.strokeStyle = settings.color;
-      ctx.lineWidth = settings.width;
+      ctx.lineWidth = settings.width * DPR;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      
+
+      // Bézier curve: draw from prevPoint to midpoint using prevPoint as control
+      const midX = (prevPoint.x + point.x) / 2;
+      const midY = (prevPoint.y + point.y) / 2;
       ctx.beginPath();
-      ctx.moveTo(prevPoint.x, prevPoint.y);
-      ctx.lineTo(point.x, point.y);
+      ctx.moveTo(prevPoint.x * DPR, prevPoint.y * DPR);
+      ctx.quadraticCurveTo(prevPoint.x * DPR, prevPoint.y * DPR, midX * DPR, midY * DPR);
       ctx.stroke();
       ctx.restore();
     });
-  }, [isDrawing, activeTool, getPointerPos, getToolSettings]);
+  }, [isDrawing, activeTool, getPointerPos, getToolSettings, DPR]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !activeTool || activeTool === 'text') return;
@@ -391,23 +412,22 @@ export function PDFAnnotatorPage() {
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (activeTool !== 'text') return;
-    
+
     const canvas = drawCanvasRef.current;
     if (!canvas) return;
-    
+
     const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-    
+    // Store in logical CSS coords; DPR applied when drawing
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
     const text = prompt('Enter text:');
     if (text) {
       const ctx = canvas.getContext('2d');
       if (ctx) {
-        ctx.font = '16px Arial';
+        ctx.font = `${16 * DPR}px Arial`;
         ctx.fillStyle = '#000000';
-        ctx.fillText(text, x, y);
+        ctx.fillText(text, x * DPR, y * DPR);
       }
       
       const newAnnotation: StudentAnnotation = {
