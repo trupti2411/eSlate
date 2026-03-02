@@ -106,14 +106,57 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
   const currentStrokeRef = useRef<Stroke | null>(null);
   const activeQuestionRef = useRef<string | null>(null);
   const lastPointRef = useRef<Point | null>(null);
+  const smoothPointRef = useRef<Point | null>(null);
+  const rafRef = useRef<number>(0);
+  const currentStrokesRef = useRef<Record<string, Stroke[]>>({});
   const penColor = '#000000';
-  const penWidth = 2;
-  const MIN_DISTANCE = 4;
+  const penWidth = 3;
+  const DPR = Math.min(window.devicePixelRatio || 1, 3);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const initialLoadRef = useRef(false);
   
   const studentId = providedStudentId || (user?.id ? `student-${user.id}` : '');
+
+  currentStrokesRef.current = currentStrokes;
+
+  // Smooth bezier rendering — used for both live drawing and saved-stroke replay
+  const renderStrokesSmooth = useCallback((canvas: HTMLCanvasElement, strokes: Stroke[]) => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const stroke of strokes) {
+      if (stroke.points.length === 0) continue;
+      const pts = stroke.points;
+      ctx.save();
+      ctx.strokeStyle = stroke.color;
+      ctx.lineWidth = stroke.width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      if (pts.length === 1) {
+        // Dot — filled circle
+        ctx.arc(pts[0].x, pts[0].y, stroke.width / 2, 0, Math.PI * 2);
+        ctx.fillStyle = stroke.color;
+        ctx.fill();
+      } else if (pts.length === 2) {
+        ctx.moveTo(pts[0].x, pts[0].y);
+        ctx.lineTo(pts[1].x, pts[1].y);
+        ctx.stroke();
+      } else {
+        // Midpoint quadratic bezier — smooth curve through all points
+        ctx.moveTo((pts[0].x + pts[1].x) / 2, (pts[0].y + pts[1].y) / 2);
+        for (let i = 1; i < pts.length - 1; i++) {
+          const midX = (pts[i].x + pts[i + 1].x) / 2;
+          const midY = (pts[i].y + pts[i + 1].y) / 2;
+          ctx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+        }
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }, []);
 
   const { data: worksheet, isLoading } = useQuery<Worksheet>({
     queryKey: ['/api/worksheets', worksheetId],
@@ -156,23 +199,7 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
       requestAnimationFrame(() => {
         Object.entries(strokesMap).forEach(([qId, strokes]) => {
           const canvas = canvasRefs.current[qId];
-          if (!canvas) return;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          strokes.forEach(stroke => {
-            if (stroke.points.length < 2) return;
-            ctx.strokeStyle = stroke.color;
-            ctx.lineWidth = stroke.width;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-            for (let i = 1; i < stroke.points.length; i++) {
-              ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-            }
-            ctx.stroke();
-          });
+          if (canvas) renderStrokesSmooth(canvas, strokes);
         });
       });
     }
@@ -329,86 +356,88 @@ export function WorksheetAnswerer({ worksheetId, studentId: providedStudentId, a
     return canvas.getContext('2d');
   };
 
-  const getPointerPos = useCallback((e: React.PointerEvent<HTMLCanvasElement>, canvas: HTMLCanvasElement): Point => {
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    return {
-      x: (e.clientX - rect.left) * scaleX,
-      y: (e.clientY - rect.top) * scaleY,
-    };
-  }, []);
-
   const handlePointerDown = useCallback((questionId: string, e: React.PointerEvent<HTMLCanvasElement>) => {
     if (inputMode !== 'draw') return;
-    
     const canvas = canvasRefs.current[questionId];
     if (!canvas) return;
-
     e.preventDefault();
     (e.target as HTMLCanvasElement).setPointerCapture(e.pointerId);
-
-    const point = getPointerPos(e, canvas);
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width;
+    const sy = canvas.height / rect.height;
+    const pt = { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
     isDrawingRef.current = true;
     activeQuestionRef.current = questionId;
-    lastPointRef.current = point;
-    currentStrokeRef.current = {
-      points: [point],
-      color: penColor,
-      width: penWidth,
-    };
-
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.strokeStyle = penColor;
-      ctx.lineWidth = penWidth;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-    }
-  }, [inputMode, getPointerPos, penColor, penWidth]);
+    lastPointRef.current = pt;
+    smoothPointRef.current = pt;
+    currentStrokeRef.current = { points: [pt], color: penColor, width: penWidth };
+  }, [inputMode, penColor, penWidth]);
 
   const handlePointerMove = useCallback((questionId: string, e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawingRef.current || activeQuestionRef.current !== questionId) return;
-
     const canvas = canvasRefs.current[questionId];
     if (!canvas) return;
+    e.preventDefault();
 
-    const point = getPointerPos(e, canvas);
-    const last = lastPointRef.current;
-    if (last) {
-      const dx = point.x - last.x;
-      const dy = point.y - last.y;
-      if (dx * dx + dy * dy < MIN_DISTANCE * MIN_DISTANCE) return;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    // Collect all sub-frame stylus positions (120–240 Hz on modern tablets)
+    const nativeEvts: PointerEvent[] = (e.nativeEvent as any).getCoalescedEvents?.() ?? [e.nativeEvent];
+
+    for (const nEvt of nativeEvts) {
+      const rawX = (nEvt.clientX - rect.left) * scaleX;
+      const rawY = (nEvt.clientY - rect.top) * scaleY;
+      // EMA smoothing — dampens jitter without visible lag
+      const prev = smoothPointRef.current;
+      const smX = prev ? 0.4 * rawX + 0.6 * prev.x : rawX;
+      const smY = prev ? 0.4 * rawY + 0.6 * prev.y : rawY;
+      smoothPointRef.current = { x: smX, y: smY };
+      currentStrokeRef.current?.points.push({ x: smX, y: smY });
+      lastPointRef.current = { x: smX, y: smY };
     }
 
-    const ctx = canvas.getContext('2d');
-    if (ctx && last) {
-      ctx.beginPath();
-      ctx.moveTo(last.x, last.y);
-      ctx.lineTo(point.x, point.y);
-      ctx.stroke();
-    }
-
-    lastPointRef.current = point;
-    currentStrokeRef.current?.points.push(point);
-  }, [getPointerPos, MIN_DISTANCE]);
+    // Full-stroke redraw every frame — same bezier as final saved result
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      const c = canvasRefs.current[questionId];
+      if (!c || !currentStrokeRef.current) return;
+      const allStrokes = [
+        ...(currentStrokesRef.current[questionId] || []),
+        currentStrokeRef.current,
+      ];
+      renderStrokesSmooth(c, allStrokes);
+    });
+  }, [renderStrokesSmooth]);
 
   const handlePointerUp = useCallback((questionId: string) => {
     if (!isDrawingRef.current || activeQuestionRef.current !== questionId) return;
-
     isDrawingRef.current = false;
     activeQuestionRef.current = null;
     lastPointRef.current = null;
+    smoothPointRef.current = null;
+    cancelAnimationFrame(rafRef.current);
 
     const stroke = currentStrokeRef.current;
-    if (stroke && stroke.points.length > 0) {
-      setCurrentStrokes(prev => ({
-        ...prev,
-        [questionId]: [...(prev[questionId] || []), stroke],
-      }));
-    }
     currentStrokeRef.current = null;
-  }, []);
+
+    if (!stroke || stroke.points.length === 0) return;
+
+    // Single tap → dot: duplicate the point so renderStrokesSmooth draws a circle
+    if (stroke.points.length === 1) {
+      stroke.points.push({ ...stroke.points[0] });
+    }
+
+    setCurrentStrokes(prev => {
+      const updated = { ...prev, [questionId]: [...(prev[questionId] || []), stroke] };
+      // Immediately repaint with the final completed stroke
+      requestAnimationFrame(() => {
+        const c = canvasRefs.current[questionId];
+        if (c) renderStrokesSmooth(c, updated[questionId]);
+      });
+      return updated;
+    });
+  }, [renderStrokesSmooth]);
 
   const clearCanvas = (questionId: string) => {
     const canvas = canvasRefs.current[questionId];
