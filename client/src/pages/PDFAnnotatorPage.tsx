@@ -78,12 +78,19 @@ export function PDFAnnotatorPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const currentStrokeRef = useRef<Point[]>([]);
   const lastPointRef = useRef<Point | null>(null);
-  const prevPrevPointRef = useRef<Point | null>(null);
+  const smoothPointRef = useRef<Point | null>(null);
   const rafRef = useRef<number>(0);
   const isDrawingRef = useRef(false);
   const annotationsRef = useRef<StudentAnnotation[]>([]);
-  
+  const activeToolRef = useRef<Tool>(null);
+  const currentPageRef = useRef(1);
+  const scaleRef = useRef(1.2);
+
   annotationsRef.current = annotations;
+  activeToolRef.current = activeTool;
+  currentPageRef.current = currentPage;
+  scaleRef.current = scale;
+
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const initialLoadRef = useRef(0);
@@ -97,7 +104,7 @@ export function PDFAnnotatorPage() {
         isDrawingRef.current = false;
         setIsDrawing(false);
         lastPointRef.current = null;
-        prevPrevPointRef.current = null;
+        smoothPointRef.current = null;
         currentStrokeRef.current = [];
       }
     };
@@ -331,68 +338,87 @@ export function PDFAnnotatorPage() {
     const point = getPointerPos(e);
     currentStrokeRef.current = [point];
     lastPointRef.current = point;
-    prevPrevPointRef.current = null;
+    smoothPointRef.current = point;
     isDrawingRef.current = true;
     setIsDrawing(true);
   }, [activeTool, getPointerPos]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!isDrawing || !activeTool || activeTool === 'text') return;
+    // Use refs — NOT React state — to avoid stale-closure misses between renders
+    if (!isDrawingRef.current || !activeToolRef.current || activeToolRef.current === 'text') return;
 
     e.preventDefault();
 
-    const point = getPointerPos(e);
-    const lastPoint = lastPointRef.current;
-    if (!lastPoint) return;
+    const canvas = drawCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-    const dx = point.x - lastPoint.x;
-    const dy = point.y - lastPoint.y;
-    // Ignore tiny movements — filters stylus wobble (threshold: 3px)
-    if (dx * dx + dy * dy < 9) return;
+    const tool = activeToolRef.current;
+    const rect = canvas.getBoundingClientRect();
 
-    currentStrokeRef.current.push(point);
-    // Capture current A→B→C triple before updating refs
-    const A = prevPrevPointRef.current;
-    const B = lastPoint;
-    const C = point;
-    prevPrevPointRef.current = B;
-    lastPointRef.current = C;
+    // Collect all sub-frame stylus positions (120–240 Hz on modern tablets)
+    const nativeEvts: PointerEvent[] = (e.nativeEvent as any).getCoalescedEvents?.() ?? [e.nativeEvent];
 
+    for (const nEvt of nativeEvts) {
+      // Raw position in logical CSS pixels
+      const rawX = nEvt.clientX - rect.left;
+      const rawY = nEvt.clientY - rect.top;
+
+      // Exponential moving average — dampens jitter without noticeable lag
+      const prev = smoothPointRef.current;
+      const smoothX = prev ? 0.4 * rawX + 0.6 * prev.x : rawX;
+      const smoothY = prev ? 0.4 * rawY + 0.6 * prev.y : rawY;
+      smoothPointRef.current = { x: smoothX, y: smoothY };
+
+      const lastPoint = lastPointRef.current;
+      if (!lastPoint) continue;
+
+      const dx = smoothX - lastPoint.x;
+      const dy = smoothY - lastPoint.y;
+      if (dx * dx + dy * dy < 4) continue;   // skip sub-2px moves
+
+      currentStrokeRef.current.push({ x: smoothX, y: smoothY });
+      lastPointRef.current = { x: smoothX, y: smoothY };
+    }
+
+    // Redraw entire current stroke each frame — identical to final saved result
     cancelAnimationFrame(rafRef.current);
     rafRef.current = requestAnimationFrame(() => {
-      const canvas = drawCanvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
+      const canvas2 = drawCanvasRef.current;
+      if (!canvas2) return;
+      const ctx2 = canvas2.getContext('2d');
+      if (!ctx2) return;
 
-      const settings = getToolSettings(activeTool);
-      ctx.save();
-      ctx.globalCompositeOperation = settings.compositeOp as GlobalCompositeOperation;
-      ctx.strokeStyle = settings.color;
-      ctx.lineWidth = settings.width * DPR;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
+      ctx2.clearRect(0, 0, canvas2.width, canvas2.height);
 
-      if (A) {
-        // Proper midpoint bézier: start=mid(A,B), control=B, end=mid(B,C)
-        // This creates a smooth curve that visually passes through B
-        const startX = (A.x + B.x) / 2 * DPR;
-        const startY = (A.y + B.y) / 2 * DPR;
-        const endX   = (B.x + C.x) / 2 * DPR;
-        const endY   = (B.y + C.y) / 2 * DPR;
-        ctx.moveTo(startX, startY);
-        ctx.quadraticCurveTo(B.x * DPR, B.y * DPR, endX, endY);
-      } else {
-        // First segment — simple line to midpoint
-        ctx.moveTo(B.x * DPR, B.y * DPR);
-        ctx.lineTo((B.x + C.x) / 2 * DPR, (B.y + C.y) / 2 * DPR);
+      // Repaint all completed strokes on this page
+      const pg = currentPageRef.current;
+      const sc = scaleRef.current;
+      for (const ann of annotationsRef.current) {
+        if (ann.pageNum !== pg) continue;
+        if (ann.type === 'stroke') {
+          const sr = sc / (ann.scale || 1.2);
+          const sd = ann.stroke ?? (ann.fabricJSON ? convertFabricToStroke(ann.fabricJSON) ?? undefined : undefined);
+          if (sd) drawStroke(ctx2, sd, sr);
+        } else if (ann.type === 'text' && ann.text) {
+          const S = DPR * sc / (ann.scale || 1.2);
+          ctx2.save();
+          ctx2.font = `${16 * S}px Arial`;
+          ctx2.fillStyle = '#000000';
+          ctx2.fillText(ann.text, (ann.x || 0) * S, (ann.y || 0) * S);
+          ctx2.restore();
+        }
       }
 
-      ctx.stroke();
-      ctx.restore();
+      // Paint the in-progress stroke using the same smooth bezier algorithm
+      const pts = currentStrokeRef.current;
+      if (pts.length >= 2) {
+        const settings = getToolSettings(tool);
+        drawStroke(ctx2, { points: pts, color: settings.color, width: settings.width, compositeOp: settings.compositeOp }, 1);
+      }
     });
-  }, [isDrawing, activeTool, getPointerPos, getToolSettings, DPR]);
+  }, [drawStroke, getToolSettings, DPR]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent<HTMLCanvasElement>) => {
     if (!isDrawing || !activeTool || activeTool === 'text') return;
@@ -401,7 +427,7 @@ export function PDFAnnotatorPage() {
     isDrawingRef.current = false;
     setIsDrawing(false);
     lastPointRef.current = null;
-    prevPrevPointRef.current = null;
+    smoothPointRef.current = null;
 
     const points = currentStrokeRef.current;
     if (points.length < 2) {
