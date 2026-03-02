@@ -37,6 +37,23 @@ export function AssignmentWorkPage() {
 
   const currentSubmission = submissions.find((s: Submission) => s.assignmentId === assignmentId);
 
+  // Derive these before any early returns so hooks below are unconditional
+  const attachmentUrls: string[] = (assignment as any)?.attachmentUrls ?? [];
+  const isSubmitted = ['submitted', 'graded', 'parent_verified'].includes(currentSubmission?.status ?? '');
+  const isWorksheet = (assignment as any)?.assignmentKind === 'worksheet' && !!(assignment as any)?.worksheetId;
+
+  const { data: attachmentMetadata } = useMultipleFileMetadata(attachmentUrls);
+
+  useEffect(() => {
+    if (!isWorksheet && attachmentUrls.length === 1 && !isSubmitted && assignment) {
+      const url = attachmentUrls[0];
+      const objectPath = url.includes('/uploads/') ? url.split('/uploads/').pop() : url.split('/').pop();
+      const meta = attachmentMetadata?.[0];
+      const filename = meta?.originalName || url.split('/').pop() || 'document-1.pdf';
+      navigate(`/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=0`);
+    }
+  }, [assignment?.id, isSubmitted, isWorksheet, attachmentMetadata]);
+
   const handleBack = () => window.history.back();
 
   const getUploadParameters = async (file?: { name: string; type?: string }) => {
@@ -115,26 +132,15 @@ export function AssignmentWorkPage() {
   }
 
   const dueDate = new Date(assignment.submissionDate);
-  const isOverdue = isPast(dueDate) && !['submitted', 'graded', 'parent_verified'].includes(currentSubmission?.status ?? '');
+  const isOverdue = isPast(dueDate) && !isSubmitted;
   const daysUntilDue = differenceInDays(dueDate, new Date());
-  const isSubmitted = ['submitted', 'graded', 'parent_verified'].includes(currentSubmission?.status ?? '');
-  const attachmentUrls = assignment.attachmentUrls || [];
   const hasAttachments = attachmentUrls.length > 0;
-  const isWorksheet = assignment.assignmentKind === 'worksheet' && assignment.worksheetId;
-
-  const { data: attachmentMetadata } = useMultipleFileMetadata(attachmentUrls);
 
   const openAnnotator = (url: string, index: number, meta?: any) => {
     const objectPath = url.includes('/uploads/') ? url.split('/uploads/').pop() : url.split('/').pop();
     const filename = meta?.originalName || url.split('/').pop() || `document-${index + 1}.pdf`;
-    navigate(`/pdf-annotator?assignmentId=${assignment!.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`);
+    navigate(`/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`);
   };
-
-  useEffect(() => {
-    if (!isWorksheet && attachmentUrls.length === 1 && !isSubmitted && assignment) {
-      openAnnotator(attachmentUrls[0], 0, attachmentMetadata?.[0]);
-    }
-  }, [assignment?.id, isSubmitted, isWorksheet]);
 
   const statusColor = isSubmitted
     ? 'bg-green-100 text-green-700 border-green-200'
