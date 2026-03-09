@@ -1,6 +1,18 @@
 # Overview
 
-eSlate is a secure educational platform designed for e-ink devices and high-contrast displays. It functions as a comprehensive learning management system supporting students, parents, tutors, and administrators. Key features include homework management, real-time messaging, progress tracking, and calendar scheduling, all optimized for accessibility and readability on e-ink displays. The platform aims to provide a robust and inclusive educational experience.
+eSlate is a secure educational platform designed for e-ink devices and high-contrast displays.
+
+## Marketing Pitch Page (`/pitch`)
+A public-facing (no login required) marketing/presentation page at `/pitch` targeting tutoring companies. Covers:
+- Cost savings breakdown (printing, admin, marking, parent comms, resourcing)
+- Total estimated saving: £5,000–£10,000+ per year
+- Feature showcase with UI mock-ups: Assignment Management, PDF Annotation, AI Grading, AI Question Generator, Messaging, Progress Reports, Calendar/Attendance, Multi-Role Platform
+- Device support section (e-ink, iPad, tablet, desktop)
+- Security overview
+- FAQ section
+- Call to action → back to app
+
+ It functions as a comprehensive learning management system supporting students, parents, tutors, and administrators. Key features include homework management, real-time messaging, progress tracking, and calendar scheduling, all optimized for accessibility and readability on e-ink displays. The platform aims to provide a robust and inclusive educational experience.
 
 ## Tablet-Optimised Layout (Implemented)
 All three key pages now use responsive split-panel / sidebar layouts optimised for landscape tablet use (ONYX Air 3C, iPad, etc.):

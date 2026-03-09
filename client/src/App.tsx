@@ -51,6 +51,7 @@ import EinkPreview from "@/pages/EinkPreview";
 import SwitchPreview from "@/pages/SwitchPreview";
 import AssignmentPreview from "@/pages/AssignmentPreview";
 import TabletPreview from "@/pages/TabletPreview";
+import PitchPage from "@/pages/PitchPage";
 
 import NotFound from "@/pages/not-found";
 
@@ -92,6 +93,9 @@ function Router() {
       <Route path="/switch-preview" component={SwitchPreview} />
       <Route path="/assignment-preview" component={AssignmentPreview} />
       <Route path="/tablet-preview" component={TabletPreview} />
+
+      {/* Marketing pitch page - always accessible */}
+      <Route path="/pitch" component={PitchPage} />
 
       {!isAuthenticated ? (
         <>
