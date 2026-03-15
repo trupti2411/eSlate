@@ -277,15 +277,11 @@ export default function HomePage() {
           </div>
           
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-6 leading-tight">
-            Shaping the future of education with
-            <br />
-            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">innovation that respects tradition</span>
-            <br />
-            <span className="text-gray-900">and delivers results</span>
+            <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-pink-500 bg-clip-text text-transparent">Reimagining education</span>
+            {" "}for the next generation.
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-10 leading-relaxed">
-            A complete platform for education providers to manage students, track progress, and deliver engaging lessons. 
-            Simple, beautiful, and designed with learners in mind.
+            Building the future of education — combining trusted teaching principles with modern technology to help educators manage students, track progress, and deliver engaging learning at scale.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <Link href="/auth">
