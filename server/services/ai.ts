@@ -299,7 +299,7 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
     assignmentDescription?: string;
     assignmentInstructions?: string;
     studentContent?: string;
-    hasFileSubmission?: boolean;
+    files?: { buffer: Buffer; mimeType: string }[];
   }): Promise<{
     overallAssessment: string;
     whatIsCorrect: string[];
@@ -309,17 +309,7 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
     canFullyCheck: boolean;
   }> {
     const hasText = !!(params.studentContent && params.studentContent.trim().length > 10);
-
-    if (!hasText && params.hasFileSubmission) {
-      return {
-        overallAssessment: "This submission is file-based (e.g. a scanned or annotated PDF). AI can only check text responses — please review the uploaded file manually.",
-        whatIsCorrect: [],
-        whatIsIncorrect: [],
-        whatIsMissing: [],
-        suggestedNextSteps: ["Open the submitted file to review the student's work."],
-        canFullyCheck: false,
-      };
-    }
+    const hasFiles = !!(params.files && params.files.length > 0);
 
     const prompt = `You are an experienced teacher reviewing a student's assignment submission. Provide a thorough, fair, and constructive assessment.
 
@@ -329,7 +319,9 @@ ${params.assignmentDescription ? `ASSIGNMENT DESCRIPTION: ${params.assignmentDes
 ${params.assignmentInstructions ? `INSTRUCTIONS GIVEN TO STUDENT: ${params.assignmentInstructions}` : ''}
 
 STUDENT'S SUBMITTED WORK:
-${hasText ? params.studentContent : '(No written response provided)'}
+${hasText ? params.studentContent : hasFiles ? '(See attached file(s) below)' : '(No written response provided)'}
+
+${hasFiles ? `The student submitted ${params.files!.length} file(s) — review their contents carefully above when assessing correctness.` : ''}
 
 Check the student's work thoroughly against the assignment brief. Assess:
 1. What has the student done CORRECTLY or addressed well?
@@ -350,7 +342,24 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
 Be specific and reference the actual content of the student's work. If the submission is very short or incomplete, reflect that in your assessment.`;
 
     try {
-      const result = await this.model.generateContent(prompt);
+      // Build the content parts — text prompt first, then any files as inline data
+      const contentParts: any[] = [{ text: prompt }];
+
+      if (hasFiles) {
+        for (const f of params.files!) {
+          const supported = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/gif', 'application/pdf'];
+          if (supported.includes(f.mimeType)) {
+            contentParts.push({
+              inlineData: {
+                mimeType: f.mimeType,
+                data: f.buffer.toString('base64'),
+              },
+            });
+          }
+        }
+      }
+
+      const result = await this.model.generateContent(contentParts);
       const response = result.response.text();
 
       const check = this.safeParseJSON<{

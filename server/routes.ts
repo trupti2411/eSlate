@@ -1372,13 +1372,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignment = await storage.getAssignment(submission.assignmentId);
       if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
+      // Download any submitted files so Gemini can read them
+      const fileUrls: string[] = Array.isArray(submission.fileUrls) ? submission.fileUrls as string[] : [];
+      const downloadedFiles: { buffer: Buffer; mimeType: string }[] = [];
+
+      for (const fileUrl of fileUrls) {
+        try {
+          let file: any;
+          if (fileUrl.startsWith('/objects/')) {
+            const svc = new ObjectStorageService();
+            file = await svc.getObjectEntityFile(fileUrl);
+          } else if (fileUrl.includes('googleapis.com')) {
+            const match = fileUrl.match(/googleapis\.com\/([^\/]+)\/(.+)$/);
+            if (match) {
+              file = objectStorageClient.bucket(match[1]).file(match[2]);
+            }
+          }
+          if (file) {
+            const [buffer] = await file.download();
+            const [meta] = await file.getMetadata();
+            const mimeType = meta.contentType || 'application/octet-stream';
+            downloadedFiles.push({ buffer, mimeType });
+          }
+        } catch (e) {
+          console.warn('Could not download file for AI check:', fileUrl, e);
+        }
+      }
+
       const result = await aiService.checkAssignment({
         assignmentTitle: assignment.title,
         subject: assignment.subject || 'General',
         assignmentDescription: assignment.description || undefined,
         assignmentInstructions: (assignment as any).instructions || undefined,
         studentContent: (submission as any).content || (submission as any).textResponse || undefined,
-        hasFileSubmission: !!(submission.fileUrls && (submission.fileUrls as string[]).length > 0),
+        files: downloadedFiles.length > 0 ? downloadedFiles : undefined,
       });
 
       res.json(result);
