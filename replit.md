@@ -85,6 +85,7 @@ The platform includes comprehensive security hardening:
 
 ## AI Features (Powered by Google Gemini)
 The platform includes AI-powered features using Google Gemini (free tier) to enhance the learning experience:
+- **AI Assignment Check** (Tutors): Full assignment review — reads the brief + student response and returns what's correct, incorrect, missing, and suggested next steps. Button in MarkingPage. API: `POST /api/submissions/:id/ai-check`. Implemented in `server/services/ai.ts` (`checkAssignment` method).
 - **AI Question Generator** (Tutors): Generate multiple questions at once in WorksheetEditor
 - **AI Grading Assistant** (Tutors): Get draft feedback and scoring suggestions for essay/short-answer questions
 - **Smart Hint System** (Students): Progressive hints (3 levels) with parent-configurable controls

@@ -5,7 +5,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft, CheckCircle, FileText, Eye,
-  ChevronLeft, ChevronRight, User, BookOpen, Clock, MessageSquare
+  ChevronLeft, ChevronRight, User, BookOpen, Clock, MessageSquare,
+  Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb, Loader2
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMultipleFileMetadata, getDisplayFilename } from '@/hooks/useFileMetadata';
@@ -78,6 +79,14 @@ export function MarkingPage() {
   const [score, setScore] = useState<number | ''>('');
   const [feedback, setFeedback] = useState('');
   const [gradedIds, setGradedIds] = useState<Set<string>>(new Set());
+  const [aiCheckResult, setAiCheckResult] = useState<{
+    overallAssessment: string;
+    whatIsCorrect: string[];
+    whatIsIncorrect: string[];
+    whatIsMissing: string[];
+    suggestedNextSteps: string[];
+    canFullyCheck: boolean;
+  } | null>(null);
 
   const { data: allSubmissions = [], isLoading } = useQuery<SubmissionWithDetails[]>({
     queryKey: ['/api/company/submissions'],
@@ -112,10 +121,22 @@ export function MarkingPage() {
     gradeMutation.mutate({ id: current.id, score: Number(score), feedback });
   };
 
+  const aiCheckMutation = useMutation({
+    mutationFn: (submissionId: string) =>
+      apiRequest(`/api/submissions/${submissionId}/ai-check`, 'POST', {}),
+    onSuccess: (data) => {
+      setAiCheckResult(data);
+    },
+    onError: () => {
+      toast({ title: 'AI check failed', description: 'Could not analyse this submission. Please try again.', variant: 'destructive' });
+    },
+  });
+
   const selectSubmission = (idx: number) => {
     setCurrentIndex(idx);
     setScore('');
     setFeedback('');
+    setAiCheckResult(null);
   };
 
   const goBack = () => navigate('/company/homework');
@@ -316,6 +337,130 @@ export function MarkingPage() {
                     )}
                   </div>
                 )}
+
+                {/* AI Assignment Check */}
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1">
+                      <Sparkles size={11} className="text-violet-500" /> AI Assignment Check
+                    </p>
+                    {!aiCheckResult && (
+                      <button
+                        onClick={() => current && aiCheckMutation.mutate(current.id)}
+                        disabled={aiCheckMutation.isPending}
+                        className="flex items-center gap-1.5 bg-violet-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors disabled:opacity-60"
+                      >
+                        {aiCheckMutation.isPending ? (
+                          <><Loader2 size={12} className="animate-spin" /> Checking…</>
+                        ) : (
+                          <><Sparkles size={12} /> Check with AI</>
+                        )}
+                      </button>
+                    )}
+                    {aiCheckResult && (
+                      <button
+                        onClick={() => { setAiCheckResult(null); }}
+                        className="text-xs text-gray-400 hover:text-gray-600 font-semibold"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+
+                  {!aiCheckResult && !aiCheckMutation.isPending && (
+                    <p className="text-xs text-gray-400 italic">
+                      Let AI read the assignment brief and the student's response to give you a detailed breakdown before you mark.
+                    </p>
+                  )}
+
+                  {aiCheckMutation.isPending && (
+                    <div className="flex items-center gap-2 py-3">
+                      <Loader2 size={16} className="animate-spin text-violet-500" />
+                      <p className="text-sm text-gray-500">Gemini is reading the submission…</p>
+                    </div>
+                  )}
+
+                  {aiCheckResult && (
+                    <div className="space-y-3">
+                      {/* Overall */}
+                      <div className="bg-violet-50 border border-violet-200 rounded-xl p-3">
+                        <p className="text-xs font-bold text-violet-700 mb-1">Overall Assessment</p>
+                        <p className="text-sm text-violet-900 leading-relaxed">{aiCheckResult.overallAssessment}</p>
+                      </div>
+
+                      {!aiCheckResult.canFullyCheck && (
+                        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                          <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800">This is a file submission — AI can only assess what it can read. Review the uploaded file for full marking.</p>
+                        </div>
+                      )}
+
+                      {aiCheckResult.whatIsCorrect.length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-green-700 flex items-center gap-1 mb-1.5">
+                            <CheckCircle2 size={12} /> What's correct
+                          </p>
+                          <ul className="space-y-1">
+                            {aiCheckResult.whatIsCorrect.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                                <span className="text-green-500 flex-shrink-0 mt-0.5">✓</span>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {aiCheckResult.whatIsIncorrect.length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-red-700 flex items-center gap-1 mb-1.5">
+                            <XCircle size={12} /> What's incorrect
+                          </p>
+                          <ul className="space-y-1">
+                            {aiCheckResult.whatIsIncorrect.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                                <span className="text-red-500 flex-shrink-0 mt-0.5">✗</span>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {aiCheckResult.whatIsMissing.length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-amber-700 flex items-center gap-1 mb-1.5">
+                            <AlertTriangle size={12} /> What's missing
+                          </p>
+                          <ul className="space-y-1">
+                            {aiCheckResult.whatIsMissing.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                                <span className="text-amber-500 flex-shrink-0 mt-0.5">⚠</span>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      {aiCheckResult.suggestedNextSteps.length > 0 && (
+                        <div>
+                          <p className="text-xs font-bold text-blue-700 flex items-center gap-1 mb-1.5">
+                            <Lightbulb size={12} /> Suggested next steps
+                          </p>
+                          <ul className="space-y-1">
+                            {aiCheckResult.suggestedNextSteps.map((item, i) => (
+                              <li key={i} className="flex items-start gap-2 text-xs text-gray-700">
+                                <span className="text-blue-500 flex-shrink-0 mt-0.5">→</span>
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {/* Grading */}
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">

@@ -1352,6 +1352,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // AI check a student submission (company admin / tutor)
+  app.post('/api/submissions/:submissionId/ai-check', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['company_admin', 'tutor'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const { aiService } = await import('./services/ai');
+      if (!aiService.isConfigured()) {
+        return res.status(503).json({ message: "AI service is not configured" });
+      }
+
+      const { submissionId } = req.params;
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) return res.status(404).json({ message: "Submission not found" });
+
+      const assignment = await storage.getAssignment(submission.assignmentId);
+      if (!assignment) return res.status(404).json({ message: "Assignment not found" });
+
+      const result = await aiService.checkAssignment({
+        assignmentTitle: assignment.title,
+        subject: assignment.subject || 'General',
+        assignmentDescription: assignment.description || undefined,
+        assignmentInstructions: (assignment as any).instructions || undefined,
+        studentContent: (submission as any).content || (submission as any).textResponse || undefined,
+        hasFileSubmission: !!(submission.fileUrls && (submission.fileUrls as string[]).length > 0),
+      });
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("Error running AI check:", error);
+      res.status(500).json({ message: error.message || "Failed to run AI check" });
+    }
+  });
+
   // Save reviewer annotations (tutor/company_admin/parent)
   app.patch('/api/submissions/:submissionId/reviewer-annotations', isAuthenticated, async (req: any, res: any) => {
     try {

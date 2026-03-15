@@ -293,6 +293,88 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
     }
   }
 
+  async checkAssignment(params: {
+    assignmentTitle: string;
+    subject: string;
+    assignmentDescription?: string;
+    assignmentInstructions?: string;
+    studentContent?: string;
+    hasFileSubmission?: boolean;
+  }): Promise<{
+    overallAssessment: string;
+    whatIsCorrect: string[];
+    whatIsIncorrect: string[];
+    whatIsMissing: string[];
+    suggestedNextSteps: string[];
+    canFullyCheck: boolean;
+  }> {
+    const hasText = !!(params.studentContent && params.studentContent.trim().length > 10);
+
+    if (!hasText && params.hasFileSubmission) {
+      return {
+        overallAssessment: "This submission is file-based (e.g. a scanned or annotated PDF). AI can only check text responses — please review the uploaded file manually.",
+        whatIsCorrect: [],
+        whatIsIncorrect: [],
+        whatIsMissing: [],
+        suggestedNextSteps: ["Open the submitted file to review the student's work."],
+        canFullyCheck: false,
+      };
+    }
+
+    const prompt = `You are an experienced teacher reviewing a student's assignment submission. Provide a thorough, fair, and constructive assessment.
+
+ASSIGNMENT TITLE: ${params.assignmentTitle}
+SUBJECT: ${params.subject}
+${params.assignmentDescription ? `ASSIGNMENT DESCRIPTION: ${params.assignmentDescription}` : ''}
+${params.assignmentInstructions ? `INSTRUCTIONS GIVEN TO STUDENT: ${params.assignmentInstructions}` : ''}
+
+STUDENT'S SUBMITTED WORK:
+${hasText ? params.studentContent : '(No written response provided)'}
+
+Check the student's work thoroughly against the assignment brief. Assess:
+1. What has the student done CORRECTLY or addressed well?
+2. What is INCORRECT, has errors, or is factually/logically wrong?
+3. What is MISSING — required parts of the assignment not addressed?
+4. What are the suggested next steps for improvement?
+5. Provide a brief overall assessment paragraph (2-3 sentences).
+
+Return the response as JSON with this exact structure (no markdown, just raw JSON):
+{
+  "overallAssessment": "2-3 sentence overall summary of the submission quality",
+  "whatIsCorrect": ["specific thing done correctly", "another correct element"],
+  "whatIsIncorrect": ["specific error or incorrect element", "another mistake"],
+  "whatIsMissing": ["required element not addressed", "missing section or concept"],
+  "suggestedNextSteps": ["specific actionable suggestion", "another improvement step"]
+}
+
+Be specific and reference the actual content of the student's work. If the submission is very short or incomplete, reflect that in your assessment.`;
+
+    try {
+      const result = await this.model.generateContent(prompt);
+      const response = result.response.text();
+
+      const check = this.safeParseJSON<{
+        overallAssessment: string;
+        whatIsCorrect: string[];
+        whatIsIncorrect: string[];
+        whatIsMissing: string[];
+        suggestedNextSteps: string[];
+      }>(response, 'object');
+
+      return {
+        overallAssessment: check.overallAssessment || 'Assessment could not be generated.',
+        whatIsCorrect: Array.isArray(check.whatIsCorrect) ? check.whatIsCorrect : [],
+        whatIsIncorrect: Array.isArray(check.whatIsIncorrect) ? check.whatIsIncorrect : [],
+        whatIsMissing: Array.isArray(check.whatIsMissing) ? check.whatIsMissing : [],
+        suggestedNextSteps: Array.isArray(check.suggestedNextSteps) ? check.suggestedNextSteps : [],
+        canFullyCheck: true,
+      };
+    } catch (error: any) {
+      console.error("Error checking assignment:", error);
+      throw new Error(error.message || "Failed to check assignment. Please try again.");
+    }
+  }
+
   isConfigured(): boolean {
     return !!process.env.GEMINI_API_KEY;
   }
