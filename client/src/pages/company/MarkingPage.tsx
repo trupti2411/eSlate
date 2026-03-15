@@ -5,7 +5,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft, CheckCircle, FileText, Eye,
-  ChevronLeft, ChevronRight, User, BookOpen, Clock
+  ChevronLeft, ChevronRight, User, BookOpen, Clock, MessageSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMultipleFileMetadata, getDisplayFilename } from '@/hooks/useFileMetadata';
@@ -20,6 +20,8 @@ interface SubmissionWithDetails {
   submittedAt: string | null;
   fileUrls: string[] | null;
   content: string | null;
+  parentComment: string | null;
+  parentCommentAt: string | null;
   student: {
     id: string;
     user: { firstName: string; lastName: string; email: string };
@@ -297,6 +299,21 @@ export function MarkingPage() {
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                     <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Submitted files</p>
                     <SubmittedFiles fileUrls={current.fileUrls} />
+                  </div>
+                )}
+
+                {/* Parent comment */}
+                {current.parentComment && (
+                  <div className="bg-rose-50 rounded-2xl border border-rose-200 shadow-sm p-4">
+                    <p className="text-xs font-bold uppercase tracking-widest text-rose-500 mb-2 flex items-center gap-1">
+                      <MessageSquare size={11} /> Parent note
+                    </p>
+                    <p className="text-sm text-rose-900 leading-relaxed">{current.parentComment}</p>
+                    {current.parentCommentAt && (
+                      <p className="text-xs text-rose-400 mt-1.5">
+                        Left {format(new Date(current.parentCommentAt), 'EEE d MMM, h:mm a')}
+                      </p>
+                    )}
                   </div>
                 )}
 

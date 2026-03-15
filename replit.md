@@ -2,6 +2,24 @@
 
 eSlate is a secure educational platform designed for e-ink devices and high-contrast displays.
 
+## Parent Assignment Visibility & Comments (Implemented)
+Parents can now see all assignments for their children (pending, submitted, and graded) and leave feedback comments visible to the tutor.
+
+### Features
+- **Expandable Assignment Cards**: Each card in the parent's "Homework" tab can be tapped/clicked to expand showing full details
+- **Full Status Details**: Shows assignment description, submission date/time, late flag, grading timestamp
+- **Tutor Feedback Visibility**: Graded assignments show the tutor's score and written feedback
+- **Parent Comment Field**: When a submission exists, parents can type a comment and send it to the tutor via "Send to Tutor" button
+- **Edit Comments**: Previously sent comments can be edited; timestamp shown
+- **Overdue Sorting**: Overdue assignments appear at the top of the homework list
+- **Tutor View**: `MarkingPage.tsx` shows a rose-coloured "Parent note" card when a parent has left a comment
+
+### Technical Details
+- **DB Column**: `parent_comment text`, `parent_comment_at timestamp` added to `submissions` table
+- **API Endpoint**: `PATCH /api/submissions/:submissionId/parent-comment` — parent-only, verifies parent→child relationship
+- **Storage**: `getParentChildrenWithProgress` and `getCompanySubmissions` both return parentComment/parentCommentAt
+- **Component**: `AssignmentCard` in `NewParentDashboard.tsx` handles expand/collapse, comment state, and mutation
+
 ## Marketing Pitch Page (`/pitch`)
 A public-facing (no login required) marketing/presentation page at `/pitch` targeting tutoring companies. Covers:
 - Cost savings breakdown (printing, admin, marking, parent comms, resourcing)

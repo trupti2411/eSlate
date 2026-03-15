@@ -693,6 +693,8 @@ export class DatabaseStorage implements IStorage {
           feedback: submissions.feedback,
           gradedAt: submissions.gradedAt,
           fileUrls: submissions.fileUrls,
+          parentComment: submissions.parentComment,
+          parentCommentAt: submissions.parentCommentAt,
           createdAt: submissions.createdAt,
         })
         .from(submissions)
@@ -717,6 +719,8 @@ export class DatabaseStorage implements IStorage {
               feedback: submission.feedback,
               gradedAt: submission.gradedAt,
               fileUrls: submission.fileUrls,
+              parentComment: submission.parentComment,
+              parentCommentAt: submission.parentCommentAt,
             } : null,
             submissionStatus: submission?.status || 'not_started',
           };
@@ -1845,6 +1849,8 @@ export class DatabaseStorage implements IStorage {
           a.submission_date as assignment_submission_date,
           a.subject as assignment_subject,
           a.attachment_urls as assignment_attachment_urls,
+          s.parent_comment,
+          s.parent_comment_at,
           a.assignment_kind,
           a.worksheet_id,
           a.class_id,
@@ -1875,6 +1881,8 @@ export class DatabaseStorage implements IStorage {
         isLate: row.is_late,
         score: row.score,
         feedback: row.feedback,
+        parentComment: row.parent_comment,
+        parentCommentAt: row.parent_comment_at,
         deviceType: row.device_type,
         inputMethod: row.input_method,
         createdAt: row.submission_created_at,

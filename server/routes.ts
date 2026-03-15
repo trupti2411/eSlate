@@ -1772,6 +1772,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Parent leaves a comment on their child's submission
+  app.patch("/api/submissions/:submissionId/parent-comment", isAuthenticated, async (req: any, res: any) => {
+    const user = req.user;
+    if (!user || user.role !== 'parent') {
+      return res.status(403).json({ message: "Parent access required" });
+    }
+    const { submissionId } = req.params;
+    const { comment } = req.body;
+    if (typeof comment !== 'string') {
+      return res.status(400).json({ message: "comment field required" });
+    }
+    try {
+      const submission = await storage.getSubmission(submissionId);
+      if (!submission) return res.status(404).json({ message: "Submission not found" });
+      const parent = await storage.getParentByUserId(user.id);
+      if (!parent) return res.status(403).json({ message: "Parent profile not found" });
+      const student = await storage.getStudent(submission.studentId);
+      if (!student || student.parentId !== parent.id) {
+        return res.status(403).json({ message: "Access denied to this submission" });
+      }
+      const [updated] = await db
+        .update(submissions)
+        .set({ parentComment: comment.trim() || null, parentCommentAt: comment.trim() ? new Date() : null })
+        .where(eq(submissions.id, submissionId))
+        .returning();
+      res.json(updated);
+    } catch (error) {
+      console.error("Error saving parent comment:", error);
+      res.status(500).json({ message: "Failed to save comment" });
+    }
+  });
+
   // Student profile routes
   app.get("/api/students/:studentId", isAuthenticated, async (req: any, res: any) => {
     const { studentId } = req.params;

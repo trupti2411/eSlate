@@ -209,6 +209,9 @@ export const submissions = pgTable("submissions", {
   annotations: text("annotations"), // JSON string of student annotations (pen strokes, text, highlights)
   gradedBy: varchar("graded_by").references(() => users.id), // Who graded this submission
   gradedAt: timestamp("graded_at"), // When it was graded
+  // Parent feedback on the submission
+  parentComment: text("parent_comment"), // Parent's comment/feedback visible to tutor
+  parentCommentAt: timestamp("parent_comment_at"), // When parent left the comment
   // E-ink device specific fields
   deviceType: varchar("device_type"), // 'e-ink', 'tablet', 'desktop'
   inputMethod: varchar("input_method"), // 'pen', 'touch', 'keyboard'
