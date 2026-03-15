@@ -86,6 +86,7 @@ export function MarkingPage() {
     whatIsMissing: string[];
     suggestedNextSteps: string[];
     canFullyCheck: boolean;
+    warnings?: string[];
   } | null>(null);
 
   const { data: allSubmissions = [], isLoading } = useQuery<SubmissionWithDetails[]>({
@@ -388,10 +389,14 @@ export function MarkingPage() {
                         <p className="text-sm text-violet-900 leading-relaxed">{aiCheckResult.overallAssessment}</p>
                       </div>
 
-                      {!aiCheckResult.canFullyCheck && (
-                        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                          <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800">This is a file submission — AI can only assess what it can read. Review the uploaded file for full marking.</p>
+                      {aiCheckResult.warnings && aiCheckResult.warnings.length > 0 && (
+                        <div className="space-y-1.5">
+                          {aiCheckResult.warnings.map((w, i) => (
+                            <div key={i} className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                              <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                              <p className="text-xs text-amber-800">{w}</p>
+                            </div>
+                          ))}
                         </div>
                       )}
 

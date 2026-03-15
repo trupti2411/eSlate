@@ -1373,8 +1373,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
       // Download any submitted files so Gemini can read them
+      const supportedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/gif', 'application/pdf'];
       const fileUrls: string[] = Array.isArray(submission.fileUrls) ? submission.fileUrls as string[] : [];
       const downloadedFiles: { buffer: Buffer; mimeType: string }[] = [];
+      const fileWarnings: string[] = [];
 
       for (const fileUrl of fileUrls) {
         try {
@@ -1389,13 +1391,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             }
           }
           if (file) {
-            const [buffer] = await file.download();
             const [meta] = await file.getMetadata();
             const mimeType = meta.contentType || 'application/octet-stream';
-            downloadedFiles.push({ buffer, mimeType });
+            if (!supportedMimeTypes.includes(mimeType)) {
+              fileWarnings.push(`One file (${mimeType}) could not be read by AI — only images and PDFs are supported.`);
+            } else {
+              const [buffer] = await file.download();
+              downloadedFiles.push({ buffer, mimeType });
+            }
           }
         } catch (e) {
           console.warn('Could not download file for AI check:', fileUrl, e);
+          fileWarnings.push('One submitted file could not be accessed — it may have been deleted or is temporarily unavailable.');
         }
       }
 
@@ -1408,7 +1415,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         files: downloadedFiles.length > 0 ? downloadedFiles : undefined,
       });
 
-      res.json(result);
+      res.json({ ...result, warnings: fileWarnings });
     } catch (error: any) {
       console.error("Error running AI check:", error);
       res.status(500).json({ message: error.message || "Failed to run AI check" });
