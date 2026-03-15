@@ -4,6 +4,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, getCsrfToken } from '@/lib/queryClient';
 import { Save, Send, X, Eraser, RotateCcw, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useLocation } from 'wouter';
 import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -60,6 +61,7 @@ function convertFabricToStroke(fabricJSON: any): StrokeData | null {
 }
 
 export function PDFAnnotatorPage() {
+  const [, navigate] = useLocation();
   const [activeTool, setActiveTool] = useState<Tool>('pen');
   const [pinchTransform, setPinchTransform] = useState(1);
   const [isSaving, setIsSaving] = useState(false);
@@ -637,7 +639,7 @@ export function PDFAnnotatorPage() {
           : 'Your work has been saved as a draft.',
       });
       if (status === 'submitted') {
-        window.close();
+        navigate(assignmentId ? `/student/assignment/${assignmentId}` : '/');
       }
     },
     onError: (error) => {
@@ -654,12 +656,13 @@ export function PDFAnnotatorPage() {
   });
 
   const handleClose = () => {
-    if (annotations.length > 0) {
-      if (confirm('You have unsaved work. Are you sure you want to close?')) {
-        window.close();
+    const backPath = assignmentId ? `/student/assignment/${assignmentId}` : '/';
+    if (annotations.length > initialLoadRef.current) {
+      if (confirm('You have unsaved work. Are you sure you want to go back?')) {
+        navigate(backPath);
       }
     } else {
-      window.close();
+      navigate(backPath);
     }
   };
 
@@ -740,8 +743,8 @@ export function PDFAnnotatorPage() {
             <Send className="h-5 w-5 mr-1" />
             {isSubmitting ? '...' : 'Submit'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleClose} className={toolBtnClass}>
-            <X className="h-5 w-5" />
+          <Button variant="outline" size="sm" onClick={handleClose} className={toolBtnClass} title="Back to assignment">
+            <ChevronLeft className="h-5 w-5" />
           </Button>
         </div>
       </div>

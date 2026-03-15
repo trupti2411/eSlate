@@ -9,7 +9,7 @@ import { ObjectUploader } from '@/components/ObjectUploader';
 import { AssignmentCompletionArea } from '@/components/AssignmentCompletionArea';
 import { useMultipleFileMetadata, getDisplayFilename } from '@/hooks/useFileMetadata';
 import {
-  ArrowLeft, Upload, CheckCircle, AlertCircle, Send, FileText, Eye, PenLine, ChevronRight
+  ArrowLeft, Upload, CheckCircle, AlertCircle, Send, FileText, Eye, PenLine, ChevronRight, Home
 } from 'lucide-react';
 import { format, isPast, differenceInDays } from 'date-fns';
 
@@ -54,7 +54,7 @@ export function AssignmentWorkPage() {
     }
   }, [assignment?.id, isSubmitted, isWorksheet, attachmentMetadata]);
 
-  const handleBack = () => window.history.back();
+  const handleBack = () => navigate('/');
 
   const getUploadParameters = async (file?: { name: string; type?: string }) => {
     const response = await apiRequest('/api/objects/upload', 'POST', { contentType: file?.type });
@@ -164,11 +164,13 @@ export function AssignmentWorkPage() {
       <div className="bg-indigo-600 text-white px-4 py-3 flex items-center gap-3 flex-shrink-0">
         <button
           onClick={handleBack}
-          className="w-8 h-8 rounded-xl bg-white/20 hover:bg-white/30 flex items-center justify-center flex-shrink-0 transition-colors"
-          aria-label="Back"
+          className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 rounded-xl px-3 py-1.5 text-sm font-semibold flex-shrink-0 transition-colors"
+          aria-label="Back to dashboard"
         >
-          <ArrowLeft size={16} />
+          <Home size={14} />
+          <span className="hidden sm:inline">Dashboard</span>
         </button>
+        <ChevronRight size={14} className="text-indigo-300 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="font-black text-sm truncate">{assignment.title}</p>
           <p className="text-xs text-indigo-200 truncate">{assignment.subject}</p>
