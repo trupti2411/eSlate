@@ -10,6 +10,7 @@ import {
   Calendar, ClipboardList, MessageCircle, Bell, LogOut,
   Check, X, Users, ChevronRight, Award, ThumbsUp, ChevronLeft,
   Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb,
+  PenLine, Maximize2, ZoomIn,
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 
@@ -27,7 +28,10 @@ interface Submission {
   studentName?: string;
   assignmentTitle?: string;
   fileUrls?: string[];
+  documentUrl?: string | null;
   content?: string;
+  student?: { user: { firstName: string | null; lastName: string | null } };
+  assignment?: { title: string; description?: string };
 }
 
 interface Student {
@@ -43,8 +47,8 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const queryClient = useQueryClient();
   const [tab, setTab] = useState<Tab>('today');
   const [markingId, setMarkingId] = useState<string | null>(null);
-  const [grade, setGrade] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [rollCall, setRollCall] = useState<Record<string, boolean | null>>({});
   const [aiResult, setAiResult] = useState<{
     overallAssessment: string;
@@ -83,11 +87,11 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/tutor/submissions'] });
-      toast({ title: 'Grade submitted', description: 'Student and parent have been notified.' });
+      toast({ title: 'Feedback submitted', description: 'Student and parent have been notified.' });
       setMarkingId(null);
-      setGrade('');
       setFeedback('');
       setAiResult(null);
+      setLightboxOpen(false);
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to submit grade.', variant: 'destructive' });
@@ -118,42 +122,78 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const markingSubmission = submissions.find(s => s.id === markingId);
   const matchedAssignment = markingSubmission ? assignments.find((a: any) => a.id === markingSubmission.assignmentId) : null;
 
+  const studentName = markingSubmission?.student?.user
+    ? `${markingSubmission.student.user.firstName || ''} ${markingSubmission.student.user.lastName || ''}`.trim() || 'Student'
+    : markingSubmission?.studentName || 'Student';
+  const assignmentTitle = markingSubmission?.assignment?.title || matchedAssignment?.title || 'Submission';
+
   if (markingId && markingSubmission) {
     return (
+      <>
       <div className="min-h-screen flex flex-col bg-gray-50">
         <div className="bg-teal-600 text-white px-4 py-4 flex items-center gap-3">
-          <button onClick={() => setMarkingId(null)} className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+          <button onClick={() => { setMarkingId(null); setLightboxOpen(false); }} className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
             <ChevronLeft size={18} />
           </button>
           <div className="flex-1">
-            <p className="font-black">{markingSubmission.studentName || 'Student'}</p>
-            <p className="text-sm text-teal-200">{matchedAssignment?.title || 'Submission'}</p>
+            <p className="font-black">{studentName}</p>
+            <p className="text-sm text-teal-200">{assignmentTitle}</p>
           </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
-            {/* Submitted content */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Student's submitted work</p>
-              </div>
-              <div className="p-4">
-                {markingSubmission.content ? (
-                  <p className="text-sm text-gray-700 leading-relaxed">{markingSubmission.content}</p>
-                ) : markingSubmission.fileUrls && markingSubmission.fileUrls.length > 0 ? (
-                  <div className="space-y-2">
-                    {markingSubmission.fileUrls.map((url, i) => (
-                      <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-teal-600 font-semibold hover:underline">
-                        📎 View file {i + 1}
-                      </a>
-                    ))}
+            {/* Annotated submission (PDF annotator) */}
+            {markingSubmission.documentUrl ? (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500 flex items-center gap-1.5">
+                    <PenLine size={11} className="text-teal-500" /> Student's annotated work
+                  </p>
+                  <button
+                    onClick={() => setLightboxOpen(true)}
+                    className="flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Maximize2 size={12} /> View full size
+                  </button>
+                </div>
+                <div className="relative cursor-zoom-in group" onClick={() => setLightboxOpen(true)}>
+                  <img
+                    src={`/api/files/${markingSubmission.documentUrl}`}
+                    alt="Student's annotated submission"
+                    className="w-full object-contain max-h-96 bg-gray-50"
+                    style={{ imageRendering: 'crisp-edges' }}
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
+                    <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-xl px-3 py-2 flex items-center gap-2 shadow-lg">
+                      <ZoomIn size={14} className="text-gray-700" />
+                      <span className="text-xs font-bold text-gray-700">Click to zoom in</span>
+                    </div>
                   </div>
-                ) : (
-                  <p className="text-sm text-gray-400 italic">Submitted {markingSubmission.submittedAt ? format(new Date(markingSubmission.submittedAt), 'd MMM yyyy') : ''}</p>
-                )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Student's submitted work</p>
+                </div>
+                <div className="p-4">
+                  {markingSubmission.content ? (
+                    <p className="text-sm text-gray-700 leading-relaxed">{markingSubmission.content}</p>
+                  ) : markingSubmission.fileUrls && markingSubmission.fileUrls.length > 0 ? (
+                    <div className="space-y-2">
+                      {markingSubmission.fileUrls.map((url, i) => (
+                        <a key={i} href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-teal-600 font-semibold hover:underline">
+                          📎 View file {i + 1}
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-400 italic">Submitted {markingSubmission.submittedAt ? format(new Date(markingSubmission.submittedAt), 'd MMM yyyy') : ''}</p>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* AI Check */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
@@ -239,24 +279,6 @@ export default function NewTutorDashboard({ setDesign }: Props) {
               )}
             </div>
 
-            {/* Grade picker */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Mark out of 20</p>
-              <div className="flex flex-wrap gap-2">
-                {Array.from({ length: 21 }, (_, i) => String(i)).map(g => (
-                  <button
-                    key={g}
-                    onClick={() => setGrade(g)}
-                    className={`w-11 h-11 rounded-xl border-2 font-bold text-sm transition-all ${
-                      grade === g ? 'bg-teal-600 text-white border-teal-600' : 'bg-white text-gray-800 border-gray-200'
-                    }`}
-                  >
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Feedback */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Feedback</p>
@@ -282,21 +304,54 @@ export default function NewTutorDashboard({ setDesign }: Props) {
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 flex gap-3">
-          <button onClick={() => { setMarkingId(null); setAiResult(null); }} className="flex-1 py-3 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-700">
+          <button onClick={() => { setMarkingId(null); setAiResult(null); setLightboxOpen(false); }} className="flex-1 py-3 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-700">
             Cancel
           </button>
           <button
             onClick={() => {
-              if (!grade) { toast({ title: 'Select a mark first', variant: 'destructive' }); return; }
-              gradeMutation.mutate({ id: markingId, score: parseInt(grade), fb: feedback });
+              gradeMutation.mutate({ id: markingId, score: 0, fb: feedback });
             }}
-            disabled={gradeMutation.isPending || !grade}
+            disabled={gradeMutation.isPending}
             className="flex-1 py-3 rounded-xl border-2 border-teal-600 bg-teal-600 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50"
           >
             <ThumbsUp size={15} /> {gradeMutation.isPending ? 'Submitting…' : 'Submit grade'}
           </button>
         </div>
       </div>
+
+      {/* Full-screen lightbox */}
+      {lightboxOpen && markingSubmission?.documentUrl && (
+        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" onClick={() => setLightboxOpen(false)}>
+          <div className="flex items-center justify-between px-4 py-3 bg-black/60 flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <div>
+              <p className="text-white font-bold text-sm">{studentName}</p>
+              <p className="text-white/60 text-xs">{assignmentTitle}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={e => { e.stopPropagation(); aiMutation.mutate(markingId!); setLightboxOpen(false); }}
+                disabled={aiMutation.isPending}
+                className="flex items-center gap-1.5 bg-violet-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors disabled:opacity-60"
+              >
+                <Sparkles size={12} /> Check with AI
+              </button>
+              <button onClick={() => setLightboxOpen(false)} className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+                <X size={18} className="text-white" />
+              </button>
+            </div>
+          </div>
+          <div className="flex-1 overflow-auto flex items-start justify-center p-4" onClick={e => e.stopPropagation()}>
+            <img
+              src={`/api/files/${markingSubmission.documentUrl}`}
+              alt="Student's annotated submission — full size"
+              className="max-w-full h-auto rounded-lg shadow-2xl"
+              style={{ imageRendering: 'crisp-edges', minWidth: '320px' }}
+            />
+          </div>
+          <p className="text-white/40 text-xs text-center pb-3 flex-shrink-0">Tap outside or press ✕ to close</p>
+        </div>
+      )}
+      </>
     );
   }
 
