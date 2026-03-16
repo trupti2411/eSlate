@@ -1,13 +1,16 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleAIFileManager } from "@google/generative-ai/server";
 import Groq from "groq-sdk";
+import OpenAI from "openai";
 import * as fs from 'fs';
 import * as path from 'path';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY || "");
 const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+const openaiClient = process.env.OPENAI_API_KEY ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) : null;
 const GROQ_MODEL = "llama-3.3-70b-versatile";
+const OPENAI_MODEL = "gpt-4o";
 
 interface QuestionGenerationParams {
   subject: string;
@@ -100,6 +103,33 @@ class AIService {
     return res.choices[0]?.message?.content || "";
   }
 
+  private async callOpenAI(prompt: string): Promise<string> {
+    if (!openaiClient) throw new Error("OpenAI not configured");
+    const res = await openaiClient.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+    return res.choices[0]?.message?.content || "";
+  }
+
+  private async callOpenAIVision(textPrompt: string, images: { mimeType: string; data: string }[]): Promise<string> {
+    if (!openaiClient) throw new Error("OpenAI not configured");
+    const content: OpenAI.ChatCompletionContentPart[] = images.map(img => ({
+      type: "image_url" as const,
+      image_url: { url: `data:${img.mimeType};base64,${img.data}`, detail: "high" as const },
+    }));
+    content.push({ type: "text", text: textPrompt });
+    const res = await openaiClient.chat.completions.create({
+      model: OPENAI_MODEL,
+      messages: [{ role: "user", content }],
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+    return res.choices[0]?.message?.content || "";
+  }
+
   private isQuotaError(err: any): boolean {
     return err?.status === 429 || err?.statusText === "Too Many Requests";
   }
@@ -108,7 +138,7 @@ class AIService {
     return "AI quota reached. Please try again in a few minutes or tomorrow if the daily limit is exhausted.";
   }
 
-  // For text-only AI calls — falls back to Groq automatically
+  // For text-only AI calls — Gemini first, then Groq, then GPT-4o
   private async generateText(prompt: string): Promise<string> {
     try {
       const result = await this.model.generateContent(prompt);
@@ -119,13 +149,17 @@ class AIService {
           console.log("Gemini quota exceeded — switching to Groq fallback");
           return this.callGroq(prompt);
         }
+        if (openaiClient) {
+          console.log("Gemini quota exceeded — switching to GPT-4o fallback");
+          return this.callOpenAI(prompt);
+        }
         throw new Error(this.quotaErrorMessage());
       }
       throw err;
     }
   }
 
-  // For multimodal calls (text + optional images) — falls back to Groq only if no images
+  // For multimodal calls (text + images) — Gemini first, then GPT-4o vision (best at handwriting)
   private async generateWithFallback(contentParts: any): Promise<string> {
     try {
       const result = await this.model.generateContent(contentParts);
@@ -133,15 +167,23 @@ class AIService {
     } catch (err: any) {
       if (this.isQuotaError(err)) {
         const parts = Array.isArray(contentParts) ? contentParts : [contentParts];
-        const hasImages = parts.some((p: any) => p.inlineData);
-        if (hasImages) {
-          // Cannot safely fall back to Groq when files are involved — it would give false results
-          throw new Error("AI_QUOTA_WITH_FILES");
+        const textOnly = parts.filter((p: any) => p.text).map((p: any) => p.text).join("\n\n");
+        const imageParts = parts
+          .filter((p: any) => p.inlineData)
+          .map((p: any) => ({ mimeType: p.inlineData.mimeType, data: p.inlineData.data }));
+        const hasImages = imageParts.length > 0;
+
+        if (hasImages && openaiClient) {
+          console.log("Gemini quota exceeded — switching to GPT-4o vision fallback");
+          return this.callOpenAIVision(textOnly, imageParts);
         }
-        if (groqClient) {
-          const textOnly = parts.filter((p: any) => p.text).map((p: any) => p.text).join("\n\n");
+        if (!hasImages && groqClient) {
           console.log("Gemini quota exceeded — switching to Groq fallback (text only)");
           return this.callGroq(textOnly);
+        }
+        if (!hasImages && openaiClient) {
+          console.log("Gemini quota exceeded — switching to GPT-4o fallback (text only)");
+          return this.callOpenAI(textOnly);
         }
         throw new Error(this.quotaErrorMessage());
       }
@@ -455,24 +497,13 @@ Be specific and reference the actual content of the student's work. If the submi
       };
     } catch (error: any) {
       console.error("Error checking assignment:", error);
-      if (error.message === "AI_QUOTA_WITH_FILES") {
-        // Gemini quota hit and submission has files — can't safely use text-only fallback
-        return {
-          overallAssessment: "The AI quota is temporarily reached and this submission contains uploaded files that require visual analysis to assess. The assessment below is unavailable until the quota resets (usually within minutes, or at midnight Pacific time). Please try again shortly.",
-          whatIsCorrect: [],
-          whatIsIncorrect: [],
-          whatIsMissing: [],
-          suggestedNextSteps: ["Try running the AI check again in a few minutes when the quota resets."],
-          canFullyCheck: false,
-        };
-      }
       const msg = error.message || "Failed to check assignment. Please try again.";
       throw new Error(msg);
     }
   }
 
   isConfigured(): boolean {
-    return !!process.env.GEMINI_API_KEY;
+    return !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY);
   }
 
   async extractWorksheetFromPDF(pdfPath: string, options?: { 
