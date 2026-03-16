@@ -13,6 +13,7 @@ import {
   PenLine, Maximize2, ZoomIn,
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
+import { SubmissionAnnotator } from '@/components/SubmissionAnnotator';
 
 interface Props { setDesign: (d: Design) => void; }
 type Tab = 'today' | 'marking' | 'students' | 'messages';
@@ -29,6 +30,7 @@ interface Submission {
   assignmentTitle?: string;
   fileUrls?: string[];
   documentUrl?: string | null;
+  reviewerAnnotations?: string | null;
   content?: string;
   student?: { user: { firstName: string | null; lastName: string | null } };
   assignment?: { title: string; description?: string };
@@ -154,10 +156,10 @@ export default function NewTutorDashboard({ setDesign }: Props) {
                     onClick={() => setLightboxOpen(true)}
                     className="flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 py-1.5 rounded-lg transition-colors"
                   >
-                    <Maximize2 size={12} /> View full size
+                    <PenLine size={12} /> Mark &amp; Annotate
                   </button>
                 </div>
-                <div className="relative cursor-zoom-in group" onClick={() => setLightboxOpen(true)}>
+                <div className="relative cursor-crosshair group" onClick={() => setLightboxOpen(true)}>
                   <img
                     src={`/api/files/${markingSubmission.documentUrl}`}
                     alt="Student's annotated submission"
@@ -166,8 +168,8 @@ export default function NewTutorDashboard({ setDesign }: Props) {
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
                     <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-xl px-3 py-2 flex items-center gap-2 shadow-lg">
-                      <ZoomIn size={14} className="text-gray-700" />
-                      <span className="text-xs font-bold text-gray-700">Click to zoom in</span>
+                      <PenLine size={14} className="text-teal-700" />
+                      <span className="text-xs font-bold text-teal-700">Click to mark &amp; annotate</span>
                     </div>
                   </div>
                 </div>
@@ -319,37 +321,20 @@ export default function NewTutorDashboard({ setDesign }: Props) {
         </div>
       </div>
 
-      {/* Full-screen lightbox */}
+      {/* Annotator modal */}
       {lightboxOpen && markingSubmission?.documentUrl && (
-        <div className="fixed inset-0 z-50 bg-black/90 flex flex-col" onClick={() => setLightboxOpen(false)}>
-          <div className="flex items-center justify-between px-4 py-3 bg-black/60 flex-shrink-0" onClick={e => e.stopPropagation()}>
-            <div>
-              <p className="text-white font-bold text-sm">{studentName}</p>
-              <p className="text-white/60 text-xs">{assignmentTitle}</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={e => { e.stopPropagation(); aiMutation.mutate(markingId!); setLightboxOpen(false); }}
-                disabled={aiMutation.isPending}
-                className="flex items-center gap-1.5 bg-violet-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors disabled:opacity-60"
-              >
-                <Sparkles size={12} /> Check with AI
-              </button>
-              <button onClick={() => setLightboxOpen(false)} className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-                <X size={18} className="text-white" />
-              </button>
-            </div>
-          </div>
-          <div className="flex-1 overflow-auto flex items-start justify-center p-4" onClick={e => e.stopPropagation()}>
-            <img
-              src={`/api/files/${markingSubmission.documentUrl}`}
-              alt="Student's annotated submission — full size"
-              className="max-w-full h-auto rounded-lg shadow-2xl"
-              style={{ imageRendering: 'crisp-edges', minWidth: '320px' }}
-            />
-          </div>
-          <p className="text-white/40 text-xs text-center pb-3 flex-shrink-0">Tap outside or press ✕ to close</p>
-        </div>
+        <SubmissionAnnotator
+          imageUrl={`/api/files/${markingSubmission.documentUrl}`}
+          submissionId={markingId!}
+          studentName={studentName}
+          assignmentTitle={assignmentTitle}
+          existingAnnotations={markingSubmission.reviewerAnnotations as any}
+          onClose={() => setLightboxOpen(false)}
+          onSaved={() => {
+            setLightboxOpen(false);
+            toast({ title: 'Marks saved', description: 'Annotations have been saved to this submission.' });
+          }}
+        />
       )}
       </>
     );
