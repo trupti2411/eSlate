@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, MessageSquare, Star, ChevronLeft, ChevronRight } from 'lucide-react';
+import { X, MessageSquare, Star, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { Canvas, FabricImage } from 'fabric';
 
 interface MarkedWorkViewerProps {
@@ -14,6 +14,22 @@ interface MarkedWorkViewerProps {
   onClose: () => void;
 }
 
+async function fetchAsBlobUrl(url: string): Promise<string> {
+  const resp = await fetch(url, { credentials: 'include' });
+  if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+  const blob = await resp.blob();
+  return URL.createObjectURL(blob);
+}
+
+function getNaturalSize(blobUrl: string): Promise<{ w: number; h: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+    img.onerror = () => reject(new Error('Could not read image dimensions'));
+    img.src = blobUrl;
+  });
+}
+
 export default function MarkedWorkViewer({
   fileUrls,
   reviewerAnnotations,
@@ -26,16 +42,17 @@ export default function MarkedWorkViewer({
 }: MarkedWorkViewerProps) {
   const canvasElRef = useRef<HTMLCanvasElement>(null);
   const fabricRef = useRef<Canvas | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const imageUrls = fileUrls.filter(u => u);
+  const imageUrls = fileUrls.filter(Boolean);
   const currentUrl = imageUrls[pageIndex];
 
   useEffect(() => {
-    if (!canvasElRef.current || !currentUrl) return;
+    if (!canvasElRef.current) return;
 
     let cancelled = false;
 
@@ -47,17 +64,25 @@ export default function MarkedWorkViewer({
         fabricRef.current.dispose();
         fabricRef.current = null;
       }
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+
+      if (!currentUrl) return;
 
       const container = containerRef.current;
-      const maxW = container ? container.clientWidth - 32 : 600;
-      const maxH = window.innerHeight * 0.55;
+      const maxW = Math.min((container ? container.clientWidth - 32 : 560), 700);
+      const maxH = Math.round(window.innerHeight * 0.52);
 
       try {
-        const img = await FabricImage.fromURL(currentUrl, { crossOrigin: 'anonymous' });
+        const blobUrl = await fetchAsBlobUrl(currentUrl);
+        if (cancelled) { URL.revokeObjectURL(blobUrl); return; }
+        blobUrlRef.current = blobUrl;
+
+        const { w: naturalW, h: naturalH } = await getNaturalSize(blobUrl);
         if (cancelled) return;
 
-        const naturalW = img.width ?? 800;
-        const naturalH = img.height ?? 600;
         const scale = Math.min(maxW / naturalW, maxH / naturalH, 1);
         const canvasW = Math.round(naturalW * scale);
         const canvasH = Math.round(naturalH * scale);
@@ -67,43 +92,44 @@ export default function MarkedWorkViewer({
           height: canvasH,
           selection: false,
           interactive: false,
+          renderOnAddRemove: false,
         });
         fabricRef.current = fc;
-
-        img.scaleToWidth(canvasW);
-        img.set({ left: 0, top: 0, selectable: false, evented: false });
-        fc.add(img);
-        fc.sendObjectToBack(img);
 
         if (reviewerAnnotations) {
           try {
             const parsed = JSON.parse(reviewerAnnotations);
-            const objects = parsed?.objects ?? [];
-            await fc.loadFromJSON({ version: parsed.version ?? '6.0.0', objects });
-            fc.getObjects().forEach(o => {
-              if (o !== img) {
-                o.set({ selectable: false, evented: false });
-                o.scale((o.scaleX ?? 1) * scale);
-                o.set({ left: (o.left ?? 0) * scale, top: (o.top ?? 0) * scale });
-              }
-            });
+            await fc.loadFromJSON({ version: parsed.version ?? '6.0.0', objects: parsed.objects ?? [] });
+            fc.getObjects().forEach(o => o.set({ selectable: false, evented: false }));
           } catch (_) {
           }
         }
 
+        const fabricImg = await FabricImage.fromURL(blobUrl);
+        if (cancelled) return;
+        fabricImg.scaleToWidth(canvasW);
+        fabricImg.set({ left: 0, top: 0, selectable: false, evented: false });
+        fc.add(fabricImg);
+        fc.sendObjectToBack(fabricImg);
         fc.renderAll();
+
         if (!cancelled) setImageLoaded(true);
       } catch (e) {
-        if (!cancelled) setError('Could not load the submitted image.');
+        if (!cancelled) setError('Could not load the submitted image. Please try again.');
       }
     };
 
     setup();
+
     return () => {
       cancelled = true;
       if (fabricRef.current) {
         fabricRef.current.dispose();
         fabricRef.current = null;
+      }
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
       }
     };
   }, [currentUrl, reviewerAnnotations]);
@@ -115,19 +141,21 @@ export default function MarkedWorkViewer({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div ref={containerRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+      <div ref={containerRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden">
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
-          <div>
-            <p className="font-bold text-gray-900 text-base leading-tight">{assignmentTitle}</p>
+          <div className="min-w-0 mr-3">
+            <p className="font-bold text-gray-900 text-base leading-tight truncate">{assignmentTitle}</p>
             <p className="text-xs text-gray-400 mt-0.5">
               {studentName && <span>{studentName} · </span>}
-              {gradedAt ? `Marked ${new Date(gradedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}` : 'Marked work'}
+              {gradedAt
+                ? `Marked ${new Date(gradedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                : 'Marked work'}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors">
+          <button onClick={onClose} className="p-2 rounded-xl hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0">
             <X size={20} />
           </button>
         </div>
@@ -140,31 +168,38 @@ export default function MarkedWorkViewer({
           </div>
         )}
 
-        {/* Canvas / image area */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 flex flex-col items-center gap-4 min-h-0">
+        {/* Body — scrollable */}
+        <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-4 min-h-0">
+
+          {/* Image / canvas area */}
           {imageUrls.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
-              <p className="text-sm">No submitted files to display.</p>
+            <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
+              <p className="text-sm font-medium">No submitted files to display.</p>
+              <p className="text-xs">This submission may have been text-only.</p>
             </div>
           ) : (
             <>
-              <div className="relative w-full flex justify-center">
+              <div className="relative flex justify-center">
                 {!imageLoaded && !error && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-xl">
-                    <div className="w-6 h-6 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                  <div className="absolute inset-0 flex items-center justify-center min-h-[180px] bg-gray-50 rounded-xl">
+                    <div className="w-7 h-7 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
                 {error && (
-                  <div className="flex items-center justify-center py-10 text-red-500 text-sm">{error}</div>
+                  <div className="flex items-center gap-2 py-10 text-red-500 text-sm">
+                    <AlertCircle size={16} /> {error}
+                  </div>
                 )}
-                <canvas
-                  ref={canvasElRef}
-                  className={`rounded-xl border border-gray-200 shadow-sm transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-                />
+                {!error && (
+                  <canvas
+                    ref={canvasElRef}
+                    className={`rounded-xl border border-gray-200 shadow-sm transition-opacity max-w-full ${imageLoaded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                  />
+                )}
               </div>
 
               {imageUrls.length > 1 && (
-                <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center gap-3">
                   <button
                     onClick={() => setPageIndex(i => Math.max(0, i - 1))}
                     disabled={pageIndex === 0}
@@ -172,7 +207,9 @@ export default function MarkedWorkViewer({
                   >
                     <ChevronLeft size={16} />
                   </button>
-                  <span className="text-xs text-gray-500 font-medium">Page {pageIndex + 1} of {imageUrls.length}</span>
+                  <span className="text-xs text-gray-500 font-medium">
+                    Page {pageIndex + 1} of {imageUrls.length}
+                  </span>
                   <button
                     onClick={() => setPageIndex(i => Math.min(imageUrls.length - 1, i + 1))}
                     disabled={pageIndex === imageUrls.length - 1}
@@ -185,23 +222,21 @@ export default function MarkedWorkViewer({
             </>
           )}
 
-          {/* Tutor feedback */}
-          {feedback && (
-            <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4">
+          {/* Tutor's comment */}
+          {feedback ? (
+            <div className="w-full bg-amber-50 border border-amber-200 rounded-xl p-4 flex-shrink-0">
               <div className="flex items-center gap-2 mb-2">
                 <MessageSquare size={14} className="text-amber-600" />
                 <p className="text-xs font-bold text-amber-700 uppercase tracking-wide">Tutor's Comment</p>
               </div>
               <p className="text-sm text-amber-900 leading-relaxed">{feedback}</p>
             </div>
-          )}
-
-          {!feedback && imageUrls.length > 0 && imageLoaded && (
-            <p className="text-xs text-gray-400 italic text-center">No written comment from your tutor yet.</p>
-          )}
+          ) : imageLoaded ? (
+            <p className="text-xs text-gray-400 italic text-center pb-2">No written comment from your tutor yet.</p>
+          ) : null}
         </div>
 
-        {/* Footer close */}
+        {/* Footer */}
         <div className="px-5 py-3 border-t border-gray-100 flex-shrink-0">
           <button
             onClick={onClose}
