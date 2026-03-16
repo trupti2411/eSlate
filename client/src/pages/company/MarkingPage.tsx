@@ -85,7 +85,7 @@ export function MarkingPage() {
   const [feedback, setFeedback] = useState('');
   const [gradedIds, setGradedIds] = useState<Set<string>>(new Set());
   const [lightboxOpen, setLightboxOpen] = useState(false);
-  const [aiCheckResult, setAiCheckResult] = useState<{
+  type AiResultData = {
     overallAssessment: string;
     whatIsCorrect: string[];
     whatIsIncorrect: string[];
@@ -93,7 +93,8 @@ export function MarkingPage() {
     suggestedNextSteps: string[];
     canFullyCheck: boolean;
     warnings?: string[];
-  } | null>(null);
+  };
+  const [aiCheckResults, setAiCheckResults] = useState<Map<string, AiResultData>>(new Map());
 
   const { data: allSubmissions = [], isLoading } = useQuery<SubmissionWithDetails[]>({
     queryKey: ['/api/company/submissions'],
@@ -128,11 +129,14 @@ export function MarkingPage() {
     gradeMutation.mutate({ id: current.id, score: Number(score), feedback });
   };
 
+  const aiCheckResult = current ? aiCheckResults.get(current.id) : undefined;
+  const aiChecked = current ? aiCheckResults.has(current.id) : false;
+
   const aiCheckMutation = useMutation({
     mutationFn: (submissionId: string) =>
       apiRequest(`/api/submissions/${submissionId}/ai-check`, 'POST', {}),
-    onSuccess: (data) => {
-      setAiCheckResult(data);
+    onSuccess: (data, submissionId) => {
+      setAiCheckResults(prev => new Map(prev).set(submissionId, data as AiResultData));
     },
     onError: (error: any) => {
       const isQuota = error?.message?.includes('quota');
@@ -148,7 +152,6 @@ export function MarkingPage() {
     setCurrentIndex(idx);
     setScore('');
     setFeedback('');
-    setAiCheckResult(null);
     setLightboxOpen(false);
   };
 
@@ -391,30 +394,27 @@ export function MarkingPage() {
                     <p className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1">
                       <Sparkles size={11} className="text-violet-500" /> AI Assignment Check
                     </p>
-                    {!aiCheckResult && (
+                    {!aiChecked && !aiCheckMutation.isPending && (
                       <button
                         onClick={() => current && aiCheckMutation.mutate(current.id)}
-                        disabled={aiCheckMutation.isPending}
-                        className="flex items-center gap-1.5 bg-violet-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors disabled:opacity-60"
+                        className="flex items-center gap-1.5 bg-violet-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors"
                       >
-                        {aiCheckMutation.isPending ? (
-                          <><Loader2 size={12} className="animate-spin" /> Checking…</>
-                        ) : (
-                          <><Sparkles size={12} /> Check with AI</>
-                        )}
+                        <Sparkles size={12} /> Check with AI
                       </button>
                     )}
-                    {aiCheckResult && (
-                      <button
-                        onClick={() => { setAiCheckResult(null); }}
-                        className="text-xs text-gray-400 hover:text-gray-600 font-semibold"
-                      >
-                        Clear
-                      </button>
+                    {aiCheckMutation.isPending && (
+                      <span className="flex items-center gap-1.5 bg-violet-50 text-violet-500 px-3 py-1.5 rounded-xl text-xs font-bold">
+                        <Loader2 size={12} className="animate-spin" /> Checking…
+                      </span>
+                    )}
+                    {aiChecked && !aiCheckMutation.isPending && (
+                      <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-green-200">
+                        <CheckCircle2 size={12} /> AI Checked
+                      </span>
                     )}
                   </div>
 
-                  {!aiCheckResult && !aiCheckMutation.isPending && (
+                  {!aiChecked && !aiCheckMutation.isPending && (
                     <p className="text-xs text-gray-400 italic">
                       Let AI read the assignment brief and the student's response to give you a detailed breakdown before you mark.
                     </p>

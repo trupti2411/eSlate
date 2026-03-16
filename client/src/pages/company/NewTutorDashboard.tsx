@@ -52,7 +52,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const [feedback, setFeedback] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [rollCall, setRollCall] = useState<Record<string, boolean | null>>({});
-  const [aiResult, setAiResult] = useState<{
+  type AiResultData = {
     overallAssessment: string;
     whatIsCorrect: string[];
     whatIsIncorrect: string[];
@@ -60,7 +60,10 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     suggestedNextSteps: string[];
     canFullyCheck: boolean;
     warnings?: string[];
-  } | null>(null);
+  };
+  const [aiResults, setAiResults] = useState<Map<string, AiResultData>>(new Map());
+  const aiResult = markingId ? aiResults.get(markingId) : undefined;
+  const aiChecked = markingId ? aiResults.has(markingId) : false;
 
   const { data: adminProfile } = useQuery<{ companyId?: string }>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -92,7 +95,6 @@ export default function NewTutorDashboard({ setDesign }: Props) {
       toast({ title: 'Feedback submitted', description: 'Student and parent have been notified.' });
       setMarkingId(null);
       setFeedback('');
-      setAiResult(null);
       setLightboxOpen(false);
     },
     onError: () => {
@@ -102,7 +104,9 @@ export default function NewTutorDashboard({ setDesign }: Props) {
 
   const aiMutation = useMutation({
     mutationFn: async (id: string) => apiRequest(`/api/submissions/${id}/ai-check`, 'POST', {}),
-    onSuccess: (data: any) => setAiResult(data),
+    onSuccess: (data: any, id: string) => {
+      setAiResults(prev => new Map(prev).set(id, data));
+    },
     onError: (error: any) => toast({
       title: 'AI check failed',
       description: error?.message?.includes('quota') ? 'The AI quota has been reached for today. Please try again later.' : (error?.message || 'Could not analyse this submission.'),
@@ -201,21 +205,27 @@ export default function NewTutorDashboard({ setDesign }: Props) {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">AI Assessment</p>
-                {!aiResult && (
+                {!aiChecked && !aiMutation.isPending && (
                   <button
                     onClick={() => aiMutation.mutate(markingId)}
-                    disabled={aiMutation.isPending}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold hover:bg-violet-200 disabled:opacity-50 transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold hover:bg-violet-200 transition-colors"
                   >
-                    {aiMutation.isPending ? <><Sparkles size={12} className="animate-spin" /> Checking…</> : <><Sparkles size={12} /> Check with AI</>}
+                    <Sparkles size={12} /> Check with AI
                   </button>
                 )}
-                {aiResult && (
-                  <button onClick={() => setAiResult(null)} className="text-xs text-gray-400 hover:text-gray-600">Clear</button>
+                {aiMutation.isPending && (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-500 text-xs font-bold">
+                    <Sparkles size={12} className="animate-spin" /> Checking…
+                  </span>
+                )}
+                {aiChecked && !aiMutation.isPending && (
+                  <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-200">
+                    <CheckCircle2 size={12} /> AI Checked
+                  </span>
                 )}
               </div>
 
-              {!aiResult && !aiMutation.isPending && (
+              {!aiChecked && !aiMutation.isPending && (
                 <p className="text-xs text-gray-400 italic">Tap "Check with AI" to get an instant assessment of this submission.</p>
               )}
               {aiMutation.isPending && (
@@ -306,7 +316,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 flex gap-3">
-          <button onClick={() => { setMarkingId(null); setAiResult(null); setLightboxOpen(false); }} className="flex-1 py-3 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-700">
+          <button onClick={() => { setMarkingId(null); setLightboxOpen(false); }} className="flex-1 py-3 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-700">
             Cancel
           </button>
           <button
@@ -332,6 +342,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
           onClose={() => setLightboxOpen(false)}
           onSaved={() => {
             setLightboxOpen(false);
+            queryClient.invalidateQueries({ queryKey: ['/api/tutor/submissions'] });
             toast({ title: 'Marks saved', description: 'Annotations have been saved to this submission.' });
           }}
         />
