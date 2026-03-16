@@ -69,24 +69,17 @@ interface ProgressInsightParams {
 
 class AIService {
   private model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-  private fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
   private async generateWithFallback(contentParts: any): Promise<string> {
     try {
       const result = await this.model.generateContent(contentParts);
       return result.response.text();
     } catch (err: any) {
       if (err?.status === 429) {
-        console.warn("gemini-2.0-flash quota exceeded, trying gemini-1.5-flash fallback");
-        try {
-          const fallback = await this.fallbackModel.generateContent(contentParts);
-          return fallback.response.text();
-        } catch (fallbackErr: any) {
-          if (fallbackErr?.status === 429) {
-            throw new Error("AI quota exceeded for today. The free tier limit has been reached. Please try again later or upgrade your Gemini API plan.");
-          }
-          throw fallbackErr;
-        }
+        // Extract retry delay if available
+        const retryInfo = err?.errorDetails?.find((d: any) => d['@type']?.includes('RetryInfo'));
+        const retryDelay = retryInfo?.retryDelay;
+        const retryMsg = retryDelay ? ` Please try again in ${retryDelay}.` : ' Please try again in a few minutes or tomorrow if the daily quota is exhausted.';
+        throw new Error(`AI quota reached.${retryMsg}`);
       }
       throw err;
     }
