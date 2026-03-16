@@ -2,17 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import * as fabricModule from 'fabric';
-const { fabric } = fabricModule as any;
-
-interface AnnotationMark {
-  id: string;
-  type: 'tick' | 'cross' | 'comment' | 'freehand';
-  x: number;
-  y: number;
-  text?: string;
-  fabricJSON?: any;
-}
+import { Canvas, FabricImage, FabricText, Rect, PencilBrush } from 'fabric';
 
 interface SubmissionAnnotatorProps {
   imageUrl: string;
@@ -36,8 +26,8 @@ export function SubmissionAnnotator({
   onSaved,
 }: SubmissionAnnotatorProps) {
   const { toast } = useToast();
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const fabricRef = useRef<any>(null);
+  const canvasElRef = useRef<HTMLCanvasElement>(null);
+  const fabricRef = useRef<Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const [activeTool, setActiveTool] = useState<Tool>('select');
@@ -50,112 +40,95 @@ export function SubmissionAnnotator({
   const activeToolRef = useRef<Tool>('select');
   activeToolRef.current = activeTool;
 
-  const initCanvas = useCallback((w: number, h: number) => {
-    if (!canvasRef.current) return;
-    if (fabricRef.current) {
-      fabricRef.current.dispose();
-      fabricRef.current = null;
-    }
-    const fc = new fabric.Canvas(canvasRef.current, {
-      width: w,
-      height: h,
-      selection: true,
-      isDrawingMode: false,
+  const setupCanvas = useCallback((fc: Canvas, w: number, h: number, imgSrc: string) => {
+    FabricImage.fromURL(imgSrc).then((fImg) => {
+      fImg.set({ left: 0, top: 0, scaleX: w / (fImg.width || w), scaleY: h / (fImg.height || h) });
+      fc.backgroundImage = fImg;
+      fc.renderAll();
+
+      if (existingAnnotations) {
+        try {
+          const parsed = JSON.parse(existingAnnotations);
+          if (parsed?.fabricJSON) {
+            fc.loadFromJSON(parsed.fabricJSON).then(() => fc.renderAll());
+          }
+        } catch {}
+      }
     });
-    fabricRef.current = fc;
 
-    fc.on('mouse:down', (opt: any) => {
+    fc.on('mouse:down', (opt) => {
       const tool = activeToolRef.current;
-      if (tool === 'select' || tool === 'freehand') return;
-      if (tool === 'comment') return;
-
-      const pointer = fc.getPointer(opt.e);
+      if (tool === 'select' || tool === 'freehand' || tool === 'comment') return;
+      const pointer = fc.getScenePoint(opt.e);
       if (tool === 'tick') {
-        const t = new fabric.Text('✓', {
-          left: pointer.x - 12,
-          top: pointer.y - 12,
-          fontSize: 28,
-          fill: '#16a34a',
-          selectable: true,
-          hasControls: false,
-          fontWeight: 'bold',
+        const t = new FabricText('✓', {
+          left: pointer.x - 12, top: pointer.y - 12,
+          fontSize: 32, fill: '#16a34a', selectable: true, hasControls: false, fontWeight: 'bold',
         });
         fc.add(t);
         fc.renderAll();
       } else if (tool === 'cross') {
-        const t = new fabric.Text('✗', {
-          left: pointer.x - 12,
-          top: pointer.y - 12,
-          fontSize: 28,
-          fill: '#dc2626',
-          selectable: true,
-          hasControls: false,
-          fontWeight: 'bold',
+        const t = new FabricText('✗', {
+          left: pointer.x - 12, top: pointer.y - 12,
+          fontSize: 32, fill: '#dc2626', selectable: true, hasControls: false, fontWeight: 'bold',
         });
         fc.add(t);
         fc.renderAll();
       }
     });
-
-    if (existingAnnotations) {
-      try {
-        const parsed = JSON.parse(existingAnnotations);
-        if (parsed && parsed.fabricJSON) {
-          fc.loadFromJSON(parsed.fabricJSON, () => {
-            fc.renderAll();
-          });
-        }
-      } catch {}
-    }
   }, [existingAnnotations]);
 
   useEffect(() => {
     const img = new Image();
-    img.crossOrigin = 'anonymous';
     img.onload = () => {
       const maxW = Math.min(window.innerWidth - 280, 1200);
       const maxH = window.innerHeight - 120;
-      let w = img.naturalWidth;
-      let h = img.naturalHeight;
-      if (w > maxW) { h = (h * maxW) / w; w = maxW; }
-      if (h > maxH) { w = (w * maxH) / h; h = maxH; }
-      w = Math.round(w);
-      h = Math.round(h);
+      let w = img.naturalWidth || 800;
+      let h = img.naturalHeight || 600;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
       setCanvasSize({ w, h });
       setImageLoaded(true);
 
       setTimeout(() => {
-        initCanvas(w, h);
-        if (!fabricRef.current) return;
-        fabric.Image.fromURL(img.src, (fImg: any) => {
-          fImg.scaleToWidth(w);
-          fImg.scaleToHeight(h);
-          fabricRef.current.setBackgroundImage(fImg, fabricRef.current.renderAll.bind(fabricRef.current));
-        }, { crossOrigin: 'anonymous' });
-      }, 50);
+        if (!canvasElRef.current) return;
+        if (fabricRef.current) { fabricRef.current.dispose(); }
+        const fc = new Canvas(canvasElRef.current, { width: w, height: h, selection: true });
+        fabricRef.current = fc;
+        setupCanvas(fc, w, h, img.src);
+      }, 60);
     };
     img.onerror = () => {
       setImageLoaded(true);
-      setTimeout(() => initCanvas(800, 600), 50);
+      setTimeout(() => {
+        if (!canvasElRef.current) return;
+        if (fabricRef.current) { fabricRef.current.dispose(); }
+        fabricRef.current = new Canvas(canvasElRef.current, { width: 800, height: 600 });
+      }, 60);
     };
     img.src = imageUrl;
-    return () => { if (fabricRef.current) { fabricRef.current.dispose(); fabricRef.current = null; } };
+
+    return () => {
+      if (fabricRef.current) { fabricRef.current.dispose(); fabricRef.current = null; }
+    };
   }, [imageUrl]);
 
   useEffect(() => {
-    if (!fabricRef.current) return;
     const fc = fabricRef.current;
+    if (!fc) return;
     if (activeTool === 'freehand') {
       fc.isDrawingMode = true;
-      fc.freeDrawingBrush.color = '#2563eb';
-      fc.freeDrawingBrush.width = 3;
+      const brush = new PencilBrush(fc);
+      brush.color = '#2563eb';
+      brush.width = 3;
+      fc.freeDrawingBrush = brush;
     } else {
       fc.isDrawingMode = false;
     }
     fc.selection = activeTool === 'select';
   }, [activeTool]);
 
-  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (activeTool !== 'comment') return;
     const rect = e.currentTarget.getBoundingClientRect();
     setPendingComment({ x: e.clientX - rect.left, y: e.clientY - rect.top });
@@ -163,46 +136,36 @@ export function SubmissionAnnotator({
 
   const handleAddComment = () => {
     if (!pendingComment || !commentText.trim() || !fabricRef.current) return;
-    const bg = new fabric.Rect({
-      left: pendingComment.x - 4,
-      top: pendingComment.y - 16,
-      width: Math.max(commentText.length * 8, 60),
-      height: 22,
-      fill: '#fef08a',
-      stroke: '#ca8a04',
-      strokeWidth: 1,
-      rx: 4,
-      ry: 4,
-      selectable: true,
-      hasControls: false,
+    const fc = fabricRef.current;
+    const text = commentText.trim();
+    const bg = new Rect({
+      left: pendingComment.x - 4, top: pendingComment.y - 18,
+      width: Math.max(text.length * 7.5, 60), height: 22,
+      fill: '#fef08a', stroke: '#ca8a04', strokeWidth: 1, rx: 4, ry: 4,
+      selectable: true, hasControls: false,
     });
-    const label = new fabric.Text(commentText.trim(), {
-      left: pendingComment.x,
-      top: pendingComment.y - 14,
-      fontSize: 13,
-      fill: '#713f12',
-      selectable: true,
-      hasControls: false,
+    const label = new FabricText(text, {
+      left: pendingComment.x, top: pendingComment.y - 16,
+      fontSize: 13, fill: '#713f12', selectable: true, hasControls: false,
     });
-    fabricRef.current.add(bg, label);
-    fabricRef.current.renderAll();
+    fc.add(bg, label);
+    fc.renderAll();
     setCommentText('');
     setPendingComment(null);
   };
 
   const handleUndo = () => {
-    if (!fabricRef.current) return;
-    const objects = fabricRef.current.getObjects();
-    if (objects.length > 0) {
-      fabricRef.current.remove(objects[objects.length - 1]);
-      fabricRef.current.renderAll();
-    }
+    const fc = fabricRef.current;
+    if (!fc) return;
+    const objs = fc.getObjects();
+    if (objs.length > 0) { fc.remove(objs[objs.length - 1]); fc.renderAll(); }
   };
 
   const handleClear = () => {
-    if (!fabricRef.current) return;
-    fabricRef.current.getObjects().forEach((o: any) => fabricRef.current.remove(o));
-    fabricRef.current.renderAll();
+    const fc = fabricRef.current;
+    if (!fc) return;
+    fc.remove(...fc.getObjects());
+    fc.renderAll();
   };
 
   const handleSave = async () => {
@@ -210,11 +173,10 @@ export function SubmissionAnnotator({
     setIsSaving(true);
     try {
       const fabricJSON = fabricRef.current.toJSON();
-      const payload = JSON.stringify({ fabricJSON });
       await apiRequest(`/api/submissions/${submissionId}/reviewer-annotations`, 'PATCH', {
-        reviewerAnnotations: payload,
+        reviewerAnnotations: JSON.stringify({ fabricJSON }),
       });
-      toast({ title: 'Annotations saved', description: 'Your marks have been saved to this submission.' });
+      toast({ title: 'Marks saved', description: 'Annotations saved to this submission.' });
       onSaved?.();
     } catch {
       toast({ title: 'Save failed', description: 'Could not save annotations. Try again.', variant: 'destructive' });
@@ -223,22 +185,23 @@ export function SubmissionAnnotator({
     }
   };
 
-  const tools: { key: Tool; label: string; icon: string; color: string; active: string }[] = [
-    { key: 'select', label: 'Select', icon: '↖', color: 'text-gray-700', active: 'bg-gray-200' },
-    { key: 'tick', label: 'Tick ✓', icon: '✓', color: 'text-green-700', active: 'bg-green-100 border-green-400' },
-    { key: 'cross', label: 'Cross ✗', icon: '✗', color: 'text-red-700', active: 'bg-red-100 border-red-400' },
-    { key: 'comment', label: 'Comment', icon: '💬', color: 'text-amber-700', active: 'bg-amber-100 border-amber-400' },
-    { key: 'freehand', label: 'Draw', icon: '✏️', color: 'text-blue-700', active: 'bg-blue-100 border-blue-400' },
+  const tools: { key: Tool; label: string; icon: string; textColor: string; activeCls: string }[] = [
+    { key: 'select',  label: 'Select',    icon: '↖',  textColor: 'text-gray-700',  activeCls: 'bg-gray-100 border-gray-400' },
+    { key: 'tick',    label: 'Tick ✓',    icon: '✓',  textColor: 'text-green-700', activeCls: 'bg-green-50 border-green-500' },
+    { key: 'cross',   label: 'Cross ✗',   icon: '✗',  textColor: 'text-red-700',   activeCls: 'bg-red-50 border-red-500' },
+    { key: 'comment', label: 'Comment',   icon: '💬', textColor: 'text-amber-700', activeCls: 'bg-amber-50 border-amber-500' },
+    { key: 'freehand',label: 'Draw',      icon: '✏️', textColor: 'text-blue-700',  activeCls: 'bg-blue-50 border-blue-500' },
   ];
 
   const content = (
-    <div className="fixed inset-0 z-[9999] bg-black/80 flex">
-      {/* Toolbar */}
+    <div className="fixed inset-0 z-[9999] bg-black/80 flex" onKeyDown={e => e.key === 'Escape' && onClose()}>
+      {/* Left toolbar */}
       <div className="w-56 bg-white border-r flex flex-col gap-3 p-4 flex-shrink-0 overflow-y-auto">
-        <div className="mb-1">
+        <div>
           <p className="font-black text-sm text-gray-900 truncate">{studentName || 'Student'}</p>
           <p className="text-xs text-gray-500 truncate">{assignmentTitle || 'Submission'}</p>
         </div>
+
         <div className="border-t pt-3">
           <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Tools</p>
           <div className="space-y-1.5">
@@ -248,11 +211,11 @@ export function SubmissionAnnotator({
                 onClick={() => { setActiveTool(t.key); setPendingComment(null); }}
                 className={`w-full flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm font-bold transition-all ${
                   activeTool === t.key
-                    ? `${t.active} border-current`
-                    : 'bg-white border-gray-200 hover:border-gray-300'
-                } ${t.color}`}
+                    ? `${t.activeCls} border-current`
+                    : 'bg-white border-gray-200 hover:border-gray-300 text-gray-700'
+                } ${activeTool === t.key ? t.textColor : ''}`}
               >
-                <span className="text-base w-5 text-center">{t.icon}</span>
+                <span className="text-base w-5 text-center leading-none">{t.icon}</span>
                 {t.label}
               </button>
             ))}
@@ -283,12 +246,12 @@ export function SubmissionAnnotator({
           </div>
         )}
 
-        <div className="border-t pt-3 space-y-1.5 mt-auto">
-          <button onClick={handleUndo} className="w-full py-2 text-xs font-bold border border-gray-200 rounded-xl hover:bg-gray-50">↩ Undo last</button>
+        <div className="border-t pt-3 space-y-1.5">
+          <button onClick={handleUndo} className="w-full py-2 text-xs font-bold border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700">↩ Undo last</button>
           <button onClick={handleClear} className="w-full py-2 text-xs font-bold border border-red-200 text-red-600 rounded-xl hover:bg-red-50">🗑 Clear all</button>
         </div>
 
-        <div className="space-y-1.5">
+        <div className="space-y-1.5 mt-auto">
           <button
             onClick={handleSave}
             disabled={isSaving}
@@ -296,7 +259,7 @@ export function SubmissionAnnotator({
           >
             {isSaving ? 'Saving…' : '💾 Save marks'}
           </button>
-          <button onClick={onClose} className="w-full py-2 text-xs font-bold border border-gray-200 rounded-xl hover:bg-gray-50">
+          <button onClick={onClose} className="w-full py-2 text-xs font-bold border border-gray-200 rounded-xl hover:bg-gray-50 text-gray-700">
             Close
           </button>
         </div>
@@ -304,26 +267,21 @@ export function SubmissionAnnotator({
 
       {/* Canvas area */}
       <div className="flex-1 overflow-auto bg-gray-900 flex items-start justify-center p-6">
-        <div
-          ref={containerRef}
-          className="relative shadow-2xl rounded-lg overflow-hidden"
+        <div ref={containerRef} className="relative shadow-2xl rounded-lg overflow-hidden bg-white"
           style={{ width: canvasSize.w, height: canvasSize.h }}
+          onClick={handleCanvasClick}
         >
           {!imageLoaded && (
-            <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
-              <p className="text-gray-500 text-sm">Loading…</p>
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-100 z-10">
+              <p className="text-gray-500 text-sm">Loading submission…</p>
             </div>
           )}
-          <canvas
-            ref={canvasRef}
-            onClick={handleCanvasClick}
-            style={{
-              cursor:
-                activeTool === 'tick' || activeTool === 'cross' ? 'crosshair' :
-                activeTool === 'comment' ? 'cell' :
-                activeTool === 'freehand' ? 'crosshair' : 'default',
-            }}
-          />
+          <canvas ref={canvasElRef} style={{
+            cursor:
+              activeTool === 'tick' || activeTool === 'cross' ? 'crosshair' :
+              activeTool === 'comment' ? 'cell' :
+              activeTool === 'freehand' ? 'crosshair' : 'default',
+          }} />
         </div>
       </div>
     </div>

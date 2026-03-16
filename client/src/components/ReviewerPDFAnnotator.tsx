@@ -20,8 +20,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import * as pdfjsLib from 'pdfjs-dist';
-import * as fabricModule from 'fabric';
-const { fabric } = fabricModule as any;
+import { Canvas as FabricCanvas, FabricText, Rect as FabricRect, Group as FabricGroup, PencilBrush } from 'fabric';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -75,7 +74,7 @@ function ReviewerPDFAnnotatorContent({
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pageCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
   const overlayCanvasRefs = useRef<Map<number, HTMLCanvasElement>>(new Map());
-  const fabricCanvasRefs = useRef<Map<number, fabric.Canvas>>(new Map());
+  const fabricCanvasRefs = useRef<Map<number, FabricCanvas>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -169,14 +168,11 @@ function ReviewerPDFAnnotatorContent({
         
         let fabricCanvas = fabricCanvasRefs.current.get(pageNum);
         if (!fabricCanvas) {
-          fabricCanvas = new fabric.Canvas(overlayCanvas, {
+          fabricCanvas = new FabricCanvas(overlayCanvas, {
             width: viewport.width,
             height: viewport.height,
             isDrawingMode: false,
-            preserveObjectStacking: true,
             selection: !isViewOnly,
-            allowTouchScrolling: false,
-            enablePointerEvents: true
           });
           fabricCanvasRefs.current.set(pageNum, fabricCanvas);
         } else {
@@ -210,16 +206,12 @@ function ReviewerPDFAnnotatorContent({
         fabricCanvas.selection = false;
       } else if (activeTool === 'freehand') {
         fabricCanvas.isDrawingMode = true;
-        fabricCanvas.freeDrawingBrush.color = '#FF0000';
-        fabricCanvas.freeDrawingBrush.width = 2;
+        const brush = new PencilBrush(fabricCanvas);
+        brush.color = '#FF0000';
+        brush.width = 2;
+        fabricCanvas.freeDrawingBrush = brush;
       } else {
         fabricCanvas.isDrawingMode = false;
-      }
-      
-      // Control pointer events on Fabric's wrapper to enable scrolling in navigate mode
-      const wrapper = fabricCanvas.wrapperEl;
-      if (wrapper) {
-        wrapper.style.pointerEvents = (activeTool || isViewOnly) ? 'auto' : 'none';
       }
     }
   }, [activeTool, isViewOnly]);
@@ -231,7 +223,7 @@ function ReviewerPDFAnnotatorContent({
       const pageAnnotations = annotations.filter(a => a.pageNum === pageNum);
       for (const annotation of pageAnnotations) {
         if (annotation.type === 'tick') {
-          const tick = new fabric.Text('✓', {
+          const tick = new FabricText('✓', {
             left: annotation.x,
             top: annotation.y,
             fontSize: 32,
@@ -243,7 +235,7 @@ function ReviewerPDFAnnotatorContent({
           });
           fabricCanvas.add(tick);
         } else if (annotation.type === 'cross') {
-          const cross = new fabric.Text('✗', {
+          const cross = new FabricText('✗', {
             left: annotation.x,
             top: annotation.y,
             fontSize: 32,
@@ -255,8 +247,8 @@ function ReviewerPDFAnnotatorContent({
           });
           fabricCanvas.add(cross);
         } else if (annotation.type === 'comment') {
-          const group = new fabric.Group([
-            new fabric.Rect({
+          const group = new FabricGroup([
+            new FabricRect({
               left: 0,
               top: 0,
               width: Math.max(150, (annotation.text?.length || 10) * 7),
@@ -267,7 +259,7 @@ function ReviewerPDFAnnotatorContent({
               rx: 4,
               ry: 4
             }),
-            new fabric.Text(annotation.text || '', {
+            new FabricText(annotation.text || '', {
               left: 8,
               top: 10,
               fontSize: 12,
@@ -283,8 +275,8 @@ function ReviewerPDFAnnotatorContent({
           });
           fabricCanvas.add(group);
         } else if (annotation.type === 'freehand' && annotation.fabricJSON) {
-          fabricCanvas.loadFromJSON(annotation.fabricJSON, () => {
-            fabricCanvas.renderAll();
+          fabricCanvas.loadFromJSON(annotation.fabricJSON).then(() => {
+            fabricCanvas!.renderAll();
           });
         }
       }
