@@ -1372,12 +1372,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const assignment = await storage.getAssignment(submission.assignmentId);
       if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
-      // Download any submitted files so Gemini can read them
+      // Download any submitted files so AI can read them
       const supportedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/gif', 'application/pdf'];
-      const fileUrls: string[] = Array.isArray(submission.fileUrls) ? submission.fileUrls as string[] : [];
       const downloadedFiles: { buffer: Buffer; mimeType: string }[] = [];
       const fileWarnings: string[] = [];
 
+      // Helper: download a file from object storage by UUID file ID
+      const downloadByFileId = async (fileId: string): Promise<{ buffer: Buffer; mimeType: string } | null> => {
+        try {
+          const svc = new ObjectStorageService();
+          const privateDir = svc.getPrivateObjectDir();
+          const objectPath = `${privateDir}/uploads/${fileId}`;
+          const pathParts = objectPath.split('/').filter((p: string) => p);
+          const bucketName = pathParts[0];
+          const objectName = pathParts.slice(1).join('/');
+          const bucket = objectStorageClient.bucket(bucketName);
+          const file = bucket.file(objectName);
+          const [exists] = await file.exists();
+          if (!exists) return null;
+          const [meta] = await file.getMetadata();
+          const mimeType = meta.contentType || 'image/png';
+          if (!supportedMimeTypes.includes(mimeType)) {
+            fileWarnings.push(`One file (${mimeType}) could not be read by AI — only images and PDFs are supported.`);
+            return null;
+          }
+          const [buffer] = await file.download();
+          return { buffer, mimeType };
+        } catch (e) {
+          console.warn('Could not download file for AI check:', fileId, e);
+          fileWarnings.push('One submitted file could not be accessed — it may have been deleted or is temporarily unavailable.');
+          return null;
+        }
+      };
+
+      // 1. Check document_url (PDF annotator submissions store the annotated image here)
+      const documentUrl = (submission as any).documentUrl || (submission as any).document_url;
+      if (documentUrl && !documentUrl.startsWith('http')) {
+        // It's a UUID file ID
+        const downloaded = await downloadByFileId(documentUrl);
+        if (downloaded) downloadedFiles.push(downloaded);
+      }
+
+      // 2. Check file_urls array (direct upload submissions)
+      const fileUrls: string[] = Array.isArray(submission.fileUrls) ? submission.fileUrls as string[] : [];
       for (const fileUrl of fileUrls) {
         try {
           let file: any;
@@ -1389,6 +1426,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (match) {
               file = objectStorageClient.bucket(match[1]).file(match[2]);
             }
+          } else if (!fileUrl.startsWith('http')) {
+            // Treat as UUID file ID
+            const downloaded = await downloadByFileId(fileUrl);
+            if (downloaded) downloadedFiles.push(downloaded);
+            continue;
           }
           if (file) {
             const [meta] = await file.getMetadata();
@@ -1405,6 +1447,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           fileWarnings.push('One submitted file could not be accessed — it may have been deleted or is temporarily unavailable.');
         }
       }
+
+      console.log(`AI check: found ${downloadedFiles.length} file(s) to analyse for submission ${submissionId}`);
 
       const result = await aiService.checkAssignment({
         assignmentTitle: assignment.title,
