@@ -6,7 +6,8 @@ import { useToast } from '@/hooks/use-toast';
 import {
   ArrowLeft, CheckCircle, FileText, Eye,
   ChevronLeft, ChevronRight, User, BookOpen, Clock, MessageSquare,
-  Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb, Loader2
+  Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb, Loader2,
+  Maximize2, X, ZoomIn, PenLine
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useMultipleFileMetadata, getDisplayFilename } from '@/hooks/useFileMetadata';
@@ -20,6 +21,8 @@ interface SubmissionWithDetails {
   feedback: string | null;
   submittedAt: string | null;
   fileUrls: string[] | null;
+  documentUrl: string | null;
+  annotations: string | null;
   content: string | null;
   parentComment: string | null;
   parentCommentAt: string | null;
@@ -79,6 +82,7 @@ export function MarkingPage() {
   const [score, setScore] = useState<number | ''>('');
   const [feedback, setFeedback] = useState('');
   const [gradedIds, setGradedIds] = useState<Set<string>>(new Set());
+  const [lightboxOpen, setLightboxOpen] = useState(false);
   const [aiCheckResult, setAiCheckResult] = useState<{
     overallAssessment: string;
     whatIsCorrect: string[];
@@ -143,6 +147,7 @@ export function MarkingPage() {
     setScore('');
     setFeedback('');
     setAiCheckResult(null);
+    setLightboxOpen(false);
   };
 
   const goBack = () => navigate('/company/homework');
@@ -310,6 +315,40 @@ export function MarkingPage() {
                   <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
                     <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Assignment brief</p>
                     <p className="text-sm text-gray-700 leading-relaxed">{current.assignment.description}</p>
+                  </div>
+                )}
+
+                {/* Annotated submission (PDF annotator) */}
+                {current.documentUrl && (
+                  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <p className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1.5">
+                        <PenLine size={11} className="text-teal-500" /> Student's annotated work
+                      </p>
+                      <button
+                        onClick={() => setLightboxOpen(true)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-teal-600 hover:text-teal-700 bg-teal-50 hover:bg-teal-100 px-2.5 py-1.5 rounded-lg transition-colors"
+                      >
+                        <Maximize2 size={12} /> View full size
+                      </button>
+                    </div>
+                    <div
+                      className="relative cursor-zoom-in group"
+                      onClick={() => setLightboxOpen(true)}
+                    >
+                      <img
+                        src={`/api/files/${current.documentUrl}`}
+                        alt="Student's annotated submission"
+                        className="w-full object-contain max-h-96 bg-gray-50"
+                        style={{ imageRendering: 'crisp-edges' }}
+                      />
+                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors flex items-center justify-center">
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 rounded-xl px-3 py-2 flex items-center gap-2 shadow-lg">
+                          <ZoomIn size={14} className="text-gray-700" />
+                          <span className="text-xs font-bold text-gray-700">Click to zoom in</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 )}
 
@@ -565,6 +604,59 @@ export function MarkingPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Full-screen lightbox for annotated submission */}
+      {lightboxOpen && current?.documentUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/90 flex flex-col"
+          onClick={() => setLightboxOpen(false)}
+        >
+          {/* Header bar */}
+          <div
+            className="flex items-center justify-between px-4 py-3 bg-black/60 flex-shrink-0"
+            onClick={e => e.stopPropagation()}
+          >
+            <div>
+              <p className="text-white font-bold text-sm">
+                {current.student.user.firstName} {current.student.user.lastName}
+              </p>
+              <p className="text-white/60 text-xs">{current.assignment.title}</p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={e => { e.stopPropagation(); aiCheckMutation.mutate(current.id); setLightboxOpen(false); }}
+                disabled={aiCheckMutation.isPending}
+                className="flex items-center gap-1.5 bg-violet-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors disabled:opacity-60"
+              >
+                <Sparkles size={12} /> Check with AI
+              </button>
+              <button
+                onClick={() => setLightboxOpen(false)}
+                className="w-9 h-9 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <X size={18} className="text-white" />
+              </button>
+            </div>
+          </div>
+
+          {/* Scrollable image */}
+          <div
+            className="flex-1 overflow-auto flex items-start justify-center p-4"
+            onClick={e => e.stopPropagation()}
+          >
+            <img
+              src={`/api/files/${current.documentUrl}`}
+              alt="Student's annotated submission — full size"
+              className="max-w-full h-auto rounded-lg shadow-2xl"
+              style={{ imageRendering: 'crisp-edges', minWidth: '320px' }}
+            />
+          </div>
+
+          <p className="text-white/40 text-xs text-center pb-3 flex-shrink-0">
+            Tap outside or press ✕ to close
+          </p>
         </div>
       )}
     </div>
