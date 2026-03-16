@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import {
   Calendar, ClipboardList, MessageCircle, Bell, LogOut,
   Check, X, Users, ChevronRight, Award, ThumbsUp, ChevronLeft,
+  Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb,
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 
@@ -45,6 +46,14 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const [grade, setGrade] = useState('');
   const [feedback, setFeedback] = useState('');
   const [rollCall, setRollCall] = useState<Record<string, boolean | null>>({});
+  const [aiResult, setAiResult] = useState<{
+    overallAssessment: string;
+    whatIsCorrect: string[];
+    whatIsIncorrect: string[];
+    whatIsMissing: string[];
+    suggestedNextSteps: string[];
+    warnings?: string[];
+  } | null>(null);
 
   const { data: adminProfile } = useQuery<{ companyId?: string }>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -77,10 +86,17 @@ export default function NewTutorDashboard({ setDesign }: Props) {
       setMarkingId(null);
       setGrade('');
       setFeedback('');
+      setAiResult(null);
     },
     onError: () => {
       toast({ title: 'Error', description: 'Failed to submit grade.', variant: 'destructive' });
     },
+  });
+
+  const aiMutation = useMutation({
+    mutationFn: async (id: string) => apiRequest(`/api/submissions/${id}/ai-check`, 'POST', {}),
+    onSuccess: (data: any) => setAiResult(data),
+    onError: () => toast({ title: 'AI check failed', description: 'Could not analyse this submission.', variant: 'destructive' }),
   });
 
   const tabs: { key: Tab; label: string; icon: typeof Calendar }[] = [
@@ -134,6 +150,81 @@ export default function NewTutorDashboard({ setDesign }: Props) {
               </div>
             </div>
 
+            {/* AI Check */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">AI Assessment</p>
+                {!aiResult && (
+                  <button
+                    onClick={() => aiMutation.mutate(markingId)}
+                    disabled={aiMutation.isPending}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold hover:bg-violet-200 disabled:opacity-50 transition-colors"
+                  >
+                    {aiMutation.isPending ? <><Sparkles size={12} className="animate-spin" /> Checking…</> : <><Sparkles size={12} /> Check with AI</>}
+                  </button>
+                )}
+                {aiResult && (
+                  <button onClick={() => setAiResult(null)} className="text-xs text-gray-400 hover:text-gray-600">Clear</button>
+                )}
+              </div>
+
+              {!aiResult && !aiMutation.isPending && (
+                <p className="text-xs text-gray-400 italic">Tap "Check with AI" to get an instant assessment of this submission.</p>
+              )}
+              {aiMutation.isPending && (
+                <p className="text-xs text-violet-500 italic">Gemini is reading the submission…</p>
+              )}
+
+              {aiResult && (
+                <div className="space-y-3">
+                  <div className="bg-violet-50 border border-violet-200 rounded-xl p-3">
+                    <p className="text-xs font-bold text-violet-700 mb-1">Overall</p>
+                    <p className="text-sm text-violet-900 leading-relaxed">{aiResult.overallAssessment}</p>
+                  </div>
+
+                  {aiResult.warnings && aiResult.warnings.length > 0 && aiResult.warnings.map((w, i) => (
+                    <div key={i} className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                      <AlertTriangle size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800">{w}</p>
+                    </div>
+                  ))}
+
+                  {aiResult.whatIsCorrect.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-green-700 flex items-center gap-1 mb-1"><CheckCircle2 size={12} /> Correct</p>
+                      <ul className="space-y-1">{aiResult.whatIsCorrect.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-gray-700"><span className="text-green-500 flex-shrink-0">✓</span>{item}</li>
+                      ))}</ul>
+                    </div>
+                  )}
+                  {aiResult.whatIsIncorrect.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-red-700 flex items-center gap-1 mb-1"><XCircle size={12} /> Incorrect</p>
+                      <ul className="space-y-1">{aiResult.whatIsIncorrect.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-gray-700"><span className="text-red-500 flex-shrink-0">✗</span>{item}</li>
+                      ))}</ul>
+                    </div>
+                  )}
+                  {aiResult.whatIsMissing.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-amber-700 flex items-center gap-1 mb-1"><AlertTriangle size={12} /> Missing</p>
+                      <ul className="space-y-1">{aiResult.whatIsMissing.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-gray-700"><span className="text-amber-500 flex-shrink-0">⚠</span>{item}</li>
+                      ))}</ul>
+                    </div>
+                  )}
+                  {aiResult.suggestedNextSteps.length > 0 && (
+                    <div>
+                      <p className="text-xs font-bold text-blue-700 flex items-center gap-1 mb-1"><Lightbulb size={12} /> Next steps</p>
+                      <ul className="space-y-1">{aiResult.suggestedNextSteps.map((item, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-gray-700"><span className="text-blue-500 flex-shrink-0">→</span>{item}</li>
+                      ))}</ul>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
             {/* Grade picker */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Mark out of 20</p>
@@ -177,7 +268,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
         </div>
 
         <div className="sticky bottom-0 bg-white border-t border-gray-100 px-4 py-3 flex gap-3">
-          <button onClick={() => setMarkingId(null)} className="flex-1 py-3 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-700">
+          <button onClick={() => { setMarkingId(null); setAiResult(null); }} className="flex-1 py-3 rounded-xl border-2 border-gray-200 font-bold text-sm text-gray-700">
             Cancel
           </button>
           <button

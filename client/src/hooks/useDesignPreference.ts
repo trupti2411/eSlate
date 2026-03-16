@@ -4,7 +4,7 @@ export type Design = 'classic' | 'new';
 
 export function useDesignPreference() {
   const [design, setDesignState] = useState<Design>(() => {
-    return (localStorage.getItem('eslate_design') as Design) || 'classic';
+    return (localStorage.getItem('eslate_design') as Design) || 'new';
   });
 
   const [bannerSeen, setBannerSeenState] = useState<boolean>(() => {
