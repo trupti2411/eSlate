@@ -84,6 +84,22 @@ class AIService {
     return res.choices[0]?.message?.content || "";
   }
 
+  private async callGroqVision(textPrompt: string, images: { mimeType: string; data: string }[]): Promise<string> {
+    if (!groqClient) throw new Error("Groq not configured");
+    const content: any[] = images.map(img => ({
+      type: "image_url",
+      image_url: { url: `data:${img.mimeType};base64,${img.data}` },
+    }));
+    content.push({ type: "text", text: textPrompt });
+    const res = await groqClient.chat.completions.create({
+      model: "llama-3.2-11b-vision-preview",
+      messages: [{ role: "user", content }],
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+    return res.choices[0]?.message?.content || "";
+  }
+
   private isQuotaError(err: any): boolean {
     return err?.status === 429 || err?.statusText === "Too Many Requests";
   }
