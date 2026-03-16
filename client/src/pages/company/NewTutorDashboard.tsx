@@ -96,7 +96,11 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const aiMutation = useMutation({
     mutationFn: async (id: string) => apiRequest(`/api/submissions/${id}/ai-check`, 'POST', {}),
     onSuccess: (data: any) => setAiResult(data),
-    onError: () => toast({ title: 'AI check failed', description: 'Could not analyse this submission.', variant: 'destructive' }),
+    onError: (error: any) => toast({
+      title: 'AI check failed',
+      description: error?.message?.includes('quota') ? 'The AI quota has been reached for today. Please try again later.' : (error?.message || 'Could not analyse this submission.'),
+      variant: 'destructive',
+    }),
   });
 
   const tabs: { key: Tab; label: string; icon: typeof Calendar }[] = [

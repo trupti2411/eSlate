@@ -69,6 +69,28 @@ interface ProgressInsightParams {
 
 class AIService {
   private model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+  private fallbackModel = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+  private async generateWithFallback(contentParts: any): Promise<string> {
+    try {
+      const result = await this.model.generateContent(contentParts);
+      return result.response.text();
+    } catch (err: any) {
+      if (err?.status === 429) {
+        console.warn("gemini-2.0-flash quota exceeded, trying gemini-1.5-flash fallback");
+        try {
+          const fallback = await this.fallbackModel.generateContent(contentParts);
+          return fallback.response.text();
+        } catch (fallbackErr: any) {
+          if (fallbackErr?.status === 429) {
+            throw new Error("AI quota exceeded for today. The free tier limit has been reached. Please try again later or upgrade your Gemini API plan.");
+          }
+          throw fallbackErr;
+        }
+      }
+      throw err;
+    }
+  }
 
   private safeParseJSON<T>(response: string, type: 'array' | 'object'): T {
     try {
@@ -359,8 +381,7 @@ Be specific and reference the actual content of the student's work. If the submi
         }
       }
 
-      const result = await this.model.generateContent(contentParts);
-      const response = result.response.text();
+      const response = await this.generateWithFallback(contentParts);
 
       const check = this.safeParseJSON<{
         overallAssessment: string;
@@ -380,7 +401,8 @@ Be specific and reference the actual content of the student's work. If the submi
       };
     } catch (error: any) {
       console.error("Error checking assignment:", error);
-      throw new Error(error.message || "Failed to check assignment. Please try again.");
+      const msg = error.message || "Failed to check assignment. Please try again.";
+      throw new Error(msg);
     }
   }
 

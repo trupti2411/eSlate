@@ -128,8 +128,13 @@ export function MarkingPage() {
     onSuccess: (data) => {
       setAiCheckResult(data);
     },
-    onError: () => {
-      toast({ title: 'AI check failed', description: 'Could not analyse this submission. Please try again.', variant: 'destructive' });
+    onError: (error: any) => {
+      const isQuota = error?.message?.includes('quota');
+      toast({
+        title: 'AI check failed',
+        description: isQuota ? 'The AI quota has been reached for today. Please try again later.' : (error?.message || 'Could not analyse this submission. Please try again.'),
+        variant: 'destructive',
+      });
     },
   });
 
