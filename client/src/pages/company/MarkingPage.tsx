@@ -388,11 +388,20 @@ export function MarkingPage() {
 
                   {aiCheckResult && (
                     <div className="space-y-3">
+                      {!aiCheckResult.canFullyCheck && (
+                        <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded-xl p-3">
+                          <AlertTriangle size={14} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-amber-800 font-medium">AI quota temporarily reached — files in this submission could not be analysed. The assessment below may not reflect the student's actual work. Try again in a few minutes.</p>
+                        </div>
+                      )}
+
                       {/* Overall */}
+                      {aiCheckResult.canFullyCheck && (
                       <div className="bg-violet-50 border border-violet-200 rounded-xl p-3">
                         <p className="text-xs font-bold text-violet-700 mb-1">Overall Assessment</p>
                         <p className="text-sm text-violet-900 leading-relaxed">{aiCheckResult.overallAssessment}</p>
                       </div>
+                      )}
 
                       {aiCheckResult.warnings && aiCheckResult.warnings.length > 0 && (
                         <div className="space-y-1.5">

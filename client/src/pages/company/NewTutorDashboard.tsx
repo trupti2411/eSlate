@@ -52,6 +52,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     whatIsIncorrect: string[];
     whatIsMissing: string[];
     suggestedNextSteps: string[];
+    canFullyCheck: boolean;
     warnings?: string[];
   } | null>(null);
 
@@ -181,10 +182,19 @@ export default function NewTutorDashboard({ setDesign }: Props) {
 
               {aiResult && (
                 <div className="space-y-3">
+                  {!aiResult.canFullyCheck && (
+                    <div className="flex items-start gap-2 bg-amber-50 border border-amber-300 rounded-xl p-3">
+                      <AlertTriangle size={13} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-amber-800 font-medium">AI quota temporarily reached — files could not be analysed. This assessment does not reflect the student's actual work. Try again in a few minutes.</p>
+                    </div>
+                  )}
+
+                  {aiResult.canFullyCheck && (
                   <div className="bg-violet-50 border border-violet-200 rounded-xl p-3">
                     <p className="text-xs font-bold text-violet-700 mb-1">Overall</p>
                     <p className="text-sm text-violet-900 leading-relaxed">{aiResult.overallAssessment}</p>
                   </div>
+                  )}
 
                   {aiResult.warnings && aiResult.warnings.length > 0 && aiResult.warnings.map((w, i) => (
                     <div key={i} className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl p-3">

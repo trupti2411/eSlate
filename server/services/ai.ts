@@ -109,22 +109,23 @@ class AIService {
     }
   }
 
-  // For multimodal calls (text + optional images) — falls back to Groq text-only
+  // For multimodal calls (text + optional images) — falls back to Groq only if no images
   private async generateWithFallback(contentParts: any): Promise<string> {
     try {
       const result = await this.model.generateContent(contentParts);
       return result.response.text();
     } catch (err: any) {
       if (this.isQuotaError(err)) {
+        const parts = Array.isArray(contentParts) ? contentParts : [contentParts];
+        const hasImages = parts.some((p: any) => p.inlineData);
+        if (hasImages) {
+          // Cannot safely fall back to Groq when files are involved — it would give false results
+          throw new Error("AI_QUOTA_WITH_FILES");
+        }
         if (groqClient) {
-          const parts = Array.isArray(contentParts) ? contentParts : [contentParts];
           const textOnly = parts.filter((p: any) => p.text).map((p: any) => p.text).join("\n\n");
-          const hasImages = parts.some((p: any) => p.inlineData);
-          const prompt = hasImages
-            ? `${textOnly}\n\n[Note: The student submitted file(s) that cannot be read in fallback mode. Base your assessment on the assignment description and any text content provided.]`
-            : textOnly;
-          console.log("Gemini quota exceeded — switching to Groq fallback" + (hasImages ? " (image analysis skipped)" : ""));
-          return this.callGroq(prompt);
+          console.log("Gemini quota exceeded — switching to Groq fallback (text only)");
+          return this.callGroq(textOnly);
         }
         throw new Error(this.quotaErrorMessage());
       }
@@ -438,6 +439,17 @@ Be specific and reference the actual content of the student's work. If the submi
       };
     } catch (error: any) {
       console.error("Error checking assignment:", error);
+      if (error.message === "AI_QUOTA_WITH_FILES") {
+        // Gemini quota hit and submission has files — can't safely use text-only fallback
+        return {
+          overallAssessment: "The AI quota is temporarily reached and this submission contains uploaded files that require visual analysis to assess. The assessment below is unavailable until the quota resets (usually within minutes, or at midnight Pacific time). Please try again shortly.",
+          whatIsCorrect: [],
+          whatIsIncorrect: [],
+          whatIsMissing: [],
+          suggestedNextSteps: ["Try running the AI check again in a few minutes when the quota resets."],
+          canFullyCheck: false,
+        };
+      }
       const msg = error.message || "Failed to check assignment. Please try again.";
       throw new Error(msg);
     }
