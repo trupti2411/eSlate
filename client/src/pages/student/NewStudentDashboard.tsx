@@ -6,10 +6,11 @@ import type { Design } from '@/hooks/useDesignPreference';
 import { isPast, format, differenceInDays } from 'date-fns';
 import {
   CheckSquare, BookOpen, BarChart2, Bell, LogOut,
-  AlertCircle, Clock, ChevronRight, Check,
+  AlertCircle, Clock, ChevronRight, Check, Eye,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import type { Assignment, Submission, Class } from '@shared/schema';
+import MarkedWorkViewer from '@/components/MarkedWorkViewer';
 
 interface Props { setDesign: (d: Design) => void; }
 
@@ -25,6 +26,7 @@ export default function NewStudentDashboard({ setDesign }: Props) {
   const { user, logoutMutation } = useAuth();
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<Tab>('homework');
+  const [viewerSub, setViewerSub] = useState<any | null>(null);
 
   const { data: studentProfile } = useQuery({
     queryKey: ['/api/auth/student-profile'],
@@ -84,6 +86,7 @@ export default function NewStudentDashboard({ setDesign }: Props) {
     navigate(a.kind === 'worksheet' ? `/student/worksheet/${a.id}` : `/student/assignment/${a.id}`);
 
   return (
+    <>
     <div className="h-screen flex overflow-hidden bg-gray-50">
 
       {/* ── Sidebar (md+) ── */}
@@ -379,27 +382,42 @@ export default function NewStudentDashboard({ setDesign }: Props) {
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {submissions
-                      .filter((s: any) => s.status === 'graded' && s.score !== null)
+                      .filter((s: any) => s.status === 'graded' || s.status === 'parent_verified')
                       .map((s: any) => {
                         const assignment = allWork.find(a => a.id === s.assignmentId);
+                        const hasMarkedWork = (s.fileUrls?.length > 0) || s.reviewerAnnotations || s.feedback;
                         return (
                           <div key={s.id} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm">
                             <div className="flex items-start gap-3">
                               <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center text-2xl flex-shrink-0">🎯</div>
-                              <div className="flex-1">
-                                <p className="font-bold text-gray-900">{assignment?.title || 'Assignment'}</p>
-                                {s.gradedAt && <p className="text-xs text-gray-400">Graded {format(new Date(s.gradedAt), 'd MMM yyyy')}</p>}
-                                {s.feedback && <p className="text-sm text-gray-600 mt-2 italic">"{s.feedback}"</p>}
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-gray-900 leading-tight">{assignment?.title || 'Assignment'}</p>
+                                {s.gradedAt && <p className="text-xs text-gray-400 mt-0.5">Graded {format(new Date(s.gradedAt), 'd MMM yyyy')}</p>}
+                                {s.feedback && <p className="text-sm text-gray-600 mt-2 italic line-clamp-2">"{s.feedback}"</p>}
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="text-2xl font-black text-indigo-700">{s.score}</p>
-                                <p className="text-xs text-gray-400">/{s.maxScore || 20}</p>
+                                {s.score !== null && s.score !== undefined ? (
+                                  <>
+                                    <p className="text-2xl font-black text-indigo-700">{s.score}</p>
+                                    <p className="text-xs text-gray-400">/{s.maxScore || 20}</p>
+                                  </>
+                                ) : (
+                                  <span className="text-xs bg-green-100 text-green-700 font-bold px-2 py-0.5 rounded-full">Marked</span>
+                                )}
                               </div>
                             </div>
+                            {hasMarkedWork && (
+                              <button
+                                onClick={() => setViewerSub({ ...s, assignmentTitle: assignment?.title || 'Assignment' })}
+                                className="mt-3 w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-indigo-50 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors border border-indigo-100"
+                              >
+                                <Eye size={13} /> View Marked Work
+                              </button>
+                            )}
                           </div>
                         );
                       })}
-                    {submissions.filter((s: any) => s.status === 'graded' && s.score !== null).length === 0 && (
+                    {submissions.filter((s: any) => s.status === 'graded' || s.status === 'parent_verified').length === 0 && (
                       <div className="col-span-2 text-center py-16">
                         <div className="text-4xl mb-3">⏳</div>
                         <p className="font-bold text-gray-800">Waiting for marks</p>
@@ -414,5 +432,19 @@ export default function NewStudentDashboard({ setDesign }: Props) {
         </div>
       </div>
     </div>
+
+    {viewerSub && (
+      <MarkedWorkViewer
+        submissionId={viewerSub.id}
+        fileUrls={viewerSub.fileUrls ?? []}
+        reviewerAnnotations={viewerSub.reviewerAnnotations}
+        feedback={viewerSub.feedback}
+        score={viewerSub.score}
+        assignmentTitle={viewerSub.assignmentTitle}
+        gradedAt={viewerSub.gradedAt}
+        onClose={() => setViewerSub(null)}
+      />
+    )}
+    </>
   );
 }

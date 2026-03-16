@@ -7,11 +7,12 @@ import { isPast, format } from 'date-fns';
 import {
   Users, CheckSquare, MessageCircle, Bell, LogOut, AlertCircle,
   ChevronDown, ChevronUp, MessageSquare, Star, Clock, CheckCircle2,
-  BookOpen, Send
+  BookOpen, Send, Eye
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import MarkedWorkViewer from '@/components/MarkedWorkViewer';
 
 interface Props { setDesign: (d: Design) => void; }
 type Tab = 'children' | 'homework' | 'messages';
@@ -25,6 +26,7 @@ interface Submission {
   feedback: string | null;
   gradedAt: string | null;
   fileUrls: string[];
+  reviewerAnnotations: string | null;
   parentComment: string | null;
   parentCommentAt: string | null;
 }
@@ -63,6 +65,7 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState(a.submission?.parentComment ?? '');
   const [editing, setEditing] = useState(false);
+  const [showViewer, setShowViewer] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -196,6 +199,30 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
                 <p className="text-sm text-indigo-900 leading-relaxed">{a.submission.feedback}</p>
               )}
             </div>
+          )}
+
+          {/* View marked work */}
+          {isGraded && a.submission && ((a.submission.fileUrls?.length > 0) || a.submission.reviewerAnnotations || a.submission.feedback) && (
+            <button
+              onClick={() => setShowViewer(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold hover:bg-rose-100 transition-colors border border-rose-100"
+            >
+              <Eye size={13} /> View Marked Work
+            </button>
+          )}
+
+          {showViewer && a.submission && (
+            <MarkedWorkViewer
+              submissionId={a.submission.id}
+              fileUrls={a.submission.fileUrls ?? []}
+              reviewerAnnotations={a.submission.reviewerAnnotations}
+              feedback={a.submission.feedback}
+              score={a.submission.score}
+              assignmentTitle={a.title}
+              studentName={childName}
+              gradedAt={a.submission.gradedAt}
+              onClose={() => setShowViewer(false)}
+            />
           )}
 
           {/* Parent comment — only if submitted */}
