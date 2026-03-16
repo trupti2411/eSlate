@@ -1,10 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { GoogleAIFileManager } from "@google/generative-ai/server";
+import Groq from "groq-sdk";
 import * as fs from 'fs';
 import * as path from 'path';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "");
 const fileManager = new GoogleAIFileManager(process.env.GEMINI_API_KEY || "");
+const groqClient = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
+const GROQ_MODEL = "llama-3.3-70b-versatile";
 
 interface QuestionGenerationParams {
   subject: string;
@@ -69,17 +72,61 @@ interface ProgressInsightParams {
 
 class AIService {
   private model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  private async callGroq(prompt: string): Promise<string> {
+    if (!groqClient) throw new Error("Groq not configured");
+    const res = await groqClient.chat.completions.create({
+      model: GROQ_MODEL,
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+      max_tokens: 2048,
+    });
+    return res.choices[0]?.message?.content || "";
+  }
+
+  private isQuotaError(err: any): boolean {
+    return err?.status === 429 || err?.statusText === "Too Many Requests";
+  }
+
+  private quotaErrorMessage(): string {
+    return "AI quota reached. Please try again in a few minutes or tomorrow if the daily limit is exhausted.";
+  }
+
+  // For text-only AI calls — falls back to Groq automatically
+  private async generateText(prompt: string): Promise<string> {
+    try {
+      const result = await this.model.generateContent(prompt);
+      return result.response.text();
+    } catch (err: any) {
+      if (this.isQuotaError(err)) {
+        if (groqClient) {
+          console.log("Gemini quota exceeded — switching to Groq fallback");
+          return this.callGroq(prompt);
+        }
+        throw new Error(this.quotaErrorMessage());
+      }
+      throw err;
+    }
+  }
+
+  // For multimodal calls (text + optional images) — falls back to Groq text-only
   private async generateWithFallback(contentParts: any): Promise<string> {
     try {
       const result = await this.model.generateContent(contentParts);
       return result.response.text();
     } catch (err: any) {
-      if (err?.status === 429) {
-        // Extract retry delay if available
-        const retryInfo = err?.errorDetails?.find((d: any) => d['@type']?.includes('RetryInfo'));
-        const retryDelay = retryInfo?.retryDelay;
-        const retryMsg = retryDelay ? ` Please try again in ${retryDelay}.` : ' Please try again in a few minutes or tomorrow if the daily quota is exhausted.';
-        throw new Error(`AI quota reached.${retryMsg}`);
+      if (this.isQuotaError(err)) {
+        if (groqClient) {
+          const parts = Array.isArray(contentParts) ? contentParts : [contentParts];
+          const textOnly = parts.filter((p: any) => p.text).map((p: any) => p.text).join("\n\n");
+          const hasImages = parts.some((p: any) => p.inlineData);
+          const prompt = hasImages
+            ? `${textOnly}\n\n[Note: The student submitted file(s) that cannot be read in fallback mode. Base your assessment on the assignment description and any text content provided.]`
+            : textOnly;
+          console.log("Gemini quota exceeded — switching to Groq fallback" + (hasImages ? " (image analysis skipped)" : ""));
+          return this.callGroq(prompt);
+        }
+        throw new Error(this.quotaErrorMessage());
       }
       throw err;
     }
@@ -130,8 +177,7 @@ Return the response as a JSON array with this exact structure (no markdown, just
 Generate exactly ${params.count} questions covering different aspects of ${params.topic}.`;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text();
+      const response = await this.generateText(prompt);
       
       const questions = this.safeParseJSON<GeneratedQuestion[]>(response, 'array');
       
@@ -180,8 +226,7 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
 }`;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text();
+      const response = await this.generateText(prompt);
       
       const grading = this.safeParseJSON<GradingResult>(response, 'object');
       
@@ -224,8 +269,8 @@ IMPORTANT RULES:
 Provide your hint as a plain text response (no JSON, no formatting):`;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      return result.response.text().trim();
+      const response = await this.generateText(prompt);
+      return response.trim();
     } catch (error) {
       console.error("Error generating hint:", error);
       throw new Error("Failed to generate hint. Please try again.");
@@ -266,8 +311,7 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
 }`;
 
     try {
-      const result = await this.model.generateContent(prompt);
-      const response = result.response.text();
+      const response = await this.generateText(prompt);
       
       const insights = this.safeParseJSON<{
         summary: string;
@@ -300,8 +344,8 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
     };
 
     try {
-      const result = await this.model.generateContent(prompts[contentType]);
-      return result.response.text().trim();
+      const response = await this.generateText(prompts[contentType]);
+      return response.trim();
     } catch (error) {
       console.error("Error enhancing content:", error);
       throw new Error("Failed to enhance content. Please try again.");

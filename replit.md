@@ -83,8 +83,11 @@ The platform includes comprehensive security hardening:
 - **Audit Logging**: All mutating API calls (POST/PATCH/PUT/DELETE) logged to `audit_logs` table with userId, action, IP address, user agent, status, and timestamp. Login/logout events explicitly logged. Viewable by admins at GET `/api/admin/audit-logs`.
 - **Security Files**: `server/security.ts` contains rate limiting, CSRF, security headers, and audit logging middleware.
 
-## AI Features (Powered by Google Gemini)
-The platform includes AI-powered features using Google Gemini (free tier) to enhance the learning experience:
+## AI Features (Gemini + Groq Dual-Engine)
+The platform uses Google Gemini as primary AI with Groq (LLaMA 3.3 70B) as automatic fallback when Gemini's free-tier quota is reached:
+- **Primary**: `gemini-2.0-flash` via `GEMINI_API_KEY` — supports multimodal (images, PDFs)
+- **Fallback**: `llama-3.3-70b-versatile` on Groq via `GROQ_API_KEY` — text-only, 14,400 req/day free
+- All AI methods use `generateText()` helper for text calls, `generateWithFallback()` for multimodal; both auto-switch to Groq on 429 errors
 - **AI Assignment Check** (Tutors): Full assignment review — reads the brief + student response and returns what's correct, incorrect, missing, and suggested next steps. Button in MarkingPage. API: `POST /api/submissions/:id/ai-check`. Implemented in `server/services/ai.ts` (`checkAssignment` method).
 - **AI Question Generator** (Tutors): Generate multiple questions at once in WorksheetEditor
 - **AI Grading Assistant** (Tutors): Get draft feedback and scoring suggestions for essay/short-answer questions
