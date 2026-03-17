@@ -42,7 +42,25 @@ function parseAnnotations(raw: string): { version: string; objects: any[] } | nu
   }
 }
 
+async function resolveDocumentUrl(
+  submissionId: string,
+  documentUrl: string | null | undefined,
+  fileUrls: string[],
+): Promise<string | null> {
+  if (fileUrls.filter(Boolean).length > 0) return null;
+  if (documentUrl) return documentUrl;
+  try {
+    const resp = await fetch(`/api/submissions/${submissionId}/review`, { credentials: 'include' });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.documentUrl ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function MarkedWorkViewer({
+  submissionId,
   fileUrls,
   documentUrl,
   reviewerAnnotations,
@@ -59,12 +77,30 @@ export default function MarkedWorkViewer({
   const [pageIndex, setPageIndex] = useState(0);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(true);
+  const [resolvedUrl, setResolvedUrl] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const fileList = (fileUrls ?? []).filter(Boolean);
-  const docApiUrl = documentUrl ? `/api/files/${documentUrl}` : null;
-  const allUrls: string[] = fileList.length > 0 ? fileList : docApiUrl ? [docApiUrl] : [];
+  const allUrls: string[] = fileList.length > 0
+    ? fileList
+    : resolvedUrl
+    ? [`/api/files/${resolvedUrl}`]
+    : [];
   const currentUrl = allUrls[pageIndex] ?? null;
+
+  useEffect(() => {
+    let cancelled = false;
+    setResolving(true);
+    setResolvedUrl(null);
+    resolveDocumentUrl(submissionId, documentUrl, fileList).then(url => {
+      if (!cancelled) {
+        setResolvedUrl(url);
+        setResolving(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [submissionId, documentUrl]);
 
   useEffect(() => {
     if (!canvasElRef.current) return;
@@ -142,6 +178,8 @@ export default function MarkedWorkViewer({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
+  const showingNoWork = !resolving && allUrls.length === 0;
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3"
@@ -177,10 +215,14 @@ export default function MarkedWorkViewer({
         <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-4 min-h-0">
 
           {/* Image / canvas */}
-          {allUrls.length === 0 ? (
+          {resolving ? (
+            <div className="flex items-center justify-center min-h-[180px]">
+              <div className="w-7 h-7 border-2 border-indigo-300 border-t-indigo-600 rounded-full animate-spin" />
+            </div>
+          ) : showingNoWork ? (
             <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
               <p className="text-sm font-medium">No submitted work to display.</p>
-              <p className="text-xs">This submission may have been completed digitally within the platform.</p>
+              <p className="text-xs">The file may not be available.</p>
             </div>
           ) : (
             <>
