@@ -10,13 +10,14 @@ import {
   Calendar, ClipboardList, MessageCircle, Bell, LogOut,
   Check, X, Users, ChevronRight, Award, ThumbsUp, ChevronLeft,
   Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb,
-  PenLine, Maximize2, ZoomIn,
+  PenLine, Maximize2, ZoomIn, Eye, BookCheck,
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 import { SubmissionAnnotator } from '@/components/SubmissionAnnotator';
+import MarkedWorkViewer from '@/components/MarkedWorkViewer';
 
 interface Props { setDesign: (d: Design) => void; }
-type Tab = 'today' | 'marking' | 'students' | 'messages';
+type Tab = 'today' | 'marking' | 'marked' | 'students' | 'messages';
 
 interface Submission {
   id: string;
@@ -32,8 +33,10 @@ interface Submission {
   documentUrl?: string | null;
   reviewerAnnotations?: string | null;
   content?: string;
+  gradeLevel?: string | null;
   student?: { user: { firstName: string | null; lastName: string | null } };
   assignment?: { title: string; description?: string };
+  class?: { id: string; name: string; description?: string | null };
 }
 
 interface Student {
@@ -52,6 +55,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const [feedback, setFeedback] = useState('');
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [rollCall, setRollCall] = useState<Record<string, boolean | null>>({});
+  const [viewingMarkedId, setViewingMarkedId] = useState<string | null>(null);
   type AiResultData = {
     overallAssessment: string;
     whatIsCorrect: string[];
@@ -117,6 +121,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const tabs: { key: Tab; label: string; icon: typeof Calendar }[] = [
     { key: 'today', label: 'Today', icon: Calendar },
     { key: 'marking', label: 'To Mark', icon: ClipboardList },
+    { key: 'marked', label: 'Marked', icon: BookCheck },
     { key: 'students', label: 'Students', icon: Users },
     { key: 'messages', label: 'Messages', icon: MessageCircle },
   ];
@@ -469,18 +474,25 @@ export default function NewTutorDashboard({ setDesign }: Props) {
               )}
 
               {/* Recent grading */}
-              {graded.slice(0, 3).map(s => (
-                <div key={s.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
-                    <Award size={18} className="text-green-600" />
+              {graded.slice(0, 3).map(s => {
+                const sName = s.student?.user
+                  ? `${s.student.user.firstName || ''} ${s.student.user.lastName || ''}`.trim()
+                  : s.studentName || 'Student';
+                return (
+                  <div key={s.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                      <Award size={18} className="text-green-600" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm text-gray-900 truncate">{sName}</p>
+                      <p className="text-xs text-gray-500">
+                        {s.assignment?.title || 'Assignment'} · {s.submittedAt ? format(new Date(s.submittedAt), 'd MMM') : ''}
+                      </p>
+                    </div>
+                    <span className="text-xs font-bold px-2 py-1 rounded-full bg-green-100 text-green-700 border border-green-200">Marked</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-sm text-gray-900 truncate">{s.studentName || 'Student'}</p>
-                    <p className="text-xs text-gray-500">Graded {s.score}/20 · {s.submittedAt ? format(new Date(s.submittedAt), 'd MMM') : ''}</p>
-                  </div>
-                  <span className="text-lg font-black text-green-600">{s.score}</span>
-                </div>
-              ))}
+                );
+              })}
             </>
           )}
 
@@ -524,6 +536,92 @@ export default function NewTutorDashboard({ setDesign }: Props) {
               )}
             </>
           )}
+
+          {/* MARKED */}
+          {tab === 'marked' && (() => {
+            if (subLoading) return (
+              <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}</div>
+            );
+            if (graded.length === 0) return (
+              <div className="text-center py-12">
+                <div className="text-4xl mb-3">📋</div>
+                <p className="font-bold text-gray-800">No marked work yet</p>
+                <p className="text-sm text-gray-500 mt-1">Assignments you've marked will appear here.</p>
+              </div>
+            );
+
+            // Group: gradeLevel → classDescription → className (term)
+            const grouped: Record<string, Record<string, Record<string, Submission[]>>> = {};
+            for (const s of graded) {
+              const year = s.gradeLevel || 'Other';
+              const cls = s.class?.description || s.class?.name || 'Class';
+              const term = s.class?.name || 'Term';
+              if (!grouped[year]) grouped[year] = {};
+              if (!grouped[year][cls]) grouped[year][cls] = {};
+              if (!grouped[year][cls][term]) grouped[year][cls][term] = [];
+              grouped[year][cls][term].push(s);
+            }
+
+            return (
+              <div className="space-y-6">
+                {Object.entries(grouped).sort(([a],[b]) => a.localeCompare(b)).map(([year, classes]) => (
+                  <div key={year}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-px flex-1 bg-gray-200" />
+                      <span className="text-xs font-black uppercase tracking-widest text-gray-500 px-2">{year}</span>
+                      <div className="h-px flex-1 bg-gray-200" />
+                    </div>
+                    <div className="space-y-4">
+                      {Object.entries(classes).map(([cls, terms]) => (
+                        <div key={cls} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                          <div className="px-4 py-2.5 bg-teal-50 border-b border-teal-100">
+                            <p className="text-xs font-bold text-teal-800">{cls}</p>
+                          </div>
+                          {Object.entries(terms).sort(([a],[b]) => a.localeCompare(b)).map(([term, subs]) => (
+                            <div key={term}>
+                              <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
+                                <p className="text-xs font-semibold text-gray-500">{term}</p>
+                              </div>
+                              <div className="divide-y divide-gray-50">
+                                {subs.map(s => {
+                                  const sName = s.student?.user
+                                    ? `${s.student.user.firstName || ''} ${s.student.user.lastName || ''}`.trim()
+                                    : 'Student';
+                                  const assignTitle = s.assignment?.title || 'Assignment';
+                                  const dateStr = s.submittedAt ? format(new Date(s.submittedAt), 'd MMM yyyy') : '';
+                                  return (
+                                    <div key={s.id} className="px-4 py-3 flex items-center gap-3">
+                                      <div className="w-9 h-9 rounded-full bg-teal-100 flex items-center justify-center text-sm font-bold text-teal-700 flex-shrink-0">
+                                        {sName.charAt(0).toUpperCase()}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-bold text-sm text-gray-900 truncate">{sName}</p>
+                                        <p className="text-xs text-gray-500 truncate">{assignTitle}</p>
+                                        {dateStr && <p className="text-xs text-gray-400">{dateStr}</p>}
+                                        {s.feedback && <p className="text-xs text-teal-700 mt-0.5 italic truncate">"{s.feedback}"</p>}
+                                      </div>
+                                      {s.documentUrl && (
+                                        <button
+                                          onClick={() => setViewingMarkedId(s.id)}
+                                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl bg-teal-50 text-teal-700 border border-teal-200 hover:bg-teal-100 transition-colors flex-shrink-0"
+                                        >
+                                          <Eye size={12} /> View
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* STUDENTS */}
           {tab === 'students' && (
@@ -571,6 +669,27 @@ export default function NewTutorDashboard({ setDesign }: Props) {
           )}
         </div>
       </div>
+
+      {/* Marked Work Viewer modal */}
+      {viewingMarkedId && (() => {
+        const vs = graded.find(s => s.id === viewingMarkedId);
+        if (!vs) return null;
+        const vsName = vs.student?.user
+          ? `${vs.student.user.firstName || ''} ${vs.student.user.lastName || ''}`.trim()
+          : 'Student';
+        return (
+          <MarkedWorkViewer
+            submissionId={viewingMarkedId}
+            fileUrls={vs.fileUrls ?? []}
+            documentUrl={vs.documentUrl ?? null}
+            reviewerAnnotations={vs.reviewerAnnotations ?? null}
+            studentName={vsName}
+            assignmentTitle={vs.assignment?.title || 'Assignment'}
+            feedback={vs.feedback ?? null}
+            onClose={() => setViewingMarkedId(null)}
+          />
+        );
+      })()}
     </div>
   );
 }

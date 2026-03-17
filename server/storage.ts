@@ -2048,7 +2048,10 @@ export class DatabaseStorage implements IStorage {
           a.subject as assignment_subject,
           a.attachment_urls as assignment_attachment_urls,
           a.class_id,
-          c.name as class_name
+          c.name as class_name,
+          c.description as class_description,
+          st.grade_level,
+          s.reviewer_annotations
         FROM submissions s
         INNER JOIN students st ON s.student_id = st.id
         INNER JOIN users u ON st.user_id = u.id
@@ -2099,9 +2102,12 @@ export class DatabaseStorage implements IStorage {
           subject: row.assignment_subject,
           attachmentUrls: row.assignment_attachment_urls || [],
         },
+        reviewerAnnotations: row.reviewer_annotations || null,
+        gradeLevel: row.grade_level || null,
         class: {
           id: row.class_id,
           name: row.class_name,
+          description: row.class_description || null,
         }
       }));
     } catch (error) {
