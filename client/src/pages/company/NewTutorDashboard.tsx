@@ -11,13 +11,15 @@ import {
   Check, X, Users, ChevronRight, Award, ThumbsUp, ChevronLeft,
   Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb,
   PenLine, Maximize2, ZoomIn, Eye, BookCheck, BellRing, SendHorizontal,
+  Plus, CalendarDays, ClipboardPlus,
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 import { SubmissionAnnotator } from '@/components/SubmissionAnnotator';
 import MarkedWorkViewer from '@/components/MarkedWorkViewer';
+import { TutorCalendarDashboard } from '@/components/calendar';
 
 interface Props { setDesign: (d: Design) => void; }
-type Tab = 'today' | 'marking' | 'marked' | 'students' | 'messages';
+type Tab = 'today' | 'marking' | 'marked' | 'students' | 'assign' | 'calendar' | 'messages';
 
 interface Submission {
   id: string;
@@ -108,6 +110,35 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     enabled: !!user,
   });
 
+  interface ClassItem { id: string; name: string; description: string | null; gradeLevel: string | null; }
+  const { data: classes = [] } = useQuery<ClassItem[]>({
+    queryKey: [`/api/companies/${companyId}/classes`],
+    enabled: !!companyId,
+  });
+
+  const [assignForm, setAssignForm] = useState({
+    title: '', subject: '', classId: '', submissionDate: '', description: '', instructions: '',
+  });
+  const [assignSuccess, setAssignSuccess] = useState(false);
+
+  const createAssignmentMutation = useMutation({
+    mutationFn: (data: typeof assignForm) =>
+      apiRequest('/api/assignments', 'POST', {
+        ...data,
+        createdBy: user?.id,
+        isActive: true,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/tutor/incomplete-homework'] });
+      setAssignForm({ title: '', subject: '', classId: '', submissionDate: '', description: '', instructions: '' });
+      setAssignSuccess(true);
+      setTimeout(() => setAssignSuccess(false), 3000);
+      toast({ title: 'Assignment created', description: 'Students in the class will see it immediately.' });
+    },
+    onError: (e: Error) => toast({ title: 'Error', description: e.message || 'Failed to create assignment', variant: 'destructive' }),
+  });
+
   const [remindedStudents, setRemindedStudents] = useState<Set<string>>(new Set());
   const [expandedIncomplete, setExpandedIncomplete] = useState<Set<string>>(new Set());
   const toggleIncomplete = (uid: string) =>
@@ -160,6 +191,8 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     { key: 'marking', label: 'To Mark', icon: ClipboardList },
     { key: 'marked', label: 'Marked', icon: BookCheck },
     { key: 'students', label: 'Students', icon: Users },
+    { key: 'assign', label: 'Assign', icon: ClipboardPlus },
+    { key: 'calendar', label: 'Calendar', icon: CalendarDays },
     { key: 'messages', label: 'Messages', icon: MessageCircle },
   ];
 
@@ -417,12 +450,12 @@ export default function NewTutorDashboard({ setDesign }: Props) {
               </button>
             </div>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-1 overflow-x-auto scrollbar-none">
             {tabs.map(t => (
               <button
                 key={t.key}
                 onClick={() => setTab(t.key)}
-                className={`flex items-center gap-2 px-3 py-2.5 text-sm font-bold rounded-t-xl transition-all ${
+                className={`flex items-center gap-2 px-3 py-2.5 text-sm font-bold rounded-t-xl transition-all whitespace-nowrap flex-shrink-0 ${
                   tab === t.key ? 'bg-gray-50 text-teal-700' : 'text-teal-200 hover:text-white hover:bg-white/10'
                 }`}
               >
@@ -790,6 +823,136 @@ export default function NewTutorDashboard({ setDesign }: Props) {
                 </>
               )}
             </>
+          )}
+
+          {/* ASSIGN */}
+          {tab === 'assign' && (
+            <div className="space-y-4">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 px-1 flex items-center gap-1.5">
+                <Plus size={12} /> New Assignment
+              </p>
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                {assignSuccess && (
+                  <div className="flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm font-medium">
+                    <CheckCircle2 size={16} /> Assignment created successfully!
+                  </div>
+                )}
+
+                {/* Title */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">Title <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    value={assignForm.title}
+                    onChange={e => setAssignForm(f => ({ ...f, title: e.target.value }))}
+                    placeholder="e.g. Week 5 Maths Worksheet"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                </div>
+
+                {/* Subject + Class side by side */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Subject <span className="text-red-500">*</span></label>
+                    <input
+                      type="text"
+                      value={assignForm.subject}
+                      onChange={e => setAssignForm(f => ({ ...f, subject: e.target.value }))}
+                      placeholder="e.g. Maths"
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1.5">Class <span className="text-red-500">*</span></label>
+                    <select
+                      value={assignForm.classId}
+                      onChange={e => setAssignForm(f => ({ ...f, classId: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                    >
+                      <option value="">Select class…</option>
+                      {classes.map((c: ClassItem) => (
+                        <option key={c.id} value={c.id}>
+                          {c.description || c.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Due date */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">Due Date <span className="text-red-500">*</span></label>
+                  <input
+                    type="datetime-local"
+                    value={assignForm.submissionDate}
+                    onChange={e => setAssignForm(f => ({ ...f, submissionDate: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+                  />
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">Description</label>
+                  <textarea
+                    value={assignForm.description}
+                    onChange={e => setAssignForm(f => ({ ...f, description: e.target.value }))}
+                    placeholder="Brief description of the assignment…"
+                    rows={2}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
+                  />
+                </div>
+
+                {/* Instructions */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">Instructions</label>
+                  <textarea
+                    value={assignForm.instructions}
+                    onChange={e => setAssignForm(f => ({ ...f, instructions: e.target.value }))}
+                    placeholder="Step-by-step instructions for students…"
+                    rows={3}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400 resize-none"
+                  />
+                </div>
+
+                <button
+                  disabled={!assignForm.title || !assignForm.subject || !assignForm.classId || !assignForm.submissionDate || createAssignmentMutation.isPending}
+                  onClick={() => createAssignmentMutation.mutate(assignForm)}
+                  className="w-full bg-teal-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-sm"
+                >
+                  {createAssignmentMutation.isPending ? (
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Plus size={16} />
+                  )}
+                  {createAssignmentMutation.isPending ? 'Creating…' : 'Create Assignment'}
+                </button>
+              </div>
+
+              {/* Recent assignments */}
+              {assignments.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400 px-1">Recent Assignments</p>
+                  {assignments.slice(0, 5).map((a: any) => (
+                    <div key={a.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 shadow-sm">
+                      <div className="w-9 h-9 rounded-xl bg-teal-50 flex items-center justify-center flex-shrink-0">
+                        <ClipboardList size={16} className="text-teal-600" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{a.title}</p>
+                        <p className="text-xs text-gray-400">{a.subject} · Due {a.submissionDate ? format(new Date(a.submissionDate), 'd MMM') : '—'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* CALENDAR */}
+          {tab === 'calendar' && (
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden -mx-4">
+              <TutorCalendarDashboard />
+            </div>
           )}
 
           {/* MESSAGES */}
