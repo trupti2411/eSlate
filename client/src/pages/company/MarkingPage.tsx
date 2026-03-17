@@ -103,6 +103,11 @@ export function MarkingPage() {
   const pending = allSubmissions.filter(s => s.status === 'submitted' && !gradedIds.has(s.id));
   const current = pending[currentIndex] || null;
 
+  // Derive AI check result: prefer in-memory (just fetched) over stored DB value
+  const storedAiResult = current && (current as any).aiCheckResult
+    ? (() => { try { return JSON.parse((current as any).aiCheckResult); } catch { return null; } })()
+    : null;
+
   const gradeMutation = useMutation({
     mutationFn: ({ id, score, feedback }: { id: string; score: number; feedback: string }) =>
       apiRequest(`/api/company/submissions/${id}/grade`, 'PATCH', { score, feedback }),
@@ -129,14 +134,19 @@ export function MarkingPage() {
     gradeMutation.mutate({ id: current.id, score: Number(score), feedback });
   };
 
-  const aiCheckResult = current ? aiCheckResults.get(current.id) : undefined;
-  const aiChecked = current ? aiCheckResults.has(current.id) : false;
+  // In-memory result (from this session) takes priority; fall back to DB-stored result
+  const aiCheckResult = current
+    ? (aiCheckResults.get(current.id) || storedAiResult || undefined)
+    : undefined;
+  const aiChecked = !!aiCheckResult;
 
   const aiCheckMutation = useMutation({
     mutationFn: (submissionId: string) =>
       apiRequest(`/api/submissions/${submissionId}/ai-check`, 'POST', {}),
     onSuccess: (data, submissionId) => {
       setAiCheckResults(prev => new Map(prev).set(submissionId, data as AiResultData));
+      // Invalidate so the stored result is reflected on next load
+      queryClient.invalidateQueries({ queryKey: ['/api/company/submissions'] });
     },
     onError: (error: any) => {
       const isQuota = error?.message?.includes('quota');
@@ -409,7 +419,7 @@ export function MarkingPage() {
                     )}
                     {aiChecked && !aiCheckMutation.isPending && (
                       <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-green-200">
-                        <CheckCircle2 size={12} /> AI Checked
+                        <CheckCircle2 size={12} /> {storedAiResult && !aiCheckResults.has(current?.id ?? '') ? 'Previously checked' : 'AI Checked'}
                       </span>
                     )}
                   </div>

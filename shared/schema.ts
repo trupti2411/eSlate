@@ -209,6 +209,8 @@ export const submissions = pgTable("submissions", {
   annotations: text("annotations"), // JSON string of student annotations (pen strokes, text, highlights)
   gradedBy: varchar("graded_by").references(() => users.id), // Who graded this submission
   gradedAt: timestamp("graded_at"), // When it was graded
+  // AI check result (stored after first check to prevent re-runs)
+  aiCheckResult: text("ai_check_result"), // JSON string of AI assessment result
   // Parent feedback on the submission
   parentComment: text("parent_comment"), // Parent's comment/feedback visible to tutor
   parentCommentAt: timestamp("parent_comment_at"), // When parent left the comment

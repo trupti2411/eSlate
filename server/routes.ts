@@ -1369,6 +1369,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const submission = await storage.getSubmission(submissionId);
       if (!submission) return res.status(404).json({ message: "Submission not found" });
 
+      // Return cached result if already checked — prevents duplicate API costs
+      if ((submission as any).aiCheckResult) {
+        try {
+          const cached = JSON.parse((submission as any).aiCheckResult);
+          return res.json({ ...cached, cached: true });
+        } catch { /* fall through to re-run if JSON is corrupt */ }
+      }
+
       const assignment = await storage.getAssignment(submission.assignmentId);
       if (!assignment) return res.status(404).json({ message: "Assignment not found" });
 
@@ -1458,6 +1466,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         studentContent: (submission as any).content || (submission as any).textResponse || undefined,
         files: downloadedFiles.length > 0 ? downloadedFiles : undefined,
       });
+
+      // Persist result so page refreshes don't cost another API call
+      try {
+        const toStore = { ...result, warnings: fileWarnings };
+        await storage.updateSubmission(submissionId, { aiCheckResult: JSON.stringify(toStore) } as any);
+      } catch (e) {
+        console.warn('Could not persist AI check result:', e);
+      }
 
       res.json({ ...result, warnings: fileWarnings });
     } catch (error: any) {
