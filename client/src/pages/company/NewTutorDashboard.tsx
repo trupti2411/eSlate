@@ -109,6 +109,13 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   });
 
   const [remindedStudents, setRemindedStudents] = useState<Set<string>>(new Set());
+  const [expandedIncomplete, setExpandedIncomplete] = useState<Set<string>>(new Set());
+  const toggleIncomplete = (uid: string) =>
+    setExpandedIncomplete(prev => {
+      const next = new Set(Array.from(prev));
+      next.has(uid) ? next.delete(uid) : next.add(uid);
+      return next;
+    });
 
   const remindMutation = useMutation({
     mutationFn: async ({ studentUserId, studentAssignments }: { studentUserId: string; studentAssignments: { title: string }[] }) =>
@@ -673,44 +680,64 @@ export default function NewTutorDashboard({ setDesign }: Props) {
                     </p>
                     {Array.from(byStudent.values()).map(({ studentName, studentUserId, items }) => {
                       const reminded = remindedStudents.has(studentUserId);
+                      const expanded = expandedIncomplete.has(studentUserId);
                       return (
                         <div key={studentUserId} className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
-                          <div className="px-4 py-3 flex items-center gap-3 border-b border-red-50">
+                          {/* Tappable header row */}
+                          <button
+                            onClick={() => toggleIncomplete(studentUserId)}
+                            className="w-full px-4 py-3 flex items-center gap-3 text-left"
+                          >
                             <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-sm font-bold text-red-700 flex-shrink-0">
                               {studentName.charAt(0).toUpperCase()}
                             </div>
-                            <p className="flex-1 font-bold text-sm text-gray-900">{studentName}</p>
-                            <button
-                              disabled={reminded || remindMutation.isPending}
-                              onClick={() => remindMutation.mutate({
-                                studentUserId,
-                                studentAssignments: items.map((i: IncompleteItem) => ({ title: i.assignmentTitle })),
-                              })}
-                              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex-shrink-0 ${
-                                reminded
-                                  ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
-                                  : 'bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50'
-                              }`}
-                            >
-                              {reminded ? <><CheckCircle2 size={12} /> Sent</> : <><SendHorizontal size={12} /> Remind</>}
-                            </button>
-                          </div>
-                          <div className="divide-y divide-gray-50">
-                            {items.map((item: IncompleteItem) => (
-                              <div key={item.assignmentId} className="px-4 py-2.5 flex items-center gap-3">
-                                <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0 ml-0.5" />
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm text-gray-800 truncate">{item.assignmentTitle}</p>
-                                  <p className="text-xs text-gray-400">
-                                    Due {item.submissionDate ? format(new Date(item.submissionDate), 'd MMM yyyy') : '—'} · {item.className}
-                                  </p>
-                                </div>
-                                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 flex-shrink-0">
-                                  {item.status === 'draft' ? 'Draft' : 'Missing'}
-                                </span>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-gray-900">{studentName}</p>
+                              <p className="text-xs text-gray-400">{items.length} assignment{items.length !== 1 ? 's' : ''} missing</p>
+                            </div>
+                            <ChevronRight
+                              size={16}
+                              className={`text-gray-400 flex-shrink-0 transition-transform duration-200 ${expanded ? 'rotate-90' : ''}`}
+                            />
+                          </button>
+
+                          {/* Collapsible assignment list + remind button */}
+                          {expanded && (
+                            <>
+                              <div className="divide-y divide-gray-50 border-t border-red-50">
+                                {items.map((item: IncompleteItem) => (
+                                  <div key={item.assignmentId} className="px-4 py-2.5 flex items-center gap-3">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0 ml-0.5" />
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm text-gray-800 truncate">{item.assignmentTitle}</p>
+                                      <p className="text-xs text-gray-400">
+                                        Due {item.submissionDate ? format(new Date(item.submissionDate), 'd MMM yyyy') : '—'} · {item.className}
+                                      </p>
+                                    </div>
+                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 flex-shrink-0">
+                                      {item.status === 'draft' ? 'Draft' : 'Missing'}
+                                    </span>
+                                  </div>
+                                ))}
                               </div>
-                            ))}
-                          </div>
+                              <div className="px-4 py-3 border-t border-red-50 flex justify-end">
+                                <button
+                                  disabled={reminded || remindMutation.isPending}
+                                  onClick={() => remindMutation.mutate({
+                                    studentUserId,
+                                    studentAssignments: items.map((i: IncompleteItem) => ({ title: i.assignmentTitle })),
+                                  })}
+                                  className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all ${
+                                    reminded
+                                      ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
+                                      : 'bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50'
+                                  }`}
+                                >
+                                  {reminded ? <><CheckCircle2 size={12} /> Sent</> : <><SendHorizontal size={12} /> Send Reminder</>}
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })}
