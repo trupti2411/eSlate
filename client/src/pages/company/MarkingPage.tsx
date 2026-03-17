@@ -28,6 +28,7 @@ interface SubmissionWithDetails {
   content: string | null;
   parentComment: string | null;
   parentCommentAt: string | null;
+  aiCheckResult: string | null;
   student: {
     id: string;
     user: { firstName: string; lastName: string; email: string };
@@ -103,10 +104,11 @@ export function MarkingPage() {
   const pending = allSubmissions.filter(s => s.status === 'submitted' && !gradedIds.has(s.id));
   const current = pending[currentIndex] || null;
 
-  // Derive AI check result: prefer in-memory (just fetched) over stored DB value
-  const storedAiResult = current && (current as any).aiCheckResult
-    ? (() => { try { return JSON.parse((current as any).aiCheckResult); } catch { return null; } })()
-    : null;
+  // Parse the DB-stored AI check result (null if never checked)
+  const storedAiResult: AiResultData | null = (() => {
+    if (!current?.aiCheckResult) return null;
+    try { return JSON.parse(current.aiCheckResult); } catch { return null; }
+  })();
 
   const gradeMutation = useMutation({
     mutationFn: ({ id, score, feedback }: { id: string; score: number; feedback: string }) =>
@@ -404,23 +406,21 @@ export function MarkingPage() {
                     <p className="text-xs font-bold uppercase tracking-widest text-gray-400 flex items-center gap-1">
                       <Sparkles size={11} className="text-violet-500" /> AI Assignment Check
                     </p>
-                    {!aiChecked && !aiCheckMutation.isPending && (
+                    {aiCheckMutation.isPending ? (
+                      <span className="flex items-center gap-1.5 bg-violet-50 text-violet-500 px-3 py-1.5 rounded-xl text-xs font-bold">
+                        <Loader2 size={12} className="animate-spin" /> Checking…
+                      </span>
+                    ) : aiChecked ? (
+                      <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-green-200 cursor-not-allowed">
+                        <CheckCircle2 size={12} /> Previously checked
+                      </span>
+                    ) : (
                       <button
                         onClick={() => current && aiCheckMutation.mutate(current.id)}
                         className="flex items-center gap-1.5 bg-violet-600 text-white px-3 py-1.5 rounded-xl text-xs font-bold hover:bg-violet-700 transition-colors"
                       >
                         <Sparkles size={12} /> Check with AI
                       </button>
-                    )}
-                    {aiCheckMutation.isPending && (
-                      <span className="flex items-center gap-1.5 bg-violet-50 text-violet-500 px-3 py-1.5 rounded-xl text-xs font-bold">
-                        <Loader2 size={12} className="animate-spin" /> Checking…
-                      </span>
-                    )}
-                    {aiChecked && !aiCheckMutation.isPending && (
-                      <span className="flex items-center gap-1.5 bg-green-50 text-green-700 px-2.5 py-1.5 rounded-xl text-xs font-bold border border-green-200">
-                        <CheckCircle2 size={12} /> {storedAiResult && !aiCheckResults.has(current?.id ?? '') ? 'Previously checked' : 'AI Checked'}
-                      </span>
                     )}
                   </div>
 
