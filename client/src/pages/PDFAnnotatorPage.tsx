@@ -140,7 +140,8 @@ export function PDFAnnotatorPage() {
 
   const urlParams = new URLSearchParams(window.location.search);
   const assignmentId = urlParams.get('assignmentId') || '';
-  const pdfUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}` : '';
+  const docIndex = urlParams.get('docIndex') || '0';
+  const pdfUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}?docIndex=${docIndex}` : '';
 
   const { data: existingSubmission } = useQuery({
     queryKey: ['/api/assignments', assignmentId, 'my-submission'],

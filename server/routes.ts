@@ -5344,13 +5344,14 @@ Good luck with your assignment!"
   app.get('/api/pdf-proxy/:assignmentId', isAuthenticated, async (req: any, res) => {
     try {
       const { assignmentId } = req.params;
+      const docIndex = parseInt((req.query.docIndex as string) || '0', 10) || 0;
       
       const assignment = await storage.getAssignment(assignmentId);
       if (!assignment) {
         return res.status(404).json({ error: 'Assignment not found' });
       }
       
-      const pdfUrl = assignment.attachmentUrls?.[0];
+      const pdfUrl = assignment.attachmentUrls?.[docIndex] ?? assignment.attachmentUrls?.[0];
       if (!pdfUrl) {
         return res.status(404).json({ error: 'No PDF attachment found' });
       }
@@ -5358,8 +5359,22 @@ Good luck with your assignment!"
       try {
         const objectStorageService = new ObjectStorageService();
         let file;
-        
-        if (pdfUrl.startsWith('/objects/')) {
+
+        if (pdfUrl.startsWith('/api/files/')) {
+          // URL format returned by /api/homework/upload-direct
+          const fileId = pdfUrl.split('/api/files/')[1];
+          const privateDir = objectStorageService.getPrivateObjectDir();
+          const objectPath = `${privateDir}/uploads/${fileId}`;
+          const pathParts = objectPath.split('/').filter((p: string) => p);
+          const bucketName = pathParts[0];
+          const objectName = pathParts.slice(1).join('/');
+          const bucket = objectStorageClient.bucket(bucketName);
+          file = bucket.file(objectName);
+          const [exists] = await file.exists();
+          if (!exists) {
+            return res.status(404).json({ error: 'PDF file not found in storage' });
+          }
+        } else if (pdfUrl.startsWith('/objects/')) {
           file = await objectStorageService.getObjectEntityFile(pdfUrl);
         } else {
           const match = pdfUrl.match(/googleapis\.com\/([^\/]+)\/(.+)$/);

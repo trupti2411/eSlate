@@ -11,7 +11,13 @@ interface FileMetadata {
 // Extract object path from upload URL for metadata lookup
 function getObjectPathFromUrl(url: string): string {
   try {
-    // All URLs have /uploads/ in them, so extract everything after that
+    // Handle /api/files/:uuid format (from upload-direct endpoint)
+    if (url.startsWith('/api/files/')) {
+      const fileId = url.split('/api/files/')[1]?.split('?')[0];
+      if (fileId) return `/objects/uploads/${fileId}`;
+      return '';
+    }
+    // All GCS/legacy URLs have /uploads/ in them — extract the UUID after that
     if (url.includes('/uploads/')) {
       const uploadsIndex = url.indexOf('/uploads/');
       const objectId = url.substring(uploadsIndex + '/uploads/'.length);
