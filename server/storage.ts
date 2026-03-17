@@ -2237,7 +2237,7 @@ export class DatabaseStorage implements IStorage {
           u.last_name,
           u.email,
           s.parent_id,
-          COALESCE(sub.status, 'not_started') as submission_status
+          COALESCE(sub.status::text, 'not_started') as submission_status
         FROM assignments a
         JOIN classes c ON c.id = a.class_id
         JOIN student_class_assignments sca ON sca.class_id = c.id AND sca.is_active = true
