@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { DesignNavToggle } from '@/components/DesignSwitchBanner';
 import type { Design } from '@/hooks/useDesignPreference';
-import { isPast, format } from 'date-fns';
+import { isPast, format, startOfWeek } from 'date-fns';
 import {
   Users, CheckSquare, MessageCircle, Bell, LogOut, AlertCircle,
   ChevronDown, ChevronUp, MessageSquare, Star, Clock, CheckCircle2,
@@ -40,6 +40,8 @@ interface AssignmentItem {
   submissionDate: string;
   submissionStatus: string;
   submission: Submission | null;
+  className?: string | null;
+  classDescription?: string | null;
 }
 
 interface ChildData {
@@ -451,25 +453,54 @@ export default function NewParentDashboard({ setDesign }: Props) {
                       <p className="font-bold text-gray-800">No assignments yet</p>
                       <p className="text-sm text-gray-500 mt-1">Assignments will appear here once the tutor sets them.</p>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {selectedChild.assignments
-                        .sort((a, b) => {
-                          const aOver = (!a.submission || a.submission.status === 'draft') && isPast(new Date(a.submissionDate));
-                          const bOver = (!b.submission || b.submission.status === 'draft') && isPast(new Date(b.submissionDate));
-                          if (aOver && !bOver) return -1;
-                          if (!aOver && bOver) return 1;
-                          return new Date(a.submissionDate).getTime() - new Date(b.submissionDate).getTime();
-                        })
-                        .map(a => (
-                          <AssignmentCard
-                            key={a.id}
-                            a={a}
-                            childName={selectedChild.user.firstName || 'your child'}
-                          />
+                  ) : (() => {
+                    // Group by term (className) → week (submissionDate)
+                    const sorted = [...selectedChild.assignments].sort((a, b) =>
+                      new Date(a.submissionDate).getTime() - new Date(b.submissionDate).getTime()
+                    );
+                    const byTerm: Record<string, Record<string, AssignmentItem[]>> = {};
+                    for (const a of sorted) {
+                      const term = a.className || 'General';
+                      const weekStart = startOfWeek(new Date(a.submissionDate), { weekStartsOn: 1 });
+                      const weekKey = format(weekStart, 'yyyy-MM-dd');
+                      if (!byTerm[term]) byTerm[term] = {};
+                      if (!byTerm[term][weekKey]) byTerm[term][weekKey] = [];
+                      byTerm[term][weekKey].push(a);
+                    }
+                    const childName = selectedChild.user.firstName || 'your child';
+                    return (
+                      <div className="space-y-6">
+                        {selectedChild.gradeLevel && (
+                          <p className="text-xs font-bold text-rose-600 uppercase tracking-widest px-1">{selectedChild.gradeLevel}</p>
+                        )}
+                        {Object.entries(byTerm).map(([term, weekGroups]) => (
+                          <div key={term}>
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="h-px flex-1 bg-rose-100" />
+                              <span className="text-xs font-black uppercase tracking-widest text-rose-500 px-2">{term}</span>
+                              <div className="h-px flex-1 bg-rose-100" />
+                            </div>
+                            <div className="space-y-4">
+                              {Object.entries(weekGroups)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .map(([weekKey, items]) => (
+                                  <div key={weekKey}>
+                                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
+                                      Week of {format(new Date(weekKey), 'd MMM')}
+                                    </p>
+                                    <div className="space-y-3">
+                                      {items.map(a => (
+                                        <AssignmentCard key={a.id} a={a} childName={childName} />
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                            </div>
+                          </div>
                         ))}
-                    </div>
-                  )
+                      </div>
+                    );
+                  })()
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-gray-500">Select a child above to view their homework.</p>

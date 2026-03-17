@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { DesignNavToggle } from '@/components/DesignSwitchBanner';
 import type { Design } from '@/hooks/useDesignPreference';
-import { isPast, format, differenceInDays } from 'date-fns';
+import { isPast, format, differenceInDays, startOfWeek } from 'date-fns';
 import {
   CheckSquare, BookOpen, BarChart2, Bell, LogOut,
   AlertCircle, Clock, ChevronRight, Check, Eye,
@@ -242,96 +242,109 @@ export default function NewStudentDashboard({ setDesign }: Props) {
                     <p className="font-bold text-gray-800">All caught up!</p>
                     <p className="text-sm text-gray-500 mt-1">No homework at the moment.</p>
                   </div>
-                ) : (
-                  <>
-                    {/* Overdue */}
-                    {overdue.length > 0 && (
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-red-500 mb-2 px-1">Overdue</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {overdue.map(a => (
-                            <button
-                              key={a.id}
-                              onClick={() => openWork(a)}
-                              className="w-full text-left bg-white rounded-2xl border border-red-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                            >
-                              <div className="px-4 py-1.5 bg-red-50 flex items-center gap-1">
-                                <AlertCircle size={11} className="text-red-600" />
-                                <p className="text-xs font-bold text-red-700">OVERDUE — tap to open</p>
-                              </div>
-                              <div className="px-4 py-3 flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
-                                  {a.kind === 'worksheet' ? '📝' : '📚'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
-                                  <p className="text-xs text-gray-500 mt-0.5">{(a as any).subject || 'Assignment'}</p>
-                                </div>
-                                <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />
-                              </div>
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Pending */}
-                    {pending.length > 0 && (
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-amber-600 mb-2 px-1">Pending</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {pending.map(a => {
-                            const dueDate = (a as any).dueDate || (a as any).submissionDate;
-                            const daysLeft = dueDate ? differenceInDays(new Date(dueDate), new Date()) : null;
-                            return (
-                              <button
-                                key={a.id}
-                                onClick={() => openWork(a)}
-                                className="w-full text-left bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow"
-                              >
-                                <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
-                                  {a.kind === 'worksheet' ? '📝' : '📚'}
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
-                                  <p className="text-xs text-gray-500 mt-0.5">
-                                    {daysLeft !== null
-                                      ? daysLeft <= 2
-                                        ? `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
-                                        : `Due ${format(new Date(dueDate), 'EEE d MMM')}`
-                                      : (a as any).subject || ''}
+                ) : (() => {
+                  // Build class map from classes data
+                  const classMap = new Map((classes as any[]).map(c => [c.id, c]));
+                  // Group allWork by term (class name) → week
+                  const byTerm: Record<string, Record<string, typeof allWork>> = {};
+                  for (const a of allWork) {
+                    const cls = classMap.get((a as any).classId);
+                    const term = cls?.name || 'General';
+                    const dueDate = (a as any).dueDate || (a as any).submissionDate;
+                    const weekStart = dueDate ? startOfWeek(new Date(dueDate), { weekStartsOn: 1 }) : new Date();
+                    const weekKey = format(weekStart, 'yyyy-MM-dd');
+                    if (!byTerm[term]) byTerm[term] = {};
+                    if (!byTerm[term][weekKey]) byTerm[term][weekKey] = [];
+                    byTerm[term][weekKey].push(a);
+                  }
+                  return (
+                    <div className="space-y-6">
+                      {Object.entries(byTerm).map(([term, weekGroups]) => (
+                        <div key={term}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="h-px flex-1 bg-indigo-100" />
+                            <span className="text-xs font-black uppercase tracking-widest text-indigo-500 px-2">{term}</span>
+                            <div className="h-px flex-1 bg-indigo-100" />
+                          </div>
+                          <div className="space-y-4">
+                            {Object.entries(weekGroups)
+                              .sort(([a], [b]) => a.localeCompare(b))
+                              .map(([weekKey, items]) => (
+                                <div key={weekKey}>
+                                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
+                                    Week of {format(new Date(weekKey), 'd MMM')}
                                   </p>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {items.map(a => {
+                                      const status = getStatus(a);
+                                      const dueDate = (a as any).dueDate || (a as any).submissionDate;
+                                      const daysLeft = dueDate ? differenceInDays(new Date(dueDate), new Date()) : null;
+                                      if (status === 'overdue') return (
+                                        <button
+                                          key={a.id}
+                                          onClick={() => openWork(a)}
+                                          className="w-full text-left bg-white rounded-2xl border border-red-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
+                                        >
+                                          <div className="px-4 py-1.5 bg-red-50 flex items-center gap-1">
+                                            <AlertCircle size={11} className="text-red-600" />
+                                            <p className="text-xs font-bold text-red-700">OVERDUE — tap to open</p>
+                                          </div>
+                                          <div className="px-4 py-3 flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
+                                              {a.kind === 'worksheet' ? '📝' : '📚'}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                              <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
+                                              <p className="text-xs text-gray-500 mt-0.5">{(a as any).subject || 'Assignment'}</p>
+                                            </div>
+                                            <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />
+                                          </div>
+                                        </button>
+                                      );
+                                      if (status === 'done') return (
+                                        <div key={a.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 opacity-70 shadow-sm">
+                                          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
+                                            <Check size={18} className="text-green-600" strokeWidth={3} />
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">Submitted</p>
+                                          </div>
+                                          {statusBadge('done')}
+                                        </div>
+                                      );
+                                      return (
+                                        <button
+                                          key={a.id}
+                                          onClick={() => openWork(a)}
+                                          className="w-full text-left bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow"
+                                        >
+                                          <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
+                                            {a.kind === 'worksheet' ? '📝' : '📚'}
+                                          </div>
+                                          <div className="flex-1 min-w-0">
+                                            <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">
+                                              {daysLeft !== null
+                                                ? daysLeft <= 2
+                                                  ? `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
+                                                  : `Due ${format(new Date(dueDate), 'EEE d MMM')}`
+                                                : (a as any).subject || ''}
+                                            </p>
+                                          </div>
+                                          {statusBadge('pending')}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                                {statusBadge('pending')}
-                              </button>
-                            );
-                          })}
+                              ))}
+                          </div>
                         </div>
-                      </div>
-                    )}
-
-                    {/* Done */}
-                    {done.length > 0 && (
-                      <div>
-                        <p className="text-xs font-bold uppercase tracking-widest text-green-600 mb-2 px-1">Completed</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {done.slice(0, 4).map(a => (
-                            <div key={a.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 opacity-60 shadow-sm">
-                              <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
-                                <Check size={18} className="text-green-600" strokeWidth={3} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
-                                <p className="text-xs text-gray-500 mt-0.5">Submitted</p>
-                              </div>
-                              {statusBadge('done')}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
+                      ))}
+                    </div>
+                  );
+                })()}
               </>
             )}
 

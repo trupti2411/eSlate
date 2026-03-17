@@ -677,11 +677,19 @@ export class DatabaseStorage implements IStorage {
               solutionNotes: assignments.solutionNotes,
               solutionFileUrls: assignments.solutionFileUrls,
               createdAt: assignments.createdAt,
+              classId: assignments.classId,
             })
             .from(assignments)
             .where(inArray(assignments.classId, classIds))
             .orderBy(desc(assignments.createdAt))
           : [];
+
+        const classInfoMap = new Map<string, { name: string; description: string | null }>();
+        if (classIds.length > 0) {
+          const classRows = await db.select({ id: classes.id, name: classes.name, description: classes.description })
+            .from(classes).where(inArray(classes.id, classIds));
+          classRows.forEach(c => classInfoMap.set(c.id, { name: c.name, description: c.description }));
+        }
 
         const studentSubmissions = await db.select({
           id: submissions.id,
@@ -710,8 +718,11 @@ export class DatabaseStorage implements IStorage {
 
         const assignmentsWithStatus = studentAssignments.map(assignment => {
           const submission = studentSubmissions.find(s => s.assignmentId === assignment.id);
+          const cls = assignment.classId ? classInfoMap.get(assignment.classId) : null;
           return {
             ...assignment,
+            className: cls?.name ?? null,
+            classDescription: cls?.description ?? null,
             submission: submission ? {
               id: submission.id,
               status: submission.status,
