@@ -120,18 +120,45 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     title: '', subject: '', classId: '', submissionDate: '', description: '', instructions: '',
   });
   const [assignSuccess, setAssignSuccess] = useState(false);
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+    setUploading(true);
+    const newUrls: string[] = [];
+    for (const file of files) {
+      const fd = new FormData();
+      fd.append('file', file);
+      try {
+        const res = await fetch('/api/homework/upload-direct', { method: 'POST', body: fd, credentials: 'include' });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.fileUrl) newUrls.push(json.fileUrl);
+        }
+      } catch { /* silent */ }
+    }
+    setAttachmentUrls(prev => [...prev, ...newUrls]);
+    setUploading(false);
+    if (newUrls.length) toast({ title: `${newUrls.length} file${newUrls.length > 1 ? 's' : ''} attached` });
+    e.target.value = '';
+  };
 
   const createAssignmentMutation = useMutation({
     mutationFn: (data: typeof assignForm) =>
       apiRequest('/api/assignments', 'POST', {
         ...data,
+        companyId,
         createdBy: user?.id,
         isActive: true,
+        attachmentUrls,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/assignments'] });
       queryClient.invalidateQueries({ queryKey: ['/api/tutor/incomplete-homework'] });
       setAssignForm({ title: '', subject: '', classId: '', submissionDate: '', description: '', instructions: '' });
+      setAttachmentUrls([]);
       setAssignSuccess(true);
       setTimeout(() => setAssignSuccess(false), 3000);
       toast({ title: 'Assignment created', description: 'Students in the class will see it immediately.' });
@@ -914,8 +941,32 @@ export default function NewTutorDashboard({ setDesign }: Props) {
                   />
                 </div>
 
+                {/* File attachments */}
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 mb-1.5">Attachments</label>
+                  <label className={`flex items-center gap-2 border-2 border-dashed border-gray-200 rounded-xl px-4 py-3 cursor-pointer hover:border-teal-400 transition-colors ${uploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                    <input type="file" multiple accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.xls,.xlsx" className="hidden" onChange={handleAttachmentUpload} />
+                    {uploading
+                      ? <><div className="w-4 h-4 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" /><span className="text-sm text-gray-500">Uploading…</span></>
+                      : <><Plus size={14} className="text-teal-500" /><span className="text-sm text-gray-500">Attach files (PDF, Word, images)</span></>
+                    }
+                  </label>
+                  {attachmentUrls.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      {attachmentUrls.map((url, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 rounded-lg px-3 py-1.5">
+                          <span className="flex-1 truncate">{url.split('/').pop()}</span>
+                          <button onClick={() => setAttachmentUrls(prev => prev.filter((_, j) => j !== i))} className="text-red-400 hover:text-red-600">
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <button
-                  disabled={!assignForm.title || !assignForm.subject || !assignForm.classId || !assignForm.submissionDate || createAssignmentMutation.isPending}
+                  disabled={!assignForm.title || !assignForm.subject || !assignForm.classId || !assignForm.submissionDate || createAssignmentMutation.isPending || uploading}
                   onClick={() => createAssignmentMutation.mutate(assignForm)}
                   className="w-full bg-teal-600 text-white font-bold py-3 rounded-xl flex items-center justify-center gap-2 hover:bg-teal-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all text-sm"
                 >
