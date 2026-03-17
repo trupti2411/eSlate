@@ -429,7 +429,51 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
     const hasText = !!(params.studentContent && params.studentContent.trim().length > 10);
     const hasFiles = !!(params.files && params.files.length > 0);
 
-    const prompt = `You are an experienced teacher reviewing a student's assignment submission. Provide a thorough, fair, and constructive assessment.
+    const isMathSubject = /math|maths|arithmetic|algebra|geometry|calculus|numeracy|number|integer|fraction|decimal|statistic|trigon|addition|subtract|multiply|division/i.test(params.subject || params.assignmentTitle || '');
+    const hasImageFiles = hasFiles && params.files!.some(f => f.mimeType.startsWith('image/'));
+
+    const prompt = isMathSubject && hasImageFiles ? `You are an experienced maths teacher carefully marking a student's handwritten worksheet. Your job is to be ACCURATE and FAIR — do not mark a correct answer as wrong.
+
+ASSIGNMENT: ${params.assignmentTitle}
+SUBJECT: ${params.subject}
+${params.assignmentDescription ? `DESCRIPTION: ${params.assignmentDescription}` : ''}
+
+---
+CRITICAL INSTRUCTIONS FOR HANDWRITTEN MATHS:
+
+1. SCAN THE IMAGE carefully. Identify every numbered problem on the worksheet.
+
+2. For EACH problem, do the following in your head (do NOT put this reasoning in the JSON output):
+   a. Read the printed question text (e.g. "-2 + 3 = ___")
+   b. Calculate the mathematically correct answer yourself (e.g. 1)
+   c. Read what the student has written in the answer blank — handwriting can be messy:
+      - A minus sign may look like a dash or underline
+      - The digit "1" may look like a slash or tick mark
+      - "0" may look like "D", "O", or an oval
+      - Numbers like "-15" have a minus sign followed by digits — read them together as a negative number
+      - If the answer space has a dash/line before digits, it is a NEGATIVE number
+   d. Compare: does the student's answer equal the correct answer you calculated?
+   e. If YES → the answer is CORRECT. Do NOT list it as incorrect.
+   f. If NO, and you are VERY confident (95%+) about your reading → list it as incorrect.
+   g. If you are UNSURE how to read the handwriting → give the student the benefit of the doubt and count it as correct.
+
+3. SELF-CHECK RULE (mandatory): Before outputting any problem as "incorrect", verify:
+   - You calculated the correct answer as X
+   - You read the student's answer as Y
+   - X ≠ Y
+   Only if all three are true should you list it as incorrect.
+   If your stated "correct answer" in whatIsIncorrect matches what the student appears to have written, you have made a reading error — remove that problem from the incorrect list.
+
+4. Grouping: Instead of listing every single correct problem individually, you may group them (e.g. "Problems 1, 2, 4–8, 10–12 are all correct").
+
+Return ONLY raw JSON (no markdown, no code blocks):
+{
+  "overallAssessment": "2-3 sentence fair summary of the student's performance",
+  "whatIsCorrect": ["Brief summary of correct answers, e.g. 'Problems 1, 2, 4, 5, 6, 7, 8, 10, 11, 12 are all correct'"],
+  "whatIsIncorrect": ["Problem X is incorrect; student wrote Y, correct answer is Z"],
+  "whatIsMissing": ["any problems left completely blank"],
+  "suggestedNextSteps": ["specific, constructive improvement tip"]
+}` : `You are an experienced teacher reviewing a student's assignment submission. Provide a thorough, fair, and constructive assessment.
 
 ASSIGNMENT TITLE: ${params.assignmentTitle}
 SUBJECT: ${params.subject}
