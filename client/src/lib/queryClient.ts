@@ -99,7 +99,15 @@ export const getQueryFn: <T>(options: {
       credentials: "include",
     });
 
-    if (unauthorizedBehavior === "returnNull" && res.status === 401) {
+    if (res.status === 401) {
+      // Clear stale JWT so the next request won't keep sending an expired token
+      localStorage.removeItem('authToken');
+      cachedCsrfToken = null;
+      if (unauthorizedBehavior === "returnNull") {
+        return null;
+      }
+      // For protected routes, redirect to login
+      window.location.href = "/auth";
       return null;
     }
 
