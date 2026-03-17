@@ -5,6 +5,7 @@ import { Canvas, FabricImage } from 'fabric';
 interface MarkedWorkViewerProps {
   submissionId: string;
   fileUrls: string[];
+  documentUrl: string | null | undefined;
   reviewerAnnotations: string | null | undefined;
   feedback: string | null | undefined;
   score: number | null | undefined;
@@ -30,8 +31,20 @@ function getNaturalSize(blobUrl: string): Promise<{ w: number; h: number }> {
   });
 }
 
+function parseAnnotations(raw: string): { version: string; objects: any[] } | null {
+  try {
+    const parsed = JSON.parse(raw);
+    const data = parsed.fabricJSON ?? parsed;
+    if (!data || typeof data !== 'object') return null;
+    return { version: data.version ?? '6.0.0', objects: data.objects ?? [] };
+  } catch {
+    return null;
+  }
+}
+
 export default function MarkedWorkViewer({
   fileUrls,
+  documentUrl,
   reviewerAnnotations,
   feedback,
   score,
@@ -48,31 +61,26 @@ export default function MarkedWorkViewer({
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const imageUrls = fileUrls.filter(Boolean);
-  const currentUrl = imageUrls[pageIndex];
+  const fileList = (fileUrls ?? []).filter(Boolean);
+  const docApiUrl = documentUrl ? `/api/files/${documentUrl}` : null;
+  const allUrls: string[] = fileList.length > 0 ? fileList : docApiUrl ? [docApiUrl] : [];
+  const currentUrl = allUrls[pageIndex] ?? null;
 
   useEffect(() => {
     if (!canvasElRef.current) return;
-
     let cancelled = false;
 
     const setup = async () => {
       setImageLoaded(false);
       setError(null);
 
-      if (fabricRef.current) {
-        fabricRef.current.dispose();
-        fabricRef.current = null;
-      }
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
-      }
+      if (fabricRef.current) { fabricRef.current.dispose(); fabricRef.current = null; }
+      if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null; }
 
       if (!currentUrl) return;
 
       const container = containerRef.current;
-      const maxW = Math.min((container ? container.clientWidth - 32 : 560), 700);
+      const maxW = Math.min(container ? container.clientWidth - 32 : 560, 700);
       const maxH = Math.round(window.innerHeight * 0.52);
 
       try {
@@ -97,11 +105,12 @@ export default function MarkedWorkViewer({
         fabricRef.current = fc;
 
         if (reviewerAnnotations) {
-          try {
-            const parsed = JSON.parse(reviewerAnnotations);
-            await fc.loadFromJSON({ version: parsed.version ?? '6.0.0', objects: parsed.objects ?? [] });
-            fc.getObjects().forEach(o => o.set({ selectable: false, evented: false }));
-          } catch (_) {
+          const annotationData = parseAnnotations(reviewerAnnotations);
+          if (annotationData) {
+            try {
+              await fc.loadFromJSON({ version: annotationData.version, objects: annotationData.objects });
+              fc.getObjects().forEach(o => o.set({ selectable: false, evented: false }));
+            } catch (_) {}
           }
         }
 
@@ -115,22 +124,15 @@ export default function MarkedWorkViewer({
 
         if (!cancelled) setImageLoaded(true);
       } catch (e) {
-        if (!cancelled) setError('Could not load the submitted image. Please try again.');
+        if (!cancelled) setError('Could not load the submitted work. Please try again.');
       }
     };
 
     setup();
-
     return () => {
       cancelled = true;
-      if (fabricRef.current) {
-        fabricRef.current.dispose();
-        fabricRef.current = null;
-      }
-      if (blobUrlRef.current) {
-        URL.revokeObjectURL(blobUrlRef.current);
-        blobUrlRef.current = null;
-      }
+      if (fabricRef.current) { fabricRef.current.dispose(); fabricRef.current = null; }
+      if (blobUrlRef.current) { URL.revokeObjectURL(blobUrlRef.current); blobUrlRef.current = null; }
     };
   }, [currentUrl, reviewerAnnotations]);
 
@@ -141,7 +143,10 @@ export default function MarkedWorkViewer({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3"
+      onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+    >
       <div ref={containerRef} className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[94vh] flex flex-col overflow-hidden">
 
         {/* Header */}
@@ -168,20 +173,20 @@ export default function MarkedWorkViewer({
           </div>
         )}
 
-        {/* Body — scrollable */}
+        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto flex flex-col gap-4 p-4 min-h-0">
 
-          {/* Image / canvas area */}
-          {imageUrls.length === 0 ? (
+          {/* Image / canvas */}
+          {allUrls.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-10 text-gray-400 gap-2">
-              <p className="text-sm font-medium">No submitted files to display.</p>
-              <p className="text-xs">This submission may have been text-only.</p>
+              <p className="text-sm font-medium">No submitted work to display.</p>
+              <p className="text-xs">This submission may have been completed digitally within the platform.</p>
             </div>
           ) : (
             <>
               <div className="relative flex justify-center">
                 {!imageLoaded && !error && (
-                  <div className="absolute inset-0 flex items-center justify-center min-h-[180px] bg-gray-50 rounded-xl">
+                  <div className="flex items-center justify-center min-h-[180px] w-full bg-gray-50 rounded-xl">
                     <div className="w-7 h-7 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
                   </div>
                 )}
@@ -193,12 +198,12 @@ export default function MarkedWorkViewer({
                 {!error && (
                   <canvas
                     ref={canvasElRef}
-                    className={`rounded-xl border border-gray-200 shadow-sm transition-opacity max-w-full ${imageLoaded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                    className={`rounded-xl border border-gray-200 shadow-sm max-w-full transition-opacity ${imageLoaded ? 'opacity-100' : 'opacity-0 absolute'}`}
                   />
                 )}
               </div>
 
-              {imageUrls.length > 1 && (
+              {allUrls.length > 1 && (
                 <div className="flex items-center justify-center gap-3">
                   <button
                     onClick={() => setPageIndex(i => Math.max(0, i - 1))}
@@ -208,11 +213,11 @@ export default function MarkedWorkViewer({
                     <ChevronLeft size={16} />
                   </button>
                   <span className="text-xs text-gray-500 font-medium">
-                    Page {pageIndex + 1} of {imageUrls.length}
+                    Page {pageIndex + 1} of {allUrls.length}
                   </span>
                   <button
-                    onClick={() => setPageIndex(i => Math.min(imageUrls.length - 1, i + 1))}
-                    disabled={pageIndex === imageUrls.length - 1}
+                    onClick={() => setPageIndex(i => Math.min(allUrls.length - 1, i + 1))}
+                    disabled={pageIndex === allUrls.length - 1}
                     className="p-2 rounded-lg border border-gray-200 disabled:opacity-40 hover:bg-gray-50 transition-colors"
                   >
                     <ChevronRight size={16} />

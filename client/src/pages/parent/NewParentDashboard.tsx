@@ -26,6 +26,7 @@ interface Submission {
   feedback: string | null;
   gradedAt: string | null;
   fileUrls: string[];
+  documentUrl: string | null;
   reviewerAnnotations: string | null;
   parentComment: string | null;
   parentCommentAt: string | null;
@@ -215,6 +216,7 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
             <MarkedWorkViewer
               submissionId={a.submission.id}
               fileUrls={a.submission.fileUrls ?? []}
+              documentUrl={a.submission.documentUrl}
               reviewerAnnotations={a.submission.reviewerAnnotations}
               feedback={a.submission.feedback}
               score={a.submission.score}

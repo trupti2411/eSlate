@@ -437,6 +437,7 @@ export default function NewStudentDashboard({ setDesign }: Props) {
       <MarkedWorkViewer
         submissionId={viewerSub.id}
         fileUrls={viewerSub.fileUrls ?? []}
+        documentUrl={viewerSub.documentUrl ?? null}
         reviewerAnnotations={viewerSub.reviewerAnnotations}
         feedback={viewerSub.feedback}
         score={viewerSub.score}
