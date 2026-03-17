@@ -10,7 +10,7 @@ import {
   Calendar, ClipboardList, MessageCircle, Bell, LogOut,
   Check, X, Users, ChevronRight, Award, ThumbsUp, ChevronLeft,
   Sparkles, CheckCircle2, XCircle, AlertTriangle, Lightbulb,
-  PenLine, Maximize2, ZoomIn, Eye, BookCheck,
+  PenLine, Maximize2, ZoomIn, Eye, BookCheck, BellRing, SendHorizontal,
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 import { SubmissionAnnotator } from '@/components/SubmissionAnnotator';
@@ -88,6 +88,36 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const { data: assignments = [] } = useQuery<any[]>({
     queryKey: ['/api/assignments'],
     enabled: !!user,
+  });
+
+  interface IncompleteItem {
+    assignmentId: string;
+    assignmentTitle: string;
+    submissionDate: string;
+    classId: string;
+    className: string;
+    studentId: string;
+    studentUserId: string;
+    studentName: string;
+    parentId: string | null;
+    status: string;
+  }
+
+  const { data: incompleteItems = [] } = useQuery<IncompleteItem[]>({
+    queryKey: ['/api/tutor/incomplete-homework'],
+    enabled: !!user,
+  });
+
+  const [remindedStudents, setRemindedStudents] = useState<Set<string>>(new Set());
+
+  const remindMutation = useMutation({
+    mutationFn: async ({ studentUserId, studentAssignments }: { studentUserId: string; studentAssignments: { title: string }[] }) =>
+      apiRequest('/api/tutor/remind-student', 'POST', { studentUserId, assignments: studentAssignments }),
+    onSuccess: (_data, vars) => {
+      setRemindedStudents(prev => new Set(Array.from(prev).concat([vars.studentUserId])));
+      toast({ title: 'Reminder sent', description: 'A message has been sent to the student.' });
+    },
+    onError: () => toast({ title: 'Error', description: 'Failed to send reminder.', variant: 'destructive' }),
   });
 
   const gradeMutation = useMutation({
@@ -626,6 +656,69 @@ export default function NewTutorDashboard({ setDesign }: Props) {
           {/* STUDENTS */}
           {tab === 'students' && (
             <>
+              {/* Incomplete Homework section */}
+              {incompleteItems.length > 0 && (() => {
+                // Group by studentUserId
+                const byStudent = new Map<string, { studentName: string; studentUserId: string; items: IncompleteItem[] }>();
+                for (const item of incompleteItems) {
+                  if (!byStudent.has(item.studentUserId)) {
+                    byStudent.set(item.studentUserId, { studentName: item.studentName, studentUserId: item.studentUserId, items: [] });
+                  }
+                  byStudent.get(item.studentUserId)!.items.push(item);
+                }
+                return (
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-widest text-red-500 px-1 flex items-center gap-1.5">
+                      <BellRing size={12} /> Incomplete Homework ({byStudent.size} student{byStudent.size !== 1 ? 's' : ''})
+                    </p>
+                    {Array.from(byStudent.values()).map(({ studentName, studentUserId, items }) => {
+                      const reminded = remindedStudents.has(studentUserId);
+                      return (
+                        <div key={studentUserId} className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
+                          <div className="px-4 py-3 flex items-center gap-3 border-b border-red-50">
+                            <div className="w-9 h-9 rounded-full bg-red-100 flex items-center justify-center text-sm font-bold text-red-700 flex-shrink-0">
+                              {studentName.charAt(0).toUpperCase()}
+                            </div>
+                            <p className="flex-1 font-bold text-sm text-gray-900">{studentName}</p>
+                            <button
+                              disabled={reminded || remindMutation.isPending}
+                              onClick={() => remindMutation.mutate({
+                                studentUserId,
+                                studentAssignments: items.map((i: IncompleteItem) => ({ title: i.assignmentTitle })),
+                              })}
+                              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-xl transition-all flex-shrink-0 ${
+                                reminded
+                                  ? 'bg-green-50 text-green-700 border border-green-200 cursor-default'
+                                  : 'bg-teal-600 text-white hover:bg-teal-700 disabled:opacity-50'
+                              }`}
+                            >
+                              {reminded ? <><CheckCircle2 size={12} /> Sent</> : <><SendHorizontal size={12} /> Remind</>}
+                            </button>
+                          </div>
+                          <div className="divide-y divide-gray-50">
+                            {items.map((item: IncompleteItem) => (
+                              <div key={item.assignmentId} className="px-4 py-2.5 flex items-center gap-3">
+                                <div className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0 ml-0.5" />
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-gray-800 truncate">{item.assignmentTitle}</p>
+                                  <p className="text-xs text-gray-400">
+                                    Due {item.submissionDate ? format(new Date(item.submissionDate), 'd MMM yyyy') : '—'} · {item.className}
+                                  </p>
+                                </div>
+                                <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100 flex-shrink-0">
+                                  {item.status === 'draft' ? 'Draft' : 'Missing'}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+
+              {/* All students */}
               {studLoading ? (
                 <div className="space-y-3">{[1, 2, 3].map(i => <div key={i} className="h-16 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}</div>
               ) : students.length === 0 ? (
@@ -634,29 +727,40 @@ export default function NewTutorDashboard({ setDesign }: Props) {
                   <p className="font-bold text-gray-800">No students yet</p>
                 </div>
               ) : (
-                <div className="space-y-2">
-                  {students.map(s => {
-                    const name = `${s.user.firstName || ''} ${s.user.lastName || ''}`.trim() || s.user.email;
-                    const studentSubs = submissions.filter(sub => sub.studentId === s.id);
-                    const hasPending = studentSubs.some(sub => sub.status === 'submitted');
-                    return (
-                      <div key={s.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 shadow-sm">
-                        <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-sm font-bold text-teal-700 flex-shrink-0">
-                          {name.charAt(0).toUpperCase()}
+                <>
+                  <p className="text-xs font-bold uppercase tracking-widest text-gray-400 px-1">All Students ({students.length})</p>
+                  <div className="space-y-2">
+                    {students.map(s => {
+                      const name = `${s.user.firstName || ''} ${s.user.lastName || ''}`.trim() || s.user.email;
+                      const studentSubs = submissions.filter(sub => sub.studentId === s.id);
+                      const hasPending = studentSubs.some(sub => sub.status === 'submitted');
+                      const missingCount = incompleteItems.filter(i => i.studentId === s.id).length;
+                      return (
+                        <div key={s.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 shadow-sm">
+                          <div className="w-10 h-10 rounded-full bg-teal-100 flex items-center justify-center text-sm font-bold text-teal-700 flex-shrink-0">
+                            {name.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-sm text-gray-900">{name}</p>
+                            <p className="text-xs text-gray-500">{s.gradeLevel || 'Student'}</p>
+                          </div>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            {missingCount > 0 && (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-100">
+                                {missingCount} missing
+                              </span>
+                            )}
+                            {hasPending && (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                To mark
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-bold text-sm text-gray-900">{name}</p>
-                          <p className="text-xs text-gray-500">{s.gradeLevel || 'Student'}</p>
-                        </div>
-                        {hasPending && (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">
-                            Needs marking
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                </>
               )}
             </>
           )}
@@ -686,6 +790,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
             studentName={vsName}
             assignmentTitle={vs.assignment?.title || 'Assignment'}
             feedback={vs.feedback ?? null}
+            score={vs.score ?? null}
             onClose={() => setViewingMarkedId(null)}
           />
         );

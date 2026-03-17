@@ -234,6 +234,7 @@ export interface IStorage {
   getCompanyWorksheetSubmissions(companyId: string): Promise<any[]>;
   getTutorSubmissions(tutorId: string): Promise<any[]>;
   getTutorSubmission(tutorId: string, submissionId: string): Promise<any | undefined>;
+  getTutorIncompleteHomework(tutorId: string): Promise<any[]>;
   gradeSubmission(submissionId: string, score: number, feedback: string, gradedBy: string): Promise<Submission>;
   updateSubmissionAnnotations(submissionId: string, reviewerAnnotations: string): Promise<Submission>;
   updateSubmission(id: string, updates: Partial<InsertSubmission>): Promise<Submission>;
@@ -2218,6 +2219,51 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error in getTutorSubmission:", error);
       return undefined;
+    }
+  }
+
+  async getTutorIncompleteHomework(tutorId: string): Promise<any[]> {
+    try {
+      const results = await db.execute(sql`
+        SELECT
+          a.id as assignment_id,
+          a.title as assignment_title,
+          a.submission_date,
+          c.id as class_id,
+          c.name as class_name,
+          s.id as student_id,
+          u.id as student_user_id,
+          u.first_name,
+          u.last_name,
+          u.email,
+          s.parent_id,
+          COALESCE(sub.status, 'not_started') as submission_status
+        FROM assignments a
+        JOIN classes c ON c.id = a.class_id
+        JOIN student_class_assignments sca ON sca.class_id = c.id AND sca.is_active = true
+        JOIN students s ON s.id = sca.student_id
+        JOIN users u ON u.id = s.user_id
+        LEFT JOIN submissions sub ON sub.assignment_id = a.id AND sub.student_id = s.id
+        WHERE c.tutor_id = ${tutorId}
+          AND a.is_active = true
+          AND (sub.id IS NULL OR sub.status = 'draft')
+        ORDER BY a.submission_date ASC, u.first_name ASC
+      `);
+      return (results.rows || []).map((row: any) => ({
+        assignmentId: row.assignment_id,
+        assignmentTitle: row.assignment_title,
+        submissionDate: row.submission_date,
+        classId: row.class_id,
+        className: row.class_name,
+        studentId: row.student_id,
+        studentUserId: row.student_user_id,
+        studentName: `${row.first_name || ''} ${row.last_name || ''}`.trim() || row.email,
+        parentId: row.parent_id,
+        status: row.submission_status,
+      }));
+    } catch (error) {
+      console.error("Error in getTutorIncompleteHomework:", error);
+      return [];
     }
   }
 

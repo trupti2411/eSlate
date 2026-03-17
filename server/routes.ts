@@ -3019,6 +3019,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get incomplete homework (students who haven't submitted)
+  app.get('/api/tutor/incomplete-homework', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const tutor = await storage.getTutorByUserId(user.id);
+      if (!tutor) return res.status(404).json({ message: "Tutor not found" });
+      const incomplete = await storage.getTutorIncompleteHomework(tutor.id);
+      res.json(incomplete);
+    } catch (error) {
+      console.error("Error fetching incomplete homework:", error);
+      res.status(500).json({ message: "Failed to fetch incomplete homework" });
+    }
+  });
+
+  // Send reminder message to a student
+  app.post('/api/tutor/remind-student', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (!['tutor', 'company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { studentUserId, assignments: missingAssignments } = req.body;
+      if (!studentUserId || !Array.isArray(missingAssignments) || missingAssignments.length === 0) {
+        return res.status(400).json({ message: "studentUserId and assignments are required" });
+      }
+      const list = missingAssignments.map((a: any) => `• ${a.title}`).join('\n');
+      const content = `Hi! Just a friendly reminder that the following assignment${missingAssignments.length > 1 ? 's are' : ' is'} still outstanding:\n\n${list}\n\nPlease log in to eSlate to complete and submit your work. Thanks!`;
+      const message = await storage.createMessage({ senderId: user.id, receiverId: studentUserId, content });
+      res.json({ success: true, message });
+    } catch (error) {
+      console.error("Error sending reminder:", error);
+      res.status(500).json({ message: "Failed to send reminder" });
+    }
+  });
+
   // Get a specific submission for grading
   app.get('/api/tutor/submissions/:submissionId', isAuthenticated, async (req: any, res: any) => {
     try {
