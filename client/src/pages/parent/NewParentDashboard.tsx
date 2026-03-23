@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { DesignNavToggle } from '@/components/DesignSwitchBanner';
@@ -36,9 +36,11 @@ interface AssignmentItem {
   id: string;
   title: string;
   description: string | null;
+  instructions: string | null;
   subject: string;
   submissionDate: string;
   submissionStatus: string;
+  attachmentUrls: string[] | null;
   submission: Submission | null;
   className?: string | null;
   classDescription?: string | null;
@@ -64,11 +66,142 @@ function statusLabel(status: string): string {
   }
 }
 
+function toApiFileUrl(rawUrl: string): string {
+  if (!rawUrl) return rawUrl;
+  if (rawUrl.startsWith('/api/')) return rawUrl;
+  const m = rawUrl.match(/\/uploads\/([^/?#]+)/);
+  return m ? `/api/files/${m[1]}` : rawUrl;
+}
+
+interface FileViewerProps {
+  files: string[];
+  title: string;
+  subtitle?: string;
+  onClose: () => void;
+}
+
+function ParentFileViewer({ files, title, subtitle, onClose }: FileViewerProps) {
+  const [pageIndex, setPageIndex] = useState(0);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [mimeType, setMimeType] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const blobRef = useRef<string | null>(null);
+
+  const apiUrls = files.map(toApiFileUrl).filter(Boolean);
+  const currentUrl = apiUrls[pageIndex];
+
+  useEffect(() => {
+    if (!currentUrl) return;
+    setLoading(true);
+    setError(null);
+    if (blobRef.current) {
+      URL.revokeObjectURL(blobRef.current);
+      blobRef.current = null;
+    }
+    setBlobUrl(null);
+
+    fetch(currentUrl, { credentials: 'include' })
+      .then(res => {
+        if (!res.ok) throw new Error(`Could not load file (${res.status})`);
+        const ct = res.headers.get('content-type') || '';
+        setMimeType(ct);
+        return res.blob();
+      })
+      .then(blob => {
+        const url = URL.createObjectURL(blob);
+        blobRef.current = url;
+        setBlobUrl(url);
+        setLoading(false);
+      })
+      .catch(err => {
+        setError(err.message || 'Failed to load file');
+        setLoading(false);
+      });
+
+    return () => {
+      if (blobRef.current) {
+        URL.revokeObjectURL(blobRef.current);
+        blobRef.current = null;
+      }
+    };
+  }, [currentUrl]);
+
+  const isImage = mimeType.startsWith('image/');
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/80 flex flex-col" onClick={onClose}>
+      <div className="flex items-center justify-between px-4 py-3 bg-gray-900 flex-shrink-0" onClick={e => e.stopPropagation()}>
+        <div>
+          <p className="text-white font-bold text-sm leading-tight">{title}</p>
+          {subtitle && <p className="text-gray-400 text-xs">{subtitle}</p>}
+        </div>
+        <div className="flex items-center gap-3">
+          {apiUrls.length > 1 && (
+            <div className="flex items-center gap-2">
+              <button
+                disabled={pageIndex === 0}
+                onClick={() => setPageIndex(i => i - 1)}
+                className="text-white disabled:opacity-30 hover:text-gray-300 px-2 py-1 text-sm"
+              >
+                ‹ Prev
+              </button>
+              <span className="text-gray-400 text-xs">{pageIndex + 1} / {apiUrls.length}</span>
+              <button
+                disabled={pageIndex === apiUrls.length - 1}
+                onClick={() => setPageIndex(i => i + 1)}
+                className="text-white disabled:opacity-30 hover:text-gray-300 px-2 py-1 text-sm"
+              >
+                Next ›
+              </button>
+            </div>
+          )}
+          <button onClick={onClose} className="text-white hover:text-gray-300 text-xl font-bold w-8 h-8 flex items-center justify-center">
+            ×
+          </button>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto flex items-center justify-center bg-gray-800 p-2" onClick={e => e.stopPropagation()}>
+        {loading && (
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-4 border-rose-300 border-t-rose-600 rounded-full animate-spin" />
+            <p className="text-gray-300 text-sm">Loading file…</p>
+          </div>
+        )}
+        {error && !loading && (
+          <div className="text-center">
+            <AlertCircle className="h-10 w-10 text-red-400 mx-auto mb-2" />
+            <p className="text-red-300 text-sm">{error}</p>
+            <a href={currentUrl} target="_blank" rel="noreferrer" className="mt-3 inline-block text-rose-400 text-sm underline">
+              Try opening in new tab
+            </a>
+          </div>
+        )}
+        {blobUrl && !loading && !error && (
+          isImage ? (
+            <img src={blobUrl} alt="Assignment file" className="max-w-full max-h-full object-contain rounded shadow-lg" />
+          ) : (
+            <iframe
+              src={blobUrl}
+              title="Assignment file"
+              className="w-full h-full rounded"
+              style={{ minHeight: '70vh' }}
+            />
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
 function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string }) {
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState(a.submission?.parentComment ?? '');
   const [editing, setEditing] = useState(false);
   const [showViewer, setShowViewer] = useState(false);
+  const [showAssignmentViewer, setShowAssignmentViewer] = useState(false);
+  const [showWorkViewer, setShowWorkViewer] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
@@ -242,6 +375,52 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
               studentName={childName}
               gradedAt={a.submission.gradedAt}
               onClose={() => setShowViewer(false)}
+            />
+          )}
+
+          {/* View assignment document — visible for all stages when tutor uploaded files */}
+          {(a.attachmentUrls?.length ?? 0) > 0 && (
+            <button
+              onClick={() => setShowAssignmentViewer(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gray-50 text-gray-700 text-xs font-bold hover:bg-gray-100 transition-colors border border-gray-200"
+            >
+              <BookOpen size={13} /> View Assignment Sheet
+            </button>
+          )}
+
+          {/* View child's work — shown for in-progress and submitted stages */}
+          {(isInProgress || (hasSubmission && !isGraded)) && a.submission &&
+            ((a.submission.fileUrls?.length > 0) || a.submission.documentUrl) && (
+            <button
+              onClick={() => setShowWorkViewer(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-violet-50 text-violet-700 text-xs font-bold hover:bg-violet-100 transition-colors border border-violet-100"
+            >
+              <PenLine size={13} /> View {childName}'s Work
+            </button>
+          )}
+
+          {/* File viewer modals — rendered outside card scroll area */}
+          {showAssignmentViewer && (
+            <ParentFileViewer
+              files={a.attachmentUrls ?? []}
+              title={a.title}
+              subtitle="Assignment sheet"
+              onClose={() => setShowAssignmentViewer(false)}
+            />
+          )}
+
+          {showWorkViewer && a.submission && (
+            <ParentFileViewer
+              files={
+                a.submission.fileUrls?.length > 0
+                  ? a.submission.fileUrls
+                  : a.submission.documentUrl
+                  ? [a.submission.documentUrl]
+                  : []
+              }
+              title={`${childName}'s Work`}
+              subtitle={a.title}
+              onClose={() => setShowWorkViewer(false)}
             />
           )}
 
