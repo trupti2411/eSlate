@@ -7,7 +7,7 @@ import { isPast, format, startOfWeek } from 'date-fns';
 import {
   Users, CheckSquare, MessageCircle, Bell, LogOut, AlertCircle,
   ChevronDown, ChevronUp, MessageSquare, Star, Clock, CheckCircle2,
-  BookOpen, Send, Eye
+  BookOpen, Send, Eye, PenLine
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 import { apiRequest } from '@/lib/queryClient';
@@ -72,12 +72,12 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const isOverdue = !a.submission?.status || a.submission.status === 'draft' || a.submission.status === 'not_started'
-    ? isPast(new Date(a.submissionDate))
-    : false;
-
-  const hasSubmission = !!a.submission && a.submission.status !== 'draft';
+  // Four distinct stages
+  const isInProgress = a.submission?.status === 'draft';
+  const hasSubmission = !!a.submission && !isInProgress;
   const isGraded = a.submission?.status === 'graded' || a.submission?.status === 'parent_verified';
+  // Only mark overdue if student hasn't started at all — in-progress should not be shown as overdue
+  const isOverdue = !a.submission && isPast(new Date(a.submissionDate));
 
   const cardBorder = isOverdue
     ? 'border-red-200'
@@ -85,6 +85,8 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
     ? 'border-green-200'
     : hasSubmission
     ? 'border-blue-200'
+    : isInProgress
+    ? 'border-violet-200'
     : 'border-gray-100';
 
   const badgeStyle = isOverdue
@@ -93,6 +95,8 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
     ? 'bg-green-100 text-green-700 border-green-200'
     : hasSubmission
     ? 'bg-blue-100 text-blue-700 border-blue-200'
+    : isInProgress
+    ? 'bg-violet-100 text-violet-700 border-violet-200'
     : 'bg-amber-100 text-amber-700 border-amber-200';
 
   const badgeText = isOverdue
@@ -101,7 +105,9 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
     ? 'Graded'
     : hasSubmission
     ? 'Submitted'
-    : 'Pending';
+    : isInProgress
+    ? 'In progress'
+    : 'Assigned';
 
   const saveComment = useMutation({
     mutationFn: async () => {
@@ -164,16 +170,21 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
             </div>
           )}
 
-          {/* Submission status details */}
+          {/* Submission status details — four stages */}
           <div>
             <p className="text-xs font-semibold text-gray-500 mb-2">Status</p>
             <div className="flex flex-wrap gap-2">
-              {!hasSubmission ? (
-                <div className="flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                  <Clock className="h-4 w-4" />
-                  {isOverdue ? `Overdue — not yet submitted` : `Not submitted yet · Due ${format(new Date(a.submissionDate), 'EEE d MMM')}`}
+              {isOverdue ? (
+                <div className="flex items-center gap-1.5 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-1.5">
+                  <AlertCircle className="h-4 w-4" />
+                  Overdue — not yet started · Due {format(new Date(a.submissionDate), 'EEE d MMM')}
                 </div>
-              ) : (
+              ) : isInProgress ? (
+                <div className="flex items-center gap-1.5 text-sm text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-3 py-1.5">
+                  <PenLine className="h-4 w-4" />
+                  In progress — your child is working on this
+                </div>
+              ) : hasSubmission ? (
                 <>
                   <div className="flex items-center gap-1.5 text-sm text-blue-700 bg-blue-50 border border-blue-200 rounded-lg px-3 py-1.5">
                     <CheckCircle2 className="h-4 w-4" />
@@ -187,6 +198,11 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
                     </div>
                   )}
                 </>
+              ) : (
+                <div className="flex items-center gap-1.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
+                  <Clock className="h-4 w-4" />
+                  Assigned · Due {format(new Date(a.submissionDate), 'EEE d MMM')}
+                </div>
               )}
             </div>
           </div>
@@ -314,12 +330,14 @@ export default function NewParentDashboard({ setDesign }: Props) {
 
   const childStats = (child: ChildData) => {
     const total = child.assignments.length;
+    const inProgress = child.assignments.filter(a => a.submission?.status === 'draft').length;
     const submitted = child.assignments.filter(a => a.submission && a.submission.status !== 'draft').length;
     const graded = child.assignments.filter(a => a.submission?.status === 'graded' || a.submission?.status === 'parent_verified').length;
+    // Overdue = no submission at all (not even a draft) and past due date
     const overdue = child.assignments.filter(a =>
-      (!a.submission || a.submission.status === 'draft') && isPast(new Date(a.submissionDate))
+      !a.submission && isPast(new Date(a.submissionDate))
     ).length;
-    return { total, submitted, graded, overdue };
+    return { total, inProgress, submitted, graded, overdue };
   };
 
   return (
@@ -398,16 +416,17 @@ export default function NewParentDashboard({ setDesign }: Props) {
                             )}
                           </div>
                         </div>
-                        <div className="grid grid-cols-4 gap-2 text-center mb-3">
+                        <div className="grid grid-cols-5 gap-1.5 text-center mb-3">
                           {[
                             { label: 'Total', value: stats.total, color: 'text-gray-700' },
+                            { label: 'In Progress', value: stats.inProgress, color: stats.inProgress > 0 ? 'text-violet-600' : 'text-gray-400' },
                             { label: 'Submitted', value: stats.submitted, color: 'text-blue-600' },
                             { label: 'Graded', value: stats.graded, color: 'text-green-600' },
                             { label: 'Overdue', value: stats.overdue, color: stats.overdue > 0 ? 'text-red-600' : 'text-gray-400' },
                           ].map(s => (
                             <div key={s.label} className="bg-gray-50 rounded-xl py-2">
-                              <div className={`text-xl font-extrabold ${s.color}`}>{s.value}</div>
-                              <div className="text-xs text-gray-400">{s.label}</div>
+                              <div className={`text-lg font-extrabold ${s.color}`}>{s.value}</div>
+                              <div className="text-[10px] text-gray-400 leading-tight">{s.label}</div>
                             </div>
                           ))}
                         </div>
