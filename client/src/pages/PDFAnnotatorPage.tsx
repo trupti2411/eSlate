@@ -292,8 +292,11 @@ export function PDFAnnotatorPage() {
     const renderPage = async () => {
       try {
         const page = await pdfDocRef.current!.getPage(currentPage);
-        // Render at physical pixel resolution for crisp text and lines
-        const viewport = page.getViewport({ scale: scale * DPR });
+        // Explicitly read page rotation (0, 90, 180, 270) from PDF metadata
+        // and pass it as the total rotation so PDF.js applies it correctly.
+        // Without this, landscape pages scanned with rotate:90 appear sideways.
+        const pageRotation = page.rotate ?? 0;
+        const viewport = page.getViewport({ scale: scale * DPR, rotation: pageRotation });
         const logicalW = Math.round(viewport.width / DPR);
         const logicalH = Math.round(viewport.height / DPR);
 
