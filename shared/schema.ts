@@ -183,6 +183,7 @@ export const assignments = pgTable("assignments", {
   attachmentUrls: text("attachment_urls").array().default([]), // Files uploaded by admin/tutor
   allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg']), // Specified file types
   maxFileSize: integer("max_file_size").default(31457280), // 30MB in bytes
+  pageRotations: jsonb("page_rotations").$type<Record<string, number>>().default({}), // Per-page rotation corrections (e.g. {"1": 90})
   status: assignmentStatusEnum("status").notNull().default('assigned'),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),

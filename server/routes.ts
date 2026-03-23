@@ -605,6 +605,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Save page rotation for a specific page of an assignment (any authenticated user)
+  app.patch('/api/assignments/:id/page-rotation', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { pageNum, rotation } = req.body;
+      if (typeof pageNum !== 'number' || typeof rotation !== 'number') {
+        return res.status(400).json({ message: "pageNum and rotation are required numbers" });
+      }
+      const assignment = await storage.getAssignment(req.params.id);
+      if (!assignment) return res.status(404).json({ message: "Assignment not found" });
+      const existing = (assignment.pageRotations as Record<string, number>) || {};
+      const updated = { ...existing, [String(pageNum)]: rotation };
+      await storage.updateAssignment(req.params.id, { pageRotations: updated } as any);
+      res.json({ pageRotations: updated });
+    } catch (error) {
+      console.error("Error saving page rotation:", error);
+      res.status(500).json({ message: "Failed to save page rotation" });
+    }
+  });
+
   // Delete assignment
   app.delete('/api/assignments/:id', isAuthenticated, async (req: any, res: any) => {
     try {

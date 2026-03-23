@@ -160,6 +160,30 @@ export function PDFAnnotatorPage() {
     enabled: !!assignmentId
   });
 
+  // Load stored page rotations for this assignment
+  const { data: assignmentData } = useQuery({
+    queryKey: ['/api/assignments', assignmentId],
+    queryFn: async () => {
+      const response = await fetch(`/api/assignments/${assignmentId}`, { credentials: 'include' });
+      if (!response.ok) return null;
+      return response.json();
+    },
+    enabled: !!assignmentId
+  });
+
+  // In-memory map of page rotations (updated on rotate, seeded from DB)
+  const pageRotationsMapRef = useRef<Record<string, number>>({});
+
+  // Seed the in-memory map once assignment data loads
+  useEffect(() => {
+    if (assignmentData?.pageRotations) {
+      pageRotationsMapRef.current = assignmentData.pageRotations;
+      // Apply stored rotation for the current page
+      const stored = assignmentData.pageRotations[String(currentPage)] ?? 0;
+      setViewRotation(stored);
+    }
+  }, [assignmentData]);
+
   useEffect(() => {
     if (existingSubmission?.annotations && Array.isArray(existingSubmission.annotations)) {
       setAnnotations(existingSubmission.annotations);
@@ -585,9 +609,31 @@ export function PDFAnnotatorPage() {
     e.preventDefault();
     setScale(s => Math.min(3, Math.max(0.5, s - e.deltaY * 0.001)));
   }, []);
-  const goToPrevPage = () => { setCurrentPage(p => Math.max(p - 1, 1)); setViewRotation(0); };
-  const goToNextPage = () => { setCurrentPage(p => Math.min(p + 1, numPages)); setViewRotation(0); };
-  const rotateView = () => setViewRotation(r => (r + 90) % 360);
+  const goToPrevPage = () => {
+    const next = Math.max(currentPage - 1, 1);
+    setCurrentPage(next);
+    setViewRotation(pageRotationsMapRef.current[String(next)] ?? 0);
+  };
+  const goToNextPage = () => {
+    const next = Math.min(currentPage + 1, numPages);
+    setCurrentPage(next);
+    setViewRotation(pageRotationsMapRef.current[String(next)] ?? 0);
+  };
+  const rotateView = async () => {
+    const next = (viewRotation + 90) % 360;
+    setViewRotation(next);
+    // Persist to the in-memory map and DB
+    pageRotationsMapRef.current[String(currentPage)] = next;
+    if (assignmentId) {
+      const csrfToken = await getCsrfToken();
+      fetch(`/api/assignments/${assignmentId}/page-rotation`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}) },
+        credentials: 'include',
+        body: JSON.stringify({ pageNum: currentPage, rotation: next }),
+      }).catch(err => console.warn('Failed to save page rotation:', err));
+    }
+  };
 
   const saveSubmission = useMutation({
     mutationFn: async (status: 'draft' | 'submitted') => {
