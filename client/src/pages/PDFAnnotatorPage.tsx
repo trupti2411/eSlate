@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, getCsrfToken } from '@/lib/queryClient';
-import { Save, Send, Eraser, RotateCcw, Undo2, ChevronLeft, ChevronRight, Home } from 'lucide-react';
+import { Save, Send, Eraser, RotateCcw, RotateCw, Undo2, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { useLocation } from 'wouter';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -74,6 +74,7 @@ export function PDFAnnotatorPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isDrawing, setIsDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
+  const [viewRotation, setViewRotation] = useState(0); // manual rotation: 0, 90, 180, 270
   
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -292,11 +293,11 @@ export function PDFAnnotatorPage() {
     const renderPage = async () => {
       try {
         const page = await pdfDocRef.current!.getPage(currentPage);
-        // Explicitly read page rotation (0, 90, 180, 270) from PDF metadata
-        // and pass it as the total rotation so PDF.js applies it correctly.
-        // Without this, landscape pages scanned with rotate:90 appear sideways.
+        // Combine the PDF's own rotation metadata with any manual view rotation
+        // so users can fix sideways PDFs that have no rotation metadata (rotate: 0)
         const pageRotation = page.rotate ?? 0;
-        const viewport = page.getViewport({ scale: scale * DPR, rotation: pageRotation });
+        const totalRotation = (pageRotation + viewRotation) % 360;
+        const viewport = page.getViewport({ scale: scale * DPR, rotation: totalRotation });
         const logicalW = Math.round(viewport.width / DPR);
         const logicalH = Math.round(viewport.height / DPR);
 
@@ -334,7 +335,7 @@ export function PDFAnnotatorPage() {
     
     renderPage();
     return () => { cancelled = true; };
-  }, [pdfLoaded, numPages, currentPage, scale]);
+  }, [pdfLoaded, numPages, currentPage, scale, viewRotation]);
 
   useEffect(() => {
     if (canvasSize.width === 0) return;
@@ -584,8 +585,9 @@ export function PDFAnnotatorPage() {
     e.preventDefault();
     setScale(s => Math.min(3, Math.max(0.5, s - e.deltaY * 0.001)));
   }, []);
-  const goToPrevPage = () => setCurrentPage(p => Math.max(p - 1, 1));
-  const goToNextPage = () => setCurrentPage(p => Math.min(p + 1, numPages));
+  const goToPrevPage = () => { setCurrentPage(p => Math.max(p - 1, 1)); setViewRotation(0); };
+  const goToNextPage = () => { setCurrentPage(p => Math.min(p + 1, numPages)); setViewRotation(0); };
+  const rotateView = () => setViewRotation(r => (r + 90) % 360);
 
   const saveSubmission = useMutation({
     mutationFn: async (status: 'draft' | 'submitted') => {
@@ -714,6 +716,15 @@ export function PDFAnnotatorPage() {
           </Button>
           <Button variant="outline" size="sm" onClick={clearAnnotations} className={toolBtnClass} title="Clear page">
             <RotateCcw className="h-5 w-5" />
+          </Button>
+          <Button
+            variant={viewRotation !== 0 ? 'default' : 'outline'}
+            size="sm"
+            onClick={rotateView}
+            className={toolBtnClass}
+            title={`Rotate page (currently ${viewRotation}°)`}
+          >
+            <RotateCw className="h-5 w-5" />
           </Button>
           <div className="w-px h-8 bg-black mx-1" />
           <span className="text-xs font-medium text-gray-600 px-1">
