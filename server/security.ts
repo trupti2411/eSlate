@@ -106,6 +106,7 @@ export function securityHeaders(_req: Request, res: Response, next: NextFunction
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
     "connect-src 'self' ws: wss: https://storage.googleapis.com",
+    "frame-src 'self' blob:",
     "frame-ancestors 'none'",
     "base-uri 'self'",
     "form-action 'self'",

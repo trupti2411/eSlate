@@ -182,12 +182,23 @@ function ParentFileViewer({ files, title, subtitle, onClose }: FileViewerProps) 
           isImage ? (
             <img src={blobUrl} alt="Assignment file" className="max-w-full max-h-full object-contain rounded shadow-lg" />
           ) : (
-            <iframe
-              src={blobUrl}
-              title="Assignment file"
-              className="w-full h-full rounded"
-              style={{ minHeight: '70vh' }}
-            />
+            <div className="w-full h-full flex flex-col" style={{ minHeight: '70vh' }}>
+              <iframe
+                src={blobUrl}
+                title="Assignment file"
+                className="flex-1 w-full rounded border-0"
+              />
+              <div className="flex-shrink-0 flex justify-center py-2 bg-gray-900">
+                <a
+                  href={currentUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-gray-400 hover:text-white underline"
+                >
+                  ↗ Open in new tab if not displaying
+                </a>
+              </div>
+            </div>
           )
         )}
       </div>
