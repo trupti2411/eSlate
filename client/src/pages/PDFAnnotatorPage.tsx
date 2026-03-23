@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiRequest, getCsrfToken } from '@/lib/queryClient';
-import { Save, Send, X, Eraser, RotateCcw, Undo2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Save, Send, Eraser, RotateCcw, Undo2, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { useLocation } from 'wouter';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -141,6 +141,7 @@ export function PDFAnnotatorPage() {
   const urlParams = new URLSearchParams(window.location.search);
   const assignmentId = urlParams.get('assignmentId') || '';
   const docIndex = urlParams.get('docIndex') || '0';
+  const returnTo = urlParams.get('returnTo') || '/';
   const pdfUrl = assignmentId ? `/api/pdf-proxy/${assignmentId}?docIndex=${docIndex}` : '';
 
   const { data: existingSubmission } = useQuery({
@@ -640,7 +641,7 @@ export function PDFAnnotatorPage() {
           : 'Your work has been saved as a draft.',
       });
       if (status === 'submitted') {
-        navigate(assignmentId ? `/student/assignment/${assignmentId}` : '/');
+        navigate(returnTo);
       }
     },
     onError: (error) => {
@@ -657,13 +658,12 @@ export function PDFAnnotatorPage() {
   });
 
   const handleClose = () => {
-    const backPath = assignmentId ? `/student/assignment/${assignmentId}` : '/';
     if (annotations.length > initialLoadRef.current) {
-      if (confirm('You have unsaved work. Are you sure you want to go back?')) {
-        navigate(backPath);
+      if (confirm('You have unsaved work. Are you sure you want to leave?')) {
+        navigate(returnTo);
       }
     } else {
-      navigate(backPath);
+      navigate(returnTo);
     }
   };
 
@@ -684,7 +684,19 @@ export function PDFAnnotatorPage() {
     <div className="h-screen flex flex-col bg-white select-none" style={{ touchAction: 'manipulation' }}>
       <div className="flex items-center justify-between p-2 border-b-2 border-black bg-white">
 
+        {/* Left: Home + annotation tools */}
         <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleClose}
+            className="min-w-[48px] min-h-[48px] text-base font-bold flex items-center gap-1.5 px-3"
+            title="Back to dashboard"
+          >
+            <Home className="h-4 w-4" />
+            <span className="text-xs hidden sm:inline">Home</span>
+          </Button>
+          <div className="w-px h-8 bg-gray-300 mx-1" />
           <Button
             variant={activeTool === 'eraser' ? 'default' : 'outline'}
             size="sm"
@@ -707,6 +719,7 @@ export function PDFAnnotatorPage() {
           <span className="text-xs text-gray-400">{Math.round(scale * 100)}%</span>
         </div>
 
+        {/* Centre: page navigation */}
         {numPages > 1 && (
           <div className="flex items-center gap-1">
             <Button variant="outline" size="sm" onClick={goToPrevPage} disabled={currentPage === 1} className={toolBtnClass}>
@@ -719,10 +732,11 @@ export function PDFAnnotatorPage() {
           </div>
         )}
 
+        {/* Right: Save + Submit */}
         <div className="flex items-center gap-1">
           {autoSaveStatus !== 'idle' && (
             <span className="text-xs text-gray-500 mr-1">
-              {autoSaveStatus === 'saving' ? 'Saving...' : 'Saved'}
+              {autoSaveStatus === 'saving' ? 'Saving...' : 'Saved ✓'}
             </span>
           )}
           <Button
@@ -743,9 +757,6 @@ export function PDFAnnotatorPage() {
           >
             <Send className="h-5 w-5 mr-1" />
             {isSubmitting ? '...' : 'Submit'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleClose} className={toolBtnClass} title="Back to assignment">
-            <ChevronLeft className="h-5 w-5" />
           </Button>
         </div>
       </div>

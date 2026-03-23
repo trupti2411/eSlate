@@ -50,7 +50,9 @@ export function AssignmentWorkPage() {
       const objectPath = url.includes('/uploads/') ? url.split('/uploads/').pop() : url.split('/').pop();
       const meta = attachmentMetadata?.[0];
       const filename = meta?.originalName || url.split('/').pop() || 'document-1.pdf';
-      navigate(`/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=0`);
+      // returnTo=/ so the Home button in the annotator goes directly to the dashboard
+      // (this page would just auto-redirect back to the annotator anyway)
+      navigate(`/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=0&returnTo=${encodeURIComponent('/')}`);
     }
   }, [assignment?.id, isSubmitted, isWorksheet, attachmentMetadata]);
 
@@ -139,7 +141,9 @@ export function AssignmentWorkPage() {
   const openAnnotator = (url: string, index: number, meta?: any) => {
     const objectPath = url.includes('/uploads/') ? url.split('/uploads/').pop() : url.split('/').pop();
     const filename = meta?.originalName || url.split('/').pop() || `document-${index + 1}.pdf`;
-    navigate(`/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}`);
+    // For multi-doc, return to the assignment file list so student can open the next doc
+    const returnTo = encodeURIComponent(`/student/assignment/${assignment.id}`);
+    navigate(`/pdf-annotator?assignmentId=${assignment.id}&objectPath=${objectPath}&filename=${encodeURIComponent(filename)}&docIndex=${index}&returnTo=${returnTo}`);
   };
 
   const statusColor = isSubmitted
