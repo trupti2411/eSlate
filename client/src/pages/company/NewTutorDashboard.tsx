@@ -68,8 +68,6 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     warnings?: string[];
   };
   const [aiResults, setAiResults] = useState<Map<string, AiResultData>>(new Map());
-  const aiResult = markingId ? aiResults.get(markingId) : undefined;
-  const aiChecked = markingId ? aiResults.has(markingId) : false;
 
   const { data: adminProfile } = useQuery<{ companyId?: string }>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -218,6 +216,8 @@ export default function NewTutorDashboard({ setDesign }: Props) {
     mutationFn: async (id: string) => apiRequest(`/api/submissions/${id}/ai-check`, 'POST', {}),
     onSuccess: (data: any, id: string) => {
       setAiResults(prev => new Map(prev).set(id, data));
+      // Refresh so the stored result is available on next load (button stays locked)
+      queryClient.invalidateQueries({ queryKey: ['/api/tutor/submissions'] });
     },
     onError: (error: any) => toast({
       title: 'AI check failed',
@@ -242,6 +242,17 @@ export default function NewTutorDashboard({ setDesign }: Props) {
 
   const markingSubmission = submissions.find(s => s.id === markingId);
   const matchedAssignment = markingSubmission ? assignments.find((a: any) => a.id === markingSubmission.assignmentId) : null;
+
+  // AI check: in-memory result (just run this session) takes priority over DB-stored result
+  const storedAiResult: AiResultData | null = (() => {
+    const stored = (markingSubmission as any)?.aiCheckResult;
+    if (!stored) return null;
+    try { return JSON.parse(stored); } catch { return null; }
+  })();
+  const aiResult: AiResultData | undefined = markingId
+    ? (aiResults.get(markingId) || storedAiResult || undefined)
+    : undefined;
+  const aiChecked = !!aiResult;
 
   const studentName = markingSubmission?.student?.user
     ? `${markingSubmission.student.user.firstName || ''} ${markingSubmission.student.user.lastName || ''}`.trim() || 'Student'
@@ -320,23 +331,21 @@ export default function NewTutorDashboard({ setDesign }: Props) {
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="text-xs font-bold uppercase tracking-widest text-gray-400">AI Assessment</p>
-                {!aiChecked && !aiMutation.isPending && (
+                {aiMutation.isPending ? (
+                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-500 text-xs font-bold">
+                    <Sparkles size={12} className="animate-spin" /> Checking…
+                  </span>
+                ) : aiChecked ? (
+                  <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-200 cursor-not-allowed select-none">
+                    <CheckCircle2 size={12} /> Previously checked
+                  </span>
+                ) : (
                   <button
                     onClick={() => aiMutation.mutate(markingId)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 text-xs font-bold hover:bg-violet-200 transition-colors"
                   >
                     <Sparkles size={12} /> Check with AI
                   </button>
-                )}
-                {aiMutation.isPending && (
-                  <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-50 text-violet-500 text-xs font-bold">
-                    <Sparkles size={12} className="animate-spin" /> Checking…
-                  </span>
-                )}
-                {aiChecked && !aiMutation.isPending && (
-                  <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-green-50 text-green-700 text-xs font-bold border border-green-200">
-                    <CheckCircle2 size={12} /> AI Checked
-                  </span>
                 )}
               </div>
 

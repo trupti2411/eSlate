@@ -2066,7 +2066,8 @@ export class DatabaseStorage implements IStorage {
           c.name as class_name,
           c.description as class_description,
           st.grade_level,
-          s.reviewer_annotations
+          s.reviewer_annotations,
+          s.ai_check_result
         FROM submissions s
         INNER JOIN students st ON s.student_id = st.id
         INNER JOIN users u ON st.user_id = u.id
@@ -2118,6 +2119,7 @@ export class DatabaseStorage implements IStorage {
           attachmentUrls: row.assignment_attachment_urls || [],
         },
         reviewerAnnotations: row.reviewer_annotations || null,
+        aiCheckResult: row.ai_check_result || null,
         gradeLevel: row.grade_level || null,
         class: {
           id: row.class_id,
