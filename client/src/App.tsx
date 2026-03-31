@@ -126,7 +126,7 @@ function Router() {
               design === 'new' ? <NewStudentDashboard setDesign={setDesign} /> : <StudentHome />
             )}
             {user?.role === 'parent' && (
-              <NewParentDashboard setDesign={setDesign} />
+              design === 'new' ? <NewParentDashboard setDesign={setDesign} /> : <ParentDashboard />
             )}
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}

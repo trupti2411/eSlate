@@ -541,7 +541,7 @@ export default function NewParentDashboard({ setDesign }: Props) {
             <p className="text-sm text-gray-500">Parent dashboard</p>
           </div>
           <div className="flex items-center gap-2">
-            <DesignNavToggle currentDesign="new" onSwitch={() => setDesign('classic')} />
+            <DesignNavToggle design="new" onSwitch={setDesign} />
             <button
               onClick={() => logoutMutation.mutate()}
               className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-100"
