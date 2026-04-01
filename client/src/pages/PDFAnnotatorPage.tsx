@@ -685,15 +685,16 @@ export function PDFAnnotatorPage() {
       return response.json();
     },
     onSuccess: (_, status) => {
+      // Mark current annotation count as saved so Home button won't prompt "unsaved work"
+      initialLoadRef.current = annotationsRef.current.length;
       toast({
         title: status === 'submitted' ? 'Assignment Submitted' : 'Draft Saved',
         description: status === 'submitted' 
           ? 'Your assignment has been submitted successfully.' 
           : 'Your work has been saved as a draft.',
       });
-      if (status === 'submitted') {
-        navigate(returnTo);
-      }
+      // Always navigate back after saving (draft or submitted)
+      navigate(returnTo);
     },
     onError: (error) => {
       toast({
