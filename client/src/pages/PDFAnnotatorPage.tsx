@@ -37,6 +37,7 @@ interface StudentAnnotation {
   y?: number;
   toolType: 'pen' | 'highlight' | 'eraser' | 'text';
   scale?: number;
+  rotation?: number; // viewRotation when annotation was drawn (0/90/180/270)
 }
 
 function convertFabricToStroke(fabricJSON: any): StrokeData | null {
@@ -75,7 +76,9 @@ export function PDFAnnotatorPage() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [viewRotation, setViewRotation] = useState(0); // manual rotation: 0, 90, 180, 270
-  
+  const viewRotationRef = useRef(0); // mirror of viewRotation for use in callbacks
+  viewRotationRef.current = viewRotation;
+
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
   const drawCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -284,7 +287,11 @@ export function PDFAnnotatorPage() {
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const pageAnnotations = annotationsRef.current.filter(a => a.pageNum === pageNum);
+    const pageAnnotations = annotationsRef.current.filter(a =>
+      a.pageNum === pageNum &&
+      // Show annotation only if it matches current rotation, or it predates the rotation field (rotation undefined)
+      (a.rotation === undefined || a.rotation === viewRotationRef.current)
+    );
     
     for (const annotation of pageAnnotations) {
       if (annotation.type === 'stroke' && (annotation.stroke || annotation.fabricJSON)) {
@@ -550,7 +557,8 @@ export function PDFAnnotatorPage() {
         width: settings.width,
         compositeOp: settings.compositeOp
       },
-      scale: scale
+      scale: scale,
+      rotation: viewRotationRef.current
     };
     
     setAnnotations(prev => [...prev, newAnnotation]);
@@ -585,7 +593,8 @@ export function PDFAnnotatorPage() {
         x,
         y,
         toolType: 'text',
-        scale: scale
+        scale: scale,
+        rotation: viewRotationRef.current
       };
       setAnnotations(prev => [...prev, newAnnotation]);
     }
@@ -631,6 +640,9 @@ export function PDFAnnotatorPage() {
         headers: { 'Content-Type': 'application/json', ...(csrfToken ? { 'x-csrf-token': csrfToken } : {}) },
         credentials: 'include',
         body: JSON.stringify({ pageNum: currentPage, rotation: next }),
+      }).then(() => {
+        // Bust cache so the saved rotation is re-loaded when the PDF is reopened
+        queryClient.invalidateQueries({ queryKey: ['/api/assignments', assignmentId] });
       }).catch(err => console.warn('Failed to save page rotation:', err));
     }
   };
