@@ -287,11 +287,7 @@ export function PDFAnnotatorPage() {
     
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    const pageAnnotations = annotationsRef.current.filter(a =>
-      a.pageNum === pageNum &&
-      // Show annotation only if it matches current rotation, or it predates the rotation field (rotation undefined)
-      (a.rotation === undefined || a.rotation === viewRotationRef.current)
-    );
+    const pageAnnotations = annotationsRef.current.filter(a => a.pageNum === pageNum);
     
     for (const annotation of pageAnnotations) {
       if (annotation.type === 'stroke' && (annotation.stroke || annotation.fabricJSON)) {
@@ -630,6 +626,32 @@ export function PDFAnnotatorPage() {
   };
   const rotateView = async () => {
     const next = (viewRotation + 90) % 360;
+
+    // Transform annotation coordinates for the current page BEFORE rotation changes.
+    // Each 90° clockwise turn: new_x = canvasH - old_y, new_y = old_x
+    // canvasSize is in CSS (logical) pixels — same space as annotation points.
+    const cW = canvasSize.width;
+    const cH = canvasSize.height;
+    if (cW > 0 && cH > 0) {
+      setAnnotations(prev => prev.map(ann => {
+        if (ann.pageNum !== currentPage) return ann;
+        if (ann.type === 'stroke' && ann.stroke) {
+          return {
+            ...ann,
+            rotation: next,
+            stroke: {
+              ...ann.stroke,
+              points: ann.stroke.points.map(p => ({ x: cH - p.y, y: p.x }))
+            }
+          };
+        }
+        if (ann.type === 'text') {
+          return { ...ann, rotation: next, x: cH - (ann.y ?? 0), y: ann.x ?? 0 };
+        }
+        return { ...ann, rotation: next };
+      }));
+    }
+
     setViewRotation(next);
     // Persist to the in-memory map and DB
     pageRotationsMapRef.current[String(currentPage)] = next;
