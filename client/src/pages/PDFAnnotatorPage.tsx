@@ -2,7 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { apiRequest, getCsrfToken } from '@/lib/queryClient';
+import { apiRequest, getCsrfToken, queryClient } from '@/lib/queryClient';
 import { Save, Send, Eraser, RotateCcw, RotateCw, Undo2, ChevronLeft, ChevronRight, Home } from 'lucide-react';
 import { useLocation } from 'wouter';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -687,6 +687,8 @@ export function PDFAnnotatorPage() {
     onSuccess: (_, status) => {
       // Mark current annotation count as saved so Home button won't prompt "unsaved work"
       initialLoadRef.current = annotationsRef.current.length;
+      // Bust the cache so annotations reload fresh when the PDF is reopened
+      queryClient.invalidateQueries({ queryKey: ['/api/assignments', assignmentId, 'my-submission'] });
       toast({
         title: status === 'submitted' ? 'Assignment Submitted' : 'Draft Saved',
         description: status === 'submitted' 

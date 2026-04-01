@@ -10,8 +10,8 @@ const app = express();
 global.uploadedFiles = global.uploadedFiles || new Map();
 
 app.use(securityHeaders);
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false, limit: '10mb' }));
 app.use(auditMiddleware);
 
 app.use((req, res, next) => {
