@@ -78,6 +78,10 @@ export function PDFAnnotatorPage() {
   const [viewRotation, setViewRotation] = useState(0); // manual rotation: 0, 90, 180, 270
   const viewRotationRef = useRef(0); // mirror of viewRotation for use in callbacks
   viewRotationRef.current = viewRotation;
+  // Tracks the CSS canvas dimensions. Updated immediately on each rotate click (W↔H swap)
+  // AND synced back whenever the PDF actually finishes rendering at the new rotation.
+  // This avoids stale values when the user rotates faster than the PDF re-renders.
+  const canvasDimsRef = useRef({ width: 0, height: 0 });
 
   const pdfDocRef = useRef<pdfjsLib.PDFDocumentProxy | null>(null);
   const pdfCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -353,6 +357,8 @@ export function PDFAnnotatorPage() {
           drawCanvas.height = viewport.height;
           drawCanvas.style.width = `${logicalW}px`;
           drawCanvas.style.height = `${logicalH}px`;
+          // Sync the dims ref so rotateView always has correct current values
+          canvasDimsRef.current = { width: logicalW, height: logicalH };
           setCanvasSize({ width: logicalW, height: logicalH });
         }
       } catch (error) {
@@ -629,9 +635,14 @@ export function PDFAnnotatorPage() {
 
     // Transform annotation coordinates for the current page BEFORE rotation changes.
     // Each 90° clockwise turn: new_x = canvasH - old_y, new_y = old_x
-    // canvasSize is in CSS (logical) pixels — same space as annotation points.
-    const cW = canvasSize.width;
-    const cH = canvasSize.height;
+    //
+    // canvasDimsRef always has the latest dimensions — even when the user clicks rotate
+    // faster than the PDF re-renders. It's updated immediately here (W↔H swap for each 90°
+    // turn) so the NEXT rapid click will use the correct dimensions.
+    const cW = canvasDimsRef.current.width || canvasSize.width;
+    const cH = canvasDimsRef.current.height || canvasSize.height;
+    // Pre-update the ref so a rapid second click uses the correct post-rotation dims
+    canvasDimsRef.current = { width: cH, height: cW };
     if (cW > 0 && cH > 0) {
       setAnnotations(prev => prev.map(ann => {
         if (ann.pageNum !== currentPage) return ann;
