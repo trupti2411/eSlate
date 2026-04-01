@@ -292,8 +292,32 @@ export function PDFAnnotatorPage() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
     const pageAnnotations = annotationsRef.current.filter(a => a.pageNum === pageNum);
+    const currentRot = viewRotationRef.current;
     
     for (const annotation of pageAnnotations) {
+      // Compute how much the view has rotated since this annotation was drawn.
+      // Instead of transforming stored coordinates, we rotate the canvas context
+      // so the annotation draws in the correct physical location regardless of orientation.
+      const annRot = annotation.rotation ?? 0;
+      const delta = (currentRot - annRot + 360) % 360;
+
+      ctx.save();
+      switch (delta) {
+        case 90:
+          ctx.translate(canvas.width, 0);
+          ctx.rotate(Math.PI / 2);
+          break;
+        case 180:
+          ctx.translate(canvas.width, canvas.height);
+          ctx.rotate(Math.PI);
+          break;
+        case 270:
+          ctx.translate(0, canvas.height);
+          ctx.rotate(-Math.PI / 2);
+          break;
+        // case 0: no transform needed
+      }
+
       if (annotation.type === 'stroke' && (annotation.stroke || annotation.fabricJSON)) {
         const savedScale = annotation.scale || 1.2;
         const scaleRatio = currentScale / savedScale;
@@ -308,14 +332,14 @@ export function PDFAnnotatorPage() {
         const savedScale = annotation.scale || 1.2;
         const scaleRatio = currentScale / savedScale;
         const S = DPR * scaleRatio;
-        ctx.save();
         ctx.font = `${16 * S}px Arial`;
         ctx.fillStyle = '#000000';
         ctx.fillText(annotation.text, (annotation.x || 0) * S, (annotation.y || 0) * S);
-        ctx.restore();
       }
+
+      ctx.restore();
     }
-  }, [drawStroke]);
+  }, [drawStroke, DPR]);
 
   useEffect(() => {
     if (!pdfLoaded || !pdfDocRef.current || numPages === 0) return;
@@ -632,37 +656,9 @@ export function PDFAnnotatorPage() {
   };
   const rotateView = async () => {
     const next = (viewRotation + 90) % 360;
-
-    // Transform annotation coordinates for the current page BEFORE rotation changes.
-    // Each 90° clockwise turn: new_x = canvasH - old_y, new_y = old_x
-    //
-    // canvasDimsRef always has the latest dimensions — even when the user clicks rotate
-    // faster than the PDF re-renders. It's updated immediately here (W↔H swap for each 90°
-    // turn) so the NEXT rapid click will use the correct dimensions.
-    const cW = canvasDimsRef.current.width || canvasSize.width;
-    const cH = canvasDimsRef.current.height || canvasSize.height;
-    // Pre-update the ref so a rapid second click uses the correct post-rotation dims
-    canvasDimsRef.current = { width: cH, height: cW };
-    if (cW > 0 && cH > 0) {
-      setAnnotations(prev => prev.map(ann => {
-        if (ann.pageNum !== currentPage) return ann;
-        if (ann.type === 'stroke' && ann.stroke) {
-          return {
-            ...ann,
-            rotation: next,
-            stroke: {
-              ...ann.stroke,
-              points: ann.stroke.points.map(p => ({ x: cH - p.y, y: p.x }))
-            }
-          };
-        }
-        if (ann.type === 'text') {
-          return { ...ann, rotation: next, x: cH - (ann.y ?? 0), y: ann.x ?? 0 };
-        }
-        return { ...ann, rotation: next };
-      }));
-    }
-
+    // Annotation coordinates are NEVER transformed on rotate.
+    // redrawAnnotations applies a canvas context rotation so each annotation
+    // draws at the correct physical location regardless of the current view rotation.
     setViewRotation(next);
     // Persist to the in-memory map and DB
     pageRotationsMapRef.current[String(currentPage)] = next;
@@ -674,7 +670,6 @@ export function PDFAnnotatorPage() {
         credentials: 'include',
         body: JSON.stringify({ pageNum: currentPage, rotation: next }),
       }).then(() => {
-        // Bust cache so the saved rotation is re-loaded when the PDF is reopened
         queryClient.invalidateQueries({ queryKey: ['/api/assignments', assignmentId] });
       }).catch(err => console.warn('Failed to save page rotation:', err));
     }
