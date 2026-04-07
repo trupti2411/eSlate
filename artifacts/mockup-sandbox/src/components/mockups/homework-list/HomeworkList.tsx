@@ -138,7 +138,7 @@ function HomeworkRow({ hw }: { hw: Homework }) {
 
       {/* Title + subject */}
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium leading-tight ${isDone ? "line-through text-gray-400" : "text-gray-900"}`}>
+        <p className={`text-sm font-medium leading-tight ${isDone ? "text-gray-400" : "text-gray-900"}`}>
           {hw.title}
         </p>
         <div className="flex items-center gap-1.5 mt-1">
@@ -188,7 +188,7 @@ function WeekSection({ week }: { week: Week }) {
           )}
           <div>
             <div className="flex items-center gap-2">
-              <span className={`text-sm font-semibold ${allDone ? "text-gray-400 line-through" : "text-gray-800"}`}>
+              <span className={`text-sm font-semibold ${allDone ? "text-gray-400" : "text-gray-800"}`}>
                 Week {week.number}
               </span>
               {allDone && (
