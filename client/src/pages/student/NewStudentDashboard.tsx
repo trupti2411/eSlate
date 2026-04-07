@@ -3,10 +3,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { DesignNavToggle } from '@/components/DesignSwitchBanner';
 import type { Design } from '@/hooks/useDesignPreference';
-import { isPast, format, differenceInDays, startOfWeek } from 'date-fns';
+import { isPast, format, differenceInDays, startOfWeek, endOfWeek } from 'date-fns';
 import {
   CheckSquare, BookOpen, BarChart2, Bell, LogOut,
-  AlertCircle, Clock, ChevronRight, Check, Eye,
+  AlertCircle, Clock, ChevronRight, ChevronDown, Check, Eye, CheckCircle2,
 } from 'lucide-react';
 import { useLocation } from 'wouter';
 import type { Assignment, Submission, Class } from '@shared/schema';
@@ -27,6 +27,8 @@ export default function NewStudentDashboard({ setDesign }: Props) {
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<Tab>('homework');
   const [viewerSub, setViewerSub] = useState<any | null>(null);
+  const [openTerms, setOpenTerms] = useState<Record<string, boolean>>({});
+  const [openWeeks, setOpenWeeks] = useState<Record<string, boolean>>({});
 
   const { data: studentProfile } = useQuery({
     queryKey: ['/api/auth/student-profile'],
@@ -84,6 +86,21 @@ export default function NewStudentDashboard({ setDesign }: Props) {
 
   const openWork = (a: any) =>
     navigate(a.kind === 'worksheet' ? `/student/worksheet/${a.id}` : `/student/assignment/${a.id}`);
+
+  // Build Term → Week grouping for collapsible homework list
+  const classMap = new Map((classes as any[]).map(c => [c.id, c]));
+  const byTerm: Record<string, Record<string, typeof allWork>> = {};
+  for (const a of allWork) {
+    const cls = classMap.get((a as any).classId);
+    const term = cls?.name || 'General';
+    const dueDate = (a as any).dueDate || (a as any).submissionDate;
+    const weekStart = dueDate ? startOfWeek(new Date(dueDate), { weekStartsOn: 1 }) : new Date();
+    const weekKey = format(weekStart, 'yyyy-MM-dd');
+    if (!byTerm[term]) byTerm[term] = {};
+    if (!byTerm[term][weekKey]) byTerm[term][weekKey] = [];
+    byTerm[term][weekKey].push(a);
+  }
+  const termList = Object.entries(byTerm);
 
   return (
     <>
@@ -233,8 +250,8 @@ export default function NewStudentDashboard({ setDesign }: Props) {
                 )}
 
                 {aLoading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 animate-pulse" />)}
+                  <div className="space-y-3">
+                    {[1, 2, 3].map(i => <div key={i} className="h-14 bg-white rounded-xl border border-gray-100 animate-pulse" />)}
                   </div>
                 ) : allWork.length === 0 ? (
                   <div className="text-center py-16">
@@ -242,109 +259,174 @@ export default function NewStudentDashboard({ setDesign }: Props) {
                     <p className="font-bold text-gray-800">All caught up!</p>
                     <p className="text-sm text-gray-500 mt-1">No homework at the moment.</p>
                   </div>
-                ) : (() => {
-                  // Build class map from classes data
-                  const classMap = new Map((classes as any[]).map(c => [c.id, c]));
-                  // Group allWork by term (class name) → week
-                  const byTerm: Record<string, Record<string, typeof allWork>> = {};
-                  for (const a of allWork) {
-                    const cls = classMap.get((a as any).classId);
-                    const term = cls?.name || 'General';
-                    const dueDate = (a as any).dueDate || (a as any).submissionDate;
-                    const weekStart = dueDate ? startOfWeek(new Date(dueDate), { weekStartsOn: 1 }) : new Date();
-                    const weekKey = format(weekStart, 'yyyy-MM-dd');
-                    if (!byTerm[term]) byTerm[term] = {};
-                    if (!byTerm[term][weekKey]) byTerm[term][weekKey] = [];
-                    byTerm[term][weekKey].push(a);
-                  }
-                  return (
-                    <div className="space-y-6">
-                      {Object.entries(byTerm).map(([term, weekGroups]) => (
+                ) : (
+                  <div className="space-y-5">
+                    {termList.map(([term, weekGroups]) => {
+                      const allHw = Object.values(weekGroups).flat();
+                      const termDone = allHw.filter(a => getStatus(a) === 'done').length;
+                      const isTermOpen = openTerms[term] !== false;
+                      const progressPct = allHw.length ? Math.round((termDone / allHw.length) * 100) : 0;
+                      return (
                         <div key={term}>
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="h-px flex-1 bg-indigo-100" />
-                            <span className="text-xs font-black uppercase tracking-widest text-indigo-500 px-2">{term}</span>
-                            <div className="h-px flex-1 bg-indigo-100" />
-                          </div>
-                          <div className="space-y-4">
-                            {Object.entries(weekGroups)
-                              .sort(([a], [b]) => a.localeCompare(b))
-                              .map(([weekKey, items]) => (
-                                <div key={weekKey}>
-                                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2 px-1">
-                                    Week of {format(new Date(weekKey), 'd MMM')}
-                                  </p>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {items.map(a => {
-                                      const status = getStatus(a);
-                                      const dueDate = (a as any).dueDate || (a as any).submissionDate;
-                                      const daysLeft = dueDate ? differenceInDays(new Date(dueDate), new Date()) : null;
-                                      if (status === 'overdue') return (
-                                        <button
-                                          key={a.id}
-                                          onClick={() => openWork(a)}
-                                          className="w-full text-left bg-white rounded-2xl border border-red-200 overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                                        >
-                                          <div className="px-4 py-1.5 bg-red-50 flex items-center gap-1">
-                                            <AlertCircle size={11} className="text-red-600" />
-                                            <p className="text-xs font-bold text-red-700">OVERDUE — tap to open</p>
-                                          </div>
-                                          <div className="px-4 py-3 flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
-                                              {a.kind === 'worksheet' ? '📝' : '📚'}
+                          {/* ── Term header ── */}
+                          <button
+                            onClick={() => setOpenTerms(prev => ({ ...prev, [term]: !isTermOpen }))}
+                            className="w-full flex items-center justify-between px-4 py-3 bg-gray-900 text-white rounded-xl mb-2 hover:bg-gray-800 transition-colors"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              {isTermOpen
+                                ? <ChevronDown size={15} className="text-gray-400 shrink-0" />
+                                : <ChevronRight size={15} className="text-gray-400 shrink-0" />}
+                              <span className="text-sm font-bold">{term}</span>
+                            </div>
+                            <div className="flex items-center gap-2.5">
+                              <div className="h-1.5 w-20 bg-gray-700 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-emerald-400 rounded-full transition-all"
+                                  style={{ width: `${progressPct}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-400 tabular-nums">{termDone}/{allHw.length}</span>
+                            </div>
+                          </button>
+
+                          {/* ── Weeks ── */}
+                          {isTermOpen && (
+                            <div className="pl-3 space-y-2">
+                              {Object.entries(weekGroups)
+                                .sort(([a], [b]) => a.localeCompare(b))
+                                .map(([weekKey, items], wIdx) => {
+                                  const wStart = new Date(weekKey);
+                                  const wEnd = endOfWeek(wStart, { weekStartsOn: 1 });
+                                  const weekDone = items.filter(a => getStatus(a) === 'done').length;
+                                  const allWeekDone = weekDone === items.length;
+                                  const isWeekOpen = openWeeks[weekKey] !== false;
+                                  return (
+                                    <div key={weekKey} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                                      {/* Week header */}
+                                      <button
+                                        onClick={() => setOpenWeeks(prev => ({ ...prev, [weekKey]: !isWeekOpen }))}
+                                        className={`w-full flex items-center justify-between px-4 py-3 transition-colors text-left ${allWeekDone ? 'bg-gray-50 hover:bg-gray-100' : 'bg-white hover:bg-gray-50'}`}
+                                      >
+                                        <div className="flex items-center gap-2.5">
+                                          {isWeekOpen
+                                            ? <ChevronDown size={13} className="text-gray-400 shrink-0" />
+                                            : <ChevronRight size={13} className="text-gray-400 shrink-0" />}
+                                          <div>
+                                            <div className="flex items-center gap-2">
+                                              <span className={`text-sm font-semibold ${allWeekDone ? 'text-gray-400' : 'text-gray-800'}`}>
+                                                Week {wIdx + 1}
+                                              </span>
+                                              {allWeekDone && (
+                                                <span className="text-[10px] font-medium bg-emerald-100 text-emerald-700 rounded-full px-2 py-0.5">All done</span>
+                                              )}
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                              <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
-                                              <p className="text-xs text-gray-500 mt-0.5">{(a as any).subject || 'Assignment'}</p>
+                                            <div className={`text-[11px] font-mono ${allWeekDone ? 'text-gray-400' : 'text-gray-500'}`}>
+                                              {format(wStart, 'd MMM')} – {format(wEnd, 'd MMM')}
                                             </div>
-                                            <ChevronRight size={15} className="text-gray-400 flex-shrink-0" />
                                           </div>
-                                        </button>
-                                      );
-                                      if (status === 'done') return (
-                                        <div key={a.id} className="bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 opacity-70 shadow-sm">
-                                          <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center flex-shrink-0">
-                                            <Check size={18} className="text-green-600" strokeWidth={3} />
-                                          </div>
-                                          <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">Submitted</p>
-                                          </div>
-                                          {statusBadge('done')}
                                         </div>
-                                      );
-                                      return (
-                                        <button
-                                          key={a.id}
-                                          onClick={() => openWork(a)}
-                                          className="w-full text-left bg-white rounded-2xl border border-gray-100 px-4 py-3 flex items-center gap-3 shadow-sm hover:shadow-md transition-shadow"
-                                        >
-                                          <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-lg flex-shrink-0">
-                                            {a.kind === 'worksheet' ? '📝' : '📚'}
+                                        <div className="flex items-center gap-2">
+                                          <div className="flex gap-0.5">
+                                            {items.map(hw => {
+                                              const s = getStatus(hw);
+                                              return (
+                                                <div
+                                                  key={hw.id}
+                                                  className={`w-2 h-2 rounded-full ${s === 'done' ? 'bg-emerald-400' : s === 'overdue' ? 'bg-red-400' : 'bg-gray-200'}`}
+                                                />
+                                              );
+                                            })}
                                           </div>
-                                          <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-sm text-gray-900 truncate">{a.title}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">
-                                              {daysLeft !== null
-                                                ? daysLeft <= 2
-                                                  ? `Due in ${daysLeft} day${daysLeft !== 1 ? 's' : ''}`
-                                                  : `Due ${format(new Date(dueDate), 'EEE d MMM')}`
-                                                : (a as any).subject || ''}
-                                            </p>
-                                          </div>
-                                          {statusBadge('pending')}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                          </div>
+                                          <span className="text-[11px] text-gray-400 tabular-nums">{weekDone}/{items.length}</span>
+                                        </div>
+                                      </button>
+
+                                      {/* Homework rows */}
+                                      {isWeekOpen && (
+                                        <div className="divide-y divide-gray-100 border-t border-gray-100">
+                                          {items.map(a => {
+                                            const status = getStatus(a);
+                                            const isDone = status === 'done';
+                                            const hwDue = (a as any).dueDate || (a as any).submissionDate;
+                                            const givenDate = (a as any).createdAt
+                                              ? format(new Date((a as any).createdAt), 'd MMM')
+                                              : '—';
+                                            const sub = submissionMap.get(a.id);
+                                            const grade = (sub as any)?.score;
+                                            return (
+                                              <button
+                                                key={a.id}
+                                                onClick={() => !isDone ? openWork(a) : undefined}
+                                                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                                                  isDone
+                                                    ? 'bg-gray-50/70 cursor-default'
+                                                    : status === 'overdue'
+                                                    ? 'bg-white hover:bg-red-50/40'
+                                                    : 'bg-white hover:bg-indigo-50/30'
+                                                }`}
+                                              >
+                                                {/* Status icon */}
+                                                <div className="shrink-0">
+                                                  {isDone
+                                                    ? <CheckCircle2 size={18} className="text-emerald-500" />
+                                                    : status === 'overdue'
+                                                    ? <AlertCircle size={18} className="text-red-400" />
+                                                    : <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300" />}
+                                                </div>
+
+                                                {/* Title + subject */}
+                                                <div className="flex-1 min-w-0">
+                                                  <p className={`text-sm font-medium leading-tight truncate ${isDone ? 'text-gray-400' : 'text-gray-900'}`}>
+                                                    {a.title}
+                                                  </p>
+                                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                                    <span className={`text-[10px] ${isDone ? 'text-gray-400' : 'text-gray-500'}`}>
+                                                      {(a as any).subject || (a.kind === 'worksheet' ? 'Worksheet' : 'Assignment')}
+                                                    </span>
+                                                    {hwDue && (
+                                                      <span className="text-[10px] text-gray-400">
+                                                        · Due {format(new Date(hwDue), 'd MMM')}
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                </div>
+
+                                                {/* Given date box */}
+                                                <div className="shrink-0 border border-gray-200 rounded-lg px-2 py-1 bg-white shadow-sm text-center min-w-[56px]">
+                                                  <div className="text-[9px] text-gray-400 uppercase tracking-wide font-medium">Given</div>
+                                                  <div className={`text-xs font-semibold ${isDone ? 'text-gray-400' : 'text-gray-700'}`}>{givenDate}</div>
+                                                </div>
+
+                                                {/* Status badge */}
+                                                <div className="shrink-0">
+                                                  {isDone ? (
+                                                    grade != null ? (
+                                                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{grade}/10</span>
+                                                    ) : (
+                                                      <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">Done</span>
+                                                    )
+                                                  ) : status === 'overdue' ? (
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">Overdue</span>
+                                                  ) : (
+                                                    <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-200">Pending</span>
+                                                  )}
+                                                </div>
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
-                  );
-                })()}
+                      );
+                    })}
+                  </div>
+                )}
               </>
             )}
 
