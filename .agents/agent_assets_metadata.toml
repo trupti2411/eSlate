@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "d_d0mcHLpp2TCe12z2cJl"
+uri = "file://eSlate_Device_Requirements.pdf"
+type = "pdf"
+title = "eSlate — eInk Device Technical Requirements"
