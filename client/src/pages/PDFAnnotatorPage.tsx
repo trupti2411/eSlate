@@ -381,9 +381,12 @@ export function PDFAnnotatorPage() {
           drawCanvas.height = viewport.height;
           drawCanvas.style.width = `${logicalW}px`;
           drawCanvas.style.height = `${logicalH}px`;
-          // Sync the dims ref so rotateView always has correct current values
           canvasDimsRef.current = { width: logicalW, height: logicalH };
           setCanvasSize({ width: logicalW, height: logicalH });
+          // Redraw annotations immediately after the canvas is correctly sized.
+          // This guarantees the context-rotation transform uses the right canvas.width/height
+          // regardless of whether the canvasSize state change has propagated yet.
+          redrawAnnotations(currentPage, scale);
         }
       } catch (error) {
         if (!cancelled) console.error(`Error rendering page ${currentPage}:`, error);
@@ -392,12 +395,13 @@ export function PDFAnnotatorPage() {
     
     renderPage();
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pdfLoaded, numPages, currentPage, scale, viewRotation]);
 
   useEffect(() => {
     if (canvasSize.width === 0) return;
     redrawAnnotations(currentPage, scale);
-  }, [annotations, canvasSize, redrawAnnotations, currentPage, scale]);
+  }, [annotations, canvasSize, viewRotation, redrawAnnotations, currentPage, scale]);
 
   const getPointerPos = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = drawCanvasRef.current!;
