@@ -293,6 +293,7 @@ export function PDFAnnotatorPage() {
     
     const pageAnnotations = annotationsRef.current.filter(a => a.pageNum === pageNum);
     const currentRot = viewRotationRef.current;
+    console.log(`[redraw] viewRot=${currentRot} canvas=${canvas.width}x${canvas.height} annotations=${pageAnnotations.length}`);
     
     for (const annotation of pageAnnotations) {
       // Compute how much the view has rotated since this annotation was drawn.
@@ -300,6 +301,8 @@ export function PDFAnnotatorPage() {
       // so the annotation draws in the correct physical location regardless of orientation.
       const annRot = annotation.rotation ?? 0;
       const delta = (currentRot - annRot + 360) % 360;
+      const firstPt = annotation.stroke?.points?.[0];
+      console.log(`  ann ${annotation.id} annRot=${annRot} delta=${delta} firstPt=${firstPt ? `(${firstPt.x.toFixed(1)},${firstPt.y.toFixed(1)})` : 'n/a'}`);
 
       ctx.save();
       switch (delta) {
@@ -401,7 +404,7 @@ export function PDFAnnotatorPage() {
   useEffect(() => {
     if (canvasSize.width === 0) return;
     redrawAnnotations(currentPage, scale);
-  }, [annotations, canvasSize, viewRotation, redrawAnnotations, currentPage, scale]);
+  }, [annotations, canvasSize, redrawAnnotations, currentPage, scale]);
 
   const getPointerPos = useCallback((e: React.PointerEvent<HTMLCanvasElement>): Point => {
     const canvas = drawCanvasRef.current!;
