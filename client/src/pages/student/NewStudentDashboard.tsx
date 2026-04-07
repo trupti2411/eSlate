@@ -87,6 +87,9 @@ export default function NewStudentDashboard({ setDesign }: Props) {
   const openWork = (a: any) =>
     navigate(a.kind === 'worksheet' ? `/student/worksheet/${a.id}` : `/student/assignment/${a.id}`);
 
+  // Current week key — used to default only this week open
+  const currentWeekKey = format(startOfWeek(new Date(), { weekStartsOn: 1 }), 'yyyy-MM-dd');
+
   // Build Term → Week grouping for collapsible homework list
   const classMap = new Map((classes as any[]).map(c => [c.id, c]));
   const byTerm: Record<string, Record<string, typeof allWork>> = {};
@@ -300,7 +303,9 @@ export default function NewStudentDashboard({ setDesign }: Props) {
                                   const wEnd = endOfWeek(wStart, { weekStartsOn: 1 });
                                   const weekDone = items.filter(a => getStatus(a) === 'done').length;
                                   const allWeekDone = weekDone === items.length;
-                                  const isWeekOpen = openWeeks[weekKey] !== false;
+                                  const isWeekOpen = openWeeks[weekKey] !== undefined
+                                    ? openWeeks[weekKey]
+                                    : weekKey === currentWeekKey;
                                   return (
                                     <div key={weekKey} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm">
                                       {/* Week header */}
