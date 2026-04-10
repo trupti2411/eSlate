@@ -254,11 +254,13 @@ export default function HomePage() {
               <Link href="/contact" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
                 Contact Us
               </Link>
-              <Link href="/auth">
-                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
-                  Sign In
-                </Button>
-              </Link>
+              {!import.meta.env.PROD && (
+                <Link href="/auth">
+                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
+                    Sign In
+                  </Button>
+                </Link>
+              )}
             </div>
           </div>
         </div>
@@ -284,11 +286,13 @@ export default function HomePage() {
             Building the future of education — combining trusted teaching principles with modern technology to help educators manage students, track progress, and deliver engaging learning at scale.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
-            <Link href="/auth">
-              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-8 shadow-xl shadow-blue-500/25">
-                Get Started Free <ArrowRight className="ml-2 h-5 w-5" />
-              </Button>
-            </Link>
+            {!import.meta.env.PROD && (
+              <Link href="/auth">
+                <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-8 shadow-xl shadow-blue-500/25">
+                  Get Started Free <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </Link>
+            )}
           </div>
           
           <div className="mt-12 flex justify-center gap-8 text-sm text-gray-500">
@@ -720,11 +724,13 @@ export default function HomePage() {
           <p className="text-gray-600 text-lg mb-8">
             Join education providers using eSlate to manage learning better
           </p>
-          <Link href="/auth">
-            <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-10 shadow-xl shadow-blue-500/25">
-              Sign In Now <ArrowRight className="ml-2 h-5 w-5" />
-            </Button>
-          </Link>
+          {!import.meta.env.PROD && (
+            <Link href="/auth">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white text-lg px-10 shadow-xl shadow-blue-500/25">
+                Sign In Now <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+            </Link>
+          )}
         </div>
       </section>
 
