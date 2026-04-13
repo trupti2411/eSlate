@@ -92,22 +92,35 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
 }
 
 export function securityHeaders(_req: Request, res: Response, next: NextFunction): void {
+  const isDev = process.env.NODE_ENV !== 'production';
+
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+
+  if (!isDev) {
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+
+  const scriptSrc = isDev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://replit.com"
+    : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
+
+  const frameAncestors = isDev
+    ? "frame-ancestors 'self' https://*.replit.dev https://*.replit.app https://*.picard.replit.dev https://replit.com"
+    : "frame-ancestors 'none'";
 
   res.setHeader('Content-Security-Policy', [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+    scriptSrc,
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data: https://fonts.gstatic.com",
     "connect-src 'self' ws: wss: https://storage.googleapis.com",
     "frame-src 'self' blob:",
-    "frame-ancestors 'none'",
+    frameAncestors,
     "base-uri 'self'",
     "form-action 'self'",
   ].join('; '));

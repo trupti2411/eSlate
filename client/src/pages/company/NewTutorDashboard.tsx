@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { DesignNavToggle } from '@/components/DesignSwitchBanner';
 import { apiRequest, getCsrfToken } from '@/lib/queryClient';
@@ -52,6 +53,16 @@ export default function NewTutorDashboard({ setDesign }: Props) {
   const { user, logoutMutation } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [, navigate] = useLocation();
+
+  const handleDesignSwitch = (d: Design) => {
+    if (d === 'classic') {
+      setDesign('classic');
+      navigate('/company');
+    } else {
+      setDesign(d);
+    }
+  };
   const [tab, setTab] = useState<Tab>('today');
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState('');
@@ -490,7 +501,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
               <span className="text-sm text-teal-200">{firstName}</span>
             </div>
             <div className="flex items-center gap-2">
-              <DesignNavToggle design="new" onSwitch={setDesign} />
+              <DesignNavToggle design="new" onSwitch={handleDesignSwitch} />
               <button className="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center">
                 <Bell size={16} />
               </button>

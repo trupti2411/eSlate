@@ -1,5 +1,5 @@
-import { Switch, Route } from "wouter";
-import { lazy, Suspense } from "react";
+import { Switch, Route, useLocation } from "wouter";
+import { lazy, Suspense, useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -57,9 +57,20 @@ import NotFound from "@/pages/not-found";
 
 const CompanyDashboard = lazy(() => import("@/pages/admin/CompanyDashboard"));
 
+function RedirectToCompany() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate('/company'); }, [navigate]);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+}
+
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { design, setDesign, bannerSeen, dismissBanner } = useDesignPreference();
+  const [location, navigate] = useLocation();
 
   if (isLoading) {
     return (
@@ -120,7 +131,10 @@ function Router() {
             <DesignSwitchBanner
               bannerSeen={bannerSeen}
               onDismiss={dismissBanner}
-              onSwitch={() => setDesign('new')}
+              onSwitch={() => {
+                setDesign('new');
+                if (location === '/company') navigate('/');
+              }}
             />
           )}
           <Route path="/">
@@ -133,18 +147,9 @@ function Router() {
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
             {user?.role === 'company_admin' && (
-              design === 'new' ? <NewTutorDashboard setDesign={setDesign} /> : (
-                <Suspense fallback={
-                  <div className="min-h-screen flex items-center justify-center bg-white">
-                    <div className="text-center">
-                      <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-black">Loading dashboard...</p>
-                    </div>
-                  </div>
-                }>
-                  <CompanyDashboard />
-                </Suspense>
-              )
+              design === 'new'
+                ? <NewTutorDashboard setDesign={setDesign} />
+                : <RedirectToCompany />
             )}
           </Route>
           <Route path="/student" component={StudentHome} />
