@@ -13,7 +13,7 @@ export function useDesignPreference() {
 
   const setDesign = (d: Design) => {
     localStorage.setItem('eslate_design', d);
-    setDesignState(d);
+    window.location.reload();
   };
 
   const dismissBanner = () => {
