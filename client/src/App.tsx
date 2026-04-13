@@ -1,4 +1,5 @@
 import { Switch, Route } from "wouter";
+import { lazy, Suspense } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -22,7 +23,6 @@ import Users from "@/pages/admin/Users";
 import TestUserCreation from "@/pages/admin/TestUserCreation";
 import Companies from "@/pages/admin/Companies";
 import CompanyManagement from "@/pages/admin/CompanyManagement";
-import CompanyDashboard from "@/pages/admin/CompanyDashboard";
 import CompanyStudents from "@/pages/admin/CompanyStudents";
 import CompanyAcademicManagement from "@/pages/admin/CompanyAcademicManagement";
 import AdminSettings from "@/pages/admin/Settings";
@@ -54,6 +54,8 @@ import TabletPreview from "@/pages/TabletPreview";
 import PitchPage from "@/pages/PitchPage";
 
 import NotFound from "@/pages/not-found";
+
+const CompanyDashboard = lazy(() => import("@/pages/admin/CompanyDashboard"));
 
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();
@@ -131,7 +133,18 @@ function Router() {
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
             {user?.role === 'company_admin' && (
-              design === 'new' ? <NewTutorDashboard setDesign={setDesign} /> : <CompanyDashboard />
+              design === 'new' ? <NewTutorDashboard setDesign={setDesign} /> : (
+                <Suspense fallback={
+                  <div className="min-h-screen flex items-center justify-center bg-white">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-black">Loading dashboard...</p>
+                    </div>
+                  </div>
+                }>
+                  <CompanyDashboard />
+                </Suspense>
+              )
             )}
           </Route>
           <Route path="/student" component={StudentHome} />
@@ -147,7 +160,7 @@ function Router() {
           <Route path="/admin/companies/:id" component={CompanyManagement} />
           <Route path="/admin/settings" component={AdminSettings} />
           <Route path="/admin/test" component={TestUserCreation} />
-          <Route path="/company" component={CompanyDashboard} />
+          <Route path="/company">{() => <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white"><div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div></div>}><CompanyDashboard /></Suspense>}</Route>
           <Route path="/company/tutors" component={CompanyTutorDashboard} />
           <Route path="/company/students" component={CompanyStudents} />
           <Route path="/company/academic" component={() => <CompanyAcademicManagement />} />
