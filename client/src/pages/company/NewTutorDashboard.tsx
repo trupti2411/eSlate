@@ -488,53 +488,57 @@ export default function NewTutorDashboard({ setDesign }: Props) {
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Nav */}
-      <div className="bg-teal-600 text-white shadow-lg">
-        <div className="max-w-2xl mx-auto px-4 pt-4 pb-0">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                <span className="text-white text-xs font-black">eS</span>
-              </div>
-              <span className="font-black text-base">eSlate</span>
-              <span className="text-teal-300 text-sm mx-1">·</span>
-              <span className="text-sm text-teal-200">{firstName}</span>
+      {/* Top header bar */}
+      <div className="bg-teal-600 text-white shadow-lg flex-shrink-0">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+              <span className="text-white text-xs font-black">eS</span>
             </div>
-            <div className="flex items-center gap-2">
-              <DesignNavToggle design="new" onSwitch={handleDesignSwitch} />
-              <button className="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center">
-                <Bell size={16} />
-              </button>
-              <button onClick={() => logoutMutation.mutate()} className="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center">
-                <LogOut size={15} />
-              </button>
-            </div>
+            <span className="font-black text-base">eSlate</span>
+            <span className="text-teal-300 text-sm mx-1">·</span>
+            <span className="text-sm text-teal-200">{firstName}</span>
           </div>
-          <div className="flex gap-1 overflow-x-auto scrollbar-none">
-            {tabs.map(t => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex items-center gap-2 px-3 py-2.5 text-sm font-bold rounded-t-xl transition-all whitespace-nowrap flex-shrink-0 ${
-                  tab === t.key ? 'bg-gray-50 text-teal-700' : 'text-teal-200 hover:text-white hover:bg-white/10'
-                }`}
-              >
-                <t.icon size={14} />
-                <span className="hidden sm:inline">{t.label}</span>
-                {t.key === 'marking' && pending.length > 0 && (
-                  <span className="w-4 h-4 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">
-                    {pending.length}
-                  </span>
-                )}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <DesignNavToggle design="new" onSwitch={handleDesignSwitch} />
+            <button className="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center">
+              <Bell size={16} />
+            </button>
+            <button onClick={() => logoutMutation.mutate()} className="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center">
+              <LogOut size={15} />
+            </button>
           </div>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="max-w-2xl mx-auto px-4 py-5 space-y-4">
+      {/* Body: vertical sidebar + content */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Vertical sidebar nav */}
+        <div className="w-48 bg-white border-r border-gray-100 flex flex-col py-3 flex-shrink-0 overflow-y-auto">
+          {tabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`flex items-center gap-3 px-4 py-3 text-sm font-bold transition-all text-left border-r-2 ${
+                tab === t.key
+                  ? 'bg-teal-50 text-teal-700 border-teal-600'
+                  : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50 border-transparent'
+              }`}
+            >
+              <t.icon size={16} className="flex-shrink-0" />
+              <span>{t.label}</span>
+              {t.key === 'marking' && pending.length > 0 && (
+                <span className="ml-auto w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0">
+                  {pending.length}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-3xl mx-auto px-4 py-5 space-y-4">
 
           {/* TODAY */}
           {tab === 'today' && (
@@ -1046,6 +1050,7 @@ export default function NewTutorDashboard({ setDesign }: Props) {
               <MessageCenter />
             </div>
           )}
+          </div>
         </div>
       </div>
 
