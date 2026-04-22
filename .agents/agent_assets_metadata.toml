@@ -66,6 +66,24 @@ uri = "file://attached_assets/eslate_v3_coral_accent.png"
 type = "image"
 title = "eSlate logo coral accent variation"
 
+[[generated]]
+id = "ARTfdQsaEv_QcB8hmMevM"
+uri = "file://attached_assets/eslate_compact_v1.png"
+type = "image"
+title = "eSlate compact teal navy icon"
+
+[[generated]]
+id = "KxCJgUQUISlwp8EN4T76x"
+uri = "file://attached_assets/eslate_compact_dark.png"
+type = "image"
+title = "eSlate compact dark background unified"
+
+[[generated]]
+id = "8nDFcYzK5SUKsxtgkuWFf"
+uri = "file://attached_assets/eslate_compact_horizontal.png"
+type = "image"
+title = "eSlate compact horizontal navbar style"
+
 [[outputs]]
 id = "d_d0mcHLpp2TCe12z2cJl"
 uri = "file://eSlate_Device_Requirements.pdf"
@@ -137,3 +155,21 @@ id = "KgVHTE9fI8oRXBnGXyvPG"
 uri = "file://attached_assets/eslate_v3_coral_accent.png"
 type = "image"
 title = "Variation H — Teal + coral accent"
+
+[[outputs]]
+id = "DRmr_8m1md-4FEVG6N62m"
+uri = "file://attached_assets/eslate_compact_v1.png"
+type = "image"
+title = "Compact A — Tight stacked, white background"
+
+[[outputs]]
+id = "UsK0o1JJmihfkbt-olx8Q"
+uri = "file://attached_assets/eslate_compact_dark.png"
+type = "image"
+title = "Compact B — Dark fill, all elements close together"
+
+[[outputs]]
+id = "aDvVnEbrrYzQ5Cks00Kp7"
+uri = "file://attached_assets/eslate_compact_horizontal.png"
+type = "image"
+title = "Compact C — Horizontal, icon + text side by side (navbar style)"
