@@ -18,6 +18,30 @@ uri = "file://attached_assets/eslate_logo_concept3.png"
 type = "image"
 title = "eSlate logo concept 3 monogram app icon"
 
+[[generated]]
+id = "d5GG7yTulj5yWWbTLkoxQ"
+uri = "file://attached_assets/eslate_v2_green_gold.png"
+type = "image"
+title = "eSlate logo green gold variation"
+
+[[generated]]
+id = "4mfjdbx8gS2zYMrFzzYKD"
+uri = "file://attached_assets/eslate_v2_slate_coral.png"
+type = "image"
+title = "eSlate logo slate coral variation"
+
+[[generated]]
+id = "vOG0I0lY5ZqiSJPgFRUJo"
+uri = "file://attached_assets/eslate_v2_monochrome.png"
+type = "image"
+title = "eSlate logo monochrome black minimal"
+
+[[generated]]
+id = "YAxtQEd1b8gaD2hC187LT"
+uri = "file://attached_assets/eslate_v2_stacked.png"
+type = "image"
+title = "eSlate logo stacked square layout"
+
 [[outputs]]
 id = "d_d0mcHLpp2TCe12z2cJl"
 uri = "file://eSlate_Device_Requirements.pdf"
@@ -41,3 +65,27 @@ id = "YEDvsewB2WPKpmHhiUmEV"
 uri = "file://attached_assets/eslate_logo_concept3.png"
 type = "image"
 title = "Concept 3 — eS monogram app icon style"
+
+[[outputs]]
+id = "Hmj_ckQ-dHR6lzM-1lnXw"
+uri = "file://attached_assets/eslate_v2_green_gold.png"
+type = "image"
+title = "Variation A — Forest green + gold stylus"
+
+[[outputs]]
+id = "hKUrLQHYJh3NDI5GxfOFc"
+uri = "file://attached_assets/eslate_v2_slate_coral.png"
+type = "image"
+title = "Variation B — Charcoal + coral"
+
+[[outputs]]
+id = "fwbjbED73JEi_1Mh9pr15"
+uri = "file://attached_assets/eslate_v2_monochrome.png"
+type = "image"
+title = "Variation C — All black, premium minimal"
+
+[[outputs]]
+id = "9Rofq6S3VqOACiq-TvIrP"
+uri = "file://attached_assets/eslate_v2_stacked.png"
+type = "image"
+title = "Variation D — Stacked layout (good for app icon)"
