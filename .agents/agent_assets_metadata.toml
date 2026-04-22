@@ -1,8 +1,43 @@
 uploads = []
-generated = []
+
+[[generated]]
+id = "x3UykJ1Luu11ezRUaN-Vf"
+uri = "file://attached_assets/eslate_logo_concept1.png"
+type = "image"
+title = "eSlate logo concept 1 teal lettermark"
+
+[[generated]]
+id = "CcW9jNUXdLyszdjCxMlGM"
+uri = "file://attached_assets/eslate_logo_concept2.png"
+type = "image"
+title = "eSlate logo concept 2 book pen indigo"
+
+[[generated]]
+id = "JpZWurxm-FVnr1yoBbt0D"
+uri = "file://attached_assets/eslate_logo_concept3.png"
+type = "image"
+title = "eSlate logo concept 3 monogram app icon"
 
 [[outputs]]
 id = "d_d0mcHLpp2TCe12z2cJl"
 uri = "file://eSlate_Device_Requirements.pdf"
 type = "pdf"
 title = "eSlate — eInk Device Technical Requirements"
+
+[[outputs]]
+id = "mvvWQC0f39LIJmEs-Mko9"
+uri = "file://attached_assets/eslate_logo_concept1.png"
+type = "image"
+title = "Concept 1 — Teal lettermark with slate shape"
+
+[[outputs]]
+id = "VEmj0_fDFJhNw4AJUI-BW"
+uri = "file://attached_assets/eslate_logo_concept2.png"
+type = "image"
+title = "Concept 2 — Book & stylus, indigo"
+
+[[outputs]]
+id = "YEDvsewB2WPKpmHhiUmEV"
+uri = "file://attached_assets/eslate_logo_concept3.png"
+type = "image"
+title = "Concept 3 — eS monogram app icon style"
