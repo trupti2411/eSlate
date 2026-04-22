@@ -42,6 +42,30 @@ uri = "file://attached_assets/eslate_v2_stacked.png"
 type = "image"
 title = "eSlate logo stacked square layout"
 
+[[generated]]
+id = "NtnoyVKZDbweFQGBfelta"
+uri = "file://attached_assets/eslate_v3_purple_gold.png"
+type = "image"
+title = "eSlate logo purple gold app icon"
+
+[[generated]]
+id = "7nCObWxZB8_ZQ_1ls5t5n"
+uri = "file://attached_assets/eslate_v3_navy_blue.png"
+type = "image"
+title = "eSlate logo midnight blue variation"
+
+[[generated]]
+id = "6qvDV3yzkcwFA_wZ6YwRE"
+uri = "file://attached_assets/eslate_v3_dark_mode.png"
+type = "image"
+title = "eSlate logo dark mode app icon"
+
+[[generated]]
+id = "XHbp487UTgIgCfbyKPgiR"
+uri = "file://attached_assets/eslate_v3_coral_accent.png"
+type = "image"
+title = "eSlate logo coral accent variation"
+
 [[outputs]]
 id = "d_d0mcHLpp2TCe12z2cJl"
 uri = "file://eSlate_Device_Requirements.pdf"
@@ -89,3 +113,27 @@ id = "9Rofq6S3VqOACiq-TvIrP"
 uri = "file://attached_assets/eslate_v2_stacked.png"
 type = "image"
 title = "Variation D — Stacked layout (good for app icon)"
+
+[[outputs]]
+id = "vsMBwDdGNJdlZTv5EwmFF"
+uri = "file://attached_assets/eslate_v3_purple_gold.png"
+type = "image"
+title = "Variation E — Purple + gold stylus"
+
+[[outputs]]
+id = "r-naW2DZ4adooNO47w2nc"
+uri = "file://attached_assets/eslate_v3_navy_blue.png"
+type = "image"
+title = "Variation F — Midnight blue + sky blue"
+
+[[outputs]]
+id = "iJR_Q4KHC-SvTllBI4-EX"
+uri = "file://attached_assets/eslate_v3_dark_mode.png"
+type = "image"
+title = "Variation G — Dark mode (dark background)"
+
+[[outputs]]
+id = "KgVHTE9fI8oRXBnGXyvPG"
+uri = "file://attached_assets/eslate_v3_coral_accent.png"
+type = "image"
+title = "Variation H — Teal + coral accent"
