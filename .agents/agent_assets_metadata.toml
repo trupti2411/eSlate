@@ -84,6 +84,24 @@ uri = "file://attached_assets/eslate_compact_horizontal.png"
 type = "image"
 title = "eSlate compact horizontal navbar style"
 
+[[generated]]
+id = "0o_fSghJIIOCCa04rEOd3"
+uri = "file://attached_assets/eslate_compact_stylus1.png"
+type = "image"
+title = "eSlate compact clear stylus horizontal"
+
+[[generated]]
+id = "S8kurILsPQDsTc8eRnqJu"
+uri = "file://attached_assets/eslate_compact_stylus2.png"
+type = "image"
+title = "eSlate compact prominent stylus outside tablet"
+
+[[generated]]
+id = "t48pz48-TOOHAreApMnD7"
+uri = "file://attached_assets/eslate_compact_stylus3.png"
+type = "image"
+title = "eSlate compact bold stylus tight spacing"
+
 [[outputs]]
 id = "d_d0mcHLpp2TCe12z2cJl"
 uri = "file://eSlate_Device_Requirements.pdf"
@@ -173,3 +191,21 @@ id = "aDvVnEbrrYzQ5Cks00Kp7"
 uri = "file://attached_assets/eslate_compact_horizontal.png"
 type = "image"
 title = "Compact C — Horizontal, icon + text side by side (navbar style)"
+
+[[outputs]]
+id = "iilWDNG7XMjjBmDSvyzzB"
+uri = "file://attached_assets/eslate_compact_stylus1.png"
+type = "image"
+title = "Option 1 — Compact, stylus extends from tablet corner"
+
+[[outputs]]
+id = "SAQi1oCuWpplUrUcFhTAt"
+uri = "file://attached_assets/eslate_compact_stylus2.png"
+type = "image"
+title = "Option 2 — Compact, large stylus overlapping outside tablet"
+
+[[outputs]]
+id = "Q3Vl-vfoT-I_mHpj1mIRl"
+uri = "file://attached_assets/eslate_compact_stylus3.png"
+type = "image"
+title = "Option 3 — Compact, bold stylus resting diagonally"
