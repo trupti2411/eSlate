@@ -92,6 +92,7 @@ export const tutoringCompanies = pgTable("tutoring_companies", {
   contactEmail: varchar("contact_email"),
   contactPhone: varchar("contact_phone"),
   address: text("address"),
+  state: varchar("state", { length: 10 }), // Australian state/territory: NSW, VIC, QLD, SA, WA, TAS, NT, ACT
   tutorChatEnabled: boolean("tutor_chat_enabled").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),

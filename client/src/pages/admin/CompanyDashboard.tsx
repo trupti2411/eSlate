@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -378,6 +378,97 @@ function ChatSettingsSection({ companyId, tutors }: { companyId?: string; tutors
               <p className="font-medium">No support contacts added yet</p>
               <p className="text-sm mt-1">Add staff members who should be available to chat with parents</p>
             </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+const AUS_STATES = [
+  { code: 'NSW', label: 'New South Wales (NSW)' },
+  { code: 'VIC', label: 'Victoria (VIC)' },
+  { code: 'QLD', label: 'Queensland (QLD)' },
+  { code: 'SA', label: 'South Australia (SA)' },
+  { code: 'WA', label: 'Western Australia (WA)' },
+  { code: 'TAS', label: 'Tasmania (TAS)' },
+  { code: 'ACT', label: 'Australian Capital Territory (ACT)' },
+  { code: 'NT', label: 'Northern Territory (NT)' },
+];
+
+function CompanyLocationSection({ companyId }: { companyId?: string }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: companySettings } = useQuery<{ state?: string; tutorChatEnabled?: boolean }>({
+    queryKey: ['/api/admin/company-settings', companyId],
+    enabled: !!companyId,
+  });
+
+  const [selectedState, setSelectedState] = useState<string>('');
+
+  useEffect(() => {
+    if (companySettings?.state) {
+      setSelectedState(companySettings.state.toUpperCase());
+    }
+  }, [companySettings?.state]);
+
+  const updateStateMutation = useMutation({
+    mutationFn: async (state: string) => {
+      return await apiRequest("/api/admin/company-settings", "PATCH", { state });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/company-settings', companyId] });
+      toast({ title: "Location updated", description: "Your business state has been saved." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to update state.", variant: "destructive" });
+    },
+  });
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2 mb-6">
+        <MapPin className="h-6 w-6" />
+        Business Location
+      </h2>
+      <Card className="border-2 border-gray-200">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <MapPin className="h-5 w-5" />
+            State / Territory
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <p className="text-sm text-gray-600">
+            Setting your state allows the academic calendar auto-setup to pre-fill the correct term dates for your region.
+          </p>
+          <div className="flex items-end gap-3">
+            <div className="flex-1 max-w-xs">
+              <Select value={selectedState} onValueChange={setSelectedState}>
+                <SelectTrigger className="border-black">
+                  <SelectValue placeholder="Select your state…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUS_STATES.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <button
+              disabled={!selectedState || updateStateMutation.isPending}
+              onClick={() => selectedState && updateStateMutation.mutate(selectedState)}
+              className="px-4 py-2 bg-black text-white text-sm rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {updateStateMutation.isPending ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+          {companySettings?.state && (
+            <p className="text-xs text-green-700 font-medium flex items-center gap-1">
+              <CheckCircle className="h-3.5 w-3.5" />
+              Currently set to: {companySettings.state}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -2990,6 +3081,7 @@ export default function CompanyDashboard() {
       {mainTab === 'settings' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="space-y-8">
+            <CompanyLocationSection companyId={companyAdmin?.companyId} />
             <ChatSettingsSection companyId={companyAdmin?.companyId} tutors={tutors} />
             <NotificationSettings userRole="company_admin" />
           </div>

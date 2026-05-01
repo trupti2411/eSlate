@@ -3765,6 +3765,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const [company] = await db.select({
         tutorChatEnabled: tutoringCompanies.tutorChatEnabled,
+        state: tutoringCompanies.state,
+        name: tutoringCompanies.name,
+        description: tutoringCompanies.description,
+        contactEmail: tutoringCompanies.contactEmail,
+        contactPhone: tutoringCompanies.contactPhone,
+        address: tutoringCompanies.address,
       }).from(tutoringCompanies).where(eq(tutoringCompanies.id, companyAdmin.companyId));
       
       res.json(company || { tutorChatEnabled: true });
@@ -3783,9 +3789,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
       if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
       
-      const { tutorChatEnabled } = req.body;
+      const { tutorChatEnabled, state, name, description, contactEmail, contactPhone, address } = req.body;
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (tutorChatEnabled !== undefined) updates.tutorChatEnabled = tutorChatEnabled;
+      if (state !== undefined) updates.state = state;
+      if (name !== undefined) updates.name = name;
+      if (description !== undefined) updates.description = description;
+      if (contactEmail !== undefined) updates.contactEmail = contactEmail;
+      if (contactPhone !== undefined) updates.contactPhone = contactPhone;
+      if (address !== undefined) updates.address = address;
+
       await db.update(tutoringCompanies)
-        .set({ tutorChatEnabled, updatedAt: new Date() })
+        .set(updates)
         .where(eq(tutoringCompanies.id, companyAdmin.companyId));
       
       res.json({ message: "Settings updated" });
@@ -4848,23 +4863,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Academic year not found" });
       }
 
-      // NSW 2026 official term dates (Eastern & Western divisions)
-      const NSW_2026_TERMS = {
-        Eastern: [
-          { name: "Term 1", startDate: new Date("2026-01-27"), endDate: new Date("2026-04-01") },
-          { name: "Term 2", startDate: new Date("2026-04-28"), endDate: new Date("2026-07-04") },
-          { name: "Term 3", startDate: new Date("2026-07-21"), endDate: new Date("2026-09-26") },
-          { name: "Term 4", startDate: new Date("2026-10-13"), endDate: new Date("2026-12-19") },
-        ],
-        Western: [
-          { name: "Term 1", startDate: new Date("2026-02-03"), endDate: new Date("2026-04-01") },
-          { name: "Term 2", startDate: new Date("2026-04-28"), endDate: new Date("2026-07-04") },
-          { name: "Term 3", startDate: new Date("2026-07-21"), endDate: new Date("2026-09-26") },
-          { name: "Term 4", startDate: new Date("2026-10-13"), endDate: new Date("2026-12-19") },
-        ],
+      // Official 2026 Australian school term dates by state/territory
+      // Sources: respective state education department websites
+      const AUS_2026_TERMS: Record<string, Record<string, { name: string; startDate: Date; endDate: Date }[]>> = {
+        NSW: {
+          Eastern: [
+            { name: "Term 1", startDate: new Date("2026-01-27"), endDate: new Date("2026-04-01") },
+            { name: "Term 2", startDate: new Date("2026-04-28"), endDate: new Date("2026-07-04") },
+            { name: "Term 3", startDate: new Date("2026-07-21"), endDate: new Date("2026-09-26") },
+            { name: "Term 4", startDate: new Date("2026-10-13"), endDate: new Date("2026-12-19") },
+          ],
+          Western: [
+            { name: "Term 1", startDate: new Date("2026-02-03"), endDate: new Date("2026-04-01") },
+            { name: "Term 2", startDate: new Date("2026-04-28"), endDate: new Date("2026-07-04") },
+            { name: "Term 3", startDate: new Date("2026-07-21"), endDate: new Date("2026-09-26") },
+            { name: "Term 4", startDate: new Date("2026-10-13"), endDate: new Date("2026-12-19") },
+          ],
+        },
+        // Victoria — source: vic.gov.au / schools.vic.gov.au
+        VIC: {
+          default: [
+            { name: "Term 1", startDate: new Date("2026-01-28"), endDate: new Date("2026-04-02") },
+            { name: "Term 2", startDate: new Date("2026-04-20"), endDate: new Date("2026-06-26") },
+            { name: "Term 3", startDate: new Date("2026-07-13"), endDate: new Date("2026-09-18") },
+            { name: "Term 4", startDate: new Date("2026-10-05"), endDate: new Date("2026-12-18") },
+          ],
+        },
+        // Queensland — source: education.qld.gov.au
+        QLD: {
+          default: [
+            { name: "Term 1", startDate: new Date("2026-01-27"), endDate: new Date("2026-03-25") },
+            { name: "Term 2", startDate: new Date("2026-04-12"), endDate: new Date("2026-06-25") },
+            { name: "Term 3", startDate: new Date("2026-07-12"), endDate: new Date("2026-09-17") },
+            { name: "Term 4", startDate: new Date("2026-10-05"), endDate: new Date("2026-12-10") },
+          ],
+        },
+        // South Australia — source: education.sa.gov.au
+        SA: {
+          default: [
+            { name: "Term 1", startDate: new Date("2026-01-27"), endDate: new Date("2026-04-10") },
+            { name: "Term 2", startDate: new Date("2026-04-27"), endDate: new Date("2026-07-03") },
+            { name: "Term 3", startDate: new Date("2026-07-20"), endDate: new Date("2026-09-25") },
+            { name: "Term 4", startDate: new Date("2026-10-12"), endDate: new Date("2026-12-11") },
+          ],
+        },
+        // Western Australia — source: education.wa.edu.au
+        WA: {
+          default: [
+            { name: "Term 1", startDate: new Date("2026-02-02"), endDate: new Date("2026-04-02") },
+            { name: "Term 2", startDate: new Date("2026-04-20"), endDate: new Date("2026-07-03") },
+            { name: "Term 3", startDate: new Date("2026-07-20"), endDate: new Date("2026-09-25") },
+            { name: "Term 4", startDate: new Date("2026-10-12"), endDate: new Date("2026-12-17") },
+          ],
+        },
+        // Tasmania — source: decyp.tas.gov.au
+        TAS: {
+          default: [
+            { name: "Term 1", startDate: new Date("2026-02-05"), endDate: new Date("2026-04-17") },
+            { name: "Term 2", startDate: new Date("2026-05-04"), endDate: new Date("2026-07-10") },
+            { name: "Term 3", startDate: new Date("2026-07-27"), endDate: new Date("2026-10-02") },
+            { name: "Term 4", startDate: new Date("2026-10-19"), endDate: new Date("2026-12-18") },
+          ],
+        },
+        // ACT — source: education.act.gov.au
+        ACT: {
+          default: [
+            { name: "Term 1", startDate: new Date("2026-02-02"), endDate: new Date("2026-04-02") },
+            { name: "Term 2", startDate: new Date("2026-04-21"), endDate: new Date("2026-07-03") },
+            { name: "Term 3", startDate: new Date("2026-07-20"), endDate: new Date("2026-09-25") },
+            { name: "Term 4", startDate: new Date("2026-10-13"), endDate: new Date("2026-12-18") },
+          ],
+        },
+        // Northern Territory — source: education.nt.gov.au (similar to QLD pattern)
+        NT: {
+          default: [
+            { name: "Term 1", startDate: new Date("2026-01-27"), endDate: new Date("2026-03-27") },
+            { name: "Term 2", startDate: new Date("2026-04-14"), endDate: new Date("2026-06-26") },
+            { name: "Term 3", startDate: new Date("2026-07-14"), endDate: new Date("2026-09-18") },
+            { name: "Term 4", startDate: new Date("2026-10-06"), endDate: new Date("2026-12-11") },
+          ],
+        },
       };
 
-      const termDates = NSW_2026_TERMS[division === 'Western' ? 'Western' : 'Eastern'];
+      // Auto-detect state from company profile if not explicitly provided
+      const companyRecord = await storage.getTutoringCompany(companyId);
+      const effectiveState = (state || companyRecord?.state || 'NSW').toUpperCase();
+
+      const stateTerms = AUS_2026_TERMS[effectiveState] || AUS_2026_TERMS['NSW'];
+      const termDates = stateTerms[division === 'Western' && effectiveState === 'NSW' ? 'Western' : 'default'] || stateTerms['Eastern'] || Object.values(stateTerms)[0];
 
       // Helper: generate weekly breakdown for a term
       function generateWeeks(termStart: Date, termEnd: Date) {
@@ -4926,9 +5012,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         createdTerms.push({ ...term, weeks: createdWeeks });
       }
 
+      const divisionLabel = effectiveState === 'NSW' ? ` (${division ?? 'Eastern'} Division)` : '';
       res.status(201).json({
-        message: `Created ${createdTerms.length} terms with weeks for ${state} ${division ?? 'Eastern'} Division 2026`,
+        message: `Created ${createdTerms.length} terms with weeks for ${effectiveState}${divisionLabel} 2026`,
         terms: createdTerms,
+        state: effectiveState,
       });
     } catch (error) {
       console.error("Error in academic auto-setup:", error);

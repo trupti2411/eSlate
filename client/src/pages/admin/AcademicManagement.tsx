@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useForm } from 'react-hook-form';
@@ -150,6 +150,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   // Auto-setup state
   const [isAutoSetupOpen, setIsAutoSetupOpen] = useState(false);
   const [autoSetupYearId, setAutoSetupYearId] = useState('');
+  const [autoSetupState, setAutoSetupState] = useState('NSW');
   const [autoSetupDivision, setAutoSetupDivision] = useState<'Eastern' | 'Western'>('Eastern');
   const [termWeeks, setTermWeeks] = useState<Record<string, any[]>>({});
   const [expandedTerms, setExpandedTerms] = useState<Record<string, boolean>>({});
@@ -300,6 +301,13 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     },
   });
 
+  // Sync company state into auto-setup dialog when company settings load
+  useEffect(() => {
+    if (companySettings?.state) {
+      setAutoSetupState(companySettings.state.toUpperCase());
+    }
+  }, [companySettings?.state]);
+
   // Fetch weeks for a term (lazy load on expand)
   const fetchTermWeeks = async (termId: string) => {
     if (termWeeks[termId]) {
@@ -319,20 +327,107 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     }
   };
 
-  // NSW 2026 preview data (for dialog preview)
-  const NSW_2026_PREVIEW = {
-    Eastern: [
-      { name: "Term 1", start: "27 Jan", end: "1 Apr", weeks: 10 },
-      { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
-      { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
-      { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
-    ],
-    Western: [
-      { name: "Term 1", start: "3 Feb", end: "1 Apr", weeks: 9 },
-      { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
-      { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
-      { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
-    ],
+  // 2026 preview data for all Australian states (for dialog preview)
+  const AUS_2026_PREVIEW: Record<string, Record<string, { name: string; start: string; end: string; weeks: number }[]>> = {
+    NSW: {
+      Eastern: [
+        { name: "Term 1", start: "27 Jan", end: "1 Apr", weeks: 10 },
+        { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
+        { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
+        { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
+      ],
+      Western: [
+        { name: "Term 1", start: "3 Feb", end: "1 Apr", weeks: 9 },
+        { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
+        { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
+        { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
+      ],
+    },
+    VIC: {
+      default: [
+        { name: "Term 1", start: "28 Jan", end: "2 Apr", weeks: 9 },
+        { name: "Term 2", start: "20 Apr", end: "26 Jun", weeks: 10 },
+        { name: "Term 3", start: "13 Jul", end: "18 Sep", weeks: 10 },
+        { name: "Term 4", start: "5 Oct", end: "18 Dec", weeks: 11 },
+      ],
+    },
+    QLD: {
+      default: [
+        { name: "Term 1", start: "27 Jan", end: "25 Mar", weeks: 9 },
+        { name: "Term 2", start: "12 Apr", end: "25 Jun", weeks: 11 },
+        { name: "Term 3", start: "12 Jul", end: "17 Sep", weeks: 10 },
+        { name: "Term 4", start: "5 Oct", end: "10 Dec", weeks: 10 },
+      ],
+    },
+    SA: {
+      default: [
+        { name: "Term 1", start: "27 Jan", end: "10 Apr", weeks: 11 },
+        { name: "Term 2", start: "27 Apr", end: "3 Jul", weeks: 10 },
+        { name: "Term 3", start: "20 Jul", end: "25 Sep", weeks: 10 },
+        { name: "Term 4", start: "12 Oct", end: "11 Dec", weeks: 9 },
+      ],
+    },
+    WA: {
+      default: [
+        { name: "Term 1", start: "2 Feb", end: "2 Apr", weeks: 9 },
+        { name: "Term 2", start: "20 Apr", end: "3 Jul", weeks: 11 },
+        { name: "Term 3", start: "20 Jul", end: "25 Sep", weeks: 10 },
+        { name: "Term 4", start: "12 Oct", end: "17 Dec", weeks: 10 },
+      ],
+    },
+    TAS: {
+      default: [
+        { name: "Term 1", start: "5 Feb", end: "17 Apr", weeks: 10 },
+        { name: "Term 2", start: "4 May", end: "10 Jul", weeks: 10 },
+        { name: "Term 3", start: "27 Jul", end: "2 Oct", weeks: 10 },
+        { name: "Term 4", start: "19 Oct", end: "18 Dec", weeks: 9 },
+      ],
+    },
+    ACT: {
+      default: [
+        { name: "Term 1", start: "2 Feb", end: "2 Apr", weeks: 9 },
+        { name: "Term 2", start: "21 Apr", end: "3 Jul", weeks: 11 },
+        { name: "Term 3", start: "20 Jul", end: "25 Sep", weeks: 10 },
+        { name: "Term 4", start: "13 Oct", end: "18 Dec", weeks: 10 },
+      ],
+    },
+    NT: {
+      default: [
+        { name: "Term 1", start: "27 Jan", end: "27 Mar", weeks: 9 },
+        { name: "Term 2", start: "14 Apr", end: "26 Jun", weeks: 11 },
+        { name: "Term 3", start: "14 Jul", end: "18 Sep", weeks: 10 },
+        { name: "Term 4", start: "6 Oct", end: "11 Dec", weeks: 10 },
+      ],
+    },
+  };
+
+  const AUS_STATES = [
+    { code: 'NSW', label: 'New South Wales (NSW)' },
+    { code: 'VIC', label: 'Victoria (VIC)' },
+    { code: 'QLD', label: 'Queensland (QLD)' },
+    { code: 'SA', label: 'South Australia (SA)' },
+    { code: 'WA', label: 'Western Australia (WA)' },
+    { code: 'TAS', label: 'Tasmania (TAS)' },
+    { code: 'ACT', label: 'Australian Capital Territory (ACT)' },
+    { code: 'NT', label: 'Northern Territory (NT)' },
+  ];
+
+  const STATE_SOURCES: Record<string, string> = {
+    NSW: 'education.nsw.gov.au',
+    VIC: 'schools.vic.gov.au',
+    QLD: 'education.qld.gov.au',
+    SA: 'education.sa.gov.au',
+    WA: 'education.wa.edu.au',
+    TAS: 'decyp.tas.gov.au',
+    ACT: 'education.act.gov.au',
+    NT: 'education.nt.gov.au',
+  };
+
+  // Get the preview for the currently selected state + division
+  const getPreviewTerms = () => {
+    const stateData = AUS_2026_PREVIEW[autoSetupState] || AUS_2026_PREVIEW['NSW'];
+    if (autoSetupState === 'NSW') return stateData[autoSetupDivision] || stateData['Eastern'];
+    return stateData['default'] || Object.values(stateData)[0];
   };
 
   const createTermMutation = useMutation({
@@ -615,6 +710,13 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const { data: academicYears = [], isLoading: yearsLoading, error: yearsError } = useQuery({
     queryKey: [`/api/companies/${companyId}/academic-years`],
     enabled: !!companyId,
+  });
+
+  // Fetch company settings to auto-detect state for calendar setup
+  const { data: companySettings } = useQuery<{ state?: string; tutorChatEnabled?: boolean; name?: string }>({
+    queryKey: ['/api/admin/company-settings'],
+    enabled: !!companyId,
+    staleTime: 60000,
   });
 
   // Fetch academic terms (with optional year filter)
@@ -1092,7 +1194,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 onClick={() => setIsAutoSetupOpen(true)}
               >
                 <Zap className="w-4 h-4 mr-2" />
-                Auto-Setup NSW 2026
+                Auto-Setup Australia 2026
               </Button>
               <Dialog open={isAddTermOpen} onOpenChange={setIsAddTermOpen}>
                 <DialogTrigger asChild>
@@ -2853,16 +2955,18 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
         </DialogContent>
       </Dialog>
 
-      {/* Auto-Setup NSW 2026 Dialog */}
+      {/* Auto-Setup Australian 2026 Academic Calendar Dialog */}
       <Dialog open={isAutoSetupOpen} onOpenChange={setIsAutoSetupOpen}>
-        <DialogContent className="sm:max-w-[560px]">
+        <DialogContent className="sm:max-w-[580px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Zap className="w-5 h-5 text-green-600" />
-              Auto-Setup NSW 2026 Academic Calendar
+              Auto-Setup 2026 Academic Calendar
             </DialogTitle>
             <DialogDescription>
-              Creates Term 1–4 with official NSW Department of Education dates, plus weekly breakdowns for each term.
+              {companySettings?.state
+                ? `Your business is set to ${autoSetupState}. Dates are pre-filled from official government sources.`
+                : 'Select your state to load official 2026 school term dates automatically.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -2883,33 +2987,55 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               <p className="text-[11px] text-gray-500">Terms will be created under this year level.</p>
             </div>
 
-            {/* Division Selector */}
+            {/* State Selector */}
             <div className="space-y-1.5">
               <Label className="text-sm font-medium flex items-center gap-1.5">
                 <MapPin className="w-3.5 h-3.5" />
-                NSW Division
+                State / Territory
+                {companySettings?.state && (
+                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-normal ml-1">
+                    Auto-detected from your profile
+                  </span>
+                )}
               </Label>
-              <div className="flex gap-2">
-                {(['Eastern', 'Western'] as const).map((div) => (
-                  <button
-                    key={div}
-                    onClick={() => setAutoSetupDivision(div)}
-                    className={`flex-1 py-1.5 text-sm rounded-md border font-medium transition-colors ${
-                      autoSetupDivision === div
-                        ? 'bg-green-600 text-white border-green-600'
-                        : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
-                    }`}
-                  >
-                    {div} Division
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-gray-500">
-                {autoSetupDivision === 'Western'
-                  ? 'Western Division: Term 1 starts Tue 3 Feb (one week later than Eastern).'
-                  : 'Eastern Division: Term 1 starts Tue 27 Jan. Most Sydney/coastal schools.'}
-              </p>
+              <Select value={autoSetupState} onValueChange={setAutoSetupState}>
+                <SelectTrigger className="border-black">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUS_STATES.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
+
+            {/* NSW Division Selector — only shown for NSW */}
+            {autoSetupState === 'NSW' && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">NSW Division</Label>
+                <div className="flex gap-2">
+                  {(['Eastern', 'Western'] as const).map((div) => (
+                    <button
+                      key={div}
+                      onClick={() => setAutoSetupDivision(div)}
+                      className={`flex-1 py-1.5 text-sm rounded-md border font-medium transition-colors ${
+                        autoSetupDivision === div
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
+                      }`}
+                    >
+                      {div} Division
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  {autoSetupDivision === 'Western'
+                    ? 'Western Division: Term 1 starts 3 Feb (one week later than Eastern).'
+                    : 'Eastern Division: Term 1 starts 27 Jan. Most Sydney/coastal schools.'}
+                </p>
+              </div>
+            )}
 
             {/* Preview Table */}
             <div className="space-y-1.5">
@@ -2917,22 +3043,22 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               <div className="border rounded-lg overflow-hidden text-sm">
                 <div className="grid grid-cols-3 bg-gray-50 font-medium text-gray-600 text-xs px-3 py-1.5 border-b">
                   <span>Term</span>
-                  <span>Dates</span>
+                  <span>Dates (2026)</span>
                   <span>Weeks</span>
                 </div>
-                {NSW_2026_PREVIEW[autoSetupDivision].map((t) => (
+                {getPreviewTerms().map((t) => (
                   <div key={t.name} className="grid grid-cols-3 px-3 py-1.5 border-b last:border-0 text-xs">
                     <span className="font-semibold text-gray-800">{t.name}</span>
                     <span className="text-gray-600">{t.start} – {t.end}</span>
-                    <span className="text-green-700 font-medium">{t.weeks} weeks</span>
+                    <span className="text-green-700 font-medium">{t.weeks} wks</span>
                   </div>
                 ))}
                 <div className="px-3 py-1.5 bg-green-50 text-xs text-green-800 font-medium">
-                  Total: 4 terms · ~{NSW_2026_PREVIEW[autoSetupDivision].reduce((s, t) => s + t.weeks, 0)} weeks created
+                  Total: 4 terms · ~{getPreviewTerms().reduce((s, t) => s + t.weeks, 0)} weeks created
                 </div>
               </div>
               <p className="text-[11px] text-gray-400">
-                Source: NSW Department of Education — education.nsw.gov.au/schooling/calendars/2026
+                Source: {STATE_SOURCES[autoSetupState] || 'Official state education department'}
               </p>
             </div>
 
@@ -2946,12 +3072,12 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             <Button
               className="bg-green-600 hover:bg-green-700 text-white"
               disabled={!autoSetupYearId || autoSetupMutation.isPending}
-              onClick={() => autoSetupMutation.mutate({ yearId: autoSetupYearId, state: 'NSW', division: autoSetupDivision })}
+              onClick={() => autoSetupMutation.mutate({ yearId: autoSetupYearId, state: autoSetupState, division: autoSetupDivision })}
             >
               {autoSetupMutation.isPending ? (
                 <span className="flex items-center gap-1.5"><span className="animate-spin">⏳</span> Creating…</span>
               ) : (
-                <span className="flex items-center gap-1.5"><Zap className="w-4 h-4" /> Create NSW 2026 Calendar</span>
+                <span className="flex items-center gap-1.5"><Zap className="w-4 h-4" /> Create {autoSetupState} 2026 Calendar</span>
               )}
             </Button>
           </div>
