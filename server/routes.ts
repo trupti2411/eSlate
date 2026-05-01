@@ -4794,6 +4794,148 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Academic Weeks - list for a term
+  app.get('/api/companies/:companyId/academic-weeks', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const { termId } = req.query as { termId?: string };
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin' && user.role !== 'tutor') {
+        return res.status(403).json({ message: "Access required" });
+      }
+
+      if (!termId) return res.status(400).json({ message: "termId query param required" });
+
+      const weeks = await storage.getAcademicWeeksByTerm(termId);
+      res.json(weeks);
+    } catch (error) {
+      console.error("Error fetching academic weeks:", error);
+      res.status(500).json({ message: "Failed to fetch academic weeks" });
+    }
+  });
+
+  // Auto-setup Australian academic calendar (terms + weeks)
+  app.post('/api/companies/:companyId/academic-auto-setup', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const { yearId, state, division } = req.body as {
+        yearId: string;
+        state: string;
+        division: 'Eastern' | 'Western';
+      };
+
+      if (!yearId || !state) {
+        return res.status(400).json({ message: "yearId and state are required" });
+      }
+
+      // Verify the academic year belongs to this company
+      const academicYear = await storage.getAcademicYear(yearId);
+      if (!academicYear || academicYear.companyId !== companyId) {
+        return res.status(404).json({ message: "Academic year not found" });
+      }
+
+      // NSW 2026 official term dates (Eastern & Western divisions)
+      const NSW_2026_TERMS = {
+        Eastern: [
+          { name: "Term 1", startDate: new Date("2026-01-27"), endDate: new Date("2026-04-01") },
+          { name: "Term 2", startDate: new Date("2026-04-28"), endDate: new Date("2026-07-04") },
+          { name: "Term 3", startDate: new Date("2026-07-21"), endDate: new Date("2026-09-26") },
+          { name: "Term 4", startDate: new Date("2026-10-13"), endDate: new Date("2026-12-19") },
+        ],
+        Western: [
+          { name: "Term 1", startDate: new Date("2026-02-03"), endDate: new Date("2026-04-01") },
+          { name: "Term 2", startDate: new Date("2026-04-28"), endDate: new Date("2026-07-04") },
+          { name: "Term 3", startDate: new Date("2026-07-21"), endDate: new Date("2026-09-26") },
+          { name: "Term 4", startDate: new Date("2026-10-13"), endDate: new Date("2026-12-19") },
+        ],
+      };
+
+      const termDates = NSW_2026_TERMS[division === 'Western' ? 'Western' : 'Eastern'];
+
+      // Helper: generate weekly breakdown for a term
+      function generateWeeks(termStart: Date, termEnd: Date) {
+        const weeks: { weekNumber: number; name: string; startDate: Date; endDate: Date }[] = [];
+        // Align to the Monday of the week containing termStart
+        const dayOfWeek = termStart.getDay(); // 0=Sun, 1=Mon
+        const daysToMonday = dayOfWeek === 0 ? 1 : dayOfWeek === 1 ? 0 : -(dayOfWeek - 1);
+        const firstMonday = new Date(termStart);
+        firstMonday.setDate(termStart.getDate() + daysToMonday);
+
+        let weekStart = new Date(firstMonday);
+        let weekNum = 1;
+        while (weekStart <= termEnd) {
+          const weekEnd = new Date(weekStart);
+          weekEnd.setDate(weekStart.getDate() + 4); // Friday
+          if (weekEnd > termEnd) weekEnd.setTime(termEnd.getTime());
+
+          weeks.push({
+            weekNumber: weekNum,
+            name: `Week ${weekNum}`,
+            startDate: new Date(weekStart),
+            endDate: new Date(weekEnd),
+          });
+
+          weekStart.setDate(weekStart.getDate() + 7);
+          weekNum++;
+        }
+        return weeks;
+      }
+
+      const createdTerms: any[] = [];
+
+      for (const termData of termDates) {
+        // Create the term
+        const term = await storage.createAcademicTerm({
+          academicYearId: yearId,
+          companyId,
+          name: termData.name,
+          startDate: termData.startDate,
+          endDate: termData.endDate,
+          isActive: true,
+        });
+
+        // Generate and create weeks
+        const weeksList = generateWeeks(termData.startDate, termData.endDate);
+        const createdWeeks: any[] = [];
+        for (const week of weeksList) {
+          const w = await storage.createAcademicWeek({
+            termId: term.id,
+            companyId,
+            weekNumber: week.weekNumber,
+            name: week.name,
+            startDate: week.startDate,
+            endDate: week.endDate,
+          });
+          createdWeeks.push(w);
+        }
+
+        createdTerms.push({ ...term, weeks: createdWeeks });
+      }
+
+      res.status(201).json({
+        message: `Created ${createdTerms.length} terms with weeks for ${state} ${division ?? 'Eastern'} Division 2026`,
+        terms: createdTerms,
+      });
+    } catch (error) {
+      console.error("Error in academic auto-setup:", error);
+      res.status(500).json({ message: "Failed to auto-setup academic calendar" });
+    }
+  });
+
   // Data clearing routes (admin only)
   app.delete('/api/admin/clear-assignments', isAuthenticated, async (req: any, res: any) => {
     try {

@@ -533,6 +533,18 @@ export const academicTerms = pgTable("academic_terms", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Academic Weeks table
+export const academicWeeks = pgTable("academic_weeks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  termId: varchar("term_id").notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  weekNumber: integer("week_number").notNull(),
+  name: varchar("name").notNull(), // e.g. "Week 1"
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Classes table
 export const classes = pgTable("classes", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -583,8 +595,20 @@ export const academicTermsRelations = relations(academicTerms, ({ one, many }) =
     fields: [academicTerms.companyId],
     references: [tutoringCompanies.id],
   }),
+  weeks: many(academicWeeks),
   classes: many(classes),
   assignments: many(assignments),
+}));
+
+export const academicWeeksRelations = relations(academicWeeks, ({ one }) => ({
+  term: one(academicTerms, {
+    fields: [academicWeeks.termId],
+    references: [academicTerms.id],
+  }),
+  company: one(tutoringCompanies, {
+    fields: [academicWeeks.companyId],
+    references: [tutoringCompanies.id],
+  }),
 }));
 
 export const classesRelations = relations(classes, ({ one, many }) => ({
@@ -618,6 +642,7 @@ export const studentClassAssignmentsRelations = relations(studentClassAssignment
 // Type exports for academic entities
 export type AcademicYear = typeof academicYears.$inferSelect;
 export type AcademicTerm = typeof academicTerms.$inferSelect;
+export type AcademicWeek = typeof academicWeeks.$inferSelect;
 export type Class = typeof classes.$inferSelect;
 export type StudentClassAssignment = typeof studentClassAssignments.$inferSelect;
 export type InsertStudentClassAssignment = typeof studentClassAssignments.$inferInsert;
@@ -635,6 +660,11 @@ export const insertAcademicTermSchema = createInsertSchema(academicTerms).omit({
   updatedAt: true,
 });
 
+export const insertAcademicWeekSchema = createInsertSchema(academicWeeks).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertClassSchema = createInsertSchema(classes).omit({
   id: true,
   createdAt: true,
@@ -650,6 +680,7 @@ export const insertStudentClassAssignmentSchema = createInsertSchema(studentClas
 // Insert types for academic management
 export type InsertAcademicYear = z.infer<typeof insertAcademicYearSchema>;
 export type InsertAcademicTerm = z.infer<typeof insertAcademicTermSchema>;
+export type InsertAcademicWeek = z.infer<typeof insertAcademicWeekSchema>;
 export type InsertClass = z.infer<typeof insertClassSchema>;
 export type InsertStudentAssignment = z.infer<typeof insertStudentClassAssignmentSchema>;
 

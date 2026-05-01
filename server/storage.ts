@@ -10,6 +10,7 @@ import {
   calendarEvents,
   academicYears,
   academicTerms,
+  academicWeeks,
   classes,
   studentClassAssignments,
   assignments,
@@ -50,6 +51,8 @@ import {
   type InsertAcademicYear,
   type AcademicTerm,
   type InsertAcademicTerm,
+  type AcademicWeek,
+  type InsertAcademicWeek,
   type Class,
   type InsertClass,
   type StudentClassAssignment,
@@ -198,6 +201,11 @@ export interface IStorage {
   updateAcademicTerm(id: string, updates: Partial<InsertAcademicTerm>): Promise<AcademicTerm>;
   deleteAcademicTerm(id: string): Promise<void>;
   permanentlyDeleteAcademicTerm(id: string): Promise<void>;
+
+  // Academic Weeks
+  createAcademicWeek(week: InsertAcademicWeek): Promise<AcademicWeek>;
+  getAcademicWeeksByTerm(termId: string): Promise<AcademicWeek[]>;
+  deleteAcademicWeeksByTerm(termId: string): Promise<void>;
 
   // Classes
   createClass(classData: InsertClass): Promise<Class>;
@@ -1524,6 +1532,22 @@ export class DatabaseStorage implements IStorage {
     
     // Finally delete the term itself
     await db.delete(academicTerms).where(eq(academicTerms.id, id));
+  }
+
+  // Academic Weeks
+  async createAcademicWeek(week: InsertAcademicWeek): Promise<AcademicWeek> {
+    const [newWeek] = await db.insert(academicWeeks).values(week).returning();
+    return newWeek;
+  }
+
+  async getAcademicWeeksByTerm(termId: string): Promise<AcademicWeek[]> {
+    return await db.select().from(academicWeeks)
+      .where(eq(academicWeeks.termId, termId))
+      .orderBy(academicWeeks.weekNumber);
+  }
+
+  async deleteAcademicWeeksByTerm(termId: string): Promise<void> {
+    await db.delete(academicWeeks).where(eq(academicWeeks.termId, termId));
   }
 
   // Classes

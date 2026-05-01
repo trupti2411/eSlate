@@ -30,7 +30,11 @@ import {
   Search,
   Filter,
   ArrowUpDown,
-  Archive
+  Archive,
+  Zap,
+  ChevronDown,
+  ChevronRight,
+  MapPin,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -142,6 +146,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     message: string;
     conflicts: string[];
   } | null>(null);
+
+  // Auto-setup state
+  const [isAutoSetupOpen, setIsAutoSetupOpen] = useState(false);
+  const [autoSetupYearId, setAutoSetupYearId] = useState('');
+  const [autoSetupDivision, setAutoSetupDivision] = useState<'Eastern' | 'Western'>('Eastern');
+  const [termWeeks, setTermWeeks] = useState<Record<string, any[]>>({});
+  const [expandedTerms, setExpandedTerms] = useState<Record<string, boolean>>({});
+  const [loadingWeeks, setLoadingWeeks] = useState<Record<string, boolean>>({});
 
   // Search, filter, and sort states for Academic Years
   const [yearSearch, setYearSearch] = useState('');
@@ -262,6 +274,65 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     if (confirm(`Are you sure you want to delete "${yearName}"? This will also delete all terms and classes under this year.`)) {
       deleteYearMutation.mutate(yearId);
     }
+  };
+
+  // Auto-setup mutation
+  const autoSetupMutation = useMutation({
+    mutationFn: async (data: { yearId: string; state: string; division: string }) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-auto-setup`, 'POST', data);
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Calendar Created",
+        description: data.message || "NSW 2026 academic calendar set up successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setIsAutoSetupOpen(false);
+      setAutoSetupYearId('');
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Setup Failed",
+        description: error.message || "Failed to auto-setup academic calendar",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Fetch weeks for a term (lazy load on expand)
+  const fetchTermWeeks = async (termId: string) => {
+    if (termWeeks[termId]) {
+      setExpandedTerms(prev => ({ ...prev, [termId]: !prev[termId] }));
+      return;
+    }
+    setLoadingWeeks(prev => ({ ...prev, [termId]: true }));
+    try {
+      const res = await fetch(`/api/companies/${companyId}/academic-weeks?termId=${termId}`, { credentials: 'include' });
+      const data = await res.json();
+      setTermWeeks(prev => ({ ...prev, [termId]: data }));
+      setExpandedTerms(prev => ({ ...prev, [termId]: true }));
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingWeeks(prev => ({ ...prev, [termId]: false }));
+    }
+  };
+
+  // NSW 2026 preview data (for dialog preview)
+  const NSW_2026_PREVIEW = {
+    Eastern: [
+      { name: "Term 1", start: "27 Jan", end: "1 Apr", weeks: 10 },
+      { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
+      { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
+      { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
+    ],
+    Western: [
+      { name: "Term 1", start: "3 Feb", end: "1 Apr", weeks: 9 },
+      { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
+      { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
+      { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
+    ],
   };
 
   const createTermMutation = useMutation({
@@ -1014,14 +1085,24 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 </p>
               )}
             </div>
-            <Dialog open={isAddTermOpen} onOpenChange={setIsAddTermOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Term
-                </Button>
-              </DialogTrigger>
-            </Dialog>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="border-green-600 text-green-700 hover:bg-green-50"
+                onClick={() => setIsAutoSetupOpen(true)}
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Auto-Setup NSW 2026
+              </Button>
+              <Dialog open={isAddTermOpen} onOpenChange={setIsAddTermOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Term
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
+            </div>
           </div>
 
           {/* Search, Filter, Sort Controls */}
@@ -1147,6 +1228,33 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       <Badge variant={term.isActive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
                         {term.isActive ? "Active" : "Archived"}
                       </Badge>
+                      {/* Weeks toggle */}
+                      <button
+                        onClick={() => fetchTermWeeks(term.id)}
+                        className="flex items-center text-[10px] text-blue-600 hover:text-blue-700 mt-1 gap-0.5"
+                      >
+                        {loadingWeeks[term.id] ? (
+                          <span className="animate-pulse">Loading weeks…</span>
+                        ) : expandedTerms[term.id] ? (
+                          <><ChevronDown className="w-3 h-3" />Hide weeks</>
+                        ) : (
+                          <><ChevronRight className="w-3 h-3" />Show weeks</>
+                        )}
+                      </button>
+                      {expandedTerms[term.id] && termWeeks[term.id] && (
+                        <div className="mt-1.5 border rounded-md divide-y text-[10px] max-h-36 overflow-y-auto">
+                          {termWeeks[term.id].length === 0 ? (
+                            <p className="px-2 py-1 text-gray-400 italic">No weeks set up</p>
+                          ) : termWeeks[term.id].map((w: any) => (
+                            <div key={w.id} className="flex justify-between px-2 py-0.5">
+                              <span className="font-medium text-gray-700">{w.name}</span>
+                              <span className="text-gray-500">
+                                {format(new Date(w.startDate), 'MMM d')} – {format(new Date(w.endDate), 'MMM d')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -2741,6 +2849,111 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 Close
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Auto-Setup NSW 2026 Dialog */}
+      <Dialog open={isAutoSetupOpen} onOpenChange={setIsAutoSetupOpen}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-green-600" />
+              Auto-Setup NSW 2026 Academic Calendar
+            </DialogTitle>
+            <DialogDescription>
+              Creates Term 1–4 with official NSW Department of Education dates, plus weekly breakdowns for each term.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Year Level Selector */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Apply to Year Level</Label>
+              <Select value={autoSetupYearId} onValueChange={setAutoSetupYearId}>
+                <SelectTrigger className="border-black">
+                  <SelectValue placeholder="Select a year level…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(academicYears as AcademicYear[]).map((year) => (
+                    <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-gray-500">Terms will be created under this year level.</p>
+            </div>
+
+            {/* Division Selector */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                NSW Division
+              </Label>
+              <div className="flex gap-2">
+                {(['Eastern', 'Western'] as const).map((div) => (
+                  <button
+                    key={div}
+                    onClick={() => setAutoSetupDivision(div)}
+                    className={`flex-1 py-1.5 text-sm rounded-md border font-medium transition-colors ${
+                      autoSetupDivision === div
+                        ? 'bg-green-600 text-white border-green-600'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
+                    }`}
+                  >
+                    {div} Division
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-500">
+                {autoSetupDivision === 'Western'
+                  ? 'Western Division: Term 1 starts Tue 3 Feb (one week later than Eastern).'
+                  : 'Eastern Division: Term 1 starts Tue 27 Jan. Most Sydney/coastal schools.'}
+              </p>
+            </div>
+
+            {/* Preview Table */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">What will be created</Label>
+              <div className="border rounded-lg overflow-hidden text-sm">
+                <div className="grid grid-cols-3 bg-gray-50 font-medium text-gray-600 text-xs px-3 py-1.5 border-b">
+                  <span>Term</span>
+                  <span>Dates</span>
+                  <span>Weeks</span>
+                </div>
+                {NSW_2026_PREVIEW[autoSetupDivision].map((t) => (
+                  <div key={t.name} className="grid grid-cols-3 px-3 py-1.5 border-b last:border-0 text-xs">
+                    <span className="font-semibold text-gray-800">{t.name}</span>
+                    <span className="text-gray-600">{t.start} – {t.end}</span>
+                    <span className="text-green-700 font-medium">{t.weeks} weeks</span>
+                  </div>
+                ))}
+                <div className="px-3 py-1.5 bg-green-50 text-xs text-green-800 font-medium">
+                  Total: 4 terms · ~{NSW_2026_PREVIEW[autoSetupDivision].reduce((s, t) => s + t.weeks, 0)} weeks created
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400">
+                Source: NSW Department of Education — education.nsw.gov.au/schooling/calendars/2026
+              </p>
+            </div>
+
+            {!autoSetupYearId && (
+              <p className="text-xs text-amber-600 font-medium">⚠ Select a year level to continue.</p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => setIsAutoSetupOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={!autoSetupYearId || autoSetupMutation.isPending}
+              onClick={() => autoSetupMutation.mutate({ yearId: autoSetupYearId, state: 'NSW', division: autoSetupDivision })}
+            >
+              {autoSetupMutation.isPending ? (
+                <span className="flex items-center gap-1.5"><span className="animate-spin">⏳</span> Creating…</span>
+              ) : (
+                <span className="flex items-center gap-1.5"><Zap className="w-4 h-4" /> Create NSW 2026 Calendar</span>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
