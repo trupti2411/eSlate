@@ -13,7 +13,8 @@ import {
   insertClassSchema,
   insertStudentClassAssignmentSchema,
   insertAssignmentSchema,
-  insertSubmissionSchema
+  insertSubmissionSchema,
+  type InsertAcademicTerm,
 } from "@shared/schema";
 import multer from "multer";
 import { randomUUID } from "crypto";
@@ -4068,6 +4069,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper: check for overlapping terms within the same academic year
+  async function checkTermOverlap(yearId: string, startDate: Date, endDate: Date, excludeTermId?: string) {
+    const existing = await storage.getAcademicTermsByYear(yearId);
+    const conflicts: string[] = [];
+    for (const t of existing) {
+      if (excludeTermId && t.id === excludeTermId) continue;
+      const tStart = new Date(t.startDate);
+      const tEnd = new Date(t.endDate);
+      const overlaps = startDate <= tEnd && endDate >= tStart;
+      if (overlaps) conflicts.push(t.name);
+    }
+    return conflicts;
+  }
+
   app.post('/api/companies/:companyId/academic-terms', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
@@ -4084,11 +4099,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      const startDate = new Date(req.body.startDate);
+      const endDate = new Date(req.body.endDate);
+
+      if (startDate >= endDate) {
+        return res.status(400).json({ message: "Start date must be before end date" });
+      }
+
+      if (req.body.academicYearId) {
+        const conflicts = await checkTermOverlap(req.body.academicYearId, startDate, endDate);
+        if (conflicts.length > 0) {
+          return res.status(409).json({
+            message: `Date range overlaps with existing term(s): ${conflicts.join(', ')}`,
+            conflicts,
+          });
+        }
+      }
+
       const validatedData = insertAcademicTermSchema.parse({
         ...req.body,
         companyId,
-        startDate: new Date(req.body.startDate),
-        endDate: new Date(req.body.endDate)
+        startDate,
+        endDate,
       });
 
       const term = await storage.createAcademicTerm(validatedData);
@@ -4096,6 +4128,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating academic term:", error);
       res.status(500).json({ message: "Failed to create academic term" });
+    }
+  });
+
+  // Update term name and/or dates
+  app.patch('/api/companies/:companyId/academic-terms/:termId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, termId } = req.params;
+      const user = req.user!;
+
+      if (user.role !== 'admin' && user.role !== 'company_admin') {
+        return res.status(403).json({ message: "Admin or company admin access required" });
+      }
+
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin || companyAdmin.companyId !== companyId) {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const existing = await storage.getAcademicTerm(termId);
+      if (!existing || existing.companyId !== companyId) {
+        return res.status(404).json({ message: "Term not found" });
+      }
+
+      const updates: Partial<InsertAcademicTerm> = {};
+
+      if (req.body.name !== undefined) updates.name = req.body.name;
+
+      if (req.body.startDate !== undefined || req.body.endDate !== undefined) {
+        const newStart = req.body.startDate ? new Date(req.body.startDate) : new Date(existing.startDate);
+        const newEnd = req.body.endDate ? new Date(req.body.endDate) : new Date(existing.endDate);
+
+        if (newStart >= newEnd) {
+          return res.status(400).json({ message: "Start date must be before end date" });
+        }
+
+        const conflicts = await checkTermOverlap(existing.academicYearId, newStart, newEnd, termId);
+        if (conflicts.length > 0) {
+          return res.status(409).json({
+            message: `Date range overlaps with: ${conflicts.join(', ')}`,
+            conflicts,
+          });
+        }
+
+        updates.startDate = newStart;
+        updates.endDate = newEnd;
+      }
+
+      const updated = await storage.updateAcademicTerm(termId, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating academic term:", error);
+      res.status(500).json({ message: "Failed to update academic term" });
     }
   });
 
@@ -4847,10 +4933,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const { yearId, state, division } = req.body as {
+      const { yearId, state, division, clearExisting } = req.body as {
         yearId: string;
         state: string;
         division: 'Eastern' | 'Western';
+        clearExisting?: boolean;
       };
 
       if (!yearId || !state) {
@@ -4979,6 +5066,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           weekNum++;
         }
         return weeks;
+      }
+
+      // Optionally delete all existing terms for this year before creating new ones
+      if (clearExisting) {
+        const existingTerms = await storage.getAcademicTermsByYear(yearId);
+        for (const t of existingTerms) {
+          await storage.deleteAcademicTerm(t.id);
+        }
       }
 
       const createdTerms: any[] = [];

@@ -35,6 +35,7 @@ import {
   ChevronDown,
   ChevronRight,
   MapPin,
+  AlertCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -152,6 +153,14 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const [autoSetupYearId, setAutoSetupYearId] = useState('');
   const [autoSetupState, setAutoSetupState] = useState('NSW');
   const [autoSetupDivision, setAutoSetupDivision] = useState<'Eastern' | 'Western'>('Eastern');
+  const [autoSetupClearExisting, setAutoSetupClearExisting] = useState(false);
+
+  // Edit term state
+  const [editingTerm, setEditingTerm] = useState<any | null>(null);
+  const [editTermName, setEditTermName] = useState('');
+  const [editTermStart, setEditTermStart] = useState('');
+  const [editTermEnd, setEditTermEnd] = useState('');
+  const [editTermErrors, setEditTermErrors] = useState<string[]>([]);
   const [termWeeks, setTermWeeks] = useState<Record<string, any[]>>({});
   const [expandedTerms, setExpandedTerms] = useState<Record<string, boolean>>({});
   const [loadingWeeks, setLoadingWeeks] = useState<Record<string, boolean>>({});
@@ -279,18 +288,19 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
 
   // Auto-setup mutation
   const autoSetupMutation = useMutation({
-    mutationFn: async (data: { yearId: string; state: string; division: string }) => {
+    mutationFn: async (data: { yearId: string; state: string; division: string; clearExisting: boolean }) => {
       return await apiRequest(`/api/companies/${companyId}/academic-auto-setup`, 'POST', data);
     },
     onSuccess: (data: any) => {
       toast({
         title: "Calendar Created",
-        description: data.message || "NSW 2026 academic calendar set up successfully",
+        description: data.message || "2026 academic calendar set up successfully",
       });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
       setIsAutoSetupOpen(false);
       setAutoSetupYearId('');
+      setAutoSetupClearExisting(false);
     },
     onError: (error: Error) => {
       toast({
@@ -298,6 +308,33 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
         description: error.message || "Failed to auto-setup academic calendar",
         variant: "destructive",
       });
+    },
+  });
+
+  // Edit term mutation
+  const editTermMutation = useMutation({
+    mutationFn: async (data: { termId: string; name: string; startDate: string; endDate: string }) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-terms/${data.termId}`, 'PATCH', {
+        name: data.name,
+        startDate: data.startDate,
+        endDate: data.endDate,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Term Updated", description: "Term dates and name saved successfully." });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setEditingTerm(null);
+      setEditTermErrors([]);
+    },
+    onError: (error: any) => {
+      const msg = error?.message || "Failed to update term";
+      // If overlap error, extract conflict names from message
+      if (msg.includes("overlaps")) {
+        setEditTermErrors([msg]);
+      } else {
+        toast({ title: "Update Failed", description: msg, variant: "destructive" });
+      }
     },
   });
 
@@ -1297,9 +1334,17 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setEditingTerm(term);
+                              setEditTermName(term.name);
+                              setEditTermStart(term.startDate ? format(new Date(term.startDate), 'yyyy-MM-dd') : '');
+                              setEditTermEnd(term.endDate ? format(new Date(term.endDate), 'yyyy-MM-dd') : '');
+                              setEditTermErrors([]);
+                            }}
+                          >
                             <Edit className="w-4 h-4 mr-2" />
-                            Edit
+                            Edit Dates
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setTermToArchive(term)}
@@ -2955,6 +3000,131 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
         </DialogContent>
       </Dialog>
 
+      {/* Edit Term Dialog */}
+      {editingTerm && (() => {
+        // Client-side overlap check
+        const siblingTerms = (academicTerms as AcademicTerm[]).filter(
+          t => t.academicYearId === editingTerm.academicYearId && t.id !== editingTerm.id
+        );
+        const overlapWarnings: string[] = [];
+        if (editTermStart && editTermEnd) {
+          const s = new Date(editTermStart);
+          const e = new Date(editTermEnd);
+          for (const t of siblingTerms) {
+            const ts = new Date(t.startDate);
+            const te = new Date(t.endDate);
+            if (s <= te && e >= ts) overlapWarnings.push(t.name);
+          }
+        }
+        const startBeforeEnd = editTermStart && editTermEnd && new Date(editTermStart) < new Date(editTermEnd);
+        const hasServerErrors = editTermErrors.length > 0;
+        const canSave = editTermName.trim() && editTermStart && editTermEnd && startBeforeEnd && overlapWarnings.length === 0;
+
+        return (
+          <Dialog open={!!editingTerm} onOpenChange={(open) => { if (!open) { setEditingTerm(null); setEditTermErrors([]); } }}>
+            <DialogContent className="sm:max-w-[440px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Edit className="w-4 h-4" />
+                  Edit Term
+                </DialogTitle>
+                <DialogDescription>Update the name and date range for this term.</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Term Name</Label>
+                  <Input
+                    value={editTermName}
+                    onChange={e => setEditTermName(e.target.value)}
+                    placeholder="e.g. Term 1"
+                    className="border-black"
+                  />
+                </div>
+
+                {/* Start Date */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Start Date</Label>
+                    <Input
+                      type="date"
+                      value={editTermStart}
+                      onChange={e => { setEditTermStart(e.target.value); setEditTermErrors([]); }}
+                      className="border-black"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">End Date</Label>
+                    <Input
+                      type="date"
+                      value={editTermEnd}
+                      onChange={e => { setEditTermEnd(e.target.value); setEditTermErrors([]); }}
+                      className="border-black"
+                    />
+                  </div>
+                </div>
+
+                {/* Start/end order error */}
+                {editTermStart && editTermEnd && !startBeforeEnd && (
+                  <div className="flex items-start gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>Start date must be before end date.</span>
+                  </div>
+                )}
+
+                {/* Overlap warning */}
+                {overlapWarnings.length > 0 && (
+                  <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>Date range overlaps with: <strong>{overlapWarnings.join(', ')}</strong>. Adjust the dates to avoid conflicts.</span>
+                  </div>
+                )}
+
+                {/* Server-side error */}
+                {hasServerErrors && (
+                  <div className="flex items-start gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{editTermErrors[0]}</span>
+                  </div>
+                )}
+
+                {/* Summary of other terms for reference */}
+                {siblingTerms.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-gray-500 font-medium">Other terms in this year:</p>
+                    <div className="border rounded-md divide-y text-[11px]">
+                      {siblingTerms.map(t => (
+                        <div key={t.id} className="flex justify-between px-2.5 py-1 text-gray-600">
+                          <span className="font-medium">{t.name}</span>
+                          <span>{t.startDate && t.endDate ? `${format(new Date(t.startDate), 'MMM d')} – ${format(new Date(t.endDate), 'MMM d, yyyy')}` : '–'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => { setEditingTerm(null); setEditTermErrors([]); }}>Cancel</Button>
+                <Button
+                  className="bg-black hover:bg-gray-800 text-white"
+                  disabled={!canSave || editTermMutation.isPending}
+                  onClick={() => editTermMutation.mutate({
+                    termId: editingTerm.id,
+                    name: editTermName.trim(),
+                    startDate: editTermStart,
+                    endDate: editTermEnd,
+                  })}
+                >
+                  {editTermMutation.isPending ? 'Saving…' : 'Save Changes'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
       {/* Auto-Setup Australian 2026 Academic Calendar Dialog */}
       <Dialog open={isAutoSetupOpen} onOpenChange={setIsAutoSetupOpen}>
         <DialogContent className="sm:max-w-[580px]">
@@ -3062,6 +3232,26 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
               </p>
             </div>
 
+            {/* Override existing terms */}
+            <div
+              className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer select-none transition-colors ${
+                autoSetupClearExisting ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setAutoSetupClearExisting(v => !v)}
+            >
+              <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                autoSetupClearExisting ? 'bg-red-600 border-red-600' : 'border-gray-400 bg-white'
+              }`}>
+                {autoSetupClearExisting && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-800">Override existing terms</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Deletes all current terms (and their weeks) for this year before creating new ones.
+                </p>
+              </div>
+            </div>
+
             {!autoSetupYearId && (
               <p className="text-xs text-amber-600 font-medium">⚠ Select a year level to continue.</p>
             )}
@@ -3072,7 +3262,7 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
             <Button
               className="bg-green-600 hover:bg-green-700 text-white"
               disabled={!autoSetupYearId || autoSetupMutation.isPending}
-              onClick={() => autoSetupMutation.mutate({ yearId: autoSetupYearId, state: autoSetupState, division: autoSetupDivision })}
+              onClick={() => autoSetupMutation.mutate({ yearId: autoSetupYearId, state: autoSetupState, division: autoSetupDivision, clearExisting: autoSetupClearExisting })}
             >
               {autoSetupMutation.isPending ? (
                 <span className="flex items-center gap-1.5"><span className="animate-spin">⏳</span> Creating…</span>
