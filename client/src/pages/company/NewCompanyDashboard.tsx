@@ -34,7 +34,10 @@ function tutorCap(tier?: string): number | null | undefined {
 interface Tutor {
   id: string;
   userId: string;
-  user?: { firstName?: string | null; lastName?: string | null; email?: string };
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
+  status?: string;
   complianceStatus?: 'compliant' | 'pending_compliance' | 'compliance_hold' | null;
   wwccExpiry?: string | null;
 }
@@ -78,6 +81,13 @@ function formatDate(s: string | null | undefined): string {
 function dayDiff(from: string, to: string): number {
   const a = new Date(from).getTime();
   const b = new Date(to).getTime();
+  return Math.round((b - a) / 86400000);
+}
+
+// Days from `from` to `to` (both YYYY-MM-DD or ISO). Negative if `to` is in the past.
+function daysBetween(from: string, to: string): number {
+  const a = new Date(dateOnly(from) + 'T00:00:00Z').getTime();
+  const b = new Date(dateOnly(to) + 'T00:00:00Z').getTime();
   return Math.round((b - a) / 86400000);
 }
 
@@ -162,6 +172,29 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
     return `${tutors.length} of ${cap} on ${adminProfile?.tier} tier`;
   })();
 
+  // WWCC alerts: on-hold (red), expiring ≤30 days (urgency by days remaining),
+  // pending compliance (amber, no expiry yet). Per v3 §8.2.
+  const wwccAlerts = useMemo(() => {
+    const items: { tutor: Tutor; severity: 'red' | 'amber'; reason: string }[] = [];
+    for (const t of tutors) {
+      if (t.complianceStatus === 'compliance_hold') {
+        items.push({ tutor: t, severity: 'red', reason: 'on hold' });
+      } else if (t.complianceStatus === 'pending_compliance') {
+        items.push({ tutor: t, severity: 'amber', reason: 'pending capture' });
+      } else if (t.wwccExpiry) {
+        const days = daysBetween(today, dateOnly(t.wwccExpiry));
+        if (days < 0) {
+          items.push({ tutor: t, severity: 'red', reason: 'expired' });
+        } else if (days <= 7) {
+          items.push({ tutor: t, severity: 'red', reason: `expires in ${days}d` });
+        } else if (days <= 30) {
+          items.push({ tutor: t, severity: 'amber', reason: `expires in ${days}d` });
+        }
+      }
+    }
+    return items;
+  }, [tutors, today]);
+
   const ownerFirstName = user?.firstName ?? '';
 
   return (
@@ -204,6 +237,9 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* WWCC compliance alerts (top-of-page so owners see them first) */}
+        {wwccAlerts.length > 0 && <WwccAlertsBanner alerts={wwccAlerts} />}
+
         {/* Active term banner */}
         <TermBanner
           academicYear={currentYear}
@@ -468,6 +504,52 @@ function AcademicCard({ year }: { year?: AcademicYear }) {
             {year.pack_version ? ` · v${year.pack_version}` : ''}
           </p>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function WwccAlertsBanner({
+  alerts,
+}: { alerts: { tutor: Tutor; severity: 'red' | 'amber'; reason: string }[] }) {
+  const hasRed = alerts.some(a => a.severity === 'red');
+  const palette = hasRed
+    ? { bg: 'bg-rose-50', border: 'border-rose-200', icon: 'bg-rose-100 text-rose-700', text: 'text-rose-900', sub: 'text-rose-700' }
+    : { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'bg-amber-100 text-amber-700', text: 'text-amber-900', sub: 'text-amber-700' };
+  const headline = hasRed
+    ? `${alerts.length} tutor${alerts.length === 1 ? '' : 's'} need urgent WWCC attention`
+    : `${alerts.length} tutor${alerts.length === 1 ? '' : 's'} with WWCC expiring soon`;
+  return (
+    <section className={`rounded-2xl border ${palette.border} ${palette.bg} p-5`}>
+      <div className="flex items-start gap-4">
+        <div className={`w-10 h-10 rounded-xl ${palette.icon} flex items-center justify-center flex-shrink-0`}>
+          <ShieldAlert size={18} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-black ${palette.text}`}>{headline}</p>
+          <ul className={`mt-2 space-y-1 text-sm ${palette.sub}`}>
+            {alerts.slice(0, 4).map(a => {
+              const fn = `${a.tutor.firstName ?? ''} ${a.tutor.lastName ?? ''}`.trim() || a.tutor.email || `Tutor #${a.tutor.id}`;
+              return (
+                <li key={a.tutor.id}>
+                  <span className="font-semibold">{fn}</span> — {a.reason}
+                  {a.tutor.wwccExpiry && a.reason.startsWith('expires') && (
+                    <span className="opacity-75"> ({formatDate(a.tutor.wwccExpiry)})</span>
+                  )}
+                </li>
+              );
+            })}
+            {alerts.length > 4 && (
+              <li className="opacity-75">+ {alerts.length - 4} more</li>
+            )}
+          </ul>
+        </div>
+        <Link
+          href="/company/tutors"
+          className={`text-xs font-bold ${hasRed ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-600 hover:bg-amber-700'} text-white px-3 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0`}
+        >
+          View staff <ChevronRight size={12} />
+        </Link>
       </div>
     </section>
   );
