@@ -78,6 +78,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/tutor/incomplete-homework', [LegacyCompanyController::class, 'incompleteHomework']);
     Route::get('/companies/{companyId}/students', [LegacyCompanyController::class, 'companyStudents']);
     Route::get('/companies/{companyId}/classes', [LegacyCompanyController::class, 'companyClasses']);
+    Route::get('/companies/{companyId}/audit-log', [LegacyCompanyController::class, 'companyAuditLog']);
     Route::post('/homework/upload-direct', [LegacyCompanyController::class, 'uploadDirect']);
     Route::post('/tutor/remind-student', [LegacyCompanyController::class, 'remindStudent']);
     Route::patch('/tutor/submissions/{submission}/grade', [LegacyCompanyController::class, 'gradeSubmission']);

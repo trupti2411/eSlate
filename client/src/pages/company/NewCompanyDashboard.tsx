@@ -7,7 +7,8 @@ import type { Design } from '@/hooks/useDesignPreference';
 import {
   Building2, Users, GraduationCap, BookOpen, ShieldCheck, ShieldAlert,
   CalendarDays, FileBarChart, Bell, LogOut, ArrowRight, UserPlus,
-  ClipboardPlus, Plus, AlertTriangle, ChevronRight,
+  ClipboardPlus, Plus, AlertTriangle, ChevronRight, Activity, Mail,
+  UserCheck, FileEdit, CircleSlash,
 } from 'lucide-react';
 
 interface Props { setDesign: (d: Design) => void; }
@@ -36,6 +37,16 @@ interface AcademicYear {
   status?: string;
   pack_version?: string;
   terms?: Term[];
+}
+
+interface AuditEntry {
+  id: number;
+  event: string;
+  entity: string | null;
+  entityId: number | null;
+  occurredAt: string;
+  actor: { id: number; name: string } | null;
+  payload: Record<string, unknown> | null;
 }
 
 function formatDate(s: string | null | undefined): string {
@@ -86,6 +97,11 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
   // Hierarchy returns the company's academic structure as { years: [...] }
   const { data: hierarchy } = useQuery<{ years?: AcademicYear[] } | AcademicYear[]>({
     queryKey: [`/api/companies/${companyId}/academic-hierarchy`],
+    enabled: !!companyId,
+  });
+
+  const { data: auditLog = [] } = useQuery<AuditEntry[]>({
+    queryKey: [`/api/companies/${companyId}/audit-log?limit=8`],
     enabled: !!companyId,
   });
 
@@ -213,6 +229,7 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
           <div className="lg:col-span-2 space-y-6">
             <QuickActionsCard hasStudents={students.length > 0} hasClasses={classes.length > 0} hasTutors={tutors.length > 0} />
             <AcademicCard year={currentYear} />
+            <ActivityCard entries={auditLog} />
           </div>
           <div className="space-y-6">
             <ComplianceCard tutors={tutors} />
@@ -430,6 +447,85 @@ function AcademicCard({ year }: { year?: AcademicYear }) {
       </div>
     </section>
   );
+}
+
+function ActivityCard({ entries }: { entries: AuditEntry[] }) {
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+          <Activity size={14} className="text-indigo-600" /> Recent activity
+        </h3>
+      </div>
+      {entries.length === 0 ? (
+        <p className="text-sm text-gray-500">No activity yet — invite a tutor or add a student to get started.</p>
+      ) : (
+        <ul className="space-y-3">
+          {entries.map(e => <ActivityRow key={e.id} entry={e} />)}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function ActivityRow({ entry }: { entry: AuditEntry }) {
+  const { icon, label, tone } = describeEvent(entry);
+  const palette = {
+    indigo: 'bg-indigo-50 text-indigo-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    amber: 'bg-amber-50 text-amber-600',
+    rose: 'bg-rose-50 text-rose-600',
+    gray: 'bg-gray-100 text-gray-600',
+  }[tone];
+  return (
+    <li className="flex items-start gap-3">
+      <span className={`w-8 h-8 rounded-xl ${palette} flex items-center justify-center flex-shrink-0`}>
+        {icon}
+      </span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-gray-900 leading-snug">
+          {label}
+          {entry.actor?.name && (
+            <span className="text-gray-500"> · {entry.actor.name}</span>
+          )}
+        </p>
+        <p className="text-xs text-gray-400 mt-0.5">{relativeTime(entry.occurredAt)}</p>
+      </div>
+    </li>
+  );
+}
+
+function describeEvent(e: AuditEntry): { icon: React.ReactNode; label: string; tone: 'indigo' | 'emerald' | 'amber' | 'rose' | 'gray' } {
+  const email = (e.payload && (e.payload as any).email) as string | undefined;
+  switch (e.event) {
+    case 'business_invited':
+      return { icon: <Mail size={14} />, label: `Business invitation sent${email ? ` to ${email}` : ''}`, tone: 'indigo' };
+    case 'owner_password_set':
+      return { icon: <UserCheck size={14} />, label: 'Owner accepted invite', tone: 'emerald' };
+    case 'tutor_invited':
+      return { icon: <UserPlus size={14} />, label: `Tutor invitation sent${email ? ` to ${email}` : ''}`, tone: 'indigo' };
+    case 'tutor_activated':
+      return { icon: <UserCheck size={14} />, label: 'Tutor activated their account', tone: 'emerald' };
+    case 'student_added':
+      return { icon: <GraduationCap size={14} />, label: 'Student added', tone: 'emerald' };
+    case 'tier_limit_rejected':
+      return { icon: <CircleSlash size={14} />, label: 'Tier limit reached — invite blocked', tone: 'rose' };
+    case 'term_edited':
+      return { icon: <FileEdit size={14} />, label: 'Term dates edited', tone: 'amber' };
+    default:
+      return { icon: <Activity size={14} />, label: e.event.replace(/_/g, ' '), tone: 'gray' };
+  }
+}
+
+function relativeTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return iso;
+  const diffSec = Math.round((Date.now() - t) / 1000);
+  if (diffSec < 60) return 'just now';
+  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+  if (diffSec < 7 * 86400) return `${Math.floor(diffSec / 86400)}d ago`;
+  return formatDate(iso);
 }
 
 function ComplianceCard({ tutors }: { tutors: Tutor[] }) {

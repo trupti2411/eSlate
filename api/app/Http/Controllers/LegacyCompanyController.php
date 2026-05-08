@@ -188,6 +188,34 @@ class LegacyCompanyController extends Controller
         ]));
     }
 
+    /**
+     * GET /api/companies/{companyId}/audit-log — last N events scoped to this business.
+     * Returned newest-first. Limited to 20 by default to keep dashboard payload tight.
+     */
+    public function companyAuditLog(Request $request, int $companyId): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $companyId);
+
+        $limit = (int) $request->query('limit', 10);
+        $limit = max(1, min(50, $limit));
+
+        $entries = \App\Models\AuditLog::where('business_id', $companyId)
+            ->with('actor:id,name,email')
+            ->orderByDesc('occurred_at')
+            ->limit($limit)
+            ->get();
+
+        return response()->json($entries->map(fn ($e) => [
+            'id'         => $e->id,
+            'event'      => $e->event,
+            'entity'     => $e->entity_type,
+            'entityId'   => $e->entity_id,
+            'occurredAt' => $e->occurred_at?->toIso8601String(),
+            'actor'      => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
+            'payload'    => $e->payload,
+        ]));
+    }
+
     public function companyTutors(Request $request, int $companyId): JsonResponse
     {
         $this->assertCanAccessBusiness($request->user(), $companyId);
