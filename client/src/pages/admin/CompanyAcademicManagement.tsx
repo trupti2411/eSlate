@@ -175,6 +175,7 @@ export default function CompanyAcademicManagement() {
                     key={t.id}
                     term={t}
                     isActive={activeTerm?.id === t.id}
+                    isPast={dateOnly(t.end_date) < today}
                     isExpanded={String(expandedTermId) === String(t.id)}
                     onToggleExpand={() =>
                       setExpandedTermId(prev => (String(prev) === String(t.id) ? null : t.id))
@@ -303,10 +304,11 @@ function YearHeader({
 }
 
 function TermCard({
-  term, isActive, isExpanded, onToggleExpand, onEdit,
+  term, isActive, isPast, isExpanded, onToggleExpand, onEdit,
 }: {
   term: Term;
   isActive: boolean;
+  isPast: boolean;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onEdit: () => void;
@@ -316,19 +318,26 @@ function TermCard({
     <article
       className={`rounded-2xl border bg-white shadow-sm overflow-hidden transition-all ${
         isActive ? 'border-indigo-300 ring-2 ring-indigo-100' : 'border-gray-100'
-      }`}
+      } ${isPast ? 'opacity-75' : ''}`}
     >
       <header className="p-5 flex items-center gap-4">
         <div
           className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 font-black text-lg ${
-            isActive ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'
+            isActive ? 'bg-indigo-600 text-white'
+              : isPast ? 'bg-gray-200 text-gray-500'
+              : 'bg-gray-100 text-gray-700'
           }`}
         >
           {term.term_number}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-lg font-black text-gray-900">{term.name}</h3>
+            <h3 className={`text-lg font-black ${isPast ? 'text-gray-500' : 'text-gray-900'}`}>{term.name}</h3>
+            {isPast && (
+              <span className="text-[10px] font-bold uppercase tracking-widest bg-gray-200 text-gray-600 px-2 py-0.5 rounded-full">
+                Passed
+              </span>
+            )}
             {isActive && (
               <span className="text-[10px] font-bold uppercase tracking-widest bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
                 Active
@@ -347,12 +356,14 @@ function TermCard({
           </p>
         </div>
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button
-            onClick={onEdit}
-            className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 px-3 py-2 rounded-xl flex items-center gap-1.5"
-          >
-            <Pencil size={12} /> Edit dates
-          </button>
+          {!isPast && (
+            <button
+              onClick={onEdit}
+              className="text-xs font-bold text-indigo-700 hover:bg-indigo-50 px-3 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Pencil size={12} /> Edit dates
+            </button>
+          )}
           <button
             onClick={onToggleExpand}
             className="text-xs font-bold text-gray-700 hover:bg-gray-100 px-3 py-2 rounded-xl flex items-center gap-1.5"
