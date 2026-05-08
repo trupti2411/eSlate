@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
   Building2, Bell, LogOut, ArrowLeft, CalendarDays, Pencil, Save, X,
-  AlertTriangle, ArrowRight, ChevronDown, ChevronUp, FileBadge2,
+  AlertTriangle, ArrowRight, ChevronDown, ChevronUp, FileBadge2, Info,
 } from 'lucide-react';
 
 interface AdminProfile { userId: string; companyId: string; companyName: string; }
@@ -159,6 +159,7 @@ export default function CompanyAcademicManagement() {
 
         {year && (
           <>
+            <CascadeNotice />
             <YearHeader
               year={year}
               years={academicYears}
@@ -222,6 +223,17 @@ function EmptyYearState({ onApply, pending }: { onApply: () => void; pending: bo
           {pending ? 'Applying…' : 'Apply NSW pack'} <ArrowRight size={14} />
         </button>
       </div>
+    </div>
+  );
+}
+
+function CascadeNotice() {
+  return (
+    <div className="rounded-xl bg-indigo-50 border border-indigo-100 px-4 py-3 flex items-start gap-3">
+      <Info size={16} className="text-indigo-600 mt-0.5 flex-shrink-0" />
+      <p className="text-xs text-indigo-900 leading-relaxed">
+        Editing a term updates <strong>only that term's dates</strong> — the others aren't shifted automatically. If your school's sequence differs from the state pack, edit each term you need to change.
+      </p>
     </div>
   );
 }
