@@ -13,7 +13,24 @@ import {
 
 interface Props { setDesign: (d: Design) => void; }
 
-interface AdminProfile { userId: string; companyId: string; companyName: string; }
+interface AdminProfile {
+  userId: string;
+  companyId: string;
+  companyName: string;
+  tier?: 'individual' | 'starter' | 'pro' | 'enterprise' | string;
+  businessType?: 'individual' | 'multi_tutor' | string;
+}
+
+const TIER_CAP: Record<string, number | null> = {
+  individual: 1,
+  starter: 5,
+  pro: 20,
+  enterprise: null, // unlimited (fair use)
+};
+function tutorCap(tier?: string): number | null | undefined {
+  if (!tier) return undefined;
+  return TIER_CAP[tier];
+}
 interface Tutor {
   id: string;
   userId: string;
@@ -138,6 +155,13 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
     ).length;
   }, [tutors]);
 
+  const cap = tutorCap(adminProfile?.tier);
+  const staffSub = (() => {
+    if (cap === null) return `${tutors.length} active · unlimited`;
+    if (cap === undefined) return complianceFlags > 0 ? `${complianceFlags} pending compliance` : 'all compliant';
+    return `${tutors.length} of ${cap} on ${adminProfile?.tier} tier`;
+  })();
+
   const ownerFirstName = user?.firstName ?? '';
 
   return (
@@ -194,9 +218,9 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
             icon={<Users size={18} />}
             label="Staff"
             value={tutors.length}
-            sub={complianceFlags > 0 ? `${complianceFlags} pending compliance` : 'all compliant'}
+            sub={staffSub}
             tone="indigo"
-            warning={complianceFlags > 0}
+            warning={complianceFlags > 0 || (cap != null && tutors.length >= cap)}
           />
           <KpiCard
             href="/company/students"

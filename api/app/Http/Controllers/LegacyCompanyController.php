@@ -39,6 +39,8 @@ class LegacyCompanyController extends Controller
             'userId' => (string) $userId,
             'companyId' => $business ? (string) $business->id : null,
             'companyName' => $business?->name,
+            'tier' => $business?->tier,
+            'businessType' => $business?->type,
         ]);
     }
 

@@ -9,7 +9,17 @@ import {
   Mail, X, Save, Search,
 } from 'lucide-react';
 
-interface AdminProfile { userId: string; companyId: string; companyName: string; }
+interface AdminProfile {
+  userId: string;
+  companyId: string;
+  companyName: string;
+  tier?: string;
+  businessType?: string;
+}
+
+const TIER_CAP: Record<string, number | null> = {
+  individual: 1, starter: 5, pro: 20, enterprise: null,
+};
 interface Tutor {
   id: string;
   userId: string;
@@ -71,6 +81,10 @@ export default function Staff() {
     return { total: tutors.length, compliant, pending, hold };
   }, [tutors]);
 
+  const tier = adminProfile?.tier;
+  const cap = tier ? TIER_CAP[tier] : undefined;
+  const atCap = cap != null && tutors.length >= cap;
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-indigo-700 text-white shadow-lg">
@@ -107,7 +121,11 @@ export default function Staff() {
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         {/* KPI strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiTile value={counts.total} label="Total" tone="indigo" />
+          <KpiTile
+            value={counts.total}
+            label={cap != null ? `of ${cap} · ${tier ?? ''}` : tier ? `${tier} tier` : 'Total'}
+            tone={atCap ? 'amber' : 'indigo'}
+          />
           <KpiTile value={counts.compliant} label="Compliant" tone="emerald" />
           <KpiTile value={counts.pending} label="Pending" tone="amber" />
           <KpiTile value={counts.hold} label="On hold" tone="rose" />
@@ -126,9 +144,11 @@ export default function Staff() {
           </div>
           <button
             onClick={() => setInviteOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            disabled={atCap}
+            title={atCap ? `${tier} tier limit reached (${cap} tutors). Upgrade to invite more.` : undefined}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
           >
-            <UserPlus size={14} /> Invite tutor
+            <UserPlus size={14} /> {atCap ? 'Tier limit reached' : 'Invite tutor'}
           </button>
         </div>
 
