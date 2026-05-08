@@ -41,6 +41,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('/businesses/{id}', [BusinessController::class, 'update']);
     Route::patch('/businesses/{id}/subjects', [BusinessController::class, 'updateSubjects']);
     Route::post('/businesses/{id}/tutors/invite', [BusinessController::class, 'inviteTutor']);
+    Route::post('/businesses/{id}/students', [BusinessController::class, 'addStudent']);
 
     // Reference data
     Route::get('/subjects', [SubjectController::class, 'index']);

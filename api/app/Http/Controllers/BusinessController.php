@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Models\Business;
 use App\Models\BusinessSubject;
 use App\Models\Invitation;
+use App\Models\Student;
 use App\Models\Subject;
 use App\Models\Tutor;
 use App\Models\User;
+use App\Models\YearGroup;
 use App\Services\AuditLogger;
 use App\Services\TierEnforcer;
 use App\Services\TierLimitExceededException;
@@ -161,6 +163,55 @@ class BusinessController extends Controller
                 'expires_at'    => $invitation->expires_at->toIso8601String(),
             ], 201);
         });
+    }
+
+    /** POST /api/businesses/{id}/students — owner adds a record-only student profile (no User row). */
+    public function addStudent(Request $request, int $id): JsonResponse
+    {
+        $business = Business::findOrFail($id);
+        $this->assertCanManage($request->user(), $business);
+
+        $data = $request->validate([
+            'first_name'      => ['required', 'string', 'max:60'],
+            'last_name'       => ['required', 'string', 'max:60'],
+            'year_group_code' => ['required', 'string', 'max:10'],
+            'date_of_birth'   => ['nullable', 'date'],
+            'school'          => ['nullable', 'string', 'max:120'],
+            'learning_goals'  => ['nullable', 'string'],
+        ]);
+
+        // Validate year group exists for this business's state
+        $yg = YearGroup::where('state_code', $business->state_code)
+            ->where('code', $data['year_group_code'])
+            ->first();
+        if (! $yg) {
+            return response()->json([
+                'message' => 'Year group not valid for this state.',
+                'errors'  => ['year_group_code' => ['Not a valid year group.']],
+            ], 422);
+        }
+
+        $student = Student::create([
+            'business_id'     => $business->id,
+            'user_id'         => null, // record-only profile
+            'first_name'      => $data['first_name'],
+            'last_name'       => $data['last_name'],
+            'year_group_code' => $data['year_group_code'],
+            'date_of_birth'   => $data['date_of_birth'] ?? null,
+            'school'          => $data['school'] ?? null,
+            'learning_goals'  => $data['learning_goals'] ?? null,
+            'status'          => Student::STATUS_ACTIVE,
+        ]);
+
+        $this->audit->log(
+            event: 'student_added',
+            businessId: $business->id,
+            actor: $request->user(),
+            entityType: 'student',
+            entityId: $student->id,
+        );
+
+        return response()->json($student, 201);
     }
 
     private function assertCanManage(User $user, Business $business): void
