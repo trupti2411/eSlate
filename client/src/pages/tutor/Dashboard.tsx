@@ -6,12 +6,12 @@ import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, Calendar, TrendingUp, Plus, ArrowRight, Home } from "lucide-react";
+import { Users, BookOpen, Calendar, TrendingUp, Plus, ArrowRight, GraduationCap, Bell, LogOut } from "lucide-react";
 import { format } from "date-fns";
 
 export default function TutorDashboard() {
   const { toast } = useToast();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, logoutMutation } = useAuth();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -54,27 +54,41 @@ export default function TutorDashboard() {
 
   return (
     <div className="min-h-screen max-h-screen bg-gray-50 flex flex-col overflow-hidden">
-      {/* Header - Compact for 13.3" screen */}
-      <div className="bg-white border-b-2 border-black flex-shrink-0">
-        <div className="max-w-[1400px] mx-auto px-4 py-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Link href="/tutor">
-                <Button variant="outline" size="sm" className="border-2 border-black hover:bg-gray-100 h-8 px-3 text-sm">
-                  <Home className="h-3 w-3 mr-1" />
-                  Home
-                </Button>
-              </Link>
-              <div className="h-5 w-px bg-gray-300" />
-              <div>
-                <h1 className="text-lg font-bold text-black">Tutor Portal</h1>
-                <p className="text-gray-500 text-xs">Manage students and track progress</p>
+      {/* Header — matches Business Portal indigo theme for visual consistency */}
+      <header className="bg-indigo-700 text-white shadow-lg flex-shrink-0">
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                <GraduationCap size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">
+                  Tutor Portal
+                </p>
+                <h1 className="text-xl sm:text-2xl font-black truncate">
+                  {user?.firstName ? `${user.firstName} ${user.lastName ?? ''}`.trim() : 'Tutor'}
+                </h1>
               </div>
             </div>
-            <BookOpen className="h-8 w-8 text-black opacity-10" />
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Link href="/tutor/profile" className="hidden md:inline text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
+                My profile
+              </Link>
+              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
+                <Bell size={16} />
+              </button>
+              <button
+                onClick={() => logoutMutation.mutate()}
+                className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
+                aria-label="Sign out"
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
       {/* Main Content - Scrollable for 13.3" screen */}
       <div className="flex-1 overflow-y-auto">

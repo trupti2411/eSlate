@@ -27,7 +27,7 @@ export function TermsAcceptanceModal({ isOpen, onAccepted, userRole }: TermsAcce
   const acceptTermsMutation = useMutation({
     mutationFn: () => apiRequest('/api/users/accept-terms', 'POST', { version: TERMS_VERSION }),
     onSuccess: (data) => {
-      queryClient.setQueryData(['/api/auth/user'], data.user);
+      queryClient.setQueryData(['/api/me'], data.user);
       toast({
         title: "Terms Accepted",
         description: "Thank you for accepting our terms and policies.",
@@ -170,7 +170,7 @@ export function TermsAcceptanceModal({ isOpen, onAccepted, userRole }: TermsAcce
 
         <DialogFooter className="flex-col sm:flex-row gap-2">
           <p className="text-xs text-muted-foreground flex-1">
-            Version {TERMS_VERSION} • By clicking "Accept & Continue," you confirm that you have read and agree to all policies.
+            Version {TERMS_VERSION} â€¢ By clicking "Accept & Continue," you confirm that you have read and agree to all policies.
           </p>
           <Button
             onClick={handleAccept}

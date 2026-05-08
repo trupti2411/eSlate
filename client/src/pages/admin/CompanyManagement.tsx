@@ -108,7 +108,7 @@ export default function CompanyManagement() {
 
   // Get current user to check if master admin
   const { data: currentUser } = useQuery<{ id: string; role: string }>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/me"],
   });
 
   // Transform students data to User format

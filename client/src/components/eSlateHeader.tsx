@@ -13,7 +13,7 @@ export function ESlateHeader({ showNav = false, children }: ESlateHeaderProps) {
   const handleLogout = async () => {
     try {
       localStorage.removeItem('authToken');
-      await fetch('/api/auth/logout', {
+      await fetch('/api/logout', {
         method: 'POST',
         credentials: 'include',
       });

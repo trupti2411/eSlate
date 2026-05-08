@@ -24,20 +24,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     isLoading,
   } = useQuery<User | null, Error>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
 
   const loginMutation = useMutation({
     mutationFn: async (credentials: LoginData) => {
-      return await apiRequest("/api/auth/login", "POST", credentials);
+      return await apiRequest("/api/login", "POST", credentials);
     },
     onSuccess: (data) => {
       // Store JWT token
       if (data.token) {
         localStorage.setItem('authToken', data.token);
       }
-      queryClient.setQueryData(["/api/auth/user"], data.user);
+      queryClient.setQueryData(["/api/me"], data.user);
       toast({
         title: "Welcome back!",
         description: "You have successfully logged in.",
@@ -54,7 +54,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const registerMutation = useMutation({
     mutationFn: async (credentials: RegisterData) => {
-      return await apiRequest("/api/auth/register", "POST", credentials);
+      return await apiRequest("/api/register", "POST", credentials);
     },
     onSuccess: (data) => {
       toast({
@@ -73,13 +73,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
-      await apiRequest("/api/auth/logout", "POST");
+      await apiRequest("/api/logout", "POST");
     },
     onSuccess: () => {
       // Clear localStorage token
       localStorage.removeItem('authToken');
       // Clear query cache
-      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.setQueryData(["/api/me"], null);
       // Clear all cached data
       queryClient.clear();
       toast({
@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onError: (error: Error) => {
       // Even if logout fails, clear local data
       localStorage.removeItem('authToken');
-      queryClient.setQueryData(["/api/auth/user"], null);
+      queryClient.setQueryData(["/api/me"], null);
       queryClient.clear();
       toast({
         title: "Logout failed",

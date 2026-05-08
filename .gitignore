@@ -4,3 +4,21 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Claude session artifacts
+.claude/
+
+# Local env files
+*.env.local
+.env
+
+# Laravel API
+api/vendor/
+api/node_modules/
+api/storage/logs/
+api/storage/framework/cache/
+api/storage/framework/sessions/
+api/storage/framework/views/
+api/database/database.sqlite
+api/.env
+api/bootstrap/cache/*.php

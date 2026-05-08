@@ -200,7 +200,7 @@ export function CompanyCalendarDashboard() {
 
   // Get company ID from user context for fetching company data
   const { data: authUser } = useQuery<{ companyAdminProfile?: { companyId: string } }>({
-    queryKey: ['/api/auth/user'],
+    queryKey: ['/api/me'],
   });
   const companyId = authUser?.companyAdminProfile?.companyId;
 

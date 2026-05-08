@@ -597,7 +597,7 @@ export default function ParentDashboard() {
                 className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 px-3 text-sm"
                 onClick={async () => {
                   try {
-                    await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+                    await fetch('/api/logout', { method: 'POST', credentials: 'include' });
                   } catch (e) {}
                   localStorage.removeItem('token');
                   localStorage.removeItem('user');

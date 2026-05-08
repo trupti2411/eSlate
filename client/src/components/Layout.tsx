@@ -31,7 +31,7 @@ export default function Layout({ children }: LayoutProps) {
       // Clear localStorage first
       localStorage.removeItem('authToken');
       
-      const response = await fetch('/api/auth/logout', {
+      const response = await fetch('/api/logout', {
         method: 'POST',
         credentials: 'include',
       });
@@ -168,7 +168,7 @@ export default function Layout({ children }: LayoutProps) {
           <footer className="eink-footer flex-shrink-0">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-4">
-                <span className="text-xs text-gray-500">© 2024 eSlate</span>
+                <span className="text-xs text-gray-500">Â© 2024 eSlate</span>
                 <Link href="/legal/privacy" className="text-xs text-gray-600 hover:text-black" data-testid="link-footer-privacy">
                   Privacy
                 </Link>

@@ -7,6 +7,8 @@ import { useAuth, AuthProvider } from "@/hooks/useAuth.tsx";
 import { useDesignPreference } from "@/hooks/useDesignPreference";
 import { DesignSwitchBanner } from "@/components/DesignSwitchBanner";
 import AuthPage from "@/pages/auth-page";
+import OnboardingPage from "@/pages/onboarding";
+import AcceptInvitePage from "@/pages/accept-invite";
 import SimpleRegistration from "@/pages/simple-registration";
 import StudentDashboard from "@/pages/student/Dashboard";
 import StudentHome from "@/pages/student/StudentHome";
@@ -14,8 +16,10 @@ import NewStudentDashboard from "@/pages/student/NewStudentDashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import NewParentDashboard from "@/pages/parent/NewParentDashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
+import TutorProfile from "@/pages/tutor/Profile";
 import CompanyTutorDashboard from "@/pages/company/TutorDashboard";
 import NewTutorDashboard from "@/pages/company/NewTutorDashboard";
+import NewCompanyDashboard from "@/pages/company/NewCompanyDashboard";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
 import Users from "@/pages/admin/Users";
@@ -74,6 +78,9 @@ function Router() {
     <Switch>
       {/* Always available auth route for registration */}
       <Route path="/auth" component={AuthPage} />
+      <Route path="/onboarding" component={OnboardingPage} />
+      <Route path="/accept-invite/business">{() => <AcceptInvitePage kind="business_owner" />}</Route>
+      <Route path="/accept-invite/tutor">{() => <AcceptInvitePage kind="tutor" />}</Route>
       <Route path="/register" component={SimpleRegistration} />
       
       {/* Legal pages - always accessible */}
@@ -131,7 +138,7 @@ function Router() {
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
             {user?.role === 'company_admin' && (
-              design === 'new' ? <NewTutorDashboard setDesign={setDesign} /> : <CompanyDashboard />
+              design === 'new' ? <NewCompanyDashboard setDesign={setDesign} /> : <CompanyDashboard />
             )}
           </Route>
           <Route path="/student" component={StudentHome} />
@@ -139,6 +146,7 @@ function Router() {
           <Route path="/student/dashboard" component={StudentDashboard} />
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
+          <Route path="/tutor/profile" component={TutorProfile} />
           <Route path="/tutor/tests" component={TestManagement} />
           <Route path="/tutor/tests/:testId/grade/:attemptId" component={TestGrading} />
           <Route path="/admin" component={AdminDashboard} />

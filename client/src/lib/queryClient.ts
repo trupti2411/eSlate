@@ -1,5 +1,13 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ?? "";
+
+function withBase(url: string): string {
+  if (/^https?:\/\//i.test(url)) return url;
+  if (url.startsWith("/api") && API_BASE) return `${API_BASE}${url}`;
+  return url;
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -7,59 +15,33 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-let cachedCsrfToken: string | null = null;
-
-export async function getCsrfToken(): Promise<string> {
-  if (cachedCsrfToken) return cachedCsrfToken;
-  const res = await fetch('/api/auth/csrf-token', { credentials: 'include' });
-  if (res.ok) {
-    const data = await res.json();
-    cachedCsrfToken = data.csrfToken;
-    return cachedCsrfToken!;
-  }
-  return '';
+function authHeaders(): Record<string, string> {
+  const token = localStorage.getItem("authToken");
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export async function apiRequest(endpoint: string, method: string = "GET", data?: any) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
+    Accept: "application/json",
+    ...authHeaders(),
   };
 
-  if (!['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
-    const csrfToken = await getCsrfToken();
-    if (csrfToken) {
-      headers['x-csrf-token'] = csrfToken;
-    }
-  }
+  const config: RequestInit = { method, headers };
+  if (data) config.body = JSON.stringify(data);
 
-  const config: RequestInit = {
-    method,
-    headers,
-    credentials: "include",
-  };
-
-  if (data) {
-    config.body = JSON.stringify(data);
-  }
-
-  let response = await fetch(endpoint, config);
-
-  if (response.status === 403 && !['GET', 'HEAD', 'OPTIONS'].includes(method.toUpperCase())) {
-    cachedCsrfToken = null;
-    const freshToken = await getCsrfToken();
-    if (freshToken) {
-      (config.headers as Record<string, string>)['x-csrf-token'] = freshToken;
-      response = await fetch(endpoint, config);
-    }
-  }
+  const response = await fetch(withBase(endpoint), config);
 
   if (!response.ok) {
     if (response.status === 401) {
-      window.location.href = "/auth";
+      localStorage.removeItem("authToken");
+      if (!window.location.pathname.startsWith("/auth")) {
+        window.location.href = "/auth";
+      }
       return null;
     }
 
-    let errorMessage;
+    let errorMessage: string;
     try {
       const errorData = await response.json();
       errorMessage = errorData?.message || `HTTP ${response.status}`;
@@ -69,13 +51,9 @@ export async function apiRequest(endpoint: string, method: string = "GET", data?
     throw new Error(errorMessage);
   }
 
-  // Always ensure we return parsed JSON
   try {
-    const jsonResponse = await response.json();
-    console.log(`API Response for ${endpoint}:`, jsonResponse);
-    return jsonResponse;
-  } catch (error) {
-    console.error(`Failed to parse JSON response from ${endpoint}:`, error);
+    return await response.json();
+  } catch {
     return null;
   }
 }
@@ -86,27 +64,19 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+      Accept: "application/json",
+      ...authHeaders(),
+    };
 
-    // Add JWT token if available
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      headers["Authorization"] = `Bearer ${token}`;
-    }
-
-    const res = await fetch(queryKey.join("/") as string, {
-      headers,
-      credentials: "include",
-    });
+    const url = withBase(queryKey.join("/") as string);
+    const res = await fetch(url, { headers });
 
     if (res.status === 401) {
-      // Clear stale JWT so the next request won't keep sending an expired token
-      localStorage.removeItem('authToken');
-      cachedCsrfToken = null;
+      localStorage.removeItem("authToken");
       if (unauthorizedBehavior === "returnNull") {
         return null;
       }
-      // For protected routes, redirect to login
       window.location.href = "/auth";
       return null;
     }
@@ -129,3 +99,8 @@ export const queryClient = new QueryClient({
     },
   },
 });
+
+// Kept for backwards compatibility with old callers; Sanctum doesn't need CSRF.
+export async function getCsrfToken(): Promise<string> {
+  return "";
+}

@@ -56,7 +56,7 @@ export default function UsersManagement() {
 
   // Get current user to check if master admin
   const { data: currentUser } = useQuery<{ id: string; role: string }>({
-    queryKey: ["/api/auth/user"],
+    queryKey: ["/api/me"],
   });
 
   // Fetch all users
@@ -283,7 +283,7 @@ export default function UsersManagement() {
           <div>
             <Link href="/admin">
               <Button variant="outline" size="sm" className="mb-3 border-black text-black hover:bg-gray-100">
-                ← Back to Admin
+                â† Back to Admin
               </Button>
             </Link>
             <h1 className="page-title flex items-center space-x-3">

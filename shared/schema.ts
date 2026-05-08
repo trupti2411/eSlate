@@ -912,12 +912,33 @@ export type InsertTestAttempt = z.infer<typeof insertTestAttemptSchema>;
 export type InsertTestAnswer = z.infer<typeof insertTestAnswerSchema>;
 
 // Authentication schemas
+// v3: self-registration is open only for solo tutors in NSW. Country=AU, state=NSW are
+// gated at the form; non-NSW AU users hit waitlistSchema instead; international is blocked.
+export const AU_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'] as const;
+export type AuState = typeof AU_STATES[number];
+
 export const registerSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
-  role: z.enum(['student', 'parent', 'tutor']).default('student'),
+  country: z.literal('AU').default('AU'),
+  state: z.literal('NSW'),                // non-NSW routes to waitlist form, not this schema
+  suburb: z.string().max(120).optional(),
+  postcode: z.string().max(10).optional(),
+  accountType: z.enum(['individual', 'multi_tutor']).default('individual'),
+  businessName: z.string().max(255).optional(),
+}).refine(
+  (data) => data.accountType !== 'multi_tutor' || (data.businessName && data.businessName.trim().length >= 2),
+  { message: "Business name is required (≥2 characters)", path: ['businessName'] }
+);
+
+export const waitlistSchema = z.object({
+  email: z.string().email("Please enter a valid email address"),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  state: z.enum(['VIC', 'QLD', 'SA', 'WA', 'TAS', 'ACT', 'NT']),
+  intendedRole: z.enum(['individual_tutor', 'multi_tutor_owner', 'other']).optional(),
 });
 
 export const loginSchema = z.object({
@@ -935,6 +956,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export type RegisterData = z.infer<typeof registerSchema>;
+export type WaitlistData = z.infer<typeof waitlistSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
