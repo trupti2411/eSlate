@@ -27,6 +27,7 @@ class ClassroomController extends Controller
             'academic_year_id' => ['required', 'integer', 'exists:academic_years,id'],
             'year_group_id' => ['required', 'integer', 'exists:year_groups,id'],
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
+            'course_offering_id' => ['nullable', 'integer', 'exists:course_offerings,id'],
             'name' => ['required', 'string', 'max:100'],
             'business_id' => ['nullable', 'integer', 'exists:businesses,id'],
         ]);
@@ -37,16 +38,28 @@ class ClassroomController extends Controller
             $data['tutor_id']
         );
 
+        // Spec §8.2.1 style check: if linked to a course offering, the offering must be in this business.
+        if (! empty($data['course_offering_id'])) {
+            $offering = \App\Models\CourseOffering::findOrFail($data['course_offering_id']);
+            if ($offering->business_id !== $scope['business_id']) {
+                return response()->json([
+                    'message' => 'Course offering not in your business.',
+                    'errors'  => ['course_offering_id' => ['Cross-business link not allowed.']],
+                ], 422);
+            }
+        }
+
         $classroom = Classroom::create([
             'business_id' => $scope['business_id'],
             'tutor_id' => $data['tutor_id'],
+            'course_offering_id' => $data['course_offering_id'] ?? null,
             'academic_year_id' => $data['academic_year_id'],
             'year_group_id' => $data['year_group_id'],
             'subject_id' => $data['subject_id'],
             'name' => $data['name'],
         ]);
 
-        return response()->json($classroom->load(['subject', 'yearGroup', 'tutor.user', 'academicYear']), 201);
+        return response()->json($classroom->load(['subject', 'yearGroup', 'tutor.user', 'academicYear', 'courseOffering']), 201);
     }
 
     public function show(Request $request, Classroom $class): JsonResponse

@@ -16,6 +16,7 @@ class Classroom extends Model
     protected $fillable = [
         'business_id',
         'tutor_id',
+        'course_offering_id',
         'academic_year_id',
         'year_group_id',
         'subject_id',
@@ -45,6 +46,12 @@ class Classroom extends Model
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    /** Optional link — class belongs to a course offering when it's a course cohort. */
+    public function courseOffering(): BelongsTo
+    {
+        return $this->belongsTo(CourseOffering::class, 'course_offering_id');
     }
 
     public function students(): BelongsToMany

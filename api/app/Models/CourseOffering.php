@@ -19,9 +19,15 @@ class CourseOffering extends Model
 
     protected $fillable = [
         'business_id', 'course_template_id', 'tutor_id', 'academic_year_id', 'created_by_user_id',
-        'name', 'target_test_date', 'starts_on', 'ends_on',
+        'name', 'description', 'target_test_date', 'starts_on', 'ends_on',
         'capacity', 'status', 'notes',
     ];
+
+    /** True when this is a custom owner-defined course (no platform template). */
+    public function isCustom(): bool
+    {
+        return $this->course_template_id === null;
+    }
 
     protected function casts(): array
     {

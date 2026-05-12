@@ -47,13 +47,14 @@ class CourseOfferingController extends Controller
         return response()->json($query->orderByDesc('starts_on')->get());
     }
 
-    /** POST /api/course-offerings — create an offering from a template. */
+    /** POST /api/course-offerings — create an offering from a template OR a custom course (null template). */
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'course_template_id' => ['required', 'integer', 'exists:course_templates,id'],
+            'course_template_id' => ['nullable', 'integer', 'exists:course_templates,id'],
             'tutor_id'           => ['required', 'integer', 'exists:tutors,id'],
             'name'               => ['required', 'string', 'max:120'],
+            'description'        => ['nullable', 'string'],
             'starts_on'          => ['required', 'date'],
             'ends_on'            => ['required', 'date', 'after_or_equal:starts_on'],
             'target_test_date'   => ['nullable', 'date'],
@@ -82,11 +83,12 @@ class CourseOfferingController extends Controller
         return DB::transaction(function () use ($data, $tutor, $user) {
             $offering = CourseOffering::create([
                 'business_id'        => $tutor->business_id,
-                'course_template_id' => $data['course_template_id'],
+                'course_template_id' => $data['course_template_id'] ?? null,
                 'tutor_id'           => $tutor->id,
                 'academic_year_id'   => $data['academic_year_id'] ?? null,
                 'created_by_user_id' => $user->id,
                 'name'               => $data['name'],
+                'description'        => $data['description'] ?? null,
                 'target_test_date'   => $data['target_test_date'] ?? null,
                 'starts_on'          => $data['starts_on'],
                 'ends_on'            => $data['ends_on'],
@@ -101,7 +103,11 @@ class CourseOfferingController extends Controller
                 actor: $user,
                 entityType: 'course_offering',
                 entityId: $offering->id,
-                payload: ['template_id' => $offering->course_template_id, 'tutor_id' => $offering->tutor_id],
+                payload: [
+                    'template_id' => $offering->course_template_id,    // null for custom courses
+                    'tutor_id'    => $offering->tutor_id,
+                    'is_custom'   => $offering->course_template_id === null,
+                ],
             );
 
             return response()->json($offering->load(['template.components', 'tutor.user:id,name,email']), 201);
