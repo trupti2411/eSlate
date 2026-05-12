@@ -267,7 +267,7 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
             tone="emerald"
           />
           <KpiCard
-            href="/company/academic"
+            href="/company/classes"
             icon={<BookOpen size={18} />}
             label="Classes"
             value={classes.length}
@@ -449,7 +449,7 @@ function QuickActionsCard({
   const actions = [
     { href: '/company/tutors', label: 'Invite tutor', icon: <UserPlus size={16} />, tone: 'indigo' as const, primary: !hasTutors },
     { href: '/company/students', label: 'Add student', icon: <Plus size={16} />, tone: 'emerald' as const, primary: hasTutors && !hasStudents },
-    { href: '/company/academic', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
+    { href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
     { href: '/company/assignments', label: 'New assignment', icon: <ClipboardPlus size={16} />, tone: 'rose' as const, primary: false },
   ];
   const toneClass = (k: 'indigo' | 'emerald' | 'amber' | 'rose', primary: boolean) => {
