@@ -7,6 +7,8 @@ use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\ClassroomController;
+use App\Http\Controllers\CourseOfferingController;
+use App\Http\Controllers\CourseTemplateController;
 use App\Http\Controllers\LegacyCompanyController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\StatePackController;
@@ -58,6 +60,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('classes', ClassroomController::class)->parameters(['classes' => 'class']);
     Route::post('/classes/{class}/enrol', [ClassroomController::class, 'enrol']);
     Route::delete('/classes/{class}/students/{student}', [ClassroomController::class, 'unenrol']);
+
+    // Course catalogue (test-prep)
+    Route::get('/course-templates', [CourseTemplateController::class, 'index']);
+    Route::get('/course-templates/{template}', [CourseTemplateController::class, 'show']);
+    Route::get('/course-templates/{template}/components', [CourseTemplateController::class, 'components']);
+
+    Route::get('/course-offerings', [CourseOfferingController::class, 'index']);
+    Route::post('/course-offerings', [CourseOfferingController::class, 'store']);
+    Route::get('/course-offerings/{offering}', [CourseOfferingController::class, 'show']);
+    Route::patch('/course-offerings/{offering}', [CourseOfferingController::class, 'update']);
+    Route::delete('/course-offerings/{offering}', [CourseOfferingController::class, 'destroy']);
+    Route::post('/course-offerings/{offering}/enrolments', [CourseOfferingController::class, 'enrol']);
+    Route::delete('/course-offerings/{offering}/enrolments/{enrolment}', [CourseOfferingController::class, 'withdraw']);
 
     // Student-facing
     Route::get('/me/assignments', [AssignmentController::class, 'myAssignments']);

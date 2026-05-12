@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Http\Controllers\Concerns\ResolvesScope;
 use App\Models\Assignment;
 use App\Models\Classroom;
+use App\Models\CourseComponent;
+use App\Models\CourseOffering;
 use App\Models\Submission;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -52,6 +54,8 @@ class AssignmentController extends Controller
             'title' => ['required', 'string', 'max:200'],
             'description' => ['nullable', 'string'],
             'class_id' => ['nullable', 'integer', 'exists:classes,id'],
+            'course_offering_id' => ['nullable', 'integer', 'exists:course_offerings,id'],
+            'course_component_id' => ['nullable', 'integer', 'exists:course_components,id'],
             'week_id' => ['nullable', 'integer', 'exists:weeks,id'],
             'due_date' => ['nullable', 'date'],
             'status' => ['nullable', 'in:draft,published,archived'],
@@ -60,17 +64,48 @@ class AssignmentController extends Controller
             'student_ids.*' => ['integer', 'exists:students,id'],
         ]);
 
+        // Spec §4.5 + §8.1: exactly one of {class_id, course_offering_id} must be non-null.
+        // (SQLite can't express this as a CHECK on ALTER TABLE, so we enforce here.)
+        $hasClass = ! empty($data['class_id']);
+        $hasOffering = ! empty($data['course_offering_id']);
+        if ($hasClass === $hasOffering) {
+            return response()->json([
+                'message' => 'Assignment must belong to exactly one of: class or course offering.',
+                'errors'  => ['class_id' => ['Set exactly one of class_id or course_offering_id.']],
+            ], 422);
+        }
+
         $scope = $this->resolveOwnerScope($request->user());
         if (! $scope['tutor_id']) {
             abort(403, 'Only tutors can create assignments.');
         }
 
-        if (! empty($data['class_id'])) {
+        $courseOffering = null;
+        if ($hasClass) {
             $class = Classroom::findOrFail($data['class_id']);
             $this->assertClassOwnedByScope($class, $scope);
             $businessId = $class->business_id;
         } else {
-            $businessId = $scope['business_id'];
+            $courseOffering = CourseOffering::findOrFail($data['course_offering_id']);
+            $this->assertOfferingOwnedByScope($courseOffering, $scope);
+            // Spec §8.2.4: cannot create assignments against draft or archived offerings.
+            if (in_array($courseOffering->status, [CourseOffering::STATUS_DRAFT, CourseOffering::STATUS_ARCHIVED], true)) {
+                return response()->json([
+                    'message' => "Cannot create assignment against a {$courseOffering->status} offering.",
+                ], 422);
+            }
+            $businessId = $courseOffering->business_id;
+
+            // Spec §8.1: component (when set) must belong to the offering's template.
+            if (! empty($data['course_component_id'])) {
+                $component = CourseComponent::findOrFail($data['course_component_id']);
+                if ($component->course_template_id !== $courseOffering->course_template_id) {
+                    return response()->json([
+                        'message' => 'Course component does not belong to this offering\'s template.',
+                        'errors'  => ['course_component_id' => ['Component / template mismatch.']],
+                    ], 422);
+                }
+            }
         }
 
         $file = $request->file('pdf');
@@ -78,6 +113,8 @@ class AssignmentController extends Controller
             'business_id' => $businessId,
             'tutor_id' => $scope['tutor_id'],
             'class_id' => $data['class_id'] ?? null,
+            'course_offering_id' => $data['course_offering_id'] ?? null,
+            'course_component_id' => $hasOffering ? ($data['course_component_id'] ?? null) : null,
             'week_id' => $data['week_id'] ?? null,
             'title' => $data['title'],
             'description' => $data['description'] ?? null,
@@ -244,6 +281,16 @@ class AssignmentController extends Controller
 
         if (! $owned) {
             abort(403, 'Cannot create assignment for a class you do not own.');
+        }
+    }
+
+    private function assertOfferingOwnedByScope(CourseOffering $offering, array $scope): void
+    {
+        $owned = ($scope['tutor_id'] !== null && $offering->tutor_id === $scope['tutor_id'])
+            || ($scope['business_id'] !== null && $offering->business_id === $scope['business_id']);
+
+        if (! $owned) {
+            abort(403, 'Cannot create assignment for a course offering you do not own.');
         }
     }
 }

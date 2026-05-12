@@ -19,6 +19,7 @@ class Assignment extends Model
 
     protected $fillable = [
         'business_id', 'tutor_id', 'class_id', 'week_id',
+        'course_offering_id', 'course_component_id',
         'title', 'description', 'pdf_path', 'pdf_original_name',
         'due_date', 'status',
     ];
@@ -46,6 +47,16 @@ class Assignment extends Model
     public function week(): BelongsTo
     {
         return $this->belongsTo(Week::class);
+    }
+
+    public function courseOffering(): BelongsTo
+    {
+        return $this->belongsTo(CourseOffering::class, 'course_offering_id');
+    }
+
+    public function courseComponent(): BelongsTo
+    {
+        return $this->belongsTo(CourseComponent::class, 'course_component_id');
     }
 
     public function targetStudents(): BelongsToMany
