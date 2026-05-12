@@ -8,7 +8,7 @@ import {
   Building2, Users, GraduationCap, BookOpen, ShieldCheck, ShieldAlert,
   CalendarDays, FileBarChart, Bell, LogOut, ArrowRight, UserPlus,
   ClipboardPlus, Plus, AlertTriangle, ChevronRight, Activity, Mail,
-  UserCheck, FileEdit, CircleSlash, Settings as SettingsIcon,
+  UserCheck, FileEdit, CircleSlash, Settings as SettingsIcon, Trophy,
 } from 'lucide-react';
 
 interface Props { setDesign: (d: Design) => void; }
@@ -131,6 +131,12 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
     queryKey: [`/api/companies/${companyId}/audit-log?limit=8`],
     enabled: !!companyId,
   });
+
+  const { data: courseOfferings = [] } = useQuery<{ id: number; status: string }[]>({
+    queryKey: ['/api/course-offerings'],
+    enabled: !!user,
+  });
+  const activeCourseCount = courseOfferings.filter(o => o.status === 'active').length;
 
   const academicYears: AcademicYear[] = useMemo(() => {
     if (!hierarchy) return [];
@@ -282,11 +288,11 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
             tone="amber"
           />
           <KpiCard
-            href="/company/reports"
-            icon={<FileBarChart size={18} />}
-            label="Reports"
-            value={'—'}
-            sub="open reports"
+            href="/company/courses"
+            icon={<Trophy size={18} />}
+            label="Test-prep"
+            value={courseOfferings.length}
+            sub={courseOfferings.length === 0 ? 'OC, Selective, NAPLAN' : `${activeCourseCount} active`}
             tone="rose"
           />
         </div>
