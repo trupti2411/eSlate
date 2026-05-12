@@ -71,7 +71,7 @@ class LegacyCompanyController extends Controller
         $this->assertCanAccessBusiness($request->user(), $companyId);
 
         $students = Student::where('business_id', $companyId)
-            ->with('user')
+            ->with(['user', 'parents'])
             ->get();
 
         return response()->json($students);

@@ -57,6 +57,11 @@ class Student extends Model
             ->first();
     }
 
+    public function parents(): HasMany
+    {
+        return $this->hasMany(StudentParent::class);
+    }
+
     public function classrooms(): BelongsToMany
     {
         return $this->belongsToMany(Classroom::class, 'student_class_assignments', 'student_id', 'class_id')

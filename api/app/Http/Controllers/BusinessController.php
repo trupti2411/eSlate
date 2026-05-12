@@ -172,12 +172,18 @@ class BusinessController extends Controller
         $this->assertCanManage($request->user(), $business);
 
         $data = $request->validate([
-            'first_name'      => ['required', 'string', 'max:60'],
-            'last_name'       => ['required', 'string', 'max:60'],
-            'year_group_code' => ['required', 'string', 'max:10'],
-            'date_of_birth'   => ['nullable', 'date'],
-            'school'          => ['nullable', 'string', 'max:120'],
-            'learning_goals'  => ['nullable', 'string'],
+            'first_name'                  => ['required', 'string', 'max:60'],
+            'last_name'                   => ['required', 'string', 'max:60'],
+            'year_group_code'             => ['required', 'string', 'max:10'],
+            'date_of_birth'               => ['nullable', 'date'],
+            'school'                      => ['nullable', 'string', 'max:120'],
+            'learning_goals'              => ['nullable', 'string'],
+            'parents'                     => ['nullable', 'array'],
+            'parents.*.name'              => ['required_with:parents.*', 'string', 'max:120'],
+            'parents.*.relationship'      => ['nullable', 'string', 'max:40'],
+            'parents.*.email'             => ['nullable', 'email', 'max:255'],
+            'parents.*.phone'             => ['nullable', 'string', 'max:40'],
+            'parents.*.is_primary'        => ['nullable', 'boolean'],
         ]);
 
         // Validate year group exists for this business's state
@@ -191,27 +197,43 @@ class BusinessController extends Controller
             ], 422);
         }
 
-        $student = Student::create([
-            'business_id'     => $business->id,
-            'user_id'         => null, // record-only profile
-            'first_name'      => $data['first_name'],
-            'last_name'       => $data['last_name'],
-            'year_group_code' => $data['year_group_code'],
-            'date_of_birth'   => $data['date_of_birth'] ?? null,
-            'school'          => $data['school'] ?? null,
-            'learning_goals'  => $data['learning_goals'] ?? null,
-            'status'          => Student::STATUS_ACTIVE,
-        ]);
+        return DB::transaction(function () use ($business, $request, $data) {
+            $student = Student::create([
+                'business_id'     => $business->id,
+                'user_id'         => null, // record-only profile
+                'first_name'      => $data['first_name'],
+                'last_name'       => $data['last_name'],
+                'year_group_code' => $data['year_group_code'],
+                'date_of_birth'   => $data['date_of_birth'] ?? null,
+                'school'          => $data['school'] ?? null,
+                'learning_goals'  => $data['learning_goals'] ?? null,
+                'status'          => Student::STATUS_ACTIVE,
+            ]);
 
-        $this->audit->log(
-            event: 'student_added',
-            businessId: $business->id,
-            actor: $request->user(),
-            entityType: 'student',
-            entityId: $student->id,
-        );
+            $parents = $data['parents'] ?? [];
+            // If no parent flagged primary, the first one wins by default.
+            $anyPrimary = collect($parents)->contains(fn ($p) => ! empty($p['is_primary']));
+            foreach ($parents as $i => $p) {
+                $student->parents()->create([
+                    'name'         => $p['name'],
+                    'relationship' => $p['relationship'] ?? null,
+                    'email'        => $p['email'] ?? null,
+                    'phone'        => $p['phone'] ?? null,
+                    'is_primary'   => $anyPrimary ? (bool) ($p['is_primary'] ?? false) : ($i === 0),
+                ]);
+            }
 
-        return response()->json($student, 201);
+            $this->audit->log(
+                event: 'student_added',
+                businessId: $business->id,
+                actor: $request->user(),
+                entityType: 'student',
+                entityId: $student->id,
+                payload: ['parent_count' => count($parents)],
+            );
+
+            return response()->json($student->load('parents'), 201);
+        });
     }
 
     private function assertCanManage(User $user, Business $business): void
