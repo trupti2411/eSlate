@@ -26,6 +26,33 @@ class BusinessController extends Controller
         private readonly AuditLogger $audit,
     ) {}
 
+    /** GET /api/businesses/{id} — full business profile + active subject ids for the Settings page. */
+    public function show(Request $request, int $id): JsonResponse
+    {
+        $business = Business::findOrFail($id);
+        $this->assertCanManage($request->user(), $business);
+
+        $activeSubjectIds = BusinessSubject::where('business_id', $business->id)
+            ->where('is_active', true)
+            ->whereNotNull('subject_id')
+            ->pluck('subject_id');
+
+        return response()->json([
+            'id'                 => $business->id,
+            'type'               => $business->type,
+            'name'               => $business->name,
+            'legal_name'         => $business->legal_name,
+            'logo'               => $business->logo,
+            'abn'                => $business->abn,
+            'state_code'         => $business->state_code,
+            'timezone'           => $business->timezone,
+            'currency'           => $business->currency,
+            'tier'               => $business->tier,
+            'pack_version'       => $business->pack_version,
+            'active_subject_ids' => $activeSubjectIds,
+        ]);
+    }
+
     /** PATCH /api/businesses/{id} — owner profile (logo, ABN, timezone, etc.) per v3 Path A step 5. */
     public function update(Request $request, int $id): JsonResponse
     {

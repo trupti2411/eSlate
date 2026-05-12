@@ -38,6 +38,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Path A — Multi-tutor onboarding (v3 §5.2)
     Route::post('/admin/businesses/invite', [AdminController::class, 'inviteBusiness']);
+    Route::get('/businesses/{id}', [BusinessController::class, 'show']);
     Route::patch('/businesses/{id}', [BusinessController::class, 'update']);
     Route::patch('/businesses/{id}/subjects', [BusinessController::class, 'updateSubjects']);
     Route::post('/businesses/{id}/tutors/invite', [BusinessController::class, 'inviteTutor']);

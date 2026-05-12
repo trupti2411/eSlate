@@ -8,7 +8,7 @@ import {
   Building2, Users, GraduationCap, BookOpen, ShieldCheck, ShieldAlert,
   CalendarDays, FileBarChart, Bell, LogOut, ArrowRight, UserPlus,
   ClipboardPlus, Plus, AlertTriangle, ChevronRight, Activity, Mail,
-  UserCheck, FileEdit, CircleSlash,
+  UserCheck, FileEdit, CircleSlash, Settings as SettingsIcon,
 } from 'lucide-react';
 
 interface Props { setDesign: (d: Design) => void; }
@@ -221,6 +221,13 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
                 {ownerFirstName ? `Owner · ${ownerFirstName}` : ''}
               </span>
               <DesignNavToggle design="new" onSwitch={setDesign} accentClass="bg-indigo-600" />
+              <Link
+                href="/company/settings"
+                className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
+                aria-label="Settings"
+              >
+                <SettingsIcon size={16} />
+              </Link>
               <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
                 <Bell size={16} />
               </button>
