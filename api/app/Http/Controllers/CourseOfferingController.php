@@ -51,7 +51,11 @@ class CourseOfferingController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
+            'course_id'          => ['nullable', 'integer', 'exists:courses,id'],
             'course_template_id' => ['nullable', 'integer', 'exists:course_templates,id'],
+            'year_group_id'      => ['nullable', 'integer', 'exists:year_groups,id'],
+            'subject_id'         => ['nullable', 'integer', 'exists:subjects,id'],
+            'level'              => ['nullable', 'string', 'max:30'],
             'tutor_id'           => ['required', 'integer', 'exists:tutors,id'],
             'name'               => ['required', 'string', 'max:120'],
             'description'        => ['nullable', 'string'],
@@ -83,8 +87,12 @@ class CourseOfferingController extends Controller
         return DB::transaction(function () use ($data, $tutor, $user) {
             $offering = CourseOffering::create([
                 'business_id'        => $tutor->business_id,
+                'course_id'          => $data['course_id'] ?? null,
                 'course_template_id' => $data['course_template_id'] ?? null,
                 'tutor_id'           => $tutor->id,
+                'year_group_id'      => $data['year_group_id'] ?? null,
+                'subject_id'         => $data['subject_id'] ?? null,
+                'level'              => $data['level'] ?? null,
                 'academic_year_id'   => $data['academic_year_id'] ?? null,
                 'created_by_user_id' => $user->id,
                 'name'               => $data['name'],

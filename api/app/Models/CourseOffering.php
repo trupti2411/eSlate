@@ -18,7 +18,9 @@ class CourseOffering extends Model
     public const STATUSES = [self::STATUS_DRAFT, self::STATUS_ACTIVE, self::STATUS_COMPLETED, self::STATUS_ARCHIVED];
 
     protected $fillable = [
-        'business_id', 'course_template_id', 'tutor_id', 'academic_year_id', 'created_by_user_id',
+        'business_id', 'course_id', 'course_template_id', 'tutor_id',
+        'year_group_id', 'subject_id', 'level',
+        'academic_year_id', 'created_by_user_id',
         'name', 'description', 'target_test_date', 'starts_on', 'ends_on',
         'capacity', 'status', 'notes',
     ];
@@ -41,6 +43,21 @@ class CourseOffering extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function course(): BelongsTo
+    {
+        return $this->belongsTo(Course::class);
+    }
+
+    public function yearGroup(): BelongsTo
+    {
+        return $this->belongsTo(YearGroup::class);
+    }
+
+    public function subject(): BelongsTo
+    {
+        return $this->belongsTo(Subject::class);
     }
 
     public function template(): BelongsTo

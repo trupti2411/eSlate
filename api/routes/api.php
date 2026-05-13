@@ -7,6 +7,7 @@ use App\Http\Controllers\AssignmentController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\ClassroomController;
+use App\Http\Controllers\CourseController;
 use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\CourseTemplateController;
 use App\Http\Controllers\LegacyCompanyController;
@@ -65,6 +66,13 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/course-templates', [CourseTemplateController::class, 'index']);
     Route::get('/course-templates/{template}', [CourseTemplateController::class, 'show']);
     Route::get('/course-templates/{template}/components', [CourseTemplateController::class, 'components']);
+
+    // Courses (owner-authored catalogue parents — Foundation, OC Test Prep, etc.)
+    Route::get('/courses', [CourseController::class, 'index']);
+    Route::post('/courses', [CourseController::class, 'store']);
+    Route::get('/courses/{course}', [CourseController::class, 'show']);
+    Route::patch('/courses/{course}', [CourseController::class, 'update']);
+    Route::delete('/courses/{course}', [CourseController::class, 'destroy']);
 
     Route::get('/course-offerings', [CourseOfferingController::class, 'index']);
     Route::post('/course-offerings', [CourseOfferingController::class, 'store']);
