@@ -191,6 +191,14 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   );
 }
 
+interface OfferingSummary {
+  id: number;
+  name: string;
+  status: string;
+  course_template_id: number | null;
+  template?: { short_name?: string } | null;
+}
+
 function CreateClassModal({ businessId, onClose }: { businessId: string; onClose: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -198,12 +206,18 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   const [subjectId, setSubjectId] = useState<string>('');
   const [yearGroupId, setYearGroupId] = useState<string>('');
   const [tutorId, setTutorId] = useState<string>('');
+  const [courseOfferingId, setCourseOfferingId] = useState<string>(''); // optional — class belongs to this course
 
   const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
   const { data: yearGroups = [] } = useQuery<YearGroupRow[]>({ queryKey: ['/api/year-groups?state=NSW'] });
   const { data: tutors = [] } = useQuery<TutorRow[]>({
     queryKey: [`/api/companies/${businessId}/tutors`],
   });
+  const { data: offerings = [] } = useQuery<OfferingSummary[]>({
+    queryKey: ['/api/course-offerings'],
+  });
+  // Hide archived offerings from the dropdown — owners shouldn't link new classes to them.
+  const availableOfferings = offerings.filter(o => o.status !== 'archived');
   // Pick the most recent active academic year for this business
   const { data: hierarchy } = useQuery<{ years?: AcademicYearRow[] } | AcademicYearRow[]>({
     queryKey: [`/api/companies/${businessId}/academic-hierarchy`],
@@ -222,6 +236,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
         subject_id: Number(subjectId),
         year_group_id: Number(yearGroupId),
         tutor_id: Number(tutorId),
+        course_offering_id: courseOfferingId ? Number(courseOfferingId) : null,
         academic_year_id: currentYear?.id,
         business_id: Number(businessId),
       }),
@@ -306,6 +321,27 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
             </select>
           </Field>
 
+          <Field
+            label="Part of a course (optional)"
+            hint="Link this class to a test-prep or custom course offering. Leave blank for a standalone class."
+          >
+            <select
+              value={courseOfferingId}
+              onChange={(e) => setCourseOfferingId(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">Standalone class (no course)</option>
+              {availableOfferings.map(o => {
+                const tag = o.template?.short_name ?? 'Custom';
+                return (
+                  <option key={o.id} value={o.id}>
+                    {o.name} — {tag}
+                  </option>
+                );
+              })}
+            </select>
+          </Field>
+
           {currentYear && (
             <p className="text-xs text-gray-500">
               Will be added to academic year <span className="font-semibold text-gray-700">{currentYear.year}</span>.
@@ -329,11 +365,12 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <div>
       <label className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</label>
       <div className="mt-1.5">{children}</div>
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }

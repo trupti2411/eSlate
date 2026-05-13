@@ -284,13 +284,15 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const { toast } = useToast();
   const qc = useQueryClient();
 
-  // Step 1: pick a template; Step 2: fill cohort details
-  const [step, setStep] = useState<1 | 2>(1);
+  // Step 0: pick mode (template vs custom). Step 1: pick a template (template mode only). Step 2: fill cohort details.
+  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [mode, setMode] = useState<'template' | 'custom'>('template');
   const [yearFilter, setYearFilter] = useState<string>('');
   const [alignmentFilter, setAlignmentFilter] = useState<'all' | 'oc' | 'selective' | 'naplan' | 'general'>('all');
   const [selectedTemplate, setSelectedTemplate] = useState<CourseTemplate | null>(null);
 
   const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [tutorId, setTutorId] = useState<string>('');
   const [startsOn, setStartsOn] = useState('');
   const [endsOn, setEndsOn] = useState('');
@@ -323,9 +325,10 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const m = useMutation({
     mutationFn: () =>
       apiRequest('/api/course-offerings', 'POST', {
-        course_template_id: selectedTemplate!.id,
+        course_template_id: mode === 'template' ? selectedTemplate!.id : null,
         tutor_id: Number(tutorId),
         name,
+        description: mode === 'custom' && description.trim() ? description.trim() : null,
         starts_on: startsOn,
         ends_on: endsOn,
         target_test_date: testDate || null,
@@ -341,7 +344,9 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
     },
   });
 
-  const valid = !!selectedTemplate && name.trim() && tutorId && startsOn && endsOn && startsOn <= endsOn;
+  const valid =
+    (mode === 'template' ? !!selectedTemplate : true) &&
+    name.trim() && tutorId && startsOn && endsOn && startsOn <= endsOn;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -352,13 +357,55 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
               <Plus size={16} className="text-indigo-600" /> New course offering
             </h3>
             <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              Step {step} of 2
+              Step {step + 1} of {mode === 'template' ? 3 : 2}
             </span>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
             <X size={16} />
           </button>
         </div>
+
+        {step === 0 && (
+          <div className="p-5 space-y-4 overflow-y-auto">
+            <p className="text-sm text-gray-600">How would you like to set up this course?</p>
+            <div className="space-y-3">
+              <button
+                onClick={() => { setMode('template'); setStep(1); }}
+                className="w-full text-left rounded-2xl border-2 border-gray-200 hover:border-indigo-400 p-4 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
+                    <Trophy size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-gray-900">Use a platform template</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Pre-built structure for OC, Selective, NAPLAN — including section names, durations, and weights from the published test format.
+                    </p>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-2" />
+                </div>
+              </button>
+              <button
+                onClick={() => { setMode('custom'); setSelectedTemplate(null); setName(''); setStep(2); }}
+                className="w-full text-left rounded-2xl border-2 border-gray-200 hover:border-indigo-400 p-4 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                    <Plus size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-gray-900">Create a custom course</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Author your own programme from scratch — any name, any year scope, any structure. No template needed.
+                    </p>
+                  </div>
+                  <ChevronRight size={16} className="text-gray-300 flex-shrink-0 mt-2" />
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
 
         {step === 1 && (
           <div className="p-5 space-y-4 overflow-y-auto">
@@ -422,27 +469,54 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
           </div>
         )}
 
-        {step === 2 && selectedTemplate && (
+        {step === 2 && (
           <div className="p-5 space-y-4 overflow-y-auto">
-            <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">Template</p>
-              <p className="text-sm font-black text-indigo-900 mt-0.5">{selectedTemplate.name}</p>
-              <button
-                onClick={() => setStep(1)}
-                className="mt-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"
-              >
-                Change template
-              </button>
-            </div>
+            {mode === 'template' && selectedTemplate && (
+              <div className="rounded-xl bg-indigo-50 border border-indigo-100 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-700">Template</p>
+                <p className="text-sm font-black text-indigo-900 mt-0.5">{selectedTemplate.name}</p>
+                <button
+                  onClick={() => setStep(1)}
+                  className="mt-1 text-xs font-bold text-indigo-600 hover:text-indigo-700"
+                >
+                  Change template
+                </button>
+              </div>
+            )}
+            {mode === 'custom' && (
+              <div className="rounded-xl bg-amber-50 border border-amber-100 p-3">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">Custom course</p>
+                <p className="text-sm font-black text-amber-900 mt-0.5">No platform template</p>
+                <button
+                  onClick={() => setStep(0)}
+                  className="mt-1 text-xs font-bold text-amber-700 hover:text-amber-800"
+                >
+                  Use a template instead
+                </button>
+              </div>
+            )}
 
             <Field label="Offering name" required>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
+                placeholder={mode === 'custom' ? 'e.g. Saturday Selective Bootcamp' : ''}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 autoFocus
               />
             </Field>
+
+            {mode === 'custom' && (
+              <Field label="Description (optional)" hint="One or two sentences students and parents will see.">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                  placeholder="What does this course cover? Who's it for?"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            )}
 
             <Field label="Tutor" required>
               <select
@@ -501,8 +575,12 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
         )}
 
         <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
-          {step === 2 ? (
-            <button onClick={() => setStep(1)} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+          {step === 1 ? (
+            <button onClick={() => setStep(0)} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+              ← Back
+            </button>
+          ) : step === 2 ? (
+            <button onClick={() => setStep(mode === 'template' ? 1 : 0)} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
               ← Back
             </button>
           ) : <div />}

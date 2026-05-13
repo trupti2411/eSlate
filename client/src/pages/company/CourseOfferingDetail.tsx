@@ -7,6 +7,7 @@ import { apiRequest } from '@/lib/queryClient';
 import {
   Trophy, Bell, LogOut, ArrowLeft, UserPlus, Trash2, X, Save,
   Target, Calendar, User, BookOpen, Play, CheckCircle2, Archive, ChevronDown,
+  Users as UsersIcon, GraduationCap, ChevronRight,
 } from 'lucide-react';
 
 interface Enrolment {
@@ -129,6 +130,7 @@ export default function CourseOfferingDetail() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
+                <ClassesUnderCourseSection offeringId={offering.id} />
                 <EnrolmentSection
                   offering={offering}
                   activeEnrolments={activeEnrolments}
@@ -274,6 +276,66 @@ function EnrolmentSection({
                   >
                     <Trash2 size={14} />
                   </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+interface ClassRow {
+  id: number;
+  name: string;
+  course_offering_id: number | null;
+  tutor?: { id: number; user?: { name?: string } };
+  subject?: { id: number; name: string };
+  yearGroup?: { id: number; label: string };
+}
+
+function ClassesUnderCourseSection({ offeringId }: { offeringId: number }) {
+  const { data: allClasses = [] } = useQuery<ClassRow[]>({
+    queryKey: ['/api/classes'],
+  });
+  const classes = allClasses.filter(c => c.course_offering_id === offeringId);
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+          <UsersIcon size={14} className="text-indigo-600" /> Classes under this course ({classes.length})
+        </h3>
+        <Link
+          href="/company/classes"
+          className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+        >
+          Manage classes <ChevronRight size={12} />
+        </Link>
+      </div>
+      <div className="p-5">
+        {classes.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No classes linked to this course yet. Create a class on the Classes page and link it here — the class becomes the place where this course meets.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {classes.map(c => {
+              const tutorName = c.tutor?.user?.name ?? '—';
+              return (
+                <li key={c.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black flex-shrink-0">
+                    <BookOpen size={14} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-900 truncate">{c.name}</p>
+                    <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+                      {c.yearGroup?.label && <span className="flex items-center gap-1"><GraduationCap size={11} /> {c.yearGroup.label}</span>}
+                      {c.subject?.name && <span>{c.subject.name}</span>}
+                      <span className="flex items-center gap-1"><User size={11} /> {tutorName}</span>
+                    </p>
+                  </div>
                 </li>
               );
             })}
