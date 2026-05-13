@@ -13,7 +13,13 @@ interface AdminProfile { userId: string; companyId: string; companyName: string;
 interface SubjectRow { id: number; code: string; name: string; state_code?: string; }
 interface YearGroupRow { id: number; code: string; label: string; state_code: string; order: number; }
 interface TutorRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; }
-interface AcademicYearRow { id: number; year: number; state_code: string; }
+interface AcademicYearRow {
+  id: number;
+  year: number;
+  state_code: string;
+  start_date?: string;
+  end_date?: string;
+}
 interface ClassRow {
   id: number;
   name: string;
@@ -206,7 +212,11 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   const [subjectId, setSubjectId] = useState<string>('');
   const [yearGroupId, setYearGroupId] = useState<string>('');
   const [tutorId, setTutorId] = useState<string>('');
-  const [courseOfferingId, setCourseOfferingId] = useState<string>(''); // optional — class belongs to this course
+  // courseOfferingId is either '' (standalone), a numeric id, or '__new__' (inline create custom)
+  const [courseOfferingId, setCourseOfferingId] = useState<string>('');
+  // Inline custom-course fields (only shown when courseOfferingId === '__new__')
+  const [newCourseName, setNewCourseName] = useState('');
+  const [newCourseDescription, setNewCourseDescription] = useState('');
 
   const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
   const { data: yearGroups = [] } = useQuery<YearGroupRow[]>({ queryKey: ['/api/year-groups?state=NSW'] });
@@ -230,19 +240,42 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   const currentYear = academicYears[0]; // hierarchy is orderByDesc('year')
 
   const m = useMutation({
-    mutationFn: () =>
-      apiRequest('/api/classes', 'POST', {
+    mutationFn: async () => {
+      let offeringIdToLink: number | null = null;
+
+      // Inline-create the offering first if the owner chose "+ New custom course"
+      if (courseOfferingId === '__new__') {
+        if (!currentYear) throw new Error('No academic year available for the new course.');
+        const newOffering = await apiRequest('/api/course-offerings', 'POST', {
+          course_template_id: null,
+          tutor_id: Number(tutorId),
+          name: newCourseName.trim(),
+          description: newCourseDescription.trim() || null,
+          starts_on: currentYear.start_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+          ends_on: currentYear.end_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
+          academic_year_id: currentYear.id,
+          target_test_date: null,
+          capacity: null,
+        });
+        offeringIdToLink = newOffering.id;
+      } else if (courseOfferingId) {
+        offeringIdToLink = Number(courseOfferingId);
+      }
+
+      return apiRequest('/api/classes', 'POST', {
         name,
         subject_id: Number(subjectId),
         year_group_id: Number(yearGroupId),
         tutor_id: Number(tutorId),
-        course_offering_id: courseOfferingId ? Number(courseOfferingId) : null,
+        course_offering_id: offeringIdToLink,
         academic_year_id: currentYear?.id,
         business_id: Number(businessId),
-      }),
+      });
+    },
     onSuccess: () => {
       toast({ title: 'Class created' });
       qc.invalidateQueries({ queryKey: ['/api/classes'] });
+      qc.invalidateQueries({ queryKey: ['/api/course-offerings'] }); // refresh in case we made a custom one
       onClose();
     },
     onError: (e: any) => {
@@ -250,7 +283,10 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
     },
   });
 
-  const valid = name.trim() && subjectId && yearGroupId && tutorId && currentYear;
+  const isCreatingNewCourse = courseOfferingId === '__new__';
+  const valid =
+    name.trim() && subjectId && yearGroupId && tutorId && currentYear &&
+    (!isCreatingNewCourse || newCourseName.trim().length > 0);
   const blockers: string[] = [];
   if (!currentYear) blockers.push('No academic year set up yet — apply your state pack first.');
   if (tutors.length === 0) blockers.push('No tutors yet — invite at least one tutor.');
@@ -322,8 +358,8 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
           </Field>
 
           <Field
-            label="Part of a course (optional)"
-            hint="Link this class to a test-prep or custom course offering. Leave blank for a standalone class."
+            label="Course (optional)"
+            hint="Link to an existing course offering, create a new custom one, or leave blank for a standalone class."
           >
             <select
               value={courseOfferingId}
@@ -331,16 +367,47 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             >
               <option value="">Standalone class (no course)</option>
-              {availableOfferings.map(o => {
-                const tag = o.template?.short_name ?? 'Custom';
-                return (
-                  <option key={o.id} value={o.id}>
-                    {o.name} — {tag}
-                  </option>
-                );
-              })}
+              {availableOfferings.length > 0 && (
+                <optgroup label="Existing courses">
+                  {availableOfferings.map(o => {
+                    const tag = o.template?.short_name ?? 'Custom';
+                    return (
+                      <option key={o.id} value={o.id}>
+                        {o.name} — {tag}
+                      </option>
+                    );
+                  })}
+                </optgroup>
+              )}
+              <option value="__new__">+ Create new custom course…</option>
             </select>
           </Field>
+
+          {isCreatingNewCourse && (
+            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">New custom course</p>
+              <Field label="Course name" hint="e.g. Saturday Selective Bootcamp, Y6 Writing Intensive.">
+                <input
+                  value={newCourseName}
+                  onChange={(e) => setNewCourseName(e.target.value)}
+                  placeholder="What should this course be called?"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                />
+              </Field>
+              <Field label="Description (optional)">
+                <textarea
+                  value={newCourseDescription}
+                  onChange={(e) => setNewCourseDescription(e.target.value)}
+                  rows={2}
+                  placeholder="One or two sentences about what this course covers."
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                />
+              </Field>
+              <p className="text-xs text-amber-700">
+                The course runs across academic year <span className="font-semibold">{currentYear?.year}</span>. You can edit dates and capacity later on the course detail page.
+              </p>
+            </div>
+          )}
 
           {currentYear && (
             <p className="text-xs text-gray-500">
