@@ -28,8 +28,12 @@ interface CourseTemplate {
 interface CourseOffering {
   id: number;
   business_id: number;
+  course_id: number | null;
   course_template_id: number;
   tutor_id: number;
+  year_group_id: number | null;
+  subject_id: number | null;
+  level: string | null;
   name: string;
   target_test_date: string | null;
   starts_on: string;
@@ -39,6 +43,17 @@ interface CourseOffering {
   template?: { id: number; code: string; name: string; short_name: string; kind: string; test_alignment: string | null; year_group_code: string };
   tutor?: { id: number; user?: { name?: string; email?: string } };
 }
+
+interface Course {
+  id: number;
+  business_id: number;
+  name: string;
+  description?: string | null;
+  offerings?: CourseOffering[];
+}
+
+interface YearGroupRow { id: number; code: string; label: string; }
+interface SubjectRow { id: number; code: string; name: string; }
 
 function formatDate(s: string | null | undefined): string {
   if (!s) return '';
@@ -69,6 +84,7 @@ export default function CoursesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'active' | 'completed' | 'archived'>('all');
   const [createOpen, setCreateOpen] = useState(false);
+  const [createCourseOpen, setCreateCourseOpen] = useState(false);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -79,6 +95,11 @@ export default function CoursesPage() {
 
   const { data: offerings = [], isLoading } = useQuery<CourseOffering[]>({
     queryKey: ['/api/course-offerings'],
+    enabled: !!user,
+  });
+
+  const { data: courses = [] } = useQuery<Course[]>({
+    queryKey: ['/api/courses'],
     enabled: !!user,
   });
 
@@ -134,11 +155,45 @@ export default function CoursesPage() {
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <KpiTile value={counts.total} label="Offerings" tone="indigo" />
-          <KpiTile value={counts.active} label="Active" tone="emerald" />
+          <KpiTile value={courses.length} label="Courses" tone="indigo" />
+          <KpiTile value={counts.active} label="Active offerings" tone="emerald" />
           <KpiTile value={counts.draft} label="Draft" tone="amber" />
           <KpiTile value={counts.completed} label="Completed" tone="rose" />
         </div>
+
+        {/* Courses catalogue — owner-authored parent categories. */}
+        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">Courses</h2>
+            <button
+              onClick={() => setCreateCourseOpen(true)}
+              className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
+            >
+              <Plus size={12} /> New course
+            </button>
+          </div>
+          {courses.length === 0 ? (
+            <p className="text-sm text-gray-500">
+              No courses yet. A course (e.g. "Foundation", "OC Test Preparation") groups offerings together so you can manage your catalogue.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {courses.map(c => (
+                <li key={c.id} className="rounded-xl border border-gray-100 p-3 flex items-start gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black flex-shrink-0">
+                    {c.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-black text-gray-900 truncate">{c.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {c.offerings?.length ?? 0} offering{(c.offerings?.length ?? 0) === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
@@ -195,6 +250,94 @@ export default function CoursesPage() {
           onClose={() => setCreateOpen(false)}
         />
       )}
+      {createCourseOpen && (
+        <CreateCourseModal onClose={() => setCreateCourseOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+function CreateCourseModal({ onClose }: { onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+
+  const m = useMutation({
+    mutationFn: () =>
+      apiRequest('/api/courses', 'POST', {
+        name: name.trim(),
+        description: description.trim() || null,
+      }),
+    onSuccess: () => {
+      toast({ title: 'Course created' });
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
+      onClose();
+    },
+    onError: (e: any) =>
+      toast({ title: 'Could not create course', description: e.message ?? 'Try again.', variant: 'destructive' }),
+  });
+
+  const valid = name.trim().length >= 2;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 className="text-base font-black flex items-center gap-2">
+            <Plus size={16} className="text-indigo-600" /> New course
+          </h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4">
+          <Field label="Name" required>
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Foundation, OC Test Preparation"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              autoFocus
+            />
+          </Field>
+          <Field label="Description (optional)" hint="What this course covers — students and parents will see this.">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </Field>
+          <p className="text-xs text-gray-500">
+            Add offerings under this course next — each offering is a specific year/subject combo (e.g. Foundation Y4 Maths).
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
+          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+            Cancel
+          </button>
+          <button
+            onClick={() => m.mutate()}
+            disabled={!valid || m.isPending}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            <Save size={14} /> {m.isPending ? 'Creating…' : 'Create course'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+        {label}{required && <span className="text-rose-500"> *</span>}
+      </label>
+      <div className="mt-1.5">{children}</div>
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }
@@ -298,6 +441,11 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const [endsOn, setEndsOn] = useState('');
   const [testDate, setTestDate] = useState('');
   const [capacity, setCapacity] = useState('');
+  // Catalogue fields (Step 1 schema; optional in UI)
+  const [parentCourseId, setParentCourseId] = useState<string>('');
+  const [yearGroupId, setYearGroupId] = useState<string>('');
+  const [subjectId, setSubjectId] = useState<string>('');
+  const [level, setLevel] = useState<string>('');
 
   const { data: templates = [] } = useQuery<CourseTemplate[]>({
     queryKey: ['/api/course-templates?state=NSW'],
@@ -305,6 +453,9 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const { data: tutors = [] } = useQuery<TutorRow[]>({
     queryKey: [`/api/companies/${businessId}/tutors`],
   });
+  const { data: courseList = [] } = useQuery<Course[]>({ queryKey: ['/api/courses'] });
+  const { data: yearGroups = [] } = useQuery<YearGroupRow[]>({ queryKey: ['/api/year-groups?state=NSW'] });
+  const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
 
   const filteredTemplates = useMemo(() => {
     return templates.filter(t => {
@@ -325,7 +476,11 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const m = useMutation({
     mutationFn: () =>
       apiRequest('/api/course-offerings', 'POST', {
+        course_id: parentCourseId ? Number(parentCourseId) : null,
         course_template_id: mode === 'template' ? selectedTemplate!.id : null,
+        year_group_id: yearGroupId ? Number(yearGroupId) : null,
+        subject_id: subjectId ? Number(subjectId) : null,
+        level: level.trim() || null,
         tutor_id: Number(tutorId),
         name,
         description: mode === 'custom' && description.trim() ? description.trim() : null,
@@ -496,6 +651,20 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
               </div>
             )}
 
+            <Field
+              label="Course (optional)"
+              hint="Group this offering under one of your catalogue courses. Leave blank for a standalone offering."
+            >
+              <select
+                value={parentCourseId}
+                onChange={(e) => setParentCourseId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">No parent course</option>
+                {courseList.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </Field>
+
             <Field label="Offering name" required>
               <input
                 value={name}
@@ -503,6 +672,38 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
                 placeholder={mode === 'custom' ? 'e.g. Saturday Selective Bootcamp' : ''}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 autoFocus
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Year group (optional)">
+                <select
+                  value={yearGroupId}
+                  onChange={(e) => setYearGroupId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">Any / all</option>
+                  {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Subject (optional)">
+                <select
+                  value={subjectId}
+                  onChange={(e) => setSubjectId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">Any / mixed</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </Field>
+            </div>
+
+            <Field label="Difficulty (optional)" hint="e.g. Beginner / Intermediate / Advanced — leave blank if not streamed.">
+              <input
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                placeholder="Beginner, Intermediate, Advanced, …"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               />
             </Field>
 
@@ -600,18 +801,6 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
-        {label}{required && <span className="text-rose-500"> *</span>}
-      </label>
-      <div className="mt-1.5">{children}</div>
-      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }
