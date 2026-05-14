@@ -197,85 +197,118 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
   );
 }
 
-interface OfferingSummary {
+interface CourseSummary {
   id: number;
   name: string;
-  status: string;
-  course_template_id: number | null;
-  template?: { short_name?: string } | null;
 }
+interface TermRow {
+  id: number;
+  name: string;
+  start_date: string;
+  end_date: string;
+  academic_year_id: number;
+}
+interface YearWithTerms extends AcademicYearRow {
+  terms?: TermRow[];
+}
+
+const dateOnly = (s: string) => s.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? s;
 
 function CreateClassModal({ businessId, onClose }: { businessId: string; onClose: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [name, setName] = useState('');
-  const [subjectId, setSubjectId] = useState<string>('');
-  const [yearGroupId, setYearGroupId] = useState<string>('');
-  const [tutorId, setTutorId] = useState<string>('');
-  // courseOfferingId is either '' (standalone), a numeric id, or '__new__' (inline create custom)
-  const [courseOfferingId, setCourseOfferingId] = useState<string>('');
-  // Inline custom-course fields (only shown when courseOfferingId === '__new__')
+
+  // Course parent
+  const [courseId, setCourseId] = useState<string>('');           // '' | numeric id | '__new__'
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseDescription, setNewCourseDescription] = useState('');
+
+  // About this class
+  const [yearGroupId, setYearGroupId] = useState<string>('');
+  const [subjectId, setSubjectId] = useState<string>('');
+  const [level, setLevel] = useState<string>('');
+
+  // When
+  const [pickedTermIds, setPickedTermIds] = useState<Set<number>>(new Set());
+
+  // Who
+  const [tutorId, setTutorId] = useState<string>('');
+
+  // Optional details
+  const [capacity, setCapacity] = useState<string>('');
+  const [description, setDescription] = useState('');
+  const [name, setName] = useState('');
+  const [nameTouched, setNameTouched] = useState(false);
 
   const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
   const { data: yearGroups = [] } = useQuery<YearGroupRow[]>({ queryKey: ['/api/year-groups?state=NSW'] });
   const { data: tutors = [] } = useQuery<TutorRow[]>({
     queryKey: [`/api/companies/${businessId}/tutors`],
   });
-  const { data: offerings = [] } = useQuery<OfferingSummary[]>({
-    queryKey: ['/api/course-offerings'],
-  });
-  // Hide archived offerings from the dropdown — owners shouldn't link new classes to them.
-  const availableOfferings = offerings.filter(o => o.status !== 'archived');
-  // Pick the most recent active academic year for this business
-  const { data: hierarchy } = useQuery<{ years?: AcademicYearRow[] } | AcademicYearRow[]>({
+  const { data: courses = [] } = useQuery<CourseSummary[]>({ queryKey: ['/api/courses'] });
+
+  const { data: hierarchy } = useQuery<{ years?: YearWithTerms[] } | YearWithTerms[]>({
     queryKey: [`/api/companies/${businessId}/academic-hierarchy`],
   });
-  const academicYears = useMemo<AcademicYearRow[]>(() => {
+  const academicYears = useMemo<YearWithTerms[]>(() => {
     if (!hierarchy) return [];
     if (Array.isArray(hierarchy)) return hierarchy;
     return hierarchy.years ?? [];
   }, [hierarchy]);
-  const currentYear = academicYears[0]; // hierarchy is orderByDesc('year')
+  const currentYear = academicYears[0];
+  const terms = currentYear?.terms ?? [];
+
+  // Auto-suggest class name from its parts unless the owner has typed one.
+  const suggestedName = useMemo(() => {
+    const courseLabel = courseId && courseId !== '__new__'
+      ? courses.find(c => String(c.id) === courseId)?.name
+      : courseId === '__new__' ? newCourseName.trim() : '';
+    const yg = yearGroups.find(y => String(y.id) === yearGroupId)?.label;
+    const sj = subjects.find(s => String(s.id) === subjectId)?.name;
+    return [courseLabel, yg, sj, level].filter(Boolean).join(' · ');
+  }, [courseId, newCourseName, yearGroupId, subjectId, level, courses, yearGroups, subjects]);
+  const effectiveName = nameTouched ? name : suggestedName;
+
+  const toggleTerm = (id: number) => {
+    setPickedTermIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const m = useMutation({
     mutationFn: async () => {
-      let offeringIdToLink: number | null = null;
-
-      // Inline-create the offering first if the owner chose "+ New custom course"
-      if (courseOfferingId === '__new__') {
-        if (!currentYear) throw new Error('No academic year available for the new course.');
-        const newOffering = await apiRequest('/api/course-offerings', 'POST', {
-          course_template_id: null,
-          tutor_id: Number(tutorId),
+      let parentCourseId: number | null = null;
+      if (courseId === '__new__') {
+        const c = await apiRequest('/api/courses', 'POST', {
           name: newCourseName.trim(),
           description: newCourseDescription.trim() || null,
-          starts_on: currentYear.start_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
-          ends_on: currentYear.end_date?.slice(0, 10) ?? new Date().toISOString().slice(0, 10),
-          academic_year_id: currentYear.id,
-          target_test_date: null,
-          capacity: null,
         });
-        offeringIdToLink = newOffering.id;
-      } else if (courseOfferingId) {
-        offeringIdToLink = Number(courseOfferingId);
+        parentCourseId = c.id;
+      } else if (courseId) {
+        parentCourseId = Number(courseId);
       }
 
       return apiRequest('/api/classes', 'POST', {
-        name,
+        name: effectiveName.trim(),
+        course_id: parentCourseId,
         subject_id: Number(subjectId),
         year_group_id: Number(yearGroupId),
         tutor_id: Number(tutorId),
-        course_offering_id: offeringIdToLink,
         academic_year_id: currentYear?.id,
         business_id: Number(businessId),
+        term_ids: Array.from(pickedTermIds),
+        capacity: capacity ? Number(capacity) : null,
+        description: description.trim() || null,
+        level: level.trim() || null,
+        status: 'draft',
       });
     },
     onSuccess: () => {
       toast({ title: 'Class created' });
       qc.invalidateQueries({ queryKey: ['/api/classes'] });
-      qc.invalidateQueries({ queryKey: ['/api/course-offerings'] }); // refresh in case we made a custom one
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
       onClose();
     },
     onError: (e: any) => {
@@ -283,13 +316,14 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
     },
   });
 
-  const isCreatingNewCourse = courseOfferingId === '__new__';
+  const isCreatingNewCourse = courseId === '__new__';
   const valid =
-    name.trim() && subjectId && yearGroupId && tutorId && currentYear &&
-    (!isCreatingNewCourse || newCourseName.trim().length > 0);
+    yearGroupId && subjectId && tutorId && pickedTermIds.size > 0 && currentYear &&
+    (!isCreatingNewCourse || newCourseName.trim().length >= 2) &&
+    effectiveName.trim().length > 0;
   const blockers: string[] = [];
-  if (!currentYear) blockers.push('No academic year set up yet — apply your state pack first.');
-  if (tutors.length === 0) blockers.push('No tutors yet — invite at least one tutor.');
+  if (!currentYear) blockers.push('No academic year set up yet — apply your state pack at /company/academic first.');
+  if (tutors.length === 0) blockers.push('No tutors yet — invite at least one at /company/tutors.');
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -302,116 +336,189 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
             <X size={16} />
           </button>
         </div>
-        <div className="p-5 space-y-4 overflow-y-auto">
+        <div className="p-5 space-y-5 overflow-y-auto">
           {blockers.length > 0 && (
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 space-y-1">
               {blockers.map((b, i) => <p key={i}>• {b}</p>)}
             </div>
           )}
 
-          <Field label="Class name">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Year 7 Maths — Tuesdays"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              autoFocus
-            />
-          </Field>
-
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Subject">
+          {/* Course (catalogue parent) */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Course</h4>
+            <Field label="Catalogue parent" hint="Pick an existing course or create a new one. Leave blank for a standalone class.">
               <select
-                value={subjectId}
-                onChange={(e) => setSubjectId(e.target.value)}
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                autoFocus
               >
-                <option value="">Select…</option>
-                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                <option value="">Standalone class (no course)</option>
+                {courses.length > 0 && (
+                  <optgroup label="Existing courses">
+                    {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </optgroup>
+                )}
+                <option value="__new__">+ Create new course…</option>
               </select>
             </Field>
-            <Field label="Year group">
-              <select
-                value={yearGroupId}
-                onChange={(e) => setYearGroupId(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              >
-                <option value="">Select…</option>
-                {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
-              </select>
-            </Field>
-          </div>
+            {isCreatingNewCourse && (
+              <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-3">
+                <Field label="New course name" hint="e.g. Foundation, OC Test Prep, Saturday Selective Bootcamp.">
+                  <input
+                    value={newCourseName}
+                    onChange={(e) => setNewCourseName(e.target.value)}
+                    placeholder="What's this course called?"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                  />
+                </Field>
+                <Field label="Description (optional)">
+                  <textarea
+                    value={newCourseDescription}
+                    onChange={(e) => setNewCourseDescription(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                  />
+                </Field>
+              </div>
+            )}
+          </section>
 
-          <Field label="Tutor">
-            <select
-              value={tutorId}
-              onChange={(e) => setTutorId(e.target.value)}
-              disabled={tutors.length === 0}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
-            >
-              <option value="">Select…</option>
-              {tutors.map(t => {
-                const nm = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || t.email || `Tutor #${t.id}`;
-                return <option key={t.id} value={t.id}>{nm}</option>;
-              })}
-            </select>
-          </Field>
+          {/* About this class */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">About this class</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Year group" hint="">
+                <select
+                  value={yearGroupId}
+                  onChange={(e) => setYearGroupId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">Select…</option>
+                  {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
+                </select>
+              </Field>
+              <Field label="Subject">
+                <select
+                  value={subjectId}
+                  onChange={(e) => setSubjectId(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">Select…</option>
+                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Difficulty (optional)" hint="Beginner / Intermediate / Advanced — or your own label.">
+                <input
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value)}
+                  placeholder="Beginner, Intermediate, Advanced, …"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+          </section>
 
-          <Field
-            label="Course (optional)"
-            hint="Link to an existing course offering, create a new custom one, or leave blank for a standalone class."
-          >
-            <select
-              value={courseOfferingId}
-              onChange={(e) => setCourseOfferingId(e.target.value)}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            >
-              <option value="">Standalone class (no course)</option>
-              {availableOfferings.length > 0 && (
-                <optgroup label="Existing courses">
-                  {availableOfferings.map(o => {
-                    const tag = o.template?.short_name ?? 'Custom';
+          {/* When */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">When</h4>
+            <Field label="Terms" hint="Pick which term(s) this class runs in. Dates come from the term boundaries.">
+              {terms.length === 0 ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                  No terms available — apply your state pack on /company/academic first.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {terms.map(t => {
+                    const isOn = pickedTermIds.has(t.id);
                     return (
-                      <option key={o.id} value={o.id}>
-                        {o.name} — {tag}
-                      </option>
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => toggleTerm(t.id)}
+                        className={`text-left rounded-xl border px-3 py-2 transition-colors ${
+                          isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                            isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                          }`}>
+                            {isOn && <span className="text-[10px]">✓</span>}
+                          </span>
+                          <span className="font-bold text-sm">{t.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {dateOnly(t.start_date)} → {dateOnly(t.end_date)}
+                        </p>
+                      </button>
                     );
                   })}
-                </optgroup>
+                </div>
               )}
-              <option value="__new__">+ Create new custom course…</option>
-            </select>
-          </Field>
+            </Field>
+          </section>
 
-          {isCreatingNewCourse && (
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-3">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-amber-700">New custom course</p>
-              <Field label="Course name" hint="e.g. Saturday Selective Bootcamp, Y6 Writing Intensive.">
+          {/* Who */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Who</h4>
+            <Field label="Tutor">
+              <select
+                value={tutorId}
+                onChange={(e) => setTutorId(e.target.value)}
+                disabled={tutors.length === 0}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">Select…</option>
+                {tutors.map(t => {
+                  const nm = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || t.email || `Tutor #${t.id}`;
+                  return <option key={t.id} value={t.id}>{nm}</option>;
+                })}
+              </select>
+            </Field>
+          </section>
+
+          {/* Optional */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Optional details</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Capacity">
                 <input
-                  value={newCourseName}
-                  onChange={(e) => setNewCourseName(e.target.value)}
-                  placeholder="What should this course be called?"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                  type="number"
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                  min={1}
+                  placeholder="No cap"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </Field>
-              <Field label="Description (optional)">
-                <textarea
-                  value={newCourseDescription}
-                  onChange={(e) => setNewCourseDescription(e.target.value)}
-                  rows={2}
-                  placeholder="One or two sentences about what this course covers."
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+              <Field label="Class name" hint="Auto-suggested. Override if you want a different label.">
+                <input
+                  value={effectiveName}
+                  onChange={(e) => { setNameTouched(true); setName(e.target.value); }}
+                  placeholder={suggestedName || 'Class name'}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 />
               </Field>
-              <p className="text-xs text-amber-700">
-                The course runs across academic year <span className="font-semibold">{currentYear?.year}</span>. You can edit dates and capacity later on the course detail page.
-              </p>
             </div>
-          )}
+            <div className="mt-3">
+              <Field label="Description">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Anything students or parents should know"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+          </section>
 
           {currentYear && (
             <p className="text-xs text-gray-500">
-              Will be added to academic year <span className="font-semibold text-gray-700">{currentYear.year}</span>.
+              Class will live under academic year <span className="font-semibold text-gray-700">{currentYear.year}</span>.
             </p>
           )}
         </div>
