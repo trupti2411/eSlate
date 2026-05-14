@@ -437,8 +437,7 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tutorId, setTutorId] = useState<string>('');
-  const [startsOn, setStartsOn] = useState('');
-  const [endsOn, setEndsOn] = useState('');
+  const [pickedTermIds, setPickedTermIds] = useState<Set<number>>(new Set());
   const [testDate, setTestDate] = useState('');
   const [capacity, setCapacity] = useState('');
   // Catalogue fields (Step 1 schema; optional in UI)
@@ -456,6 +455,39 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const { data: courseList = [] } = useQuery<Course[]>({ queryKey: ['/api/courses'] });
   const { data: yearGroups = [] } = useQuery<YearGroupRow[]>({ queryKey: ['/api/year-groups?state=NSW'] });
   const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
+
+  // Academic hierarchy — pull current year's terms so the form picks terms not dates.
+  interface TermRow { id: number; name: string; start_date: string; end_date: string; }
+  interface YearRow { id: number; year: number; terms: TermRow[] }
+  const { data: hierarchy } = useQuery<{ years?: YearRow[] } | YearRow[]>({
+    queryKey: [`/api/companies/${businessId}/academic-hierarchy`],
+  });
+  const academicYears: YearRow[] = useMemo(() => {
+    if (!hierarchy) return [];
+    return Array.isArray(hierarchy) ? hierarchy : (hierarchy.years ?? []);
+  }, [hierarchy]);
+  const currentAcademicYear = academicYears[0]; // hierarchy returns most-recent first
+  const terms = currentAcademicYear?.terms ?? [];
+
+  // Derive starts_on / ends_on from picked terms (min start, max end).
+  const dateOnly = (s: string) => s.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? s;
+  const derived = useMemo(() => {
+    const picked = terms.filter(t => pickedTermIds.has(t.id));
+    if (picked.length === 0) return { startsOn: '', endsOn: '' };
+    const starts = picked.map(t => dateOnly(t.start_date)).sort();
+    const ends = picked.map(t => dateOnly(t.end_date)).sort();
+    return { startsOn: starts[0], endsOn: ends[ends.length - 1] };
+  }, [terms, pickedTermIds]);
+  const startsOn = derived.startsOn;
+  const endsOn = derived.endsOn;
+
+  const toggleTerm = (termId: number) => {
+    setPickedTermIds(prev => {
+      const next = new Set(prev);
+      next.has(termId) ? next.delete(termId) : next.add(termId);
+      return next;
+    });
+  };
 
   const filteredTemplates = useMemo(() => {
     return templates.filter(t => {
@@ -733,24 +765,50 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
               </select>
             </Field>
 
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Starts on" required>
-                <input
-                  type="date"
-                  value={startsOn}
-                  onChange={(e) => setStartsOn(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </Field>
-              <Field label="Ends on" required>
-                <input
-                  type="date"
-                  value={endsOn}
-                  onChange={(e) => setEndsOn(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                />
-              </Field>
-            </div>
+            <Field
+              label="Terms"
+              required
+              hint="Pick which term(s) this offering runs. Dates are taken from the term boundaries."
+            >
+              {terms.length === 0 ? (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                  No academic year set up yet — apply your state pack on /company/academic first.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {terms.map(t => {
+                    const isOn = pickedTermIds.has(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => toggleTerm(t.id)}
+                        className={`text-left rounded-xl border px-3 py-2 transition-colors ${
+                          isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                            isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                          }`}>
+                            {isOn && <span className="text-[10px]">✓</span>}
+                          </span>
+                          <span className="font-bold text-sm">{t.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {dateOnly(t.start_date)} → {dateOnly(t.end_date)}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {startsOn && endsOn && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Offering runs <span className="font-semibold text-gray-700">{startsOn}</span> → <span className="font-semibold text-gray-700">{endsOn}</span>
+                </p>
+              )}
+            </Field>
 
             <div className="grid grid-cols-2 gap-3">
               <Field label="Target test date" hint="When students sit the actual test">
