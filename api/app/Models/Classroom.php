@@ -16,12 +16,27 @@ class Classroom extends Model
     protected $fillable = [
         'business_id',
         'tutor_id',
-        'course_offering_id',
+        'course_offering_id',     // deprecated; kept for back-compat
+        'course_id',
         'academic_year_id',
         'year_group_id',
         'subject_id',
         'name',
+        'starts_on',
+        'ends_on',
+        'capacity',
+        'status',
+        'description',
+        'level',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'starts_on' => 'date',
+            'ends_on' => 'date',
+        ];
+    }
 
     public function business(): BelongsTo
     {
@@ -52,6 +67,19 @@ class Classroom extends Model
     public function courseOffering(): BelongsTo
     {
         return $this->belongsTo(CourseOffering::class, 'course_offering_id');
+    }
+
+    /** Parent catalogue Course (e.g. Foundation, OC Test Prep). Replaces courseOffering link for new classes. */
+    public function course(): BelongsTo
+    {
+        return $this->belongsTo(Course::class);
+    }
+
+    /** Terms this class runs within. starts_on / ends_on are derived from the union of these terms. */
+    public function terms(): BelongsToMany
+    {
+        return $this->belongsToMany(AcademicTerm::class, 'class_terms', 'class_id', 'academic_term_id')
+            ->withTimestamps();
     }
 
     public function students(): BelongsToMany
