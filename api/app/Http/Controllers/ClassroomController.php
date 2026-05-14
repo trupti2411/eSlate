@@ -25,7 +25,7 @@ class ClassroomController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'tutor_id' => ['required', 'integer', 'exists:tutors,id'],
+            'tutor_id' => ['nullable', 'integer', 'exists:tutors,id'],   // owner may defer tutor assignment
             'academic_year_id' => ['required', 'integer', 'exists:academic_years,id'],
             'year_group_id' => ['required', 'integer', 'exists:year_groups,id'],
             'subject_id' => ['required', 'integer', 'exists:subjects,id'],
@@ -45,7 +45,7 @@ class ClassroomController extends Controller
         $scope = $this->resolveOwnerScope(
             $request->user(),
             $data['business_id'] ?? null,
-            $data['tutor_id']
+            $data['tutor_id'] ?? null
         );
 
         // course_id must belong to this business if provided.
@@ -92,7 +92,7 @@ class ClassroomController extends Controller
         return DB::transaction(function () use ($data, $scope, $termIds, $startsOn, $endsOn) {
             $classroom = Classroom::create([
                 'business_id' => $scope['business_id'],
-                'tutor_id' => $data['tutor_id'],
+                'tutor_id' => $data['tutor_id'] ?? null,
                 'course_id' => $data['course_id'] ?? null,
                 'course_offering_id' => $data['course_offering_id'] ?? null,
                 'academic_year_id' => $data['academic_year_id'],

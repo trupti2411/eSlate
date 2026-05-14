@@ -295,7 +295,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
         course_id: parentCourseId,
         subject_id: Number(subjectId),
         year_group_id: Number(yearGroupId),
-        tutor_id: Number(tutorId),
+        tutor_id: tutorId ? Number(tutorId) : null,
         academic_year_id: currentYear?.id,
         business_id: Number(businessId),
         term_ids: Array.from(pickedTermIds),
@@ -318,16 +318,23 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
 
   const isCreatingNewCourse = courseId === '__new__';
   const valid =
-    yearGroupId && subjectId && tutorId && pickedTermIds.size > 0 && currentYear &&
+    yearGroupId && subjectId && pickedTermIds.size > 0 && currentYear &&
     (!isCreatingNewCourse || newCourseName.trim().length >= 2) &&
     effectiveName.trim().length > 0;
   const blockers: string[] = [];
   if (!currentYear) blockers.push('No academic year set up yet — apply your state pack at /company/academic first.');
-  if (tutors.length === 0) blockers.push('No tutors yet — invite at least one at /company/tutors.');
+
+  // List of what's still missing — surfaces under the disabled Save button.
+  const missing: string[] = [];
+  if (!yearGroupId) missing.push('Year group');
+  if (!subjectId) missing.push('Subject');
+  if (pickedTermIds.size === 0) missing.push('at least one Term');
+  if (isCreatingNewCourse && newCourseName.trim().length < 2) missing.push('new course name');
+  if (!effectiveName.trim()) missing.push('Class name');
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h3 className="text-base font-black flex items-center gap-2">
             <Plus size={16} className="text-indigo-600" /> Create a class
@@ -388,7 +395,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
           <section>
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">About this class</h4>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Year group" hint="">
+              <Field label="Year group" required>
                 <select
                   value={yearGroupId}
                   onChange={(e) => setYearGroupId(e.target.value)}
@@ -398,7 +405,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
                   {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
                 </select>
               </Field>
-              <Field label="Subject">
+              <Field label="Subject" required>
                 <select
                   value={subjectId}
                   onChange={(e) => setSubjectId(e.target.value)}
@@ -424,7 +431,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
           {/* When */}
           <section>
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">When</h4>
-            <Field label="Terms" hint="Pick which term(s) this class runs in. Dates come from the term boundaries.">
+            <Field label="Terms" required hint="Pick which term(s) this class runs in. Dates come from the term boundaries.">
               {terms.length === 0 ? (
                 <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
                   No terms available — apply your state pack on /company/academic first.
@@ -464,14 +471,14 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
           {/* Who */}
           <section>
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Who</h4>
-            <Field label="Tutor">
+            <Field label="Tutor (optional)" hint="Leave blank if you haven't decided yet — you can assign one later from the class detail page.">
               <select
                 value={tutorId}
                 onChange={(e) => setTutorId(e.target.value)}
                 disabled={tutors.length === 0}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
               >
-                <option value="">Select…</option>
+                <option value="">Not assigned yet</option>
                 {tutors.map(t => {
                   const nm = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || t.email || `Tutor #${t.id}`;
                   return <option key={t.id} value={t.id}>{nm}</option>;
@@ -522,27 +529,36 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
             </p>
           )}
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
-          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
-            Cancel
-          </button>
-          <button
-            onClick={() => m.mutate()}
-            disabled={!valid || m.isPending}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
-          >
-            <Save size={14} /> {m.isPending ? 'Creating…' : 'Create class'}
-          </button>
+        <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <p className="text-xs text-gray-500 min-w-0 truncate">
+            {missing.length > 0
+              ? <>Still need: <span className="font-semibold text-amber-700">{missing.join(', ')}</span></>
+              : <span className="text-emerald-700 font-semibold">Ready to save</span>}
+          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+              Cancel
+            </button>
+            <button
+              onClick={() => m.mutate()}
+              disabled={!valid || m.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Save size={14} /> {m.isPending ? 'Creating…' : 'Create class'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
   return (
     <div>
-      <label className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</label>
+      <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+        {label}{required && <span className="text-rose-500"> *</span>}
+      </label>
       <div className="mt-1.5">{children}</div>
       {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>
