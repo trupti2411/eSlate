@@ -23,6 +23,7 @@ import NewCompanyDashboard from "@/pages/company/NewCompanyDashboard";
 import Staff from "@/pages/company/Staff";
 import Students from "@/pages/company/Students";
 import Classes from "@/pages/company/Classes";
+import ClassDetail from "@/pages/company/ClassDetail";
 import Courses from "@/pages/company/Courses";
 import CourseOfferingDetail from "@/pages/company/CourseOfferingDetail";
 import CompanySettings from "@/pages/company/Settings";
@@ -165,6 +166,7 @@ function Router() {
           <Route path="/company/tutors" component={Staff} />
           <Route path="/company/students" component={Students} />
           <Route path="/company/classes" component={Classes} />
+          <Route path="/company/classes/:id" component={ClassDetail} />
           <Route path="/company/courses" component={Courses} />
           <Route path="/company/courses/:id" component={CourseOfferingDetail} />
           <Route path="/company/settings" component={CompanySettings} />

@@ -148,7 +148,11 @@ function ClassRowItem({ c }: { c: ClassRow }) {
     || (c.tutor_id ? 'Tutor' : '—');
   const initials = c.name.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'C';
   return (
-    <li className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
+    <li>
+      <Link
+        href={`/company/classes/${c.id}`}
+        className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 hover:border-indigo-200 transition-colors"
+      >
       <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black flex-shrink-0">
         {initials}
       </div>
@@ -173,6 +177,7 @@ function ClassRowItem({ c }: { c: ClassRow }) {
           )}
         </div>
       </div>
+      </Link>
     </li>
   );
 }

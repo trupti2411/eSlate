@@ -324,18 +324,24 @@ function ClassesUnderCourseSection({ offeringId }: { offeringId: number }) {
             {classes.map(c => {
               const tutorName = c.tutor?.user?.name ?? '—';
               return (
-                <li key={c.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black flex-shrink-0">
-                    <BookOpen size={14} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{c.name}</p>
-                    <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
-                      {c.yearGroup?.label && <span className="flex items-center gap-1"><GraduationCap size={11} /> {c.yearGroup.label}</span>}
-                      {c.subject?.name && <span>{c.subject.name}</span>}
-                      <span className="flex items-center gap-1"><User size={11} /> {tutorName}</span>
-                    </p>
-                  </div>
+                <li key={c.id}>
+                  <Link
+                    href={`/company/classes/${c.id}`}
+                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:bg-gray-50 rounded-lg -mx-2 px-2 transition-colors"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black flex-shrink-0">
+                      <BookOpen size={14} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{c.name}</p>
+                      <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+                        {c.yearGroup?.label && <span className="flex items-center gap-1"><GraduationCap size={11} /> {c.yearGroup.label}</span>}
+                        {c.subject?.name && <span>{c.subject.name}</span>}
+                        <span className="flex items-center gap-1"><User size={11} /> {tutorName}</span>
+                      </p>
+                    </div>
+                    <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
+                  </Link>
                 </li>
               );
             })}
