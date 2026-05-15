@@ -7,6 +7,7 @@ import { apiRequest } from '@/lib/queryClient';
 import {
   BookOpen, Bell, LogOut, ArrowLeft, UserPlus, Trash2, X, Save,
   User, Users, GraduationCap, Calendar, CalendarDays, School,
+  Pencil, Play, CheckCircle2, Archive,
 } from 'lucide-react';
 
 interface ClassData {
@@ -73,6 +74,7 @@ export default function ClassDetailPage() {
   const classId = params?.id;
   const { logoutMutation } = useAuth();
   const [enrolOpen, setEnrolOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
 
   const { data: cls, isLoading } = useQuery<ClassData>({
     queryKey: [`/api/classes/${classId}`],
@@ -146,9 +148,17 @@ export default function ClassDetailPage() {
                     )}
                   </div>
                 </div>
-                <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full ${tone.bg} ${tone.text}`}>
-                  {tone.label}
-                </span>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setEditOpen(true)}
+                    className="text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 rounded-xl flex items-center gap-1.5"
+                  >
+                    <Pencil size={12} /> Edit
+                  </button>
+                  <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full ${tone.bg} ${tone.text}`}>
+                    {tone.label}
+                  </span>
+                </div>
               </div>
 
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -179,14 +189,20 @@ export default function ClassDetailPage() {
               )}
             </div>
 
-            {/* Roster */}
-            <RosterSection
-              classId={cls.id}
-              students={cls.students ?? []}
-              capacity={cls.capacity}
-              atCap={atCap}
-              onEnrolClick={() => setEnrolOpen(true)}
-            />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <RosterSection
+                  classId={cls.id}
+                  students={cls.students ?? []}
+                  capacity={cls.capacity}
+                  atCap={atCap}
+                  onEnrolClick={() => setEnrolOpen(true)}
+                />
+              </div>
+              <div>
+                <LifecycleSection classId={cls.id} status={cls.status} />
+              </div>
+            </div>
           </>
         )}
       </main>
@@ -199,6 +215,277 @@ export default function ClassDetailPage() {
           onClose={() => setEnrolOpen(false)}
         />
       )}
+      {editOpen && cls && (
+        <EditClassModal cls={cls} onClose={() => setEditOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Lifecycle ---------- */
+
+function LifecycleSection({ classId, status }: { classId: number; status: string }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const transition = useMutation({
+    mutationFn: (next: string) => apiRequest(`/api/classes/${classId}`, 'PATCH', { status: next }),
+    onSuccess: (_, next) => {
+      toast({ title: `Status changed to ${next}` });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}`] });
+      qc.invalidateQueries({ queryKey: ['/api/classes'] });
+    },
+    onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
+
+  type Btn = { to: string; label: string; icon: React.ReactNode; tone: string };
+  const transitions: Btn[] = [];
+  if (status === 'draft') {
+    transitions.push({ to: 'active', label: 'Activate', icon: <Play size={12} />, tone: 'bg-emerald-600 hover:bg-emerald-700' });
+  }
+  if (status === 'active') {
+    transitions.push({ to: 'completed', label: 'Mark completed', icon: <CheckCircle2 size={12} />, tone: 'bg-indigo-600 hover:bg-indigo-700' });
+  }
+  if (status === 'completed') {
+    transitions.push({ to: 'active', label: 'Reopen as active', icon: <Play size={12} />, tone: 'bg-amber-600 hover:bg-amber-700' });
+  }
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Lifecycle</h3>
+      <p className="text-xs text-gray-500 mb-3">
+        Current status: <span className="font-bold text-gray-700 capitalize">{status}</span>
+      </p>
+      <div className="space-y-2">
+        {transitions.map(t => (
+          <button
+            key={t.to}
+            onClick={() => transition.mutate(t.to)}
+            disabled={transition.isPending}
+            className={`w-full ${t.tone} text-white text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60`}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
+        {status !== 'archived' && (
+          <button
+            onClick={() => {
+              if (confirm('Archive this class? Students will keep their historical record.')) {
+                transition.mutate('archived');
+              }
+            }}
+            disabled={transition.isPending}
+            className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            <Archive size={12} /> Archive class
+          </button>
+        )}
+        {status === 'archived' && (
+          <p className="text-xs text-gray-500">Archived classes are read-only.</p>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 mt-4">
+        Draft → Active makes the class visible to students. Completed locks the roster but keeps history.
+      </p>
+    </section>
+  );
+}
+
+/* ---------- Edit ---------- */
+
+interface CourseSummary { id: number; name: string; }
+interface TutorPickerRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; }
+
+function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  const [name, setName] = useState(cls.name);
+  const [description, setDescription] = useState(cls.description ?? '');
+  const [level, setLevel] = useState(cls.level ?? '');
+  const [capacity, setCapacity] = useState(cls.capacity != null ? String(cls.capacity) : '');
+  const [courseId, setCourseId] = useState<string>(cls.course_id ? String(cls.course_id) : '');
+  const [tutorId, setTutorId] = useState<string>(cls.tutor_id ? String(cls.tutor_id) : '');
+  const [pickedTermIds, setPickedTermIds] = useState<Set<number>>(new Set((cls.terms ?? []).map(t => t.id)));
+
+  const { data: courses = [] } = useQuery<CourseSummary[]>({ queryKey: ['/api/courses'] });
+  const { data: tutors = [] } = useQuery<TutorPickerRow[]>({
+    queryKey: [`/api/companies/${cls.business_id}/tutors`],
+  });
+  const { data: hierarchy } = useQuery<any>({
+    queryKey: [`/api/companies/${cls.business_id}/academic-hierarchy`],
+  });
+  const allYears = useMemo<any[]>(() => {
+    if (!hierarchy) return [];
+    return Array.isArray(hierarchy) ? hierarchy : (hierarchy.years ?? []);
+  }, [hierarchy]);
+  const thisYearTerms = useMemo(() => {
+    const y = allYears.find((y: any) => y.id === cls.academic_year_id);
+    return (y?.terms ?? []) as { id: number; name: string; start_date: string; end_date: string }[];
+  }, [allYears, cls.academic_year_id]);
+
+  const toggleTerm = (id: number) => {
+    setPickedTermIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const m = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/classes/${cls.id}`, 'PATCH', {
+        name: name.trim() || undefined,
+        description: description.trim() || null,
+        level: level.trim() || null,
+        capacity: capacity ? Number(capacity) : null,
+        course_id: courseId ? Number(courseId) : null,
+        tutor_id: tutorId ? Number(tutorId) : null,
+        term_ids: Array.from(pickedTermIds),
+      }),
+    onSuccess: () => {
+      toast({ title: 'Class updated' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${cls.id}`] });
+      qc.invalidateQueries({ queryKey: ['/api/classes'] });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: 'Could not save', description: e.message, variant: 'destructive' }),
+  });
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="text-base font-black flex items-center gap-2">
+            <Pencil size={16} className="text-indigo-600" /> Edit class
+          </h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-5 overflow-y-auto">
+          <EditField label="Class name">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              autoFocus
+            />
+          </EditField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <EditField label="Course (catalogue parent)">
+              <select
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Standalone (no course)</option>
+                {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </EditField>
+            <EditField label="Tutor">
+              <select
+                value={tutorId}
+                onChange={(e) => setTutorId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Not assigned</option>
+                {tutors.map(t => {
+                  const nm = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || t.email || `Tutor #${t.id}`;
+                  return <option key={t.id} value={t.id}>{nm}</option>;
+                })}
+              </select>
+            </EditField>
+          </div>
+
+          <EditField label="Terms">
+            {thisYearTerms.length === 0 ? (
+              <p className="text-xs text-gray-500">No terms available in this academic year.</p>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {thisYearTerms.map(t => {
+                  const isOn = pickedTermIds.has(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => toggleTerm(t.id)}
+                      className={`text-left rounded-xl border px-3 py-2 transition-colors ${
+                        isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                          isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                        }`}>
+                          {isOn && <span className="text-[10px]">✓</span>}
+                        </span>
+                        <span className="font-bold text-sm">{t.name}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </EditField>
+
+          <div className="grid grid-cols-2 gap-3">
+            <EditField label="Capacity">
+              <input
+                type="number"
+                value={capacity}
+                onChange={(e) => setCapacity(e.target.value)}
+                min={1}
+                placeholder="No cap"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </EditField>
+            <EditField label="Difficulty">
+              <input
+                value={level}
+                onChange={(e) => setLevel(e.target.value)}
+                placeholder="Beginner, Intermediate, Advanced, …"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </EditField>
+          </div>
+
+          <EditField label="Description">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </EditField>
+
+          <p className="text-xs text-gray-400">
+            Year group, subject, and academic year are fixed for a class — create a new class if those need to change.
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+            Cancel
+          </button>
+          <button
+            onClick={() => m.mutate()}
+            disabled={!name.trim() || m.isPending}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            <Save size={14} /> {m.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function EditField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</label>
+      <div className="mt-1.5">{children}</div>
     </div>
   );
 }
