@@ -239,6 +239,12 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   // Who
   const [tutorId, setTutorId] = useState<string>('');
 
+  // Schedule
+  const [scheduleDay, setScheduleDay] = useState<string>(''); // '1'..'7'
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [location, setLocation] = useState('');
+
   // Optional details
   const [capacity, setCapacity] = useState<string>('');
   const [description, setDescription] = useState('');
@@ -308,6 +314,10 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
         description: description.trim() || null,
         level: level.trim() || null,
         status: 'draft',
+        schedule_day_of_week: scheduleDay ? Number(scheduleDay) : null,
+        schedule_start_time: startTime || null,
+        schedule_end_time: endTime || null,
+        location: location.trim() || null,
       });
     },
     onSuccess: () => {
@@ -490,6 +500,58 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
                 })}
               </select>
             </Field>
+          </section>
+
+          {/* Schedule */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Schedule (optional)</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Day of week">
+                <select
+                  value={scheduleDay}
+                  onChange={(e) => setScheduleDay(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">Pick a day…</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                  <option value="7">Sunday</option>
+                </select>
+              </Field>
+              <Field label="Start time">
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+              <Field label="End time">
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Location" hint="Room name, address, or 'Online'.">
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Room A, Online, Bondi Campus, …"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              If the tutor's already running another class at this day/time during overlapping terms, save will fail with a conflict message.
+            </p>
           </section>
 
           {/* Optional */}

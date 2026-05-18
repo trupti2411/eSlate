@@ -26,6 +26,10 @@ interface ClassData {
   status: 'draft' | 'active' | 'completed' | 'archived' | string;
   description: string | null;
   level: string | null;
+  schedule_day_of_week: number | null;
+  schedule_start_time: string | null;
+  schedule_end_time: string | null;
+  location: string | null;
   course?: { id: number; name: string; description?: string | null } | null;
   subject?: { id: number; name: string; code?: string } | null;
   yearGroup?: { id: number; label: string; code: string } | null;
@@ -177,6 +181,15 @@ export default function ClassDetailPage() {
                 </div>
               )}
 
+              {cls.schedule_day_of_week && cls.schedule_start_time && (
+                <div className="mt-3 flex items-center gap-2 text-xs text-indigo-100 flex-wrap">
+                  <CalendarDays size={12} />
+                  <span className="font-semibold">{['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][cls.schedule_day_of_week]}</span>
+                  <span>{(cls.schedule_start_time ?? '').slice(0, 5)}{cls.schedule_end_time ? `–${cls.schedule_end_time.slice(0, 5)}` : ''}</span>
+                  {cls.location && <span>· {cls.location}</span>}
+                </div>
+              )}
+
               {cls.terms && cls.terms.length > 0 && (
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
                   <CalendarDays size={12} className="text-indigo-200" />
@@ -307,6 +320,10 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
   const [courseId, setCourseId] = useState<string>(cls.course_id ? String(cls.course_id) : '');
   const [tutorId, setTutorId] = useState<string>(cls.tutor_id ? String(cls.tutor_id) : '');
   const [pickedTermIds, setPickedTermIds] = useState<Set<number>>(new Set((cls.terms ?? []).map(t => t.id)));
+  const [scheduleDay, setScheduleDay] = useState<string>(cls.schedule_day_of_week ? String(cls.schedule_day_of_week) : '');
+  const [startTime, setStartTime] = useState<string>(cls.schedule_start_time?.slice(0, 5) ?? '');
+  const [endTime, setEndTime] = useState<string>(cls.schedule_end_time?.slice(0, 5) ?? '');
+  const [location, setLocation] = useState<string>(cls.location ?? '');
 
   const { data: courses = [] } = useQuery<CourseSummary[]>({ queryKey: ['/api/courses'] });
   const { data: tutors = [] } = useQuery<TutorPickerRow[]>({
@@ -342,6 +359,10 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
         course_id: courseId ? Number(courseId) : null,
         tutor_id: tutorId ? Number(tutorId) : null,
         term_ids: Array.from(pickedTermIds),
+        schedule_day_of_week: scheduleDay ? Number(scheduleDay) : null,
+        schedule_start_time: startTime || null,
+        schedule_end_time: endTime || null,
+        location: location.trim() || null,
       }),
     onSuccess: () => {
       toast({ title: 'Class updated' });
@@ -429,6 +450,54 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
               </div>
             )}
           </EditField>
+
+          <div>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Schedule</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <EditField label="Day">
+                <select
+                  value={scheduleDay}
+                  onChange={(e) => setScheduleDay(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">—</option>
+                  <option value="1">Mon</option>
+                  <option value="2">Tue</option>
+                  <option value="3">Wed</option>
+                  <option value="4">Thu</option>
+                  <option value="5">Fri</option>
+                  <option value="6">Sat</option>
+                  <option value="7">Sun</option>
+                </select>
+              </EditField>
+              <EditField label="Start">
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </EditField>
+              <EditField label="End">
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </EditField>
+            </div>
+            <div className="mt-3">
+              <EditField label="Location">
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Room A, Online, …"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </EditField>
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <EditField label="Capacity">
