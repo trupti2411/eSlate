@@ -463,7 +463,7 @@ function QuickActionsCard({
     { href: '/company/tutors', label: 'Invite tutor', icon: <UserPlus size={16} />, tone: 'indigo' as const, primary: !hasTutors },
     { href: '/company/students', label: 'Add student', icon: <Plus size={16} />, tone: 'emerald' as const, primary: hasTutors && !hasStudents },
     { href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
-    { href: '/company/assignments', label: 'New assignment', icon: <ClipboardPlus size={16} />, tone: 'rose' as const, primary: false },
+    { href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'rose' as const, primary: false },
   ];
   const toneClass = (k: 'indigo' | 'emerald' | 'amber' | 'rose', primary: boolean) => {
     const map: Record<string, { primary: string; ghost: string }> = {
