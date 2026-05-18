@@ -28,6 +28,10 @@ class Classroom extends Model
         'status',
         'description',
         'level',
+        'schedule_day_of_week',
+        'schedule_start_time',
+        'schedule_end_time',
+        'location',
     ];
 
     protected function casts(): array

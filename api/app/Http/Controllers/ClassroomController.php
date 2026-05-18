@@ -40,6 +40,11 @@ class ClassroomController extends Controller
             'status' => ['nullable', 'in:draft,active,completed,archived'],
             'description' => ['nullable', 'string'],
             'level' => ['nullable', 'string', 'max:30'],
+            // Schedule (Phase 5 — when does the class meet each week?)
+            'schedule_day_of_week' => ['nullable', 'integer', 'between:1,7'],   // 1=Mon..7=Sun
+            'schedule_start_time' => ['nullable', 'date_format:H:i'],
+            'schedule_end_time'   => ['nullable', 'date_format:H:i', 'after:schedule_start_time'],
+            'location' => ['nullable', 'string', 'max:120'],
         ]);
 
         $scope = $this->resolveOwnerScope(
@@ -89,6 +94,24 @@ class ClassroomController extends Controller
         $startsOn = $terms->isNotEmpty() ? $terms->min('start_date') : null;
         $endsOn   = $terms->isNotEmpty() ? $terms->max('end_date')   : null;
 
+        // Schedule conflict: tutor double-booked within overlapping terms?
+        if ($conflict = $this->findScheduleConflict(
+            tutorId: $data['tutor_id'] ?? null,
+            dayOfWeek: $data['schedule_day_of_week'] ?? null,
+            startTime: $data['schedule_start_time'] ?? null,
+            endTime: $data['schedule_end_time'] ?? null,
+            termIds: $termIds,
+            excludeClassId: null,
+        )) {
+            return response()->json([
+                'message' => 'Schedule conflict with another class.',
+                'errors'  => ['schedule_start_time' => [
+                    "Tutor already runs '{$conflict['name']}' on the same day/time during overlapping terms.",
+                ]],
+                'conflict' => $conflict,
+            ], 422);
+        }
+
         return DB::transaction(function () use ($data, $scope, $termIds, $startsOn, $endsOn) {
             $classroom = Classroom::create([
                 'business_id' => $scope['business_id'],
@@ -105,6 +128,10 @@ class ClassroomController extends Controller
                 'status' => $data['status'] ?? 'draft',
                 'description' => $data['description'] ?? null,
                 'level' => $data['level'] ?? null,
+                'schedule_day_of_week' => $data['schedule_day_of_week'] ?? null,
+                'schedule_start_time' => $data['schedule_start_time'] ?? null,
+                'schedule_end_time' => $data['schedule_end_time'] ?? null,
+                'location' => $data['location'] ?? null,
             ]);
 
             if (! empty($termIds)) {
@@ -116,6 +143,50 @@ class ClassroomController extends Controller
                 201
             );
         });
+    }
+
+    /**
+     * Returns a conflict descriptor (id + name + day + times) if the tutor is double-booked
+     * within any of the picked terms on the same day-of-week with overlapping time. Null
+     * if no conflict or insufficient data to check.
+     */
+    private function findScheduleConflict(
+        ?int $tutorId,
+        ?int $dayOfWeek,
+        ?string $startTime,
+        ?string $endTime,
+        array $termIds,
+        ?int $excludeClassId,
+    ): ?array {
+        // Need tutor + day + at least a start time + at least one term to check.
+        if (! $tutorId || ! $dayOfWeek || ! $startTime || empty($termIds)) {
+            return null;
+        }
+        $endTime = $endTime ?? $startTime;  // treat zero-length as a point in time
+
+        $candidates = Classroom::query()
+            ->where('tutor_id', $tutorId)
+            ->where('schedule_day_of_week', $dayOfWeek)
+            ->whereNotNull('schedule_start_time')
+            ->when($excludeClassId, fn ($q) => $q->where('id', '!=', $excludeClassId))
+            ->whereHas('terms', fn ($q) => $q->whereIn('academic_term_id', $termIds))
+            ->get();
+
+        foreach ($candidates as $c) {
+            $cStart = $c->schedule_start_time;
+            $cEnd   = $c->schedule_end_time ?? $cStart;
+            // Half-open interval overlap: [startTime, endTime) ∩ [cStart, cEnd)
+            if ($startTime < $cEnd && $endTime > $cStart) {
+                return [
+                    'id'         => $c->id,
+                    'name'       => $c->name,
+                    'day'        => (int) $c->schedule_day_of_week,
+                    'start_time' => substr((string) $cStart, 0, 5),
+                    'end_time'   => substr((string) $cEnd, 0, 5),
+                ];
+            }
+        }
+        return null;
     }
 
     public function show(Request $request, Classroom $class): JsonResponse
@@ -131,7 +202,7 @@ class ClassroomController extends Controller
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:100'],
-            'tutor_id' => ['sometimes', 'integer', 'exists:tutors,id'],
+            'tutor_id' => ['sometimes', 'nullable', 'integer', 'exists:tutors,id'],
             'year_group_id' => ['sometimes', 'integer', 'exists:year_groups,id'],
             'subject_id' => ['sometimes', 'integer', 'exists:subjects,id'],
             'course_id' => ['sometimes', 'nullable', 'integer', 'exists:courses,id'],
@@ -141,7 +212,44 @@ class ClassroomController extends Controller
             'status' => ['sometimes', 'in:draft,active,completed,archived'],
             'description' => ['sometimes', 'nullable', 'string'],
             'level' => ['sometimes', 'nullable', 'string', 'max:30'],
+            // Schedule
+            'schedule_day_of_week' => ['sometimes', 'nullable', 'integer', 'between:1,7'],
+            'schedule_start_time' => ['sometimes', 'nullable', 'date_format:H:i'],
+            'schedule_end_time'   => ['sometimes', 'nullable', 'date_format:H:i'],
+            'location' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
+
+        // Pre-compute the merged class (after this update) for conflict check.
+        $mergedTutorId   = array_key_exists('tutor_id', $data) ? $data['tutor_id'] : $class->tutor_id;
+        $mergedDay       = array_key_exists('schedule_day_of_week', $data) ? $data['schedule_day_of_week'] : $class->schedule_day_of_week;
+        $mergedStart     = array_key_exists('schedule_start_time', $data) ? $data['schedule_start_time'] : $class->schedule_start_time;
+        $mergedEnd       = array_key_exists('schedule_end_time', $data) ? $data['schedule_end_time'] : $class->schedule_end_time;
+        $mergedTermIds   = array_key_exists('term_ids', $data) ? ($data['term_ids'] ?? []) : $class->terms()->pluck('academic_term_id')->all();
+
+        // Sanity: schedule_end_time must be after start
+        if ($mergedStart && $mergedEnd && $mergedEnd <= $mergedStart) {
+            return response()->json([
+                'message' => 'End time must be after start time.',
+                'errors'  => ['schedule_end_time' => ['Must be after start time.']],
+            ], 422);
+        }
+
+        if ($conflict = $this->findScheduleConflict(
+            tutorId: $mergedTutorId,
+            dayOfWeek: $mergedDay,
+            startTime: $mergedStart,
+            endTime: $mergedEnd,
+            termIds: $mergedTermIds,
+            excludeClassId: $class->id,
+        )) {
+            return response()->json([
+                'message' => 'Schedule conflict with another class.',
+                'errors'  => ['schedule_start_time' => [
+                    "Tutor already runs '{$conflict['name']}' on the same day/time during overlapping terms.",
+                ]],
+                'conflict' => $conflict,
+            ], 422);
+        }
 
         return DB::transaction(function () use ($data, $class) {
             // If terms changed, re-derive starts_on/ends_on and re-sync the pivot.
