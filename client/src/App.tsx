@@ -12,6 +12,7 @@ import AcceptInvitePage from "@/pages/accept-invite";
 import SimpleRegistration from "@/pages/simple-registration";
 import StudentDashboard from "@/pages/student/Dashboard";
 import StudentHome from "@/pages/student/StudentHome";
+import StudentAssignmentsNew from "@/pages/student/Assignments";
 import NewStudentDashboard from "@/pages/student/NewStudentDashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import NewParentDashboard from "@/pages/parent/NewParentDashboard";
@@ -151,6 +152,7 @@ function Router() {
           </Route>
           <Route path="/student" component={StudentHome} />
           <Route path="/student/home" component={StudentHome} />
+          <Route path="/student/assignments" component={StudentAssignmentsNew} />
           <Route path="/student/dashboard" component={StudentDashboard} />
           <Route path="/parent" component={ParentDashboard} />
           <Route path="/tutor" component={TutorDashboard} />
