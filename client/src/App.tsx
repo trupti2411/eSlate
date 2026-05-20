@@ -12,6 +12,7 @@ import AcceptInvitePage from "@/pages/accept-invite";
 import SimpleRegistration from "@/pages/simple-registration";
 import StudentDashboard from "@/pages/student/Dashboard";
 import StudentHome from "@/pages/student/StudentHome";
+import NewStudentHome from "@/pages/student/NewStudentHome";
 import StudentAssignmentsNew from "@/pages/student/Assignments";
 import NewStudentDashboard from "@/pages/student/NewStudentDashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
@@ -138,9 +139,7 @@ function Router() {
             />
           )}
           <Route path="/">
-            {user?.role === 'student' && (
-              design === 'new' ? <NewStudentDashboard setDesign={setDesign} /> : <StudentHome />
-            )}
+            {user?.role === 'student' && <NewStudentHome />}
             {user?.role === 'parent' && (
               design === 'new' ? <NewParentDashboard setDesign={setDesign} /> : <ParentDashboard />
             )}
@@ -150,8 +149,9 @@ function Router() {
               design === 'new' ? <NewCompanyDashboard setDesign={setDesign} /> : <CompanyDashboard />
             )}
           </Route>
-          <Route path="/student" component={StudentHome} />
-          <Route path="/student/home" component={StudentHome} />
+          <Route path="/student" component={NewStudentHome} />
+          <Route path="/student/home" component={NewStudentHome} />
+          <Route path="/student/home-legacy" component={StudentHome} />
           <Route path="/student/assignments" component={StudentAssignmentsNew} />
           <Route path="/student/dashboard" component={StudentDashboard} />
           <Route path="/parent" component={ParentDashboard} />
