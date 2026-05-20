@@ -2,7 +2,7 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
 const API_BASE = (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ?? "";
 
-function withBase(url: string): string {
+export function withBase(url: string): string {
   if (/^https?:\/\//i.test(url)) return url;
   if (url.startsWith("/api") && API_BASE) return `${API_BASE}${url}`;
   return url;
@@ -15,7 +15,7 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
-function authHeaders(): Record<string, string> {
+export function authHeaders(): Record<string, string> {
   const token = localStorage.getItem("authToken");
   return token ? { Authorization: `Bearer ${token}` } : {};
 }

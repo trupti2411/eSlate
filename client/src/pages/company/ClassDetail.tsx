@@ -3,11 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link, useRoute } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { apiRequest } from '@/lib/queryClient';
+import { apiRequest, withBase, authHeaders } from '@/lib/queryClient';
 import {
   BookOpen, Bell, LogOut, ArrowLeft, UserPlus, Trash2, X, Save,
   User, Users, GraduationCap, Calendar, CalendarDays, School,
   Pencil, Play, CheckCircle2, Archive,
+  ClipboardPlus, FileText, Download, Clock,
 } from 'lucide-react';
 
 interface ClassData {
@@ -79,6 +80,7 @@ export default function ClassDetailPage() {
   const { logoutMutation } = useAuth();
   const [enrolOpen, setEnrolOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
+  const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
 
   const { data: cls, isLoading } = useQuery<ClassData>({
     queryKey: [`/api/classes/${classId}`],
@@ -203,13 +205,17 @@ export default function ClassDetailPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2">
+              <div className="lg:col-span-2 space-y-6">
                 <RosterSection
                   classId={cls.id}
                   students={cls.students ?? []}
                   capacity={cls.capacity}
                   atCap={atCap}
                   onEnrolClick={() => setEnrolOpen(true)}
+                />
+                <AssignmentsSection
+                  classId={cls.id}
+                  onCreateClick={() => setCreateAssignmentOpen(true)}
                 />
               </div>
               <div>
@@ -231,6 +237,243 @@ export default function ClassDetailPage() {
       {editOpen && cls && (
         <EditClassModal cls={cls} onClose={() => setEditOpen(false)} />
       )}
+      {createAssignmentOpen && cls && (
+        <CreateAssignmentModal classId={cls.id} onClose={() => setCreateAssignmentOpen(false)} />
+      )}
+    </div>
+  );
+}
+
+/* ---------- Assignments ---------- */
+
+interface AssignmentRow {
+  id: number;
+  title: string;
+  description?: string | null;
+  pdf_path?: string | null;
+  pdf_original_name?: string | null;
+  due_date: string | null;
+  status: string;
+  created_at: string;
+  submissions?: { id: number; status: string }[];
+}
+
+function AssignmentsSection({ classId, onCreateClick }: { classId: number; onCreateClick: () => void }) {
+  const { data: assignments = [], isLoading } = useQuery<AssignmentRow[]>({
+    queryKey: [`/api/assignments?class_id=${classId}`],
+  });
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">
+          Assignments ({assignments.length})
+        </h3>
+        <button
+          onClick={onCreateClick}
+          className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
+        >
+          <ClipboardPlus size={12} /> New assignment
+        </button>
+      </div>
+      <div className="p-5">
+        {isLoading ? (
+          <p className="text-sm text-gray-500">Loading…</p>
+        ) : assignments.length === 0 ? (
+          <p className="text-sm text-gray-500">
+            No assignments yet. Click "New assignment" to upload a PDF and assign it to everyone enrolled.
+          </p>
+        ) : (
+          <ul className="divide-y divide-gray-100">
+            {assignments.map(a => <AssignmentRow key={a.id} a={a} />)}
+          </ul>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AssignmentRow({ a }: { a: AssignmentRow }) {
+  const downloadPdf = async () => {
+    const res = await fetch(withBase(`/api/assignments/${a.id}/pdf`), { headers: authHeaders() });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = a.pdf_original_name ?? `assignment-${a.id}.pdf`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+  const submittedCount = (a.submissions ?? []).filter(s => s.status === 'submitted').length;
+  const gradedCount = (a.submissions ?? []).filter(s => s.status === 'graded').length;
+  return (
+    <li className="py-3 first:pt-0 last:pb-0 flex items-center gap-3">
+      <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center flex-shrink-0">
+        <FileText size={14} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-gray-900 truncate">{a.title}</p>
+        <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
+          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+            a.status === 'published' ? 'bg-emerald-100 text-emerald-700'
+              : a.status === 'archived' ? 'bg-gray-100 text-gray-600'
+              : 'bg-amber-100 text-amber-700'
+          }`}>{a.status}</span>
+          {a.due_date && <span className="flex items-center gap-1"><Clock size={11} /> due {a.due_date.slice(0, 10)}</span>}
+          {submittedCount > 0 && <span>{submittedCount} submitted</span>}
+          {gradedCount > 0 && <span>{gradedCount} graded</span>}
+        </p>
+      </div>
+      {a.pdf_path && (
+        <button
+          onClick={downloadPdf}
+          className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 flex-shrink-0"
+          title="Download PDF"
+        >
+          <Download size={12} /> PDF
+        </button>
+      )}
+    </li>
+  );
+}
+
+function CreateAssignmentModal({ classId, onClose }: { classId: number; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [pdf, setPdf] = useState<File | null>(null);
+  const [status, setStatus] = useState<'draft' | 'published'>('published');
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async () => {
+    if (!title.trim() || !pdf) return;
+    setSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append('title', title.trim());
+      if (description.trim()) fd.append('description', description.trim());
+      if (dueDate) fd.append('due_date', dueDate);
+      fd.append('class_id', String(classId));
+      fd.append('status', status);
+      fd.append('pdf', pdf);
+
+      const res = await fetch(withBase('/api/assignments'), {
+        method: 'POST',
+        headers: { Accept: 'application/json', ...authHeaders() },  // no Content-Type — browser sets multipart boundary
+        body: fd,
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { msg = (await res.json())?.message ?? msg; } catch {}
+        throw new Error(msg);
+      }
+      toast({ title: 'Assignment created' });
+      qc.invalidateQueries({ queryKey: [`/api/assignments?class_id=${classId}`] });
+      onClose();
+    } catch (e: any) {
+      toast({ title: 'Could not create assignment', description: e.message ?? 'Try again.', variant: 'destructive' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const valid = title.trim() && pdf;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="text-base font-black flex items-center gap-2">
+            <ClipboardPlus size={16} className="text-indigo-600" /> New assignment
+          </h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-4 overflow-y-auto">
+          <AField label="Title" required>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="e.g. Week 3 Maths practice"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              autoFocus
+            />
+          </AField>
+          <AField label="Description (optional)">
+            <textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              placeholder="Instructions or context for students"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </AField>
+          <div className="grid grid-cols-2 gap-3">
+            <AField label="Due date (optional)">
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </AField>
+            <AField label="Status">
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value as 'draft' | 'published')}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="published">Published (visible to students)</option>
+                <option value="draft">Draft (hidden)</option>
+              </select>
+            </AField>
+          </div>
+          <AField label="PDF" required hint="One PDF — max 20MB. Students see this on their dashboard.">
+            <input
+              type="file"
+              accept="application/pdf"
+              onChange={(e) => setPdf(e.target.files?.[0] ?? null)}
+              className="w-full text-sm file:mr-3 file:rounded-xl file:border-0 file:bg-indigo-50 file:text-indigo-700 file:font-bold file:px-3 file:py-2 hover:file:bg-indigo-100"
+            />
+            {pdf && (
+              <p className="text-xs text-gray-500 mt-1.5 truncate">
+                Selected: {pdf.name} ({Math.round(pdf.size / 1024)} KB)
+              </p>
+            )}
+          </AField>
+          <p className="text-xs text-gray-500">
+            All students enrolled in this class will see this assignment when status is "published".
+          </p>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+            Cancel
+          </button>
+          <button
+            onClick={submit}
+            disabled={!valid || submitting}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            <Save size={14} /> {submitting ? 'Uploading…' : 'Create assignment'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AField({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+        {label}{required && <span className="text-rose-500"> *</span>}
+      </label>
+      <div className="mt-1.5">{children}</div>
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
     </div>
   );
 }
