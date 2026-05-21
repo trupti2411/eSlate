@@ -19,10 +19,12 @@ use App\Http\Controllers\WaitlistController;
 use App\Http\Controllers\YearGroupController;
 use Illuminate\Support\Facades\Route;
 
-// Public — no auth required
+// Public — no auth required.
+// Self-signup is closed: tutor + tutoring-company profiles are created admin-only
+// via /api/admin/businesses/invite (token-based onboarding). /api/register is intentionally
+// not routed; /api/waitlist is retained for future marketing-driven AU-state capture.
 Route::post('/login', [AuthController::class, 'login']);
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/waitlist', [WaitlistController::class, 'store']);   // non-NSW AU signup capture (v3 §5.1)
+Route::post('/waitlist', [WaitlistController::class, 'store']);   // non-NSW AU signup capture (v3 §5.1) — retained for marketing pages
 Route::post('/onboarding/accept-business-invite', [OnboardingController::class, 'acceptBusinessInvite']);
 Route::post('/onboarding/accept-tutor-invite', [OnboardingController::class, 'acceptTutorInvite']);
 

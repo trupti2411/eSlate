@@ -9,7 +9,6 @@ import { DesignSwitchBanner } from "@/components/DesignSwitchBanner";
 import AuthPage from "@/pages/auth-page";
 import OnboardingPage from "@/pages/onboarding";
 import AcceptInvitePage from "@/pages/accept-invite";
-import SimpleRegistration from "@/pages/simple-registration";
 import StudentDashboard from "@/pages/student/Dashboard";
 import StudentHome from "@/pages/student/StudentHome";
 import NewStudentHome from "@/pages/student/NewStudentHome";
@@ -91,8 +90,7 @@ function Router() {
       <Route path="/onboarding" component={OnboardingPage} />
       <Route path="/accept-invite/business">{() => <AcceptInvitePage kind="business_owner" />}</Route>
       <Route path="/accept-invite/tutor">{() => <AcceptInvitePage kind="tutor" />}</Route>
-      <Route path="/register" component={SimpleRegistration} />
-      
+
       {/* Legal pages - always accessible */}
       <Route path="/legal/privacy" component={PrivacyPolicy} />
       <Route path="/legal/terms" component={TermsOfService} />

@@ -17,9 +17,12 @@ class AdminController extends Controller
     ) {}
 
     /**
-     * POST /api/admin/businesses/invite — Path A step 1 (v3 §5.2).
-     * Admin creates a Multi-tutor business shell + signed invitation token for the owner email.
+     * POST /api/admin/businesses/invite — Path A step 1 (v3 §5.2) and Path B admin-created variant.
+     * Admin creates a business shell (individual or multi_tutor) + signed invitation token.
      * The business has no owner_user_id until the owner accepts the invite.
+     *
+     * Solo tutor invites: name is optional; auto-derived from owner_first/last_name as
+     * "{First} {Last} Tutoring" per Shadow Business naming convention.
      */
     public function inviteBusiness(Request $request): JsonResponse
     {
@@ -29,17 +32,40 @@ class AdminController extends Controller
         }
 
         $data = $request->validate([
-            'name'        => ['required', 'string', 'min:2', 'max:255'],
-            'owner_email' => ['required', 'email'],
-            'state_code'  => ['required', Rule::in(['NSW'])],   // v1: NSW only
+            'type'              => ['nullable', Rule::in(Business::TYPES)],
+            'name'              => ['nullable', 'string', 'min:2', 'max:255'],
+            'owner_email'       => ['required', 'email'],
+            'owner_first_name'  => ['nullable', 'string', 'max:60'],
+            'owner_last_name'   => ['nullable', 'string', 'max:60'],
+            'state_code'        => ['required', Rule::in(['NSW'])],
         ]);
 
-        return DB::transaction(function () use ($data, $user) {
+        $type = $data['type'] ?? Business::TYPE_MULTI_TUTOR;
+        $isIndividual = $type === Business::TYPE_INDIVIDUAL;
+
+        // Name validation per type: multi_tutor requires explicit name; individual can derive.
+        if (! $isIndividual && empty($data['name'])) {
+            return response()->json([
+                'message' => 'Business name is required for tutoring companies.',
+                'errors'  => ['name' => ['Required for multi-tutor businesses.']],
+            ], 422);
+        }
+        if ($isIndividual && empty($data['name']) && empty($data['owner_first_name']) && empty($data['owner_last_name'])) {
+            return response()->json([
+                'message' => 'Provide either a business name or owner first/last name for solo tutors.',
+                'errors'  => ['owner_first_name' => ['Required when name is empty.']],
+            ], 422);
+        }
+
+        $businessName = $data['name']
+            ?? trim(($data['owner_first_name'] ?? '') . ' ' . ($data['owner_last_name'] ?? '')) . ' Tutoring';
+
+        return DB::transaction(function () use ($data, $user, $type, $isIndividual, $businessName) {
             $business = Business::create([
-                'type'       => Business::TYPE_MULTI_TUTOR,
-                'name'       => $data['name'],
+                'type'       => $type,
+                'name'       => $businessName,
                 'state_code' => $data['state_code'],
-                'tier'       => Business::TIER_STARTER,
+                'tier'       => $isIndividual ? Business::TIER_INDIVIDUAL : Business::TIER_STARTER,
                 // owner_user_id intentionally null until the owner accepts.
             ]);
 
@@ -47,6 +73,8 @@ class AdminController extends Controller
                 'kind'        => Invitation::KIND_BUSINESS_OWNER,
                 'business_id' => $business->id,
                 'email'       => $data['owner_email'],
+                'first_name'  => $data['owner_first_name'] ?? null,
+                'last_name'   => $data['owner_last_name'] ?? null,
                 'token'       => Invitation::generateToken(),
                 'expires_at'  => now()->addDays(Invitation::TTL_DAYS),
             ]);
@@ -57,12 +85,18 @@ class AdminController extends Controller
                 actor: $user,
                 entityType: 'invitation',
                 entityId: $invitation->id,
-                payload: ['email' => $data['owner_email'], 'state_code' => $data['state_code']],
+                payload: [
+                    'email'      => $data['owner_email'],
+                    'state_code' => $data['state_code'],
+                    'type'       => $type,
+                ],
             );
 
             return response()->json([
                 'invitation_id' => $invitation->id,
                 'business_id'   => $business->id,
+                'business_type' => $type,
+                'business_name' => $business->name,
                 'token'         => $invitation->token,           // dev only — production sends via email
                 'expires_at'    => $invitation->expires_at->toIso8601String(),
             ], 201);

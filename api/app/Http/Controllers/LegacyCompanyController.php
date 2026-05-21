@@ -183,9 +183,12 @@ class LegacyCompanyController extends Controller
         }
 
         return response()->json($query->orderBy('name')->get()->map(fn ($b) => [
-            'id' => (string) $b->id,
-            'name' => $b->name,
-            'state' => $b->state_code,
+            'id'        => (string) $b->id,
+            'name'      => $b->name,
+            'state'     => $b->state_code,
+            'type'      => $b->type,                   // individual | multi_tutor
+            'tier'      => $b->tier,
+            'hasOwner'  => $b->owner_user_id !== null, // false until the invitee accepts
             'companyId' => (string) $b->id,
         ]));
     }

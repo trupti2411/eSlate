@@ -45,15 +45,29 @@ class OnboardingController extends Controller
         }
 
         return DB::transaction(function () use ($invitation, $data) {
+            $business = Business::findOrFail($invitation->business_id);
+
+            // Solo tutors get role=tutor + an attached Tutor row so they go through the WWCC + state-pack
+            // onboarding. Multi-tutor owners get role=business (wire-renamed to 'company_admin' on /api/me).
+            $isIndividual = $business->isIndividual();
+
             $user = User::create([
                 'name'     => trim("{$data['first_name']} {$data['last_name']}"),
                 'email'    => $invitation->email,
                 'password' => $data['password'],          // hashed via cast
-                'role'     => User::ROLE_BUSINESS,        // wire-rename to 'owner' is deferred
+                'role'     => $isIndividual ? User::ROLE_TUTOR : User::ROLE_BUSINESS,
             ]);
 
-            $business = Business::findOrFail($invitation->business_id);
             $business->update(['owner_user_id' => $user->id]);
+
+            if ($isIndividual) {
+                Tutor::create([
+                    'user_id'           => $user->id,
+                    'business_id'       => $business->id,
+                    'status'            => Tutor::STATUS_PENDING_COMPLIANCE,
+                    'compliance_status' => Tutor::COMPLIANCE_PENDING,
+                ]);
+            }
 
             $invitation->update([
                 'accepted_at'         => now(),
@@ -71,9 +85,10 @@ class OnboardingController extends Controller
             $token = $user->createToken('api-token')->plainTextToken;
 
             return response()->json([
-                'token'       => $token,
-                'user'        => $this->shapeUser($user),
-                'business_id' => $business->id,
+                'token'        => $token,
+                'user'         => $this->shapeUser($user),
+                'business_id'  => $business->id,
+                'business_type'=> $business->type,
             ], 201);
         });
     }
