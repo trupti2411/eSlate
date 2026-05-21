@@ -9,34 +9,25 @@ class SubjectSeeder extends Seeder
 {
     public function run(): void
     {
-        // v1 ships NSW master list only.
+        // v1 ships NSW K–6 master list only. Each subject is tagged with the year bands it serves.
+        // Reading / Writing / Thinking Skills are K–6-only — they're not NESA KLAs but they're
+        // real subjects in OC + Selective prep tutoring, which mirrors the OC/Selective test sections.
+        // Y7–12 subjects will be added in a later pass.
+        $K6 = ['K', 'Y1', 'Y2', 'Y3', 'Y4', 'Y5', 'Y6'];
+
         $nswSubjects = [
-            ['code' => 'MATH',        'name' => 'Mathematics'],
-            ['code' => 'MATH-STD',    'name' => 'Mathematics Standard'],
-            ['code' => 'MATH-ADV',    'name' => 'Mathematics Advanced'],
-            ['code' => 'ENG',         'name' => 'English'],
-            ['code' => 'ENG-STD',     'name' => 'English Standard'],
-            ['code' => 'ENG-ADV',     'name' => 'English Advanced'],
-            ['code' => 'SCI',         'name' => 'Science'],
-            ['code' => 'PHYS',        'name' => 'Physics'],
-            ['code' => 'CHEM',        'name' => 'Chemistry'],
-            ['code' => 'BIO',         'name' => 'Biology'],
-            ['code' => 'HIST',        'name' => 'History'],
-            ['code' => 'GEO',         'name' => 'Geography'],
-            ['code' => 'ART',         'name' => 'Visual Arts'],
-            ['code' => 'MUS',         'name' => 'Music'],
-            ['code' => 'PE',          'name' => 'Physical Education'],
-            ['code' => 'HEALTH',      'name' => 'Health'],
-            ['code' => 'LANG',        'name' => 'Languages'],
-            ['code' => 'DRAMA',       'name' => 'Drama'],
-            ['code' => 'TECH',        'name' => 'Technology'],
-            ['code' => 'ECON',        'name' => 'Economics & Business'],
+            ['code' => 'ENG',   'name' => 'English',         'year_levels' => $K6],
+            ['code' => 'MATH',  'name' => 'Mathematics',     'year_levels' => $K6],
+            ['code' => 'READ',  'name' => 'Reading',         'year_levels' => $K6],
+            ['code' => 'WRITE', 'name' => 'Writing',         'year_levels' => $K6],
+            ['code' => 'SCI',   'name' => 'Science',         'year_levels' => $K6],
+            ['code' => 'THINK', 'name' => 'Thinking Skills', 'year_levels' => $K6],
         ];
 
         foreach ($nswSubjects as $s) {
             Subject::updateOrCreate(
                 ['state_code' => 'NSW', 'code' => $s['code']],
-                ['name' => $s['name']]
+                ['name' => $s['name'], 'year_levels' => $s['year_levels']]
             );
         }
     }
