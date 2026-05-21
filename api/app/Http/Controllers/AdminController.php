@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Business;
+use App\Models\Classroom;
 use App\Models\Invitation;
+use App\Models\Tutor;
+use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +18,117 @@ class AdminController extends Controller
     public function __construct(
         private readonly AuditLogger $audit,
     ) {}
+
+    /**
+     * GET /api/admin/users — every user on the platform, hydrated with their business
+     * attachment (owner / tutor / standalone). Admin-only.
+     */
+    public function listUsers(Request $request): JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+
+        // Pull owner + tutor business linkage in one batch so we don't N+1 the list.
+        $ownerBiz = Business::query()
+            ->whereNotNull('owner_user_id')
+            ->get(['id', 'name', 'type', 'tier', 'owner_user_id'])
+            ->keyBy('owner_user_id');
+
+        $tutorBiz = Tutor::query()
+            ->with('business:id,name,type,tier')
+            ->get(['id', 'user_id', 'business_id', 'status', 'compliance_status'])
+            ->keyBy('user_id');
+
+        $users = User::orderBy('role')->orderBy('id')->get();
+
+        return response()->json($users->map(function (User $u) use ($ownerBiz, $tutorBiz) {
+            $name = (string) ($u->name ?? '');
+            $space = strpos($name, ' ');
+            $firstName = $space === false ? $name : substr($name, 0, $space);
+            $lastName = $space === false ? '' : trim(substr($name, $space + 1));
+
+            $owned = $ownerBiz[$u->id] ?? null;
+            $tutor = $tutorBiz[$u->id] ?? null;
+            $tutorBusiness = $tutor?->business;
+
+            // Wire-rename: legacy role=business → company_admin on the API.
+            $wireRole = $u->role === User::ROLE_BUSINESS ? 'company_admin' : $u->role;
+
+            return [
+                'id'         => (string) $u->id,
+                'firstName'  => $firstName,
+                'lastName'   => $lastName,
+                'email'      => $u->email,
+                'role'       => $wireRole,
+                'isActive'   => true,                                   // no is_active column yet — treat all as active
+                'createdAt'  => $u->created_at?->toIso8601String(),
+                'business'   => $owned ? [
+                    'id'    => (string) $owned->id,
+                    'name'  => $owned->name,
+                    'type'  => $owned->type,
+                    'tier'  => $owned->tier,
+                    'relationship' => 'owner',
+                ] : ($tutorBusiness ? [
+                    'id'    => (string) $tutorBusiness->id,
+                    'name'  => $tutorBusiness->name,
+                    'type'  => $tutorBusiness->type,
+                    'tier'  => $tutorBusiness->tier,
+                    'relationship' => 'tutor',
+                ] : null),
+                'tutorStatus'      => $tutor?->status,
+                'complianceStatus' => $tutor?->compliance_status,
+            ];
+        }));
+    }
+
+    /**
+     * GET /api/admin/stats — counts for the admin dashboard cards.
+     */
+    public function stats(Request $request): JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+
+        $byRole = User::select('role', DB::raw('count(*) as c'))
+            ->groupBy('role')
+            ->pluck('c', 'role');
+
+        $totalUsers = (int) $byRole->sum();
+        $businessesByType = Business::select('type', DB::raw('count(*) as c'))
+            ->groupBy('type')
+            ->pluck('c', 'type');
+
+        return response()->json([
+            'totalUsers'       => $totalUsers,
+            'admins'           => (int) ($byRole['admin'] ?? 0),
+            'companyAdmins'    => (int) ($byRole['business'] ?? 0),
+            'tutors'           => (int) ($byRole['tutor'] ?? 0),
+            'students'         => (int) ($byRole['student'] ?? 0),
+            'parents'          => (int) ($byRole['parent'] ?? 0),
+            'totalCompanies'   => (int) Business::count(),
+            'individualBusinesses' => (int) ($businessesByType['individual'] ?? 0),
+            'multiTutorBusinesses' => (int) ($businessesByType['multi_tutor'] ?? 0),
+            'totalClasses'     => (int) Classroom::count(),
+            'pendingInvites'   => (int) Invitation::whereNull('accepted_at')->whereNull('revoked_at')->where('expires_at', '>', now())->count(),
+            'systemStatus'     => 'Online',
+        ]);
+    }
+
+    /**
+     * PATCH /api/admin/users/{user}/status — placeholder for active/inactive toggle.
+     * Users table has no is_active column today; this returns 422 until the schema lands.
+     */
+    public function toggleUserStatus(Request $request, User $user): JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+        return response()->json([
+            'message' => 'is_active column not yet on users table — toggle is a no-op for now.',
+        ], 422);
+    }
 
     /**
      * POST /api/admin/businesses/invite — Path A step 1 (v3 §5.2) and Path B admin-created variant.

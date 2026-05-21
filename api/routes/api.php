@@ -43,6 +43,11 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Path A — Multi-tutor onboarding (v3 §5.2)
     Route::post('/admin/businesses/invite', [AdminController::class, 'inviteBusiness']);
+
+    // Admin dashboard + user-management endpoints
+    Route::get('/admin/users', [AdminController::class, 'listUsers']);
+    Route::get('/admin/stats', [AdminController::class, 'stats']);
+    Route::patch('/admin/users/{user}/status', [AdminController::class, 'toggleUserStatus']);
     Route::get('/businesses/{id}', [BusinessController::class, 'show']);
     Route::patch('/businesses/{id}', [BusinessController::class, 'update']);
     Route::patch('/businesses/{id}/subjects', [BusinessController::class, 'updateSubjects']);
