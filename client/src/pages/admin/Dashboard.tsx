@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, BookOpen, Settings, BarChart3, UserPlus, Shield, Building2, GraduationCap, TrendingUp, Activity, CheckCircle, ChevronRight, Layers, Bell } from "lucide-react";
+import { Users, BookOpen, Settings, BarChart3, UserPlus, Shield, Building2, GraduationCap, TrendingUp, Activity, CheckCircle, ChevronRight, Layers, Bell, LogOut } from "lucide-react";
 
 interface AdminStats {
   totalUsers: number;
@@ -24,7 +24,7 @@ interface AdminStats {
 
 export default function AdminDashboard() {
   const { toast } = useToast();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, isAuthenticated, isLoading, logoutMutation } = useAuth();
 
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ['/api/admin/stats'],
@@ -72,6 +72,16 @@ export default function AdminDashboard() {
                 <Bell className="h-4 w-4" />
                 <span>Welcome, {user?.firstName || 'Admin'}</span>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+                className="border-gray-300 hover:bg-gray-50"
+              >
+                <LogOut className="h-4 w-4 md:mr-2" />
+                <span className="hidden md:inline">{logoutMutation.isPending ? 'Signing out…' : 'Sign out'}</span>
+              </Button>
             </div>
           </div>
         </div>
