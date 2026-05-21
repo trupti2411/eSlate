@@ -29,6 +29,7 @@ interface ClassRow {
   year_group_id: number;
   subject_id: number;
   subject?: { id: number; name: string; code?: string };
+  subjects?: { id: number; name: string; code?: string; pivot?: { is_primary?: boolean } }[];
   yearGroup?: { id: number; label: string; code: string };
   tutor?: { id: number; user?: { name?: string; firstName?: string; lastName?: string } };
   academicYear?: { id: number; year: number };
@@ -147,6 +148,14 @@ function ClassRowItem({ c }: { c: ClassRow }) {
     || `${c.tutor?.user?.firstName ?? ''} ${c.tutor?.user?.lastName ?? ''}`.trim()
     || (c.tutor_id ? 'Tutor' : '—');
   const initials = c.name.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'C';
+  const subjectLabel = (() => {
+    if (c.subjects && c.subjects.length > 0) {
+      if (c.subjects.length === 1) return c.subjects[0].name;
+      if (c.subjects.length <= 2) return c.subjects.map(s => s.name).join(' + ');
+      return `${c.subjects.length} subjects`;
+    }
+    return c.subject?.name ?? null;
+  })();
   return (
     <li>
       <Link
@@ -159,8 +168,8 @@ function ClassRowItem({ c }: { c: ClassRow }) {
       <div className="flex-1 min-w-0">
         <p className="font-black text-gray-900 truncate">{c.name}</p>
         <div className="text-xs text-gray-500 truncate flex items-center gap-2 flex-wrap mt-0.5">
-          {c.subject?.name && (
-            <span className="font-semibold text-gray-700">{c.subject.name}</span>
+          {subjectLabel && (
+            <span className="font-semibold text-gray-700">{subjectLabel}</span>
           )}
           {c.yearGroup?.label && (
             <span className="flex items-center gap-1">
@@ -205,6 +214,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 interface CourseSummary {
   id: number;
   name: string;
+  subjects?: SubjectRow[];   // course's allowed subject set (from course_subjects pivot)
 }
 interface TermRow {
   id: number;
@@ -227,10 +237,14 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   const [courseId, setCourseId] = useState<string>('');           // '' | numeric id | '__new__'
   const [newCourseName, setNewCourseName] = useState('');
   const [newCourseDescription, setNewCourseDescription] = useState('');
+  // For a new course, owner picks its allowed subject set (e.g. WEMT → Reading/Maths/Thinking/Writing).
+  const [newCourseSubjectIds, setNewCourseSubjectIds] = useState<Set<number>>(new Set());
 
   // About this class
   const [yearGroupId, setYearGroupId] = useState<string>('');
-  const [subjectId, setSubjectId] = useState<string>('');
+  // Multi-subject: a class can teach multiple subjects (e.g. WEMT bundles Writing + English + Maths + Thinking).
+  // First-picked subject becomes the primary (mirrored to classes.subject_id by the API).
+  const [pickedSubjectIds, setPickedSubjectIds] = useState<number[]>([]);
   const [level, setLevel] = useState<string>('');
 
   // When
@@ -269,19 +283,66 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   const currentYear = academicYears[0];
   const terms = currentYear?.terms ?? [];
 
+  // When a course is picked AND it has a declared subject set, only those subjects are pickable
+  // for the class. Otherwise (no course or course w/ no declared subjects) all subjects show.
+  const selectedExistingCourse = useMemo(
+    () => courseId && courseId !== '__new__' ? courses.find(c => String(c.id) === courseId) : undefined,
+    [courseId, courses]
+  );
+  const courseScopedSubjectIds = useMemo<number[] | null>(() => {
+    if (selectedExistingCourse?.subjects && selectedExistingCourse.subjects.length > 0) {
+      return selectedExistingCourse.subjects.map(s => s.id);
+    }
+    if (courseId === '__new__' && newCourseSubjectIds.size > 0) {
+      return Array.from(newCourseSubjectIds);
+    }
+    return null;   // unconstrained
+  }, [selectedExistingCourse, courseId, newCourseSubjectIds]);
+  const availableSubjects = useMemo(
+    () => courseScopedSubjectIds === null
+      ? subjects
+      : subjects.filter(s => courseScopedSubjectIds.includes(s.id)),
+    [subjects, courseScopedSubjectIds]
+  );
+
+  // Drop any picked subjects that are no longer valid for the current course scope.
+  useMemo(() => {
+    if (courseScopedSubjectIds === null) return;
+    setPickedSubjectIds(prev => prev.filter(id => courseScopedSubjectIds.includes(id)));
+  }, [courseScopedSubjectIds]);
+
   // Auto-suggest class name from its parts unless the owner has typed one.
   const suggestedName = useMemo(() => {
     const courseLabel = courseId && courseId !== '__new__'
       ? courses.find(c => String(c.id) === courseId)?.name
       : courseId === '__new__' ? newCourseName.trim() : '';
     const yg = yearGroups.find(y => String(y.id) === yearGroupId)?.label;
-    const sj = subjects.find(s => String(s.id) === subjectId)?.name;
-    return [courseLabel, yg, sj, level].filter(Boolean).join(' · ');
-  }, [courseId, newCourseName, yearGroupId, subjectId, level, courses, yearGroups, subjects]);
+    const subjectLabels = pickedSubjectIds
+      .map(id => subjects.find(s => s.id === id)?.name)
+      .filter(Boolean);
+    const sjLabel = subjectLabels.length === 0
+      ? ''
+      : subjectLabels.length <= 2
+        ? subjectLabels.join(' + ')
+        : `${subjectLabels.length} subjects`;
+    return [courseLabel, yg, sjLabel, level].filter(Boolean).join(' · ');
+  }, [courseId, newCourseName, yearGroupId, pickedSubjectIds, level, courses, yearGroups, subjects]);
   const effectiveName = nameTouched ? name : suggestedName;
 
   const toggleTerm = (id: number) => {
     setPickedTermIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSubject = (id: number) => {
+    setPickedSubjectIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleNewCourseSubject = (id: number) => {
+    setNewCourseSubjectIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -295,6 +356,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
         const c = await apiRequest('/api/courses', 'POST', {
           name: newCourseName.trim(),
           description: newCourseDescription.trim() || null,
+          subject_ids: Array.from(newCourseSubjectIds),
         });
         parentCourseId = c.id;
       } else if (courseId) {
@@ -304,7 +366,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
       return apiRequest('/api/classes', 'POST', {
         name: effectiveName.trim(),
         course_id: parentCourseId,
-        subject_id: Number(subjectId),
+        subject_ids: pickedSubjectIds,
         year_group_id: Number(yearGroupId),
         tutor_id: tutorId ? Number(tutorId) : null,
         academic_year_id: currentYear?.id,
@@ -333,7 +395,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
 
   const isCreatingNewCourse = courseId === '__new__';
   const valid =
-    yearGroupId && subjectId && pickedTermIds.size > 0 && currentYear &&
+    yearGroupId && pickedSubjectIds.length > 0 && pickedTermIds.size > 0 && currentYear &&
     (!isCreatingNewCourse || newCourseName.trim().length >= 2) &&
     effectiveName.trim().length > 0;
   const blockers: string[] = [];
@@ -342,7 +404,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   // List of what's still missing — surfaces under the disabled Save button.
   const missing: string[] = [];
   if (!yearGroupId) missing.push('Year group');
-  if (!subjectId) missing.push('Subject');
+  if (pickedSubjectIds.length === 0) missing.push('at least one Subject');
   if (pickedTermIds.size === 0) missing.push('at least one Term');
   if (isCreatingNewCourse && newCourseName.trim().length < 2) missing.push('new course name');
   if (!effectiveName.trim()) missing.push('Class name');
@@ -386,7 +448,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
             </Field>
             {isCreatingNewCourse && (
               <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-3">
-                <Field label="New course name" hint="e.g. Foundation, OC Test Prep, Saturday Selective Bootcamp.">
+                <Field label="New course name" hint="e.g. WEMT, Foundation, OC Test Prep.">
                   <input
                     value={newCourseName}
                     onChange={(e) => setNewCourseName(e.target.value)}
@@ -402,6 +464,32 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
                     className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
                   />
                 </Field>
+                <Field label="Subjects this course covers" hint="Classes in this course can only pick from this set. WEMT typically: Reading, Maths, Thinking Skills, Writing.">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {subjects.map(s => {
+                      const isOn = newCourseSubjectIds.has(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleNewCourseSubject(s.id)}
+                          className={`text-left rounded-xl border px-3 py-2 transition-colors text-sm ${
+                            isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                              isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                            }`}>
+                              {isOn && <span className="text-[10px]">✓</span>}
+                            </span>
+                            {s.name}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
               </div>
             )}
           </section>
@@ -409,26 +497,61 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
           {/* About this class */}
           <section>
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">About this class</h4>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Year group" required>
-                <select
-                  value={yearGroupId}
-                  onChange={(e) => setYearGroupId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  <option value="">Select…</option>
-                  {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Subject" required>
-                <select
-                  value={subjectId}
-                  onChange={(e) => setSubjectId(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                >
-                  <option value="">Select…</option>
-                  {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                </select>
+            <Field label="Year group" required>
+              <select
+                value={yearGroupId}
+                onChange={(e) => setYearGroupId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Select…</option>
+                {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
+              </select>
+            </Field>
+            <div className="mt-3">
+              <Field
+                label="Subjects"
+                required
+                hint={courseScopedSubjectIds === null
+                  ? 'Pick one or more subjects this class teaches. First-picked is the primary.'
+                  : `Limited to this course's subject set (${courseScopedSubjectIds.length} ${courseScopedSubjectIds.length === 1 ? 'option' : 'options'}).`}
+              >
+                {availableSubjects.length === 0 ? (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                    {courseId === '__new__'
+                      ? 'Pick at least one subject in the new course above first.'
+                      : 'The selected course has no subjects assigned yet.'}
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {availableSubjects.map(s => {
+                      const idx = pickedSubjectIds.indexOf(s.id);
+                      const isOn = idx >= 0;
+                      const isPrimary = idx === 0;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleSubject(s.id)}
+                          className={`text-left rounded-xl border px-3 py-2 transition-colors text-sm relative ${
+                            isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                              isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                            }`}>
+                              {isOn && <span className="text-[10px]">✓</span>}
+                            </span>
+                            {s.name}
+                          </div>
+                          {isPrimary && (
+                            <span className="absolute top-1 right-2 text-[9px] font-bold uppercase tracking-wider text-indigo-700">Primary</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </Field>
             </div>
             <div className="mt-3">

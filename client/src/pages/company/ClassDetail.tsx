@@ -33,6 +33,7 @@ interface ClassData {
   location: string | null;
   course?: { id: number; name: string; description?: string | null } | null;
   subject?: { id: number; name: string; code?: string } | null;
+  subjects?: { id: number; name: string; code?: string; pivot?: { is_primary?: boolean } }[];
   yearGroup?: { id: number; label: string; code: string } | null;
   year_group?: { id: number; label: string; code: string } | null;
   tutor?: { id: number; user?: { name?: string; email?: string } } | null;
@@ -169,7 +170,18 @@ export default function ClassDetailPage() {
 
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <Stat icon={<GraduationCap size={14} />} label="Year" value={yearGroup?.label ?? '—'} />
-                <Stat icon={<School size={14} />} label="Subject" value={cls.subject?.name ?? '—'} />
+                <Stat
+                  icon={<School size={14} />}
+                  label={cls.subjects && cls.subjects.length > 1 ? 'Subjects' : 'Subject'}
+                  value={(() => {
+                    if (cls.subjects && cls.subjects.length > 0) {
+                      if (cls.subjects.length === 1) return cls.subjects[0].name;
+                      if (cls.subjects.length <= 2) return cls.subjects.map((s: any) => s.name).join(' + ');
+                      return `${cls.subjects.length} subjects`;
+                    }
+                    return cls.subject?.name ?? '—';
+                  })()}
+                />
                 <Stat icon={<User size={14} />} label="Tutor" value={tutorName} />
                 <Stat icon={<Users size={14} />} label="Roster" value={`${enrolledCount}${cls.capacity != null ? ` / ${cls.capacity}` : ''}`} />
               </div>
