@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
@@ -26,5 +27,15 @@ class Course extends Model
     public function offerings(): HasMany
     {
         return $this->hasMany(CourseOffering::class);
+    }
+
+    /**
+     * Subjects this course teaches. A class linked to this course can only pick from this set.
+     * WEMT, for example, would have {Reading, Mathematics, Thinking Skills, Writing}.
+     */
+    public function subjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Subject::class, 'course_subjects')
+            ->withTimestamps();
     }
 }

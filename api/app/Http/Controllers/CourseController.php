@@ -22,12 +22,15 @@ class CourseController extends Controller
     {
         $user = $request->user();
         $query = Course::query()
-            ->with(['offerings' => fn ($q) => $q->select(
-                'id', 'course_id', 'name', 'year_group_id', 'subject_id', 'level', 'status', 'tutor_id'
-            )->with([
-                'yearGroup:id,code,label',
-                'subject:id,code,name',
-            ])]);
+            ->with([
+                'subjects:id,code,name',
+                'offerings' => fn ($q) => $q->select(
+                    'id', 'course_id', 'name', 'year_group_id', 'subject_id', 'level', 'status', 'tutor_id'
+                )->with([
+                    'yearGroup:id,code,label',
+                    'subject:id,code,name',
+                ]),
+            ]);
 
         if (! $user->isAdmin()) {
             $scope = $this->resolveOwnerScope($user);
@@ -44,8 +47,10 @@ class CourseController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'        => ['required', 'string', 'min:2', 'max:120'],
-            'description' => ['nullable', 'string'],
+            'name'         => ['required', 'string', 'min:2', 'max:120'],
+            'description'  => ['nullable', 'string'],
+            'subject_ids'  => ['nullable', 'array'],
+            'subject_ids.*'=> ['integer', 'exists:subjects,id'],
         ]);
 
         $user = $request->user();
@@ -60,14 +65,23 @@ class CourseController extends Controller
             'description' => $data['description'] ?? null,
         ]);
 
-        return response()->json($course, 201);
+        if (! empty($data['subject_ids'])) {
+            $course->subjects()->sync($data['subject_ids']);
+        }
+
+        return response()->json($course->load('subjects:id,code,name'), 201);
     }
 
     /** GET /api/courses/{course} */
     public function show(Request $request, Course $course): JsonResponse
     {
         $this->authorizeCourse($request->user(), $course);
-        return response()->json($course->load(['offerings.yearGroup', 'offerings.subject', 'offerings.tutor.user:id,name']));
+        return response()->json($course->load([
+            'subjects:id,code,name',
+            'offerings.yearGroup',
+            'offerings.subject',
+            'offerings.tutor.user:id,name',
+        ]));
     }
 
     /** PATCH /api/courses/{course} */
@@ -75,11 +89,21 @@ class CourseController extends Controller
     {
         $this->authorizeCourse($request->user(), $course);
         $data = $request->validate([
-            'name'        => ['sometimes', 'string', 'min:2', 'max:120'],
-            'description' => ['nullable', 'string'],
+            'name'         => ['sometimes', 'string', 'min:2', 'max:120'],
+            'description'  => ['nullable', 'string'],
+            'subject_ids'  => ['sometimes', 'array'],
+            'subject_ids.*'=> ['integer', 'exists:subjects,id'],
         ]);
-        $course->update($data);
-        return response()->json($course->fresh());
+
+        if (array_key_exists('subject_ids', $data)) {
+            $course->subjects()->sync($data['subject_ids']);
+            unset($data['subject_ids']);
+        }
+
+        if (! empty($data)) {
+            $course->update($data);
+        }
+        return response()->json($course->fresh()->load('subjects:id,code,name'));
     }
 
     /** DELETE /api/courses/{course} */

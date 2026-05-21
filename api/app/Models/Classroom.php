@@ -62,9 +62,21 @@ class Classroom extends Model
         return $this->belongsTo(YearGroup::class);
     }
 
+    /** Legacy single-subject link — kept as the "primary" subject (mirrors class_subjects.is_primary=true row). */
     public function subject(): BelongsTo
     {
         return $this->belongsTo(Subject::class);
+    }
+
+    /**
+     * All subjects this class teaches. Classes linked to a multi-subject course (e.g. WEMT)
+     * will have several rows here; classic single-subject classes have one row with is_primary=true.
+     */
+    public function subjects(): BelongsToMany
+    {
+        return $this->belongsToMany(Subject::class, 'class_subjects', 'class_id', 'subject_id')
+            ->withPivot('is_primary')
+            ->withTimestamps();
     }
 
     /** Optional link — class belongs to a course offering when it's a course cohort. */

@@ -16,7 +16,15 @@ class ClassroomController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $query = Classroom::query()->with(['subject', 'yearGroup', 'tutor.user', 'academicYear', 'course', 'terms']);
+        $query = Classroom::query()->with([
+            'subject',
+            'subjects:id,code,name',
+            'yearGroup',
+            'tutor.user',
+            'academicYear',
+            'course',
+            'terms',
+        ]);
         $scoper = $this->ownedScope($request->user());
 
         return response()->json($scoper($query)->orderBy('name')->get());
@@ -28,7 +36,11 @@ class ClassroomController extends Controller
             'tutor_id' => ['nullable', 'integer', 'exists:tutors,id'],   // owner may defer tutor assignment
             'academic_year_id' => ['required', 'integer', 'exists:academic_years,id'],
             'year_group_id' => ['required', 'integer', 'exists:year_groups,id'],
-            'subject_id' => ['required', 'integer', 'exists:subjects,id'],
+            // Either subject_id (legacy single-subject) OR subject_ids[] (multi-subject WEMT-style).
+            // If both arrive, subject_ids wins and the first becomes the primary.
+            'subject_id'    => ['required_without:subject_ids', 'nullable', 'integer', 'exists:subjects,id'],
+            'subject_ids'   => ['required_without:subject_id', 'nullable', 'array', 'min:1'],
+            'subject_ids.*' => ['integer', 'exists:subjects,id'],
             'course_id' => ['nullable', 'integer', 'exists:courses,id'],
             'course_offering_id' => ['nullable', 'integer', 'exists:course_offerings,id'],   // deprecated; kept for back-compat
             'term_ids' => ['nullable', 'array'],
@@ -53,7 +65,14 @@ class ClassroomController extends Controller
             $data['tutor_id'] ?? null
         );
 
-        // course_id must belong to this business if provided.
+        // Normalise subject inputs into a single canonical list (first = primary).
+        $subjectIds = ! empty($data['subject_ids'])
+            ? array_values(array_unique($data['subject_ids']))
+            : (! empty($data['subject_id']) ? [(int) $data['subject_id']] : []);
+        $primarySubjectId = $subjectIds[0] ?? null;
+
+        // course_id must belong to this business if provided, and chosen subjects must be a subset
+        // of the course's declared subject set (when the course has any subjects declared).
         if (! empty($data['course_id'])) {
             $course = \App\Models\Course::findOrFail($data['course_id']);
             if ($course->business_id !== $scope['business_id']) {
@@ -61,6 +80,16 @@ class ClassroomController extends Controller
                     'message' => 'Course not in your business.',
                     'errors'  => ['course_id' => ['Cross-business link not allowed.']],
                 ], 422);
+            }
+            $courseSubjectIds = $course->subjects()->pluck('subjects.id')->all();
+            if (! empty($courseSubjectIds)) {
+                $invalid = array_diff($subjectIds, $courseSubjectIds);
+                if (! empty($invalid)) {
+                    return response()->json([
+                        'message' => 'One or more subjects are not part of the selected course.',
+                        'errors'  => ['subject_ids' => ['Subjects must come from the course\'s subject list.']],
+                    ], 422);
+                }
             }
         }
 
@@ -112,7 +141,7 @@ class ClassroomController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($data, $scope, $termIds, $startsOn, $endsOn) {
+        return DB::transaction(function () use ($data, $scope, $termIds, $startsOn, $endsOn, $subjectIds, $primarySubjectId) {
             $classroom = Classroom::create([
                 'business_id' => $scope['business_id'],
                 'tutor_id' => $data['tutor_id'] ?? null,
@@ -120,7 +149,7 @@ class ClassroomController extends Controller
                 'course_offering_id' => $data['course_offering_id'] ?? null,
                 'academic_year_id' => $data['academic_year_id'],
                 'year_group_id' => $data['year_group_id'],
-                'subject_id' => $data['subject_id'],
+                'subject_id' => $primarySubjectId,    // primary mirror; class_subjects is authoritative
                 'name' => $data['name'],
                 'starts_on' => $startsOn,
                 'ends_on' => $endsOn,
@@ -134,12 +163,19 @@ class ClassroomController extends Controller
                 'location' => $data['location'] ?? null,
             ]);
 
+            // Populate class_subjects with is_primary flagging the first picked subject.
+            $pivot = [];
+            foreach ($subjectIds as $i => $sid) {
+                $pivot[$sid] = ['is_primary' => $i === 0];
+            }
+            $classroom->subjects()->sync($pivot);
+
             if (! empty($termIds)) {
                 $classroom->terms()->sync($termIds);
             }
 
             return response()->json(
-                $classroom->load(['subject', 'yearGroup', 'tutor.user', 'academicYear', 'course', 'courseOffering', 'terms']),
+                $classroom->load(['subject', 'subjects:id,code,name', 'yearGroup', 'tutor.user', 'academicYear', 'course', 'courseOffering', 'terms']),
                 201
             );
         });
@@ -193,7 +229,16 @@ class ClassroomController extends Controller
     {
         $this->authorizeClass($request->user(), $class);
 
-        return response()->json($class->load(['subject', 'yearGroup', 'tutor.user', 'academicYear', 'course', 'terms', 'students.user']));
+        return response()->json($class->load([
+            'subject',
+            'subjects:id,code,name',
+            'yearGroup',
+            'tutor.user',
+            'academicYear',
+            'course.subjects:id,code,name',
+            'terms',
+            'students.user',
+        ]));
     }
 
     public function update(Request $request, Classroom $class): JsonResponse
@@ -205,6 +250,8 @@ class ClassroomController extends Controller
             'tutor_id' => ['sometimes', 'nullable', 'integer', 'exists:tutors,id'],
             'year_group_id' => ['sometimes', 'integer', 'exists:year_groups,id'],
             'subject_id' => ['sometimes', 'integer', 'exists:subjects,id'],
+            'subject_ids' => ['sometimes', 'array', 'min:1'],
+            'subject_ids.*' => ['integer', 'exists:subjects,id'],
             'course_id' => ['sometimes', 'nullable', 'integer', 'exists:courses,id'],
             'term_ids' => ['sometimes', 'array'],
             'term_ids.*' => ['integer', 'exists:academic_terms,id'],
@@ -218,6 +265,24 @@ class ClassroomController extends Controller
             'schedule_end_time'   => ['sometimes', 'nullable', 'date_format:H:i'],
             'location' => ['sometimes', 'nullable', 'string', 'max:120'],
         ]);
+
+        // If caller sent subject_ids, validate against the (possibly updated) course's allowed subjects.
+        if (array_key_exists('subject_ids', $data)) {
+            $effectiveCourseId = array_key_exists('course_id', $data) ? $data['course_id'] : $class->course_id;
+            if ($effectiveCourseId) {
+                $course = \App\Models\Course::findOrFail($effectiveCourseId);
+                $allowed = $course->subjects()->pluck('subjects.id')->all();
+                if (! empty($allowed)) {
+                    $invalid = array_diff($data['subject_ids'], $allowed);
+                    if (! empty($invalid)) {
+                        return response()->json([
+                            'message' => 'One or more subjects are not part of the selected course.',
+                            'errors'  => ['subject_ids' => ['Subjects must come from the course\'s subject list.']],
+                        ], 422);
+                    }
+                }
+            }
+        }
 
         // Pre-compute the merged class (after this update) for conflict check.
         $mergedTutorId   = array_key_exists('tutor_id', $data) ? $data['tutor_id'] : $class->tutor_id;
@@ -267,9 +332,23 @@ class ClassroomController extends Controller
                 unset($data['term_ids']);
             }
 
+            // If subject_ids changed, resync the pivot and mirror primary to classes.subject_id.
+            if (array_key_exists('subject_ids', $data)) {
+                $subjectIds = array_values(array_unique($data['subject_ids']));
+                $pivot = [];
+                foreach ($subjectIds as $i => $sid) {
+                    $pivot[$sid] = ['is_primary' => $i === 0];
+                }
+                $class->subjects()->sync($pivot);
+                $data['subject_id'] = $subjectIds[0] ?? null;
+                unset($data['subject_ids']);
+            }
+
             $class->update($data);
 
-            return response()->json($class->fresh()->load(['subject', 'yearGroup', 'tutor.user', 'academicYear', 'course', 'terms']));
+            return response()->json($class->fresh()->load([
+                'subject', 'subjects:id,code,name', 'yearGroup', 'tutor.user', 'academicYear', 'course', 'terms',
+            ]));
         });
     }
 
