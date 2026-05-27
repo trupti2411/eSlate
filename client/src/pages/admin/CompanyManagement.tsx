@@ -345,7 +345,7 @@ export default function CompanyManagement() {
       <Layout>
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
-            <div className="w-10 h-10 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <div className="w-10 h-10 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
             <p className="text-gray-600 font-medium">Loading company details...</p>
           </div>
         </div>
@@ -416,66 +416,58 @@ export default function CompanyManagement() {
   return (
     <Layout>
       <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 shadow-sm">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+        {/* Purple admin header */}
+        <header className="bg-purple-700 text-white shadow-lg">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
                 <Link href="/admin/companies">
-                  <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 hover:bg-gray-100">
-                    <ArrowLeft className="w-4 h-4 mr-2" />
-                    Back
-                  </Button>
+                  <button className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center flex-shrink-0">
+                    <ArrowLeft size={16} />
+                  </button>
                 </Link>
-                <div className="h-6 w-px bg-gray-200" />
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-gray-100 rounded-xl">
-                    <Building2 className="w-6 h-6 text-gray-600" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h1 className="text-xl font-bold text-gray-900">{company.name}</h1>
-                      <Badge className={company.isActive ? "bg-green-50 text-green-700 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"}>
-                        {company.isActive ? "Active" : "Inactive"}
-                      </Badge>
-                    </div>
-                    <p className="text-gray-500 text-sm">Company Management</p>
+                <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                  <Building2 size={20} />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-purple-200">Admin Portal · Profile</p>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-black truncate">{company.name}</h1>
+                    <Badge className={company.isActive ? "bg-white/20 text-white border-white/25" : "bg-white/10 text-purple-100 border-white/15"}>
+                      {company.isActive ? "Active" : "Inactive"}
+                    </Badge>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
                   onClick={handleEditCompany}
-                  className="border-gray-200"
+                  className="text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl flex items-center gap-1.5"
                 >
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Edit Details
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
+                  <Pencil size={12} />
+                  <span className="hidden sm:inline">Edit details</span>
+                </button>
+                <button
                   onClick={() => toggleCompanyStatus.mutate(!company.isActive)}
                   disabled={toggleCompanyStatus.isPending}
-                  className="border-gray-200"
+                  className="text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl flex items-center gap-1.5 disabled:opacity-60"
                 >
                   {company.isActive ? (
                     <>
-                      <PowerOff className="w-4 h-4 mr-2 text-red-500" />
-                      Deactivate
+                      <PowerOff size={12} />
+                      <span className="hidden sm:inline">Deactivate</span>
                     </>
                   ) : (
                     <>
-                      <Power className="w-4 h-4 mr-2 text-green-500" />
-                      Activate
+                      <Power size={12} />
+                      <span className="hidden sm:inline">Activate</span>
                     </>
                   )}
-                </Button>
+                </button>
               </div>
             </div>
           </div>
-        </div>
+        </header>
 
         {/* Tabs Navigation */}
         <div className="bg-white border-b border-gray-200">
@@ -484,28 +476,28 @@ export default function CompanyManagement() {
               <TabsList className="h-12 bg-transparent border-0 p-0 w-full justify-start gap-1">
                 <TabsTrigger 
                   value="overview" 
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                  className="rounded-none border-b-2 border-transparent text-gray-600 data-[state=active]:border-purple-600 data-[state=active]:text-purple-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
                 >
                   <Settings className="w-4 h-4 mr-2" />
                   Overview
                 </TabsTrigger>
                 <TabsTrigger 
                   value="tutors" 
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                  className="rounded-none border-b-2 border-transparent text-gray-600 data-[state=active]:border-purple-600 data-[state=active]:text-purple-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
                 >
                   <Users className="w-4 h-4 mr-2" />
                   Tutors ({tutors?.length || 0})
                 </TabsTrigger>
                 <TabsTrigger 
                   value="students" 
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                  className="rounded-none border-b-2 border-transparent text-gray-600 data-[state=active]:border-purple-600 data-[state=active]:text-purple-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
                 >
                   <GraduationCap className="w-4 h-4 mr-2" />
                   Students ({students.length})
                 </TabsTrigger>
                 <TabsTrigger 
                   value="all-users" 
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-gray-900 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
+                  className="rounded-none border-b-2 border-transparent text-gray-600 data-[state=active]:border-purple-600 data-[state=active]:text-purple-700 data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4"
                 >
                   <BookOpen className="w-4 h-4 mr-2" />
                   All Users ({companyUsers?.length || 0})
@@ -521,7 +513,7 @@ export default function CompanyManagement() {
             <div className="space-y-6">
               {/* Stats */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Card className="bg-white border border-gray-200">
+                <Card className="bg-white border border-purple-100 shadow-sm hover:shadow-md transition-all">
                   <CardContent className="pt-5 pb-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -534,7 +526,7 @@ export default function CompanyManagement() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border border-gray-200">
+                <Card className="bg-white border border-purple-100 shadow-sm hover:shadow-md transition-all">
                   <CardContent className="pt-5 pb-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -547,7 +539,7 @@ export default function CompanyManagement() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border border-gray-200">
+                <Card className="bg-white border border-purple-100 shadow-sm hover:shadow-md transition-all">
                   <CardContent className="pt-5 pb-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -560,7 +552,7 @@ export default function CompanyManagement() {
                     </div>
                   </CardContent>
                 </Card>
-                <Card className="bg-white border border-gray-200">
+                <Card className="bg-white border border-purple-100 shadow-sm hover:shadow-md transition-all">
                   <CardContent className="pt-5 pb-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -613,7 +605,7 @@ export default function CompanyManagement() {
                   <div className="flex flex-wrap gap-3">
                     <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
                       <DialogTrigger asChild>
-                        <Button className="bg-gray-800 hover:bg-gray-900 text-white">
+                        <Button className="bg-purple-600 hover:bg-purple-700 text-white">
                           <Plus className="w-4 h-4 mr-2" />
                           Add User
                         </Button>
@@ -648,7 +640,7 @@ export default function CompanyManagement() {
                 </div>
                 <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-gray-800 hover:bg-gray-900 text-white" onClick={() => setNewUserData(prev => ({ ...prev, role: 'tutor' }))}>
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => setNewUserData(prev => ({ ...prev, role: 'tutor' }))}>
                       <Plus className="w-4 h-4 mr-2" />
                       Add Tutor
                     </Button>
@@ -658,7 +650,7 @@ export default function CompanyManagement() {
 
               {tutorsLoading ? (
                 <div className="text-center py-12">
-                  <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+                  <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
                   <p className="text-gray-500">Loading tutors...</p>
                 </div>
               ) : tutors && tutors.length > 0 ? (
@@ -706,12 +698,12 @@ export default function CompanyManagement() {
               ) : (
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="text-center py-12">
-                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                      <Users className="w-8 h-8 text-gray-500" />
+                    <div className="bg-purple-100 rounded-2xl w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                      <Users className="w-6 h-6 text-purple-700" />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-800 mb-2">No Tutors Yet</h3>
                     <p className="text-gray-500 mb-4">Add tutors to this company to get started.</p>
-                    <Button onClick={() => { setNewUserData(prev => ({ ...prev, role: 'tutor' })); setIsCreateUserDialogOpen(true); }} className="bg-gray-800 hover:bg-gray-900 text-white">
+                    <Button onClick={() => { setNewUserData(prev => ({ ...prev, role: 'tutor' })); setIsCreateUserDialogOpen(true); }} className="bg-purple-600 hover:bg-purple-700 text-white">
                       <Plus className="w-4 h-4 mr-2" />
                       Add First Tutor
                     </Button>
@@ -744,7 +736,7 @@ export default function CompanyManagement() {
                               size="sm"
                               onClick={() => assignTutorMutation.mutate(tutor.id)}
                               disabled={assignTutorMutation.isPending}
-                              className="w-full bg-gray-800 hover:bg-gray-900 text-white"
+                              className="w-full bg-purple-600 hover:bg-purple-700 text-white"
                             >
                               <UserPlus className="w-4 h-4 mr-2" />
                               Assign to Company
@@ -774,7 +766,7 @@ export default function CompanyManagement() {
                 </div>
                 <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-gray-800 hover:bg-gray-900 text-white" onClick={() => setNewUserData(prev => ({ ...prev, role: 'student' }))}>
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => setNewUserData(prev => ({ ...prev, role: 'student' }))}>
                       <Plus className="w-4 h-4 mr-2" />
                       Add Student
                     </Button>
@@ -784,7 +776,7 @@ export default function CompanyManagement() {
 
               {studentsLoading ? (
                 <div className="text-center py-12">
-                  <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+                  <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
                   <p className="text-gray-500">Loading students...</p>
                 </div>
               ) : filterUsers(students).length > 0 ? (
@@ -796,8 +788,8 @@ export default function CompanyManagement() {
               ) : (
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="text-center py-12">
-                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                      <GraduationCap className="w-8 h-8 text-gray-500" />
+                    <div className="bg-purple-100 rounded-2xl w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                      <GraduationCap className="w-6 h-6 text-purple-700" />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-800 mb-2">
                       {searchQuery ? 'No Students Found' : 'No Students Yet'}
@@ -806,7 +798,7 @@ export default function CompanyManagement() {
                       {searchQuery ? 'Try adjusting your search criteria.' : 'Add students to this company to get started.'}
                     </p>
                     {!searchQuery && (
-                      <Button onClick={() => { setNewUserData(prev => ({ ...prev, role: 'student' })); setIsCreateUserDialogOpen(true); }} className="bg-gray-800 hover:bg-gray-900 text-white">
+                      <Button onClick={() => { setNewUserData(prev => ({ ...prev, role: 'student' })); setIsCreateUserDialogOpen(true); }} className="bg-purple-600 hover:bg-purple-700 text-white">
                         <Plus className="w-4 h-4 mr-2" />
                         Add First Student
                       </Button>
@@ -832,7 +824,7 @@ export default function CompanyManagement() {
                 </div>
                 <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button className="bg-gray-800 hover:bg-gray-900 text-white">
+                    <Button className="bg-purple-600 hover:bg-purple-700 text-white">
                       <Plus className="w-4 h-4 mr-2" />
                       Add User
                     </Button>
@@ -842,7 +834,7 @@ export default function CompanyManagement() {
 
               {usersLoading ? (
                 <div className="text-center py-12">
-                  <div className="w-8 h-8 border-4 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+                  <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
                   <p className="text-gray-500">Loading users...</p>
                 </div>
               ) : companyUsers && companyUsers.length > 0 ? (
@@ -874,12 +866,12 @@ export default function CompanyManagement() {
               ) : (
                 <Card className="bg-white border border-gray-200">
                   <CardContent className="text-center py-12">
-                    <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                      <Users className="w-8 h-8 text-gray-500" />
+                    <div className="bg-purple-100 rounded-2xl w-12 h-12 mx-auto mb-3 flex items-center justify-center">
+                      <Users className="w-6 h-6 text-purple-700" />
                     </div>
                     <h3 className="text-lg font-semibold text-gray-800 mb-2">No Users Yet</h3>
                     <p className="text-gray-500 mb-4">Add users to this company to get started.</p>
-                    <Button onClick={() => setIsCreateUserDialogOpen(true)} className="bg-gray-800 hover:bg-gray-900 text-white">
+                    <Button onClick={() => setIsCreateUserDialogOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
                       <Plus className="w-4 h-4 mr-2" />
                       Add First User
                     </Button>
@@ -948,7 +940,7 @@ export default function CompanyManagement() {
                 <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={createUserMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
+                <Button type="submit" disabled={createUserMutation.isPending} className="bg-purple-600 text-white hover:bg-purple-700">
                   {createUserMutation.isPending ? "Creating..." : "Create User"}
                 </Button>
               </div>
@@ -1029,7 +1021,7 @@ export default function CompanyManagement() {
                   <Button type="button" variant="outline" onClick={() => setIsEditUserDialogOpen(false)}>
                     Cancel
                   </Button>
-                  <Button type="submit" disabled={updateUserMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
+                  <Button type="submit" disabled={updateUserMutation.isPending} className="bg-purple-600 text-white hover:bg-purple-700">
                     {updateUserMutation.isPending ? "Saving..." : "Save Changes"}
                   </Button>
                 </div>
@@ -1099,7 +1091,7 @@ export default function CompanyManagement() {
                 <Button type="button" variant="outline" onClick={() => setIsEditCompanyDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" disabled={updateCompanyMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
+                <Button type="submit" disabled={updateCompanyMutation.isPending} className="bg-purple-600 text-white hover:bg-purple-700">
                   {updateCompanyMutation.isPending ? "Saving..." : "Save Changes"}
                 </Button>
               </div>
