@@ -9,10 +9,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
-  Plus, Building2, User, ArrowLeft, ChevronRight, Search, Filter,
-  CheckCircle, XCircle, Copy, MapPin, Settings,
+  Plus, Building2, User, ArrowLeft, ChevronRight, Search,
+  CheckCircle, XCircle, Copy, MapPin, Settings, Layers, LogOut, Bell,
 } from "lucide-react";
 import { Link } from "wouter";
 
@@ -39,6 +40,7 @@ type ProfileType = "individual" | "multi_tutor";
 
 export default function Companies() {
   const { toast } = useToast();
+  const { user: me, logoutMutation } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<"all" | ProfileType>("all");
@@ -137,7 +139,7 @@ export default function Companies() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
-          <div className="w-10 h-10 border-4 border-gray-400 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="w-10 h-10 border-4 border-purple-300 border-t-purple-600 rounded-full animate-spin mx-auto mb-4"></div>
           <p className="text-gray-600 font-medium">Loading profiles...</p>
         </div>
       </div>
@@ -146,34 +148,55 @@ export default function Companies() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-5">
+      {/* Purple admin header */}
+      <header className="bg-purple-700 text-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
               <Link href="/admin">
-                <Button variant="ghost" size="sm" className="text-gray-600 hover:text-gray-900 hover:bg-gray-100">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Admin
-                </Button>
+                <button className="w-9 h-9 rounded-xl bg-white/15 hover:bg-white/25 flex items-center justify-center flex-shrink-0">
+                  <ArrowLeft size={16} />
+                </button>
               </Link>
-              <div className="h-8 w-px bg-gray-200" />
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <Building2 className="h-7 w-7 text-gray-700" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Tutor & Company Profiles</h1>
-                  <p className="text-gray-500 mt-1">Create solo-tutor and tutoring-company accounts. Invites are sent via link.</p>
-                </div>
+              <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                <Building2 size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-purple-200">Admin Portal</p>
+                <h1 className="text-xl sm:text-2xl font-black truncate">Tutors &amp; companies</h1>
               </div>
             </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <div className="hidden md:flex items-center gap-2 text-xs text-purple-100">
+                <Bell size={14} />
+                <span>Welcome, {me?.firstName ?? "Admin"}</span>
+              </div>
+              <button
+                onClick={() => logoutMutation.mutate()}
+                disabled={logoutMutation.isPending}
+                className="text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl flex items-center gap-1.5 disabled:opacity-60"
+              >
+                <LogOut size={12} />
+                <span className="hidden sm:inline">{logoutMutation.isPending ? "Signing out…" : "Sign out"}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        {/* Title + create action */}
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-lg font-black text-gray-900">Tutor &amp; company profiles</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Create solo-tutor and tutoring-company accounts. Invites are sent via link.</p>
+          </div>
             <Dialog
               open={isCreateDialogOpen}
               onOpenChange={(open) => { if (!open) resetForm(); setIsCreateDialogOpen(open); }}
             >
               <DialogTrigger asChild>
-                <Button className="bg-gray-800 hover:bg-gray-900 text-white shadow-sm">
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white shadow-sm">
                   <Plus className="w-4 h-4 mr-2" />
                   Create Profile
                 </Button>
@@ -213,7 +236,7 @@ export default function Companies() {
 
                     <div className="flex justify-end gap-2 pt-2">
                       <Button type="button" variant="outline" onClick={resetForm}>Create another</Button>
-                      <Button type="button" onClick={closeDialog} className="bg-gray-800 text-white hover:bg-gray-900">Done</Button>
+                      <Button type="button" onClick={closeDialog} className="bg-purple-600 text-white hover:bg-purple-700">Done</Button>
                     </div>
                   </div>
                 ) : (
@@ -314,7 +337,7 @@ export default function Companies() {
 
                     <div className="flex justify-end gap-2 pt-2">
                       <Button type="button" variant="outline" onClick={closeDialog}>Cancel</Button>
-                      <Button type="submit" disabled={inviteMutation.isPending} className="bg-gray-800 text-white hover:bg-gray-900">
+                      <Button type="submit" disabled={inviteMutation.isPending} className="bg-purple-600 text-white hover:bg-purple-700">
                         {inviteMutation.isPending ? "Creating..." : "Create & generate invite"}
                       </Button>
                     </div>
@@ -322,96 +345,46 @@ export default function Companies() {
                 )}
               </DialogContent>
             </Dialog>
-          </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-4">
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">Total profiles</p>
-                  <div className="text-3xl font-bold text-gray-900">{total}</div>
-                </div>
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <Building2 className="h-6 w-6 text-gray-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">Tutoring companies</p>
-                  <div className="text-3xl font-bold text-purple-600">{totalCompanies}</div>
-                </div>
-                <div className="p-3 bg-purple-50 rounded-xl">
-                  <Building2 className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white border border-gray-200 shadow-sm">
-            <CardContent className="pt-5 pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-gray-500 text-sm font-medium">Solo tutors</p>
-                  <div className="text-3xl font-bold text-blue-600">{totalIndividuals}</div>
-                </div>
-                <div className="p-3 bg-blue-50 rounded-xl">
-                  <User className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
 
-        {/* Search and Filter */}
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by name..."
+        {/* Stat strip — click to filter */}
+        <div className="grid grid-cols-3 gap-3">
+          <StatCard
+            label="Total profiles" value={total} icon={<Layers size={16} />} tone="purple"
+            active={filterType === "all"} onClick={() => setFilterType("all")}
+          />
+          <StatCard
+            label="Tutoring companies" value={totalCompanies} icon={<Building2 size={16} />} tone="purple-light"
+            active={filterType === "multi_tutor"} onClick={() => setFilterType("multi_tutor")}
+          />
+          <StatCard
+            label="Solo tutors" value={totalIndividuals} icon={<User size={16} />} tone="blue"
+            active={filterType === "individual"} onClick={() => setFilterType("individual")}
+          />
+        </div>
+
+        {/* Search + filter chip */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[220px] max-w-md">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              placeholder="Search by name…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 border-gray-200"
+              className="w-full bg-white rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
             />
           </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant={filterType === "all" ? "default" : "outline"}
-                onClick={() => setFilterType("all")}
-                className={filterType === "all" ? "bg-gray-800 text-white" : "border-gray-200"}
-              >
-                All
-              </Button>
-              <Button
-                size="sm"
-                variant={filterType === "multi_tutor" ? "default" : "outline"}
-                onClick={() => setFilterType("multi_tutor")}
-                className={filterType === "multi_tutor" ? "bg-purple-600 text-white" : "border-gray-200"}
-              >
-                Companies
-              </Button>
-              <Button
-                size="sm"
-                variant={filterType === "individual" ? "default" : "outline"}
-                onClick={() => setFilterType("individual")}
-                className={filterType === "individual" ? "bg-blue-600 text-white" : "border-gray-200"}
-              >
-                Solo tutors
-              </Button>
-            </div>
-          </div>
+          {filterType !== "all" && (
+            <button
+              onClick={() => setFilterType("all")}
+              className="text-xs bg-purple-50 text-purple-700 border border-purple-200 rounded-full px-3 py-1.5 flex items-center gap-1.5 hover:bg-purple-100"
+            >
+              {filterType === "multi_tutor" ? "Companies" : "Solo tutors"} · clear
+            </button>
+          )}
+          <span className="text-xs text-gray-500 ml-auto">
+            {filtered?.length ?? 0} of {total}
+          </span>
         </div>
 
         {/* Grid */}
@@ -420,7 +393,7 @@ export default function Companies() {
             const isIndividual = b.type === "individual";
             const Icon = isIndividual ? User : Building2;
             return (
-              <Card key={b.id} className="bg-white border border-gray-200 shadow-sm hover:shadow-md transition-all group">
+              <Card key={b.id} className="bg-white border border-gray-200 shadow-sm hover:shadow-md hover:border-purple-200 transition-all group">
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center space-x-3 min-w-0">
@@ -464,7 +437,7 @@ export default function Companies() {
 
                   <div className="pt-2">
                     <Link href={`/admin/companies/${b.id}`}>
-                      <Button size="sm" className="w-full bg-gray-800 hover:bg-gray-900 text-white">
+                      <Button size="sm" className="w-full bg-purple-600 hover:bg-purple-700 text-white">
                         <Settings className="w-4 h-4 mr-2" />
                         Manage
                         <ChevronRight className="w-4 h-4 ml-auto" />
@@ -478,15 +451,15 @@ export default function Companies() {
         </div>
 
         {filtered?.length === 0 && (
-          <Card className="bg-white border border-gray-200 shadow-sm">
+          <Card className="bg-white border border-gray-200 shadow-sm rounded-2xl">
             <CardContent className="text-center py-12">
-              <div className="p-4 bg-gray-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                <XCircle className="w-8 h-8 text-gray-500" />
+              <div className="w-12 h-12 rounded-2xl bg-purple-100 text-purple-700 flex items-center justify-center mx-auto mb-3">
+                <XCircle className="w-6 h-6" />
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2">
+              <h3 className="text-lg font-black text-gray-900 mb-1">
                 {searchQuery || filterType !== "all" ? "No profiles match" : "No profiles yet"}
               </h3>
-              <p className="text-gray-500 mb-4">
+              <p className="text-sm text-gray-500 mb-4 max-w-sm mx-auto">
                 {searchQuery || filterType !== "all"
                   ? "Try a different search or filter."
                   : "Create your first solo tutor or tutoring-company profile to get started."}
@@ -494,7 +467,7 @@ export default function Companies() {
               {!searchQuery && filterType === "all" && (
                 <Button
                   onClick={() => setIsCreateDialogOpen(true)}
-                  className="bg-gray-800 hover:bg-gray-900 text-white"
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
                   <Plus className="w-4 h-4 mr-2" />
                   Create first profile
@@ -505,5 +478,40 @@ export default function Companies() {
         )}
       </div>
     </div>
+  );
+}
+
+/* ---------- subcomponents ---------- */
+
+function StatCard({
+  label, value, icon, tone, active, onClick,
+}: {
+  label: string;
+  value: number;
+  icon: React.ReactNode;
+  tone: "purple" | "purple-light" | "blue";
+  active: boolean;
+  onClick: () => void;
+}) {
+  const tones: Record<string, { bg: string; text: string; border: string; activeRing: string }> = {
+    purple:         { bg: "bg-purple-50",    text: "text-purple-700", border: "border-purple-200", activeRing: "ring-purple-400" },
+    "purple-light": { bg: "bg-purple-50/60", text: "text-purple-600", border: "border-purple-100", activeRing: "ring-purple-400" },
+    blue:           { bg: "bg-blue-50",      text: "text-blue-700",   border: "border-blue-200",   activeRing: "ring-blue-400" },
+  };
+  const t = tones[tone];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-left bg-white rounded-2xl border ${t.border} shadow-sm p-3 hover:shadow transition-all ${active ? `ring-2 ${t.activeRing} ring-offset-1` : ""}`}
+    >
+      <div className="flex items-center justify-between">
+        <div className={`w-8 h-8 rounded-lg ${t.bg} ${t.text} flex items-center justify-center`}>
+          {icon}
+        </div>
+        <span className={`text-2xl font-black ${t.text}`}>{value}</span>
+      </div>
+      <p className="text-xs font-semibold text-gray-600 mt-2">{label}</p>
+    </button>
   );
 }
