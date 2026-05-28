@@ -194,6 +194,39 @@ class LegacyCompanyController extends Controller
     }
 
     /**
+     * GET /api/companies/{companyId} — single business in the shape the
+     * admin CompanyManagement page expects. The `businesses` table is
+     * leaner than the React interface (no description/contact_phone/
+     * address/is_active yet); we fill those with safe defaults and
+     * surface the owner's email as the contact.
+     */
+    public function showCompany(Request $request, int $companyId): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $companyId);
+
+        $business = Business::with('owner:id,email')->find($companyId);
+        if (! $business) {
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        return response()->json([
+            'id'           => (string) $business->id,
+            'name'         => $business->name,
+            'legalName'    => $business->legal_name,
+            'type'         => $business->type,                 // individual | multi_tutor
+            'tier'         => $business->tier,
+            'state'        => $business->state_code,
+            'description'  => '',                              // not stored yet
+            'contactEmail' => $business->owner?->email ?? '',
+            'contactPhone' => '',                              // not stored yet
+            'address'      => '',                              // not stored yet
+            'isActive'     => $business->owner_user_id !== null,
+            'hasOwner'     => $business->owner_user_id !== null,
+            'createdAt'    => $business->created_at?->toIso8601String(),
+        ]);
+    }
+
+    /**
      * GET /api/companies/{companyId}/audit-log — last N events scoped to this business.
      * Returned newest-first. Limited to 20 by default to keep dashboard payload tight.
      */

@@ -118,6 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Classic dashboard additions
     Route::get('/companies', [LegacyCompanyController::class, 'listCompanies']);
+    Route::get('/companies/{companyId}', [LegacyCompanyController::class, 'showCompany']);
     Route::get('/companies/{companyId}/tutors', [LegacyCompanyController::class, 'companyTutors']);
     Route::get('/companies/{companyId}/academic-hierarchy', [LegacyCompanyController::class, 'companyAcademicHierarchy']);
     Route::get('/admin/company-settings', [LegacyCompanyController::class, 'companySettings']);
