@@ -120,6 +120,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/companies', [LegacyCompanyController::class, 'listCompanies']);
     Route::get('/companies/{companyId}', [LegacyCompanyController::class, 'showCompany']);
     Route::get('/companies/{companyId}/tutors', [LegacyCompanyController::class, 'companyTutors']);
+    Route::get('/companies/{companyId}/users', [LegacyCompanyController::class, 'companyUsers']);
+    Route::get('/admin/unassigned-tutors', [LegacyCompanyController::class, 'unassignedTutors']);
     Route::get('/companies/{companyId}/academic-hierarchy', [LegacyCompanyController::class, 'companyAcademicHierarchy']);
     Route::get('/admin/company-settings', [LegacyCompanyController::class, 'companySettings']);
     Route::patch('/admin/company-settings', [LegacyCompanyController::class, 'updateCompanySettings']);

@@ -260,17 +260,113 @@ class LegacyCompanyController extends Controller
 
         $tutors = Tutor::where('business_id', $companyId)->with('user')->get();
 
-        return response()->json($tutors->map(fn ($t) => [
-            'id' => (string) $t->id,
-            'userId' => (string) $t->user_id,
-            'firstName' => explode(' ', $t->user?->name ?? '')[0] ?? '',
-            'lastName' => $this->lastNameOf($t->user?->name ?? ''),
-            'email' => $t->user?->email,
-            'role' => 'tutor',
-            'status' => $t->status,
+        return response()->json($tutors->map(fn ($t) => $this->serializeTutor($t)));
+    }
+
+    /**
+     * GET /api/companies/{companyId}/users — all User rows associated
+     * with this business: the owner (role=company_admin on the wire) and
+     * every Tutor's User row. Students don't always have a User in v1,
+     * and Parents are deferred from v1 entirely (see student_parents —
+     * no user_id column). The CompanyManagement "All Users" tab pulls
+     * students separately from /companies/{id}/students.
+     */
+    public function companyUsers(Request $request, int $companyId): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $companyId);
+
+        $business = Business::with('owner')->find($companyId);
+        if (! $business) {
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        $rows = collect();
+
+        if ($business->owner) {
+            $rows->push($this->serializeUser($business->owner));
+        }
+
+        $tutorUsers = User::whereIn('id', Tutor::where('business_id', $companyId)->pluck('user_id')->filter())
+            ->get();
+        foreach ($tutorUsers as $u) {
+            $rows->push($this->serializeUser($u));
+        }
+
+        return response()->json($rows->values());
+    }
+
+    /**
+     * GET /api/admin/unassigned-tutors — Tutor rows with no business_id.
+     * Used by the admin profile detail page to surface assign-flow.
+     * Admin only.
+     */
+    public function unassignedTutors(Request $request): JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+
+        $tutors = Tutor::whereNull('business_id')->with('user')->get();
+
+        return response()->json($tutors->map(fn ($t) => $this->serializeTutor($t)));
+    }
+
+    /**
+     * Shared shape for both /companies/{id}/tutors and /admin/unassigned-tutors.
+     * Includes both a flat (firstName/email at top level) and a nested
+     * (user.firstName/etc) representation so legacy templates from the
+     * old Express era keep rendering names without a separate fix.
+     */
+    private function serializeTutor(Tutor $t): array
+    {
+        $name = (string) ($t->user?->name ?? '');
+        $space = strpos($name, ' ');
+        $firstName = $space === false ? $name : substr($name, 0, $space);
+        $lastName  = $space === false ? '' : trim(substr($name, $space + 1));
+
+        return [
+            'id'               => (string) $t->id,
+            'userId'           => $t->user_id ? (string) $t->user_id : null,
+            'firstName'        => $firstName,
+            'lastName'         => $lastName,
+            'email'            => $t->user?->email,
+            'role'             => 'tutor',
+            'status'           => $t->status,
             'complianceStatus' => $t->compliance_status,
-            'wwccExpiry' => $t->wwcc_expiry?->toDateString(),
-        ]));
+            'wwccExpiry'       => $t->wwcc_expiry?->toDateString(),
+            'specialization'   => '',                              // not stored yet
+            'qualifications'   => $t->qualifications ?? '',
+            'isVerified'       => $t->compliance_status === 'compliant',
+            'user'             => $t->user ? [
+                'id'        => (string) $t->user->id,
+                'email'     => $t->user->email,
+                'firstName' => $firstName,
+                'lastName'  => $lastName,
+            ] : null,
+        ];
+    }
+
+    /**
+     * Wire-shape for User in the company-management UI.
+     * Matches the wire-rename used by AdminController::listUsers
+     * (legacy role=business → company_admin on the wire).
+     */
+    private function serializeUser(User $u): array
+    {
+        $name = (string) ($u->name ?? '');
+        $space = strpos($name, ' ');
+        $firstName = $space === false ? $name : substr($name, 0, $space);
+        $lastName  = $space === false ? '' : trim(substr($name, $space + 1));
+
+        return [
+            'id'        => (string) $u->id,
+            'email'     => $u->email,
+            'firstName' => $firstName,
+            'lastName'  => $lastName,
+            'role'      => $u->role === User::ROLE_BUSINESS ? 'company_admin' : $u->role,
+            'isActive'  => true,                                       // no is_active column yet
+            'createdAt' => $u->created_at?->toIso8601String(),
+        ];
     }
 
     public function companyAcademicHierarchy(Request $request, int $companyId): JsonResponse
