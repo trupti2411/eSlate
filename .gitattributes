@@ -1,0 +1,12 @@
+# Force LF on files that MUST work on Linux containers.
+# Without this, Windows checkouts can ship CRLF into Docker builds,
+# which breaks shebang lines (#!/bin/sh^M = invalid interpreter).
+*.sh           text eol=lf
+Dockerfile     text eol=lf
+Caddyfile      text eol=lf
+*.yaml         text eol=lf
+*.yml          text eol=lf
+.dockerignore  text eol=lf
+
+# Everything else uses git's auto-detection / .gitconfig autocrlf.
+* text=auto
