@@ -101,6 +101,64 @@ class SubmissionController extends Controller
         return response()->json($submission->fresh()->load(['assignment', 'student.user']), 201);
     }
 
+    /**
+     * POST /api/submissions/auto-save-annotations — student draft autosave
+     * from the PDFAnnotatorPage. Persists vector annotation JSON without
+     * flattening to PDF (the device may sleep / lose state any time, this
+     * lets the work survive). Final flattening happens at submit().
+     *
+     * Refuses to overwrite a non-draft submission so an already-submitted
+     * or marked piece of work can't be silently regressed by a stale tab.
+     */
+    public function autoSaveAnnotations(Request $request): JsonResponse
+    {
+        $user = $request->user();
+        if (! $user->isStudent()) {
+            abort(403, 'Only students can auto-save annotations.');
+        }
+        $student = $user->student;
+        if (! $student) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'assignmentId' => ['required', 'integer', 'exists:assignments,id'],
+            'annotations'  => ['required', 'string'],   // opaque JSON blob from the annotator
+        ]);
+
+        $assignment = Assignment::find($data['assignmentId']);
+
+        // Same audience gate as submit() — class member or directly targeted.
+        $isClassMember = $assignment->class_id
+            && $student->classrooms()->where('classes.id', $assignment->class_id)->exists();
+        $isTargeted = $assignment->targetStudents()->where('students.id', $student->id)->exists();
+        if (! $isClassMember && ! $isTargeted) {
+            abort(403, 'This assignment is not for you.');
+        }
+
+        $submission = Submission::firstOrNew([
+            'assignment_id' => $assignment->id,
+            'student_id'    => $student->id,
+        ]);
+
+        if ($submission->exists && $submission->status !== Submission::STATUS_DRAFT) {
+            return response()->json([
+                'message' => 'Submission already finalised; auto-save skipped.',
+                'status'  => $submission->status,
+            ], 409);
+        }
+
+        $submission->status = Submission::STATUS_DRAFT;
+        $submission->annotation_data = $data['annotations'];
+        $submission->save();
+
+        return response()->json([
+            'id'      => (string) $submission->id,
+            'status'  => $submission->status,
+            'savedAt' => now()->toIso8601String(),
+        ]);
+    }
+
     public function show(Request $request, Submission $submission): JsonResponse
     {
         $this->authorizeRead($request->user(), $submission);

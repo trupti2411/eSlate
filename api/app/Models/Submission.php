@@ -17,7 +17,7 @@ class Submission extends Model
 
     protected $fillable = [
         'assignment_id', 'student_id', 'status',
-        'annotated_pdf_path', 'annotated_pdf_original_name',
+        'annotated_pdf_path', 'annotated_pdf_original_name', 'annotation_data',
         'submitted_at', 'marked_at', 'marked_by_tutor_id',
         'mark_comment', 'mark_score',
     ];

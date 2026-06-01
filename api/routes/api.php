@@ -101,6 +101,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Submissions
     Route::post('/assignments/{assignment}/submissions', [SubmissionController::class, 'submit']);
+    Route::post('/submissions/auto-save-annotations', [SubmissionController::class, 'autoSaveAnnotations']);
     Route::get('/submissions', [SubmissionController::class, 'index']);
     Route::get('/submissions/{submission}', [SubmissionController::class, 'show']);
     Route::get('/submissions/{submission}/pdf', [SubmissionController::class, 'downloadPdf']);
