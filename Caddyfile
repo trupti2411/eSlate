@@ -1,0 +1,27 @@
+{
+    # Render terminates TLS upstream; we just serve HTTP on $PORT.
+    auto_https off
+    admin off
+    persist_config off
+}
+
+# Render injects $PORT. SERVER_NAME (set in Dockerfile ENV) wires both together.
+{$SERVER_NAME:":8080"} {
+    root * /app/public
+
+    # Compression
+    encode gzip zstd
+
+    # Laravel's front controller handles every dynamic request.
+    php_server
+
+    # Health check — Render pings this every few minutes.
+    handle /healthz {
+        respond "ok" 200
+    }
+
+    log {
+        output stderr
+        format console
+    }
+}
