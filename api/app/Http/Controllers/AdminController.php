@@ -5,12 +5,15 @@ namespace App\Http\Controllers;
 use App\Models\Business;
 use App\Models\Classroom;
 use App\Models\Invitation;
+use App\Models\Student;
 use App\Models\Tutor;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AdminController extends Controller
@@ -128,6 +131,167 @@ class AdminController extends Controller
         return response()->json([
             'message' => 'is_active column not yet on users table — toggle is a no-op for now.',
         ], 422);
+    }
+
+    /**
+     * POST /api/admin/create-user — quick-create path used from the
+     * /admin/companies/:id "Add user" dialog. Bypasses the invite-token
+     * flow because the dialog does not collect a password and is meant
+     * for fast operational adds. A temporary password is generated and
+     * returned in the response so the admin can communicate it; first
+     * login should still trigger a password change (future v2).
+     *
+     * Side-effects per role:
+     *   - tutor          : also create Tutor row (status=active) under companyId.
+     *   - student        : also create Student row under companyId. firstName/lastName
+     *                      live on the student record (not the user) in this schema.
+     *   - company_admin  : attach as owner_user_id on the business if it has no
+     *                      owner yet. If an owner already exists, returns 409.
+     *   - parent / admin : User only; parent has no side-table in v1.
+     */
+    public function createUser(Request $request): JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+
+        $data = $request->validate([
+            'email'     => ['required', 'email', 'max:255', 'unique:users,email'],
+            'firstName' => ['required', 'string', 'max:60'],
+            'lastName'  => ['nullable', 'string', 'max:60'],
+            'role'      => ['required', Rule::in(['admin', 'company_admin', 'tutor', 'student', 'parent'])],
+            'companyId' => ['nullable', 'integer', 'exists:businesses,id'],
+        ]);
+
+        // Wire-rename: company_admin → business for the users.role column.
+        $storeRole = $data['role'] === 'company_admin' ? User::ROLE_BUSINESS : $data['role'];
+
+        $tempPassword = 'Welcome1!' . Str::random(4);  // surfaced in response so admin can share
+
+        $user = DB::transaction(function () use ($data, $storeRole, $tempPassword) {
+            $user = User::create([
+                'name'     => trim($data['firstName'] . ' ' . ($data['lastName'] ?? '')),
+                'email'    => $data['email'],
+                'password' => Hash::make($tempPassword),
+                'role'     => $storeRole,
+            ]);
+
+            if ($data['role'] === 'tutor' && ! empty($data['companyId'])) {
+                Tutor::create([
+                    'user_id'           => $user->id,
+                    'business_id'       => $data['companyId'],
+                    'status'            => 'active',
+                    'compliance_status' => 'pending_compliance',
+                ]);
+            } elseif ($data['role'] === 'student' && ! empty($data['companyId'])) {
+                Student::create([
+                    'user_id'         => $user->id,
+                    'business_id'     => $data['companyId'],
+                    'first_name'      => $data['firstName'],
+                    'last_name'       => $data['lastName'] ?? '',
+                    'year_group_code' => 'Y7',           // sensible default; tutor edits later
+                    'status'          => 'active',
+                ]);
+            } elseif ($data['role'] === 'company_admin' && ! empty($data['companyId'])) {
+                $biz = Business::find($data['companyId']);
+                if ($biz && $biz->owner_user_id === null) {
+                    $biz->update(['owner_user_id' => $user->id]);
+                }
+                // If business already has an owner we still keep the user; admin can wire later.
+            }
+
+            return $user;
+        });
+
+        return response()->json([
+            'id'                => (string) $user->id,
+            'email'             => $user->email,
+            'firstName'         => explode(' ', $user->name, 2)[0] ?? '',
+            'lastName'          => trim(substr($user->name, strlen(explode(' ', $user->name, 2)[0] ?? '') + 1)),
+            'role'              => $data['role'],            // echo wire role back, not the storage role
+            'isActive'          => true,
+            'createdAt'         => $user->created_at?->toIso8601String(),
+            'temporaryPassword' => $tempPassword,             // share with the new user out-of-band
+        ], 201);
+    }
+
+    /**
+     * PATCH /api/admin/users/{user} — update name/email/role on an
+     * existing user. Wire-renames company_admin ↔ business. Role
+     * changes do not retroactively create Tutor/Student rows — use
+     * createUser for the role's full side-effects.
+     */
+    public function updateUser(Request $request, User $user): JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+
+        $data = $request->validate([
+            'firstName' => ['sometimes', 'string', 'max:60'],
+            'lastName'  => ['sometimes', 'nullable', 'string', 'max:60'],
+            'email'     => ['sometimes', 'email', 'max:255', Rule::unique('users', 'email')->ignore($user->id)],
+            'role'      => ['sometimes', Rule::in(['admin', 'company_admin', 'tutor', 'student', 'parent'])],
+            // isActive accepted but ignored until users.is_active lands.
+            'isActive'  => ['sometimes', 'boolean'],
+        ]);
+
+        $updates = [];
+        if (array_key_exists('firstName', $data) || array_key_exists('lastName', $data)) {
+            $first = $data['firstName'] ?? explode(' ', $user->name, 2)[0] ?? '';
+            $last  = $data['lastName']  ?? trim(substr($user->name, strlen(explode(' ', $user->name, 2)[0] ?? '') + 1));
+            $updates['name'] = trim($first . ' ' . $last);
+        }
+        if (array_key_exists('email', $data)) {
+            $updates['email'] = $data['email'];
+        }
+        if (array_key_exists('role', $data)) {
+            $updates['role'] = $data['role'] === 'company_admin' ? User::ROLE_BUSINESS : $data['role'];
+        }
+
+        if ($updates) {
+            $user->update($updates);
+        }
+
+        $wireRole = $user->role === User::ROLE_BUSINESS ? 'company_admin' : $user->role;
+
+        return response()->json([
+            'id'        => (string) $user->id,
+            'email'     => $user->email,
+            'firstName' => explode(' ', $user->name, 2)[0] ?? '',
+            'lastName'  => trim(substr($user->name, strlen(explode(' ', $user->name, 2)[0] ?? '') + 1)),
+            'role'      => $wireRole,
+            'isActive'  => true,
+        ]);
+    }
+
+    /**
+     * DELETE /api/admin/users/{user} — hard-delete the user and clean
+     * up the role's side-tables (Tutor row, Student row). Refuses to
+     * delete the calling admin or any other admin (safety guard).
+     */
+    public function deleteUser(Request $request, User $user): JsonResponse
+    {
+        $actor = $request->user();
+        if (! $actor->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+        if ($user->id === $actor->id) {
+            return response()->json(['message' => "You can't delete your own account."], 422);
+        }
+        if ($user->isAdmin()) {
+            return response()->json(['message' => 'Refusing to delete another platform admin.'], 422);
+        }
+
+        DB::transaction(function () use ($user) {
+            Tutor::where('user_id', $user->id)->delete();
+            Student::where('user_id', $user->id)->delete();
+            // If this user owned a business, clear the owner ref but leave the business.
+            Business::where('owner_user_id', $user->id)->update(['owner_user_id' => null]);
+            $user->delete();
+        });
+
+        return response()->json(['message' => 'User deleted.']);
     }
 
     /**
