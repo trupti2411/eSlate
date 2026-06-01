@@ -34,6 +34,11 @@ class Business extends Model
         'type', 'name', 'legal_name', 'logo', 'abn',
         'state_code', 'timezone', 'currency', 'tier', 'pack_version',
         'owner_user_id',
+        'description', 'contact_email', 'contact_phone', 'address', 'is_active',
+    ];
+
+    protected $casts = [
+        'is_active' => 'boolean',
     ];
 
     public function owner(): BelongsTo

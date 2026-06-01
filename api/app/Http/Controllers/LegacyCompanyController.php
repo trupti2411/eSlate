@@ -209,21 +209,123 @@ class LegacyCompanyController extends Controller
             return response()->json(['message' => 'Company not found'], 404);
         }
 
+        return response()->json($this->serializeBusiness($business));
+    }
+
+    /**
+     * PATCH /api/companies/{companyId} — update the business profile fields
+     * the admin Edit-details dialog exposes. Quiet about unknown fields so
+     * the frontend can keep evolving without forcing a backend change.
+     */
+    public function updateCompany(Request $request, int $companyId): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $companyId);
+
+        $business = Business::find($companyId);
+        if (! $business) {
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        $data = $request->validate([
+            'name'         => ['sometimes', 'string', 'max:255'],
+            'legalName'    => ['sometimes', 'nullable', 'string', 'max:255'],
+            'description'  => ['sometimes', 'nullable', 'string'],
+            'contactEmail' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'contactPhone' => ['sometimes', 'nullable', 'string', 'max:40'],
+            'address'      => ['sometimes', 'nullable', 'string', 'max:255'],
+        ]);
+
+        // camelCase wire → snake_case columns.
+        $map = [
+            'name' => 'name', 'legalName' => 'legal_name', 'description' => 'description',
+            'contactEmail' => 'contact_email', 'contactPhone' => 'contact_phone', 'address' => 'address',
+        ];
+        $payload = [];
+        foreach ($data as $k => $v) {
+            $payload[$map[$k]] = $v;
+        }
+
+        if ($payload) {
+            $business->update($payload);
+        }
+
+        return response()->json($this->serializeBusiness($business->fresh('owner')));
+    }
+
+    /**
+     * PATCH /api/companies/{companyId}/status — flip is_active on the
+     * business. Doesn't cascade to users or invitations — just gates
+     * the business in the admin UI.
+     */
+    public function updateCompanyStatus(Request $request, int $companyId): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $companyId);
+
+        $business = Business::find($companyId);
+        if (! $business) {
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        $data = $request->validate([
+            'isActive' => ['required', 'boolean'],
+        ]);
+
+        $business->update(['is_active' => $data['isActive']]);
+
+        return response()->json($this->serializeBusiness($business->fresh('owner')));
+    }
+
+    /**
+     * PATCH /api/companies/{companyId}/assign-tutor/{tutorId} — move a
+     * Tutor row's business_id to this company. Used to clear the
+     * unassigned-tutors bucket. Admin only — owners can already use
+     * the invite flow, this bypasses it for already-existing tutors.
+     */
+    public function assignTutor(Request $request, int $companyId, int $tutorId): JsonResponse
+    {
+        if (! $request->user()->isAdmin()) {
+            return response()->json(['message' => 'Admin only.'], 403);
+        }
+
+        $business = Business::find($companyId);
+        if (! $business) {
+            return response()->json(['message' => 'Company not found'], 404);
+        }
+
+        $tutor = Tutor::find($tutorId);
+        if (! $tutor) {
+            return response()->json(['message' => 'Tutor not found'], 404);
+        }
+
+        $tutor->update(['business_id' => $business->id]);
+
         return response()->json([
+            'message' => 'Tutor assigned',
+            'tutor'   => $this->serializeTutor($tutor->fresh('user')),
+        ]);
+    }
+
+    /**
+     * Shared serialisation for the business profile shape the
+     * CompanyManagement React component expects.
+     */
+    private function serializeBusiness(Business $business): array
+    {
+        return [
             'id'           => (string) $business->id,
             'name'         => $business->name,
             'legalName'    => $business->legal_name,
-            'type'         => $business->type,                 // individual | multi_tutor
+            'type'         => $business->type,
             'tier'         => $business->tier,
             'state'        => $business->state_code,
-            'description'  => '',                              // not stored yet
-            'contactEmail' => $business->owner?->email ?? '',
-            'contactPhone' => '',                              // not stored yet
-            'address'      => '',                              // not stored yet
-            'isActive'     => $business->owner_user_id !== null,
+            'description'  => $business->description ?? '',
+            'contactEmail' => $business->contact_email ?? $business->owner?->email ?? '',
+            'contactPhone' => $business->contact_phone ?? '',
+            'address'      => $business->address ?? '',
+            'isActive'     => (bool) ($business->is_active ?? true),
             'hasOwner'     => $business->owner_user_id !== null,
             'createdAt'    => $business->created_at?->toIso8601String(),
-        ]);
+        ];
     }
 
     /**
