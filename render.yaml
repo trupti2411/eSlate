@@ -31,7 +31,9 @@ services:
         value: stderr                # Render captures stderr as service logs
       - key: DB_CONNECTION
         value: pgsql
-      - key: DATABASE_URL
+      # Laravel 11's config/database.php reads `url` from env('DB_URL'),
+      # not DATABASE_URL. Use the canonical Laravel name.
+      - key: DB_URL
         fromDatabase:
           name: eslate-db
           property: connectionString

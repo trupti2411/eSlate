@@ -5,11 +5,12 @@
     persist_config off
 }
 
-# Render injects $PORT. SERVER_NAME (set in Dockerfile ENV) wires both together.
-{$SERVER_NAME:":8080"} {
+# Render sets $PORT at container start (typically 10000). Bind directly.
+# Caddy's {$VAR:default} syntax expands at config-load time, so this works
+# whether PORT is set (Render) or not (local docker run).
+:{$PORT:8080} {
     root * /app/public
 
-    # Compression
     encode gzip zstd
 
     # Laravel's front controller handles every dynamic request.

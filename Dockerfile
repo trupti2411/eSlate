@@ -36,8 +36,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 ENV APP_ENV=production \
     APP_DEBUG=false \
-    LOG_CHANNEL=stderr \
-    SERVER_NAME=:${PORT:-8080}
+    LOG_CHANNEL=stderr
 
 EXPOSE 8080
 
