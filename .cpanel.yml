@@ -1,0 +1,39 @@
+# cPanel Git Version Control deploy spec.
+# When the user clicks "Update from Remote" in cPanel's Git interface,
+# cPanel runs the tasks below in the working directory of the cloned repo.
+#
+# Requires: cPanel "Git Version Control" feature (Deluxe / Ultimate / Business plans).
+# If your plan is "Web Hosting Economy" you'll deploy via the SSH or FTP runbook
+# in docs/DEPLOY-CPANEL.md instead — this file is harmless either way.
+#
+# IMPORTANT: replace <USER> below with your cPanel username before the first deploy.
+# (cPanel does NOT expand env vars in this file, sadly.)
+
+---
+deployment:
+  tasks:
+    # 1. Sync the Laravel API into its subdomain docroot's parent dir.
+    - export DEPLOY_API=/home/<USER>/api.dev.eslate.com.au
+    - export DEPLOY_FRONT=/home/<USER>/dev.eslate.com.au
+
+    # 2. Copy api/ → api subdomain dir.
+    - /bin/cp -R api/* $DEPLOY_API/
+    - /bin/cp api/.env.production $DEPLOY_API/.env || true
+
+    # 3. Composer install (PHP path varies by plan; adjust if needed).
+    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php composer.phar install --no-dev --optimize-autoloader 2>&1 || true
+
+    # 4. Laravel one-time tasks. --force is required in non-interactive context.
+    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan migrate --force
+    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan db:seed --force
+    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan config:cache
+    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan route:cache
+    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan storage:link || true
+
+    # 5. Frontend (React) — build is done LOCALLY by you and uploaded via Git,
+    # or via FTP. cPanel servers usually don't have Node. If you commit dist/public/
+    # the next two lines copy it; otherwise upload manually.
+    - test -d dist/public && /bin/cp -R dist/public/* $DEPLOY_FRONT/ || true
+
+    # 6. Touch the deployment marker so we can verify timestamps.
+    - date > $DEPLOY_API/storage/last_deploy.txt
