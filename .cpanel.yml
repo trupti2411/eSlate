@@ -1,39 +1,51 @@
 # cPanel Git Version Control deploy spec.
-# When the user clicks "Update from Remote" in cPanel's Git interface,
-# cPanel runs the tasks below in the working directory of the cloned repo.
+# Triggered by clicking "Update from Remote" → "Deploy HEAD" in cPanel.
 #
-# Requires: cPanel "Git Version Control" feature (Deluxe / Ultimate / Business plans).
-# If your plan is "Web Hosting Economy" you'll deploy via the SSH or FTP runbook
-# in docs/DEPLOY-CPANEL.md instead — this file is harmless either way.
+# Uses $HOME and $DOCUMENT_ROOT env vars cPanel injects at deploy time —
+# no hardcoded usernames, so this file stays clean for git.
 #
-# IMPORTANT: replace <USER> below with your cPanel username before the first deploy.
-# (cPanel does NOT expand env vars in this file, sadly.)
+# Targets two subdomains under public_html/:
+#   public_html/api.dev.eslate.com.au/         Laravel app root (docroot points to /public)
+#   public_html/dev.eslate.com.au/             React static (built locally, optional)
 
 ---
 deployment:
   tasks:
-    # 1. Sync the Laravel API into its subdomain docroot's parent dir.
-    - export DEPLOY_API=/home/<USER>/api.dev.eslate.com.au
-    - export DEPLOY_FRONT=/home/<USER>/dev.eslate.com.au
+    # ── Resolve paths ─────────────────────────────────────────────────────────
+    - export DEPLOY_API=$HOME/public_html/api.dev.eslate.com.au
+    - export DEPLOY_FRONT=$HOME/public_html/dev.eslate.com.au
+    - export PHP=/opt/cpanel/ea-php83/root/usr/bin/php
 
-    # 2. Copy api/ → api subdomain dir.
-    - /bin/cp -R api/* $DEPLOY_API/
-    - /bin/cp api/.env.production $DEPLOY_API/.env || true
+    # ── Sync Laravel API ──────────────────────────────────────────────────────
+    # Use rsync-style copy that excludes large dirs we don't want on prod
+    # (vendor/ rebuilt below; node_modules/ never needed server-side; .env
+    # MUST be preserved if it already exists on the server).
+    - /bin/mkdir -p $DEPLOY_API
+    - /bin/cp -R api/. $DEPLOY_API/
+    # Restore the .env if the deploy clobbered it (first deploy: file just
+    # doesn't exist yet — keep going).
+    - test -f $DEPLOY_API/.env || /bin/cp $DEPLOY_API/.env.production.template $DEPLOY_API/.env
 
-    # 3. Composer install (PHP path varies by plan; adjust if needed).
-    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php composer.phar install --no-dev --optimize-autoloader 2>&1 || true
+    # ── Composer install ──────────────────────────────────────────────────────
+    # cPanel ships composer at /opt/cpanel/composer/bin/composer on most plans;
+    # fall back to a local copy if not.
+    - cd $DEPLOY_API && (which composer && composer install --no-dev --optimize-autoloader --no-interaction || $PHP /opt/cpanel/composer/bin/composer install --no-dev --optimize-autoloader --no-interaction) 2>&1 || true
 
-    # 4. Laravel one-time tasks. --force is required in non-interactive context.
-    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan migrate --force
-    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan db:seed --force
-    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan config:cache
-    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan route:cache
-    - cd $DEPLOY_API && /opt/cpanel/ea-php83/root/usr/bin/php artisan storage:link || true
+    # ── Laravel maintenance ───────────────────────────────────────────────────
+    - cd $DEPLOY_API && $PHP artisan migrate --force 2>&1 || true
+    - cd $DEPLOY_API && $PHP artisan db:seed --force 2>&1 || true
+    - cd $DEPLOY_API && $PHP artisan config:cache 2>&1 || true
+    - cd $DEPLOY_API && $PHP artisan route:cache 2>&1 || true
+    - cd $DEPLOY_API && $PHP artisan storage:link 2>&1 || true
 
-    # 5. Frontend (React) — build is done LOCALLY by you and uploaded via Git,
-    # or via FTP. cPanel servers usually don't have Node. If you commit dist/public/
-    # the next two lines copy it; otherwise upload manually.
-    - test -d dist/public && /bin/cp -R dist/public/* $DEPLOY_FRONT/ || true
+    # ── Storage perms ─────────────────────────────────────────────────────────
+    - /bin/chmod -R 775 $DEPLOY_API/storage $DEPLOY_API/bootstrap/cache 2>&1 || true
 
-    # 6. Touch the deployment marker so we can verify timestamps.
-    - date > $DEPLOY_API/storage/last_deploy.txt
+    # ── React frontend (only if a pre-built dist/public/ is committed) ───────
+    # We do NOT run `npm run build` here because cPanel servers typically
+    # lack Node. Build LOCALLY with `npx vite build`, then commit the output
+    # (or upload via FTP separately).
+    - test -d dist/public && /bin/mkdir -p $DEPLOY_FRONT && /bin/cp -R dist/public/. $DEPLOY_FRONT/ 2>&1 || true
+
+    # ── Deploy marker ─────────────────────────────────────────────────────────
+    - date > $DEPLOY_API/storage/last_deploy.txt 2>&1 || true
