@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -25,19 +26,31 @@ return new class extends Migration
             $table->index('student_id');
         });
 
-        // Partial unique: at most one active enrolment per (offering, student).
+        // Partial unique index: at most one active enrolment per (offering, student).
         // Historical withdrawn/completed rows are retained so we can audit cohort moves.
-        // (Supported on SQLite and Postgres; MySQL would need a workaround per spec §8.1.)
-        \DB::statement(
-            'CREATE UNIQUE INDEX offering_enrolments_one_active_per_student '
-            . 'ON offering_enrolments (course_offering_id, student_id) '
-            . "WHERE status = 'active'"
-        );
+        //
+        // MySQL/MariaDB don't support partial indexes (WHERE clause in CREATE INDEX).
+        // On those drivers we fall back to a non-unique composite index; uniqueness of
+        // ACTIVE enrolments is enforced at the application layer in
+        // OfferingEnrolmentController::store via a defensive check before insert.
+        $driver = DB::connection()->getDriverName();
+        if (in_array($driver, ['pgsql', 'sqlite'], true)) {
+            DB::statement(
+                'CREATE UNIQUE INDEX offering_enrolments_one_active_per_student '
+                . 'ON offering_enrolments (course_offering_id, student_id) '
+                . "WHERE status = 'active'"
+            );
+        }
+        // mysql / mariadb path: the (course_offering_id, status) composite index
+        // declared in the Schema::create above is sufficient as a lookup index.
     }
 
     public function down(): void
     {
-        \DB::statement('DROP INDEX IF EXISTS offering_enrolments_one_active_per_student');
+        $driver = DB::connection()->getDriverName();
+        if (in_array($driver, ['pgsql', 'sqlite'], true)) {
+            DB::statement('DROP INDEX IF EXISTS offering_enrolments_one_active_per_student');
+        }
         Schema::dropIfExists('offering_enrolments');
     }
 };
