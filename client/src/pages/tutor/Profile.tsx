@@ -7,8 +7,9 @@ import { apiRequest } from '@/lib/queryClient';
 import {
   GraduationCap, Bell, LogOut, ShieldCheck, ShieldAlert, ShieldX,
   ArrowLeft, Mail, Building2, Briefcase, BookOpen, ChevronRight,
-  Save,
+  Save, Upload, Download, FileCheck2, X,
 } from 'lucide-react';
+import { withBase, authHeaders } from '@/lib/queryClient';
 
 type ComplianceStatus = 'compliant' | 'pending_compliance' | 'compliance_hold' | string;
 
@@ -25,6 +26,9 @@ interface TutorProfile {
   wwcc_number: string | null;
   wwcc_expiry: string | null;
   wwcc_state: string | null;
+  wwcc_certificate_uploaded?: boolean;
+  wwcc_certificate_original_name?: string | null;
+  wwcc_certificate_uploaded_at?: string | null;
   compliance_status: ComplianceStatus;
   status: string;
 }
@@ -223,12 +227,13 @@ function WwccCard({ profile, wwccDays }: { profile: TutorProfile; wwccDays: numb
   const compliant = profile.compliance_status === 'compliant';
   const onHold = profile.compliance_status === 'compliance_hold';
   const pending = profile.compliance_status === 'pending_compliance';
+  const hasCert = !!profile.wwcc_certificate_uploaded;
 
   const expiringSoon = compliant && wwccDays !== null && wwccDays <= 30;
 
   let tone: 'green' | 'amber' | 'red' = 'green';
   if (onHold) tone = 'red';
-  else if (pending || expiringSoon) tone = 'amber';
+  else if (pending || expiringSoon || !hasCert) tone = 'amber';
 
   const palette = {
     green: { bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-900', sub: 'text-emerald-700', icon: 'bg-emerald-100 text-emerald-700' },
@@ -241,48 +246,213 @@ function WwccCard({ profile, wwccDays }: { profile: TutorProfile; wwccDays: numb
     ? 'WWCC on hold — update required'
     : pending
     ? 'WWCC pending — capture required'
+    : !hasCert
+    ? 'WWCC certificate missing — please upload'
     : expiringSoon
     ? `WWCC expires in ${wwccDays} day${wwccDays === 1 ? '' : 's'}`
     : 'WWCC active';
 
+  const [showDialog, setShowDialog] = useState(false);
+
   return (
-    <section className={`rounded-2xl border ${palette.border} ${palette.bg} p-6`}>
-      <div className="flex items-start gap-4">
-        <div className={`w-12 h-12 rounded-2xl ${palette.icon} flex items-center justify-center flex-shrink-0`}>
-          <Icon size={22} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Working With Children Check</p>
-          <h3 className={`text-lg font-black mt-0.5 ${palette.text}`}>{headline}</h3>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Number</p>
-              <p className={`mt-0.5 font-mono font-semibold ${palette.text}`}>
-                {profile.wwcc_number ?? '—'}
-              </p>
+    <>
+      <section className={`rounded-2xl border ${palette.border} ${palette.bg} p-6`}>
+        <div className="flex items-start gap-4">
+          <div className={`w-12 h-12 rounded-2xl ${palette.icon} flex items-center justify-center flex-shrink-0`}>
+            <Icon size={22} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Working With Children Check</p>
+            <h3 className={`text-lg font-black mt-0.5 ${palette.text}`}>{headline}</h3>
+
+            <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Number</p>
+                <p className={`mt-0.5 font-mono font-semibold ${palette.text}`}>
+                  {profile.wwcc_number ?? '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Expiry</p>
+                <p className={`mt-0.5 font-semibold ${palette.text}`}>
+                  {profile.wwcc_expiry ? formatDate(profile.wwcc_expiry) : '—'}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Issuing state</p>
+                <p className={`mt-0.5 font-semibold ${palette.text}`}>{profile.wwcc_state ?? '—'}</p>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Expiry</p>
-              <p className={`mt-0.5 font-semibold ${palette.text}`}>
-                {profile.wwcc_expiry ? formatDate(profile.wwcc_expiry) : '—'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-gray-500">Issuing state</p>
-              <p className={`mt-0.5 font-semibold ${palette.text}`}>{profile.wwcc_state ?? '—'}</p>
+
+            {/* Certificate row */}
+            <div className="mt-4 flex flex-wrap items-center gap-3 pt-3 border-t border-black/5">
+              <span className="text-xs font-bold uppercase tracking-wider text-gray-500">Certificate</span>
+              {hasCert ? (
+                <>
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold ${palette.sub}`}>
+                    <FileCheck2 size={14} />
+                    {profile.wwcc_certificate_original_name ?? 'on file'}
+                    {profile.wwcc_certificate_uploaded_at && (
+                      <span className="text-gray-500 font-normal">
+                        · uploaded {formatDate(profile.wwcc_certificate_uploaded_at)}
+                      </span>
+                    )}
+                  </span>
+                  <a
+                    href={withBase('/api/me/wwcc-certificate')}
+                    onClick={async (e) => {
+                      // Need to send Authorization header — fetch then trigger download.
+                      e.preventDefault();
+                      const r = await fetch(withBase('/api/me/wwcc-certificate'), { headers: authHeaders() });
+                      if (!r.ok) return;
+                      const blob = await r.blob();
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = profile.wwcc_certificate_original_name ?? 'wwcc-certificate';
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 px-2.5 py-1.5 rounded-lg"
+                  >
+                    <Download size={12} /> Download
+                  </a>
+                </>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700">
+                  <ShieldAlert size={12} /> No certificate on file
+                </span>
+              )}
+              <button
+                onClick={() => setShowDialog(true)}
+                className="ml-auto inline-flex items-center gap-1.5 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-lg"
+              >
+                <Upload size={12} /> {hasCert ? 'Update WWCC' : 'Upload WWCC'}
+              </button>
             </div>
           </div>
-          {(pending || onHold) && (
-            <Link
-              href="/onboarding"
-              className="mt-4 inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-xl"
-            >
-              Capture WWCC <ChevronRight size={12} />
-            </Link>
-          )}
+        </div>
+      </section>
+
+      {showDialog && <WwccUpdateDialog profile={profile} onClose={() => setShowDialog(false)} />}
+    </>
+  );
+}
+
+function WwccUpdateDialog({ profile, onClose }: { profile: TutorProfile; onClose: () => void }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [number, setNumber] = useState(profile.wwcc_number ?? '');
+  const [expiry, setExpiry] = useState(profile.wwcc_expiry ?? '');
+  const [state, setState] = useState(profile.wwcc_state ?? 'NSW');
+  const [file, setFile] = useState<File | null>(null);
+
+  const minExpiry = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 30);
+    return d.toISOString().slice(0, 10);
+  }, []);
+
+  const m = useMutation({
+    mutationFn: async () => {
+      const fd = new FormData();
+      fd.append('wwcc_number', number);
+      fd.append('wwcc_expiry', expiry);
+      fd.append('wwcc_state', state);
+      if (file) fd.append('wwcc_certificate', file);
+      return apiRequest('/api/me/wwcc', 'POST', fd);
+    },
+    onSuccess: () => {
+      toast({ title: 'WWCC updated' });
+      queryClient.invalidateQueries({ queryKey: ['/api/me/tutor-profile'] });
+      onClose();
+    },
+    onError: (err: any) => {
+      toast({ title: 'Update failed', description: err.message ?? 'Try again.', variant: 'destructive' });
+    },
+  });
+
+  const valid = number.trim() && expiry && state.length === 3;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-start justify-center p-4 sm:p-8 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 mt-10">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Working With Children Check</p>
+            <h2 className="text-lg font-black text-gray-900 mt-0.5">Update WWCC</h2>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Number</label>
+            <input
+              value={number}
+              onChange={(e) => setNumber(e.target.value)}
+              placeholder="e.g. WWCC1234567E"
+              className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Expiry</label>
+              <input
+                type="date"
+                value={expiry}
+                min={minExpiry}
+                onChange={(e) => setExpiry(e.target.value)}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-[10px] text-gray-500 mt-1">≥30 days from today</p>
+            </div>
+            <div>
+              <label className="text-xs font-bold uppercase tracking-wider text-gray-500">State</label>
+              <input
+                value={state}
+                onChange={(e) => setState(e.target.value.toUpperCase())}
+                maxLength={3}
+                className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+              Certificate {profile.wwcc_certificate_uploaded ? '(replace)' : '(upload)'}
+            </label>
+            <input
+              type="file"
+              accept="application/pdf,image/png,image/jpeg,image/heic,image/heif,image/webp"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm file:mr-3 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700 file:text-xs file:font-bold hover:file:bg-indigo-100"
+            />
+            <p className="text-[10px] text-gray-500 mt-1">PDF / JPG / PNG / HEIC, max 8 MB. Stored privately.</p>
+            {file && (
+              <p className="text-xs text-emerald-700 mt-1.5">✓ {file.name} ({Math.round(file.size / 1024)} KB)</p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 mt-6 pt-4 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="text-xs font-bold text-gray-600 hover:bg-gray-100 px-3 py-2 rounded-lg"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => m.mutate()}
+            disabled={!valid || m.isPending}
+            className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white px-4 py-2 rounded-lg flex items-center gap-1.5"
+          >
+            <Save size={12} /> {m.isPending ? 'Saving…' : 'Save WWCC'}
+          </button>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 

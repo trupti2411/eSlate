@@ -36,6 +36,7 @@ export default function AcceptInvitePage({ kind }: { kind: Kind }) {
   const [wwccNumber, setWwccNumber] = useState('');
   const [wwccExpiry, setWwccExpiry] = useState('');
   const [wwccState, setWwccState] = useState('NSW');
+  const [wwccCertificate, setWwccCertificate] = useState<File | null>(null);
 
   const minExpiry = useMemo(() => {
     const d = new Date();
@@ -50,9 +51,16 @@ export default function AcceptInvitePage({ kind }: { kind: Kind }) {
           token, password, first_name: firstName, last_name: lastName,
         });
       }
-      return apiRequest('/api/onboarding/accept-tutor-invite', 'POST', {
-        token, password, wwcc_number: wwccNumber, wwcc_expiry: wwccExpiry, wwcc_state: wwccState,
-      });
+      // Use FormData so we can attach the optional certificate file in the same request.
+      // apiRequest (lib/queryClient.ts) detects FormData and omits the JSON Content-Type.
+      const fd = new FormData();
+      fd.append('token', token);
+      fd.append('password', password);
+      fd.append('wwcc_number', wwccNumber);
+      fd.append('wwcc_expiry', wwccExpiry);
+      fd.append('wwcc_state', wwccState);
+      if (wwccCertificate) fd.append('wwcc_certificate', wwccCertificate);
+      return apiRequest('/api/onboarding/accept-tutor-invite', 'POST', fd);
     },
     onSuccess: (data) => {
       if (data?.token) localStorage.setItem('authToken', data.token);
@@ -198,6 +206,20 @@ export default function AcceptInvitePage({ kind }: { kind: Kind }) {
                       />
                     </Field>
                   </div>
+
+                  <Field label="Certificate upload (optional, recommended)" hint="PDF / JPG / PNG / HEIC, up to 8 MB. Stored privately, only you and your business owner can view.">
+                    <input
+                      type="file"
+                      accept="application/pdf,image/png,image/jpeg,image/heic,image/heif,image/webp"
+                      onChange={(e) => setWwccCertificate(e.target.files?.[0] ?? null)}
+                      className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm file:mr-3 file:px-3 file:py-1 file:rounded-lg file:border-0 file:bg-indigo-50 file:text-indigo-700 file:text-xs file:font-bold hover:file:bg-indigo-100 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                    {wwccCertificate && (
+                      <p className="text-xs text-emerald-700 mt-1.5">
+                        ✓ {wwccCertificate.name} ({Math.round(wwccCertificate.size / 1024)} KB)
+                      </p>
+                    )}
+                  </Field>
                 </div>
               </div>
             </>
