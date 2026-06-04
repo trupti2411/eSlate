@@ -310,7 +310,10 @@ class AdminController extends Controller
         }
 
         $data = $request->validate([
-            'type'              => ['nullable', Rule::in(Business::TYPES)],
+            // ESLATE-1: admins may only create Tutoring Company (multi_tutor) profiles.
+            // Solo-tutor (individual) businesses are not creatable through the admin
+            // invite workflow — they arise only via the tutor's own onboarding.
+            'type'              => ['nullable', Rule::in([Business::TYPE_MULTI_TUTOR])],
             'name'              => ['nullable', 'string', 'min:2', 'max:255'],
             'owner_email'       => ['required', 'email'],
             'owner_first_name'  => ['nullable', 'string', 'max:60'],
@@ -326,6 +329,7 @@ class AdminController extends Controller
             'contact_phone'     => ['nullable', 'string', 'max:40', 'regex:/^[+\d][\d\s\-()]{6,30}$/'],
             'description'       => ['nullable', 'string', 'max:2000'],
         ], [
+            'type.in'             => 'Admins can only create Tutoring Company profiles, not solo tutors.',
             'abn.regex'           => 'ABN must be 11 digits (e.g. "12 345 678 901" or "12345678901").',
             'contact_phone.regex' => 'Phone number looks invalid. Use digits, spaces, dashes or parentheses; optional leading +.',
         ]);

@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -275,24 +274,16 @@ export default function Companies() {
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4">
+                    {/* ESLATE-1: admins can only create Tutoring Company profiles.
+                        Solo-tutor creation is intentionally not offered here. */}
                     <div>
-                      <Label>Profile type <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={form.type}
-                        onValueChange={(v) => setForm({ ...form, type: v as ProfileType })}
-                      >
-                        <SelectTrigger className="mt-1.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="individual">Solo tutor (just one person)</SelectItem>
-                          <SelectItem value="multi_tutor">Tutoring company (multiple tutors)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>Profile type</Label>
+                      <div className="mt-1.5 flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700">
+                        <Building2 size={16} className="text-purple-600" />
+                        Tutoring company (multiple tutors)
+                      </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {form.type === "individual"
-                          ? "We'll create a hidden Individual business so the tutor has somewhere to own classes and students."
-                          : "We'll create a Multi-Tutor business at Starter tier. The owner can invite tutors after setup."}
+                        We'll create a Multi-Tutor business at Starter tier. The owner can invite tutors after setup.
                       </p>
                     </div>
 
@@ -411,19 +402,6 @@ export default function Companies() {
                         required
                       />
                     </div>
-
-                    {form.type === "individual" && (
-                      <div>
-                        <Label htmlFor="solo-biz-name">Business name (optional)</Label>
-                        <Input
-                          id="solo-biz-name"
-                          className="mt-1.5"
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          placeholder={`Default: "${(form.ownerFirstName + ' ' + form.ownerLastName).trim() || 'Their name'} Tutoring"`}
-                        />
-                      </div>
-                    )}
 
                     <div>
                       <Label>State</Label>
