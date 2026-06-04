@@ -11,6 +11,9 @@ use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
  * Self-onboarding endpoints. Mix of authenticated (WWCC, tutor profile)
@@ -174,15 +177,25 @@ class OnboardingController extends Controller
         ];
     }
 
-    /** POST /api/me/wwcc — capture WWCC. Mandatory before tutor can be assigned to classes involving minors. */
+    /**
+     * POST /api/me/wwcc — capture WWCC. Mandatory before tutor can be assigned to classes involving minors.
+     *
+     * Accepts an optional certificate file upload via multipart/form-data:
+     *   - field `wwcc_certificate`: PDF / JPG / PNG / HEIC, max 8MB.
+     *   - Stored under storage/app/private/wwcc/{tutor_id}/{uuid}.{ext}
+     *     and served only via GET /api/me/wwcc-certificate (auth gated).
+     *
+     * If a new file is uploaded, any previous certificate is deleted.
+     */
     public function captureWwcc(Request $request): JsonResponse
     {
         $tutor = Tutor::where('user_id', $request->user()->id)->firstOrFail();
 
         $data = $request->validate([
-            'wwcc_number' => ['required', 'string', 'max:120'],
-            'wwcc_expiry' => ['required', 'date'],
-            'wwcc_state'  => ['required', 'string', 'size:3'],
+            'wwcc_number'      => ['required', 'string', 'max:120'],
+            'wwcc_expiry'      => ['required', 'date'],
+            'wwcc_state'       => ['required', 'string', 'size:3'],
+            'wwcc_certificate' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,heic,heif,webp', 'max:8192'],
         ]);
 
         // v3 §8.1: expiry must be ≥30 days in the future at point of capture.
@@ -193,19 +206,60 @@ class OnboardingController extends Controller
             ], 422);
         }
 
-        $tutor->update([
+        $updates = [
             'wwcc_number'       => $data['wwcc_number'],
             'wwcc_expiry'       => $data['wwcc_expiry'],
             'wwcc_state'        => $data['wwcc_state'],
             'compliance_status' => Tutor::COMPLIANCE_COMPLIANT,
             'status'            => Tutor::STATUS_ACTIVE,
-        ]);
+        ];
+
+        if ($request->hasFile('wwcc_certificate')) {
+            // Remove any previously-stored certificate first.
+            if ($tutor->wwcc_certificate_path && Storage::disk('local')->exists($tutor->wwcc_certificate_path)) {
+                Storage::disk('local')->delete($tutor->wwcc_certificate_path);
+            }
+
+            $file = $request->file('wwcc_certificate');
+            $ext  = $file->getClientOriginalExtension() ?: $file->extension();
+            $path = $file->storeAs(
+                "wwcc/{$tutor->id}",
+                Str::uuid() . '.' . $ext,
+                'local'   // storage/app/private/... on Laravel 11; NEVER public.
+            );
+
+            $updates['wwcc_certificate_path']          = $path;
+            $updates['wwcc_certificate_original_name'] = $file->getClientOriginalName();
+            $updates['wwcc_certificate_uploaded_at']   = now();
+        }
+
+        $tutor->update($updates);
 
         return response()->json([
             'compliance_status' => $tutor->compliance_status,
             'status'            => $tutor->status,
             'wwcc_expiry'       => $tutor->wwcc_expiry?->toDateString(),
+            'has_certificate'   => $tutor->fresh()->hasCertificate(),
         ]);
+    }
+
+    /**
+     * GET /api/me/wwcc-certificate — stream the authenticated tutor's own
+     * WWCC certificate back. Private file disk; tutor can only ever access
+     * their own. Admins and business owners get a separate route (TBD).
+     */
+    public function downloadWwccCertificate(Request $request): StreamedResponse|JsonResponse
+    {
+        $tutor = Tutor::where('user_id', $request->user()->id)->firstOrFail();
+
+        if (! $tutor->wwcc_certificate_path || ! Storage::disk('local')->exists($tutor->wwcc_certificate_path)) {
+            return response()->json(['message' => 'No certificate on file.'], 404);
+        }
+
+        return Storage::disk('local')->download(
+            $tutor->wwcc_certificate_path,
+            $tutor->wwcc_certificate_original_name ?: basename($tutor->wwcc_certificate_path)
+        );
     }
 
     /** GET /api/me/tutor-profile — return the authenticated tutor's full profile + business + WWCC. */
@@ -231,11 +285,14 @@ class OnboardingController extends Controller
             'qualifications'     => $tutor->qualifications,
             'delivery_modes'     => $tutor->delivery_modes,
             'year_levels'        => $tutor->year_levels,
-            'wwcc_number'        => $tutor->wwcc_number,
-            'wwcc_expiry'        => $tutor->wwcc_expiry?->toDateString(),
-            'wwcc_state'         => $tutor->wwcc_state,
-            'compliance_status'  => $tutor->compliance_status,
-            'status'             => $tutor->status,
+            'wwcc_number'                    => $tutor->wwcc_number,
+            'wwcc_expiry'                    => $tutor->wwcc_expiry?->toDateString(),
+            'wwcc_state'                     => $tutor->wwcc_state,
+            'wwcc_certificate_uploaded'      => $tutor->hasCertificate(),
+            'wwcc_certificate_original_name' => $tutor->wwcc_certificate_original_name,
+            'wwcc_certificate_uploaded_at'   => $tutor->wwcc_certificate_uploaded_at?->toIso8601String(),
+            'compliance_status'              => $tutor->compliance_status,
+            'status'                         => $tutor->status,
         ]);
     }
 

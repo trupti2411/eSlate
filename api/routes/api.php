@@ -34,6 +34,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Onboarding — self-service for the authenticated tutor (v3 Path B steps 2 + 5; §8 WWCC)
     Route::post('/me/wwcc', [OnboardingController::class, 'captureWwcc']);
+    Route::get('/me/wwcc-certificate', [OnboardingController::class, 'downloadWwccCertificate']);
     Route::get('/me/tutor-profile', [OnboardingController::class, 'showTutorProfile']);
     Route::patch('/me/tutor-profile', [OnboardingController::class, 'updateTutorProfile']);
 

@@ -23,6 +23,7 @@ class Tutor extends Model
     protected $fillable = [
         'user_id', 'business_id', 'status',
         'wwcc_number', 'wwcc_expiry', 'wwcc_state', 'compliance_status',
+        'wwcc_certificate_path', 'wwcc_certificate_original_name', 'wwcc_certificate_uploaded_at',
         'bio', 'hourly_rate', 'qualifications', 'delivery_modes', 'year_levels',
     ];
 
@@ -31,11 +32,17 @@ class Tutor extends Model
         return [
             'wwcc_number' => 'encrypted',
             'wwcc_expiry' => 'date',
+            'wwcc_certificate_uploaded_at' => 'datetime',
             'hourly_rate' => 'decimal:2',
             'qualifications' => 'array',
             'delivery_modes' => 'array',
             'year_levels' => 'array',
         ];
+    }
+
+    public function hasCertificate(): bool
+    {
+        return ! empty($this->wwcc_certificate_path);
     }
 
     public function user(): BelongsTo
