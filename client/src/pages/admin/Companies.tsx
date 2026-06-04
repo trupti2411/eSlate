@@ -53,6 +53,11 @@ export default function Companies() {
     ownerLastName: "",
     ownerEmail: "",
     stateCode: "NSW",
+    // ESLATE-3: optional company-profile fields (multi_tutor only)
+    abn: "",
+    address: "",
+    contactEmail: "",
+    contactPhone: "",
   });
 
   const { data: businesses, isLoading } = useQuery<BusinessSummary[]>({
@@ -70,6 +75,14 @@ export default function Companies() {
       };
       if (data.type === "multi_tutor") payload.name = data.name;
       else if (data.name.trim()) payload.name = data.name;
+      // ESLATE-3: only send the optional company-profile fields for multi_tutor,
+      // and only if they're actually filled in.
+      if (data.type === "multi_tutor") {
+        if (data.abn.trim())          payload.abn           = data.abn.trim();
+        if (data.address.trim())      payload.address       = data.address.trim();
+        if (data.contactEmail.trim()) payload.contact_email = data.contactEmail.trim();
+        if (data.contactPhone.trim()) payload.contact_phone = data.contactPhone.trim();
+      }
       return await apiRequest("/api/admin/businesses/invite", "POST", payload);
     },
     onSuccess: (res) => {
@@ -97,6 +110,10 @@ export default function Companies() {
       ownerLastName: "",
       ownerEmail: "",
       stateCode: "NSW",
+      abn: "",
+      address: "",
+      contactEmail: "",
+      contactPhone: "",
     });
     setInviteResult(null);
   };
@@ -106,8 +123,25 @@ export default function Companies() {
     resetForm();
   };
 
+  // ESLATE-3: lightweight client-side validation. Backend validates authoritatively.
+  // ABN: 11 digits with optional " " or "-" between groups.
+  const abnDigits = form.abn.replace(/[\s-]/g, "");
+  const abnValid = !form.abn.trim() || /^\d{11}$/.test(abnDigits);
+  const contactEmailValid = !form.contactEmail.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail.trim());
+  const contactPhoneDigits = form.contactPhone.replace(/[^\d]/g, "");
+  const contactPhoneValid = !form.contactPhone.trim() || (contactPhoneDigits.length >= 6 && contactPhoneDigits.length <= 15);
+  const optionalFieldsValid = abnValid && contactEmailValid && contactPhoneValid;
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!optionalFieldsValid) {
+      toast({
+        title: "Please fix the highlighted fields",
+        description: "ABN, contact email, or phone has an invalid format.",
+        variant: "destructive",
+      });
+      return;
+    }
     inviteMutation.mutate(form);
   };
 
@@ -273,6 +307,72 @@ export default function Companies() {
                           placeholder="e.g. Acme Tutoring"
                           required
                         />
+                      </div>
+                    )}
+
+                    {/* ESLATE-3: optional company-profile details (multi_tutor only). */}
+                    {form.type === "multi_tutor" && (
+                      <div className="space-y-4 rounded-xl border border-purple-100 bg-purple-50/30 p-4">
+                        <p className="text-xs font-bold uppercase tracking-widest text-purple-700">
+                          Company details (optional)
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="biz-abn">ABN</Label>
+                            <Input
+                              id="biz-abn"
+                              className={`mt-1.5 ${!abnValid ? "border-red-300 focus-visible:ring-red-400" : ""}`}
+                              value={form.abn}
+                              onChange={(e) => setForm({ ...form, abn: e.target.value })}
+                              placeholder="11 digits, e.g. 12 345 678 901"
+                              inputMode="numeric"
+                            />
+                            {!abnValid && (
+                              <p className="text-xs text-red-600 mt-1">ABN must be 11 digits.</p>
+                            )}
+                          </div>
+                          <div>
+                            <Label htmlFor="biz-phone">Contact phone</Label>
+                            <Input
+                              id="biz-phone"
+                              type="tel"
+                              className={`mt-1.5 ${!contactPhoneValid ? "border-red-300 focus-visible:ring-red-400" : ""}`}
+                              value={form.contactPhone}
+                              onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+                              placeholder="e.g. +61 2 9000 1234"
+                            />
+                            {!contactPhoneValid && (
+                              <p className="text-xs text-red-600 mt-1">Phone must contain 6–15 digits.</p>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="biz-contact-email">Contact email</Label>
+                          <Input
+                            id="biz-contact-email"
+                            type="email"
+                            className={`mt-1.5 ${!contactEmailValid ? "border-red-300 focus-visible:ring-red-400" : ""}`}
+                            value={form.contactEmail}
+                            onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                            placeholder="hello@acmetutoring.com.au"
+                          />
+                          {!contactEmailValid && (
+                            <p className="text-xs text-red-600 mt-1">Enter a valid email address.</p>
+                          )}
+                          <p className="text-xs text-gray-500 mt-1">
+                            Public-facing contact email for the company. Different from the owner login email below.
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="biz-address">Address</Label>
+                          <Input
+                            id="biz-address"
+                            className="mt-1.5"
+                            value={form.address}
+                            onChange={(e) => setForm({ ...form, address: e.target.value })}
+                            placeholder="e.g. 123 George St, Sydney NSW 2000"
+                          />
+                        </div>
                       </div>
                     )}
 

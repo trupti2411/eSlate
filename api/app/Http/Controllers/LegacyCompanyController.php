@@ -315,6 +315,7 @@ class LegacyCompanyController extends Controller
             'id'           => (string) $business->id,
             'name'         => $business->name,
             'legalName'    => $business->legal_name,
+            'abn'          => $business->abn,                 // ESLATE-3: surface ABN to detail page
             'type'         => $business->type,
             'tier'         => $business->tier,
             'state'        => $business->state_code,

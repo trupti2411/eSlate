@@ -316,7 +316,24 @@ class AdminController extends Controller
             'owner_first_name'  => ['nullable', 'string', 'max:60'],
             'owner_last_name'   => ['nullable', 'string', 'max:60'],
             'state_code'        => ['required', Rule::in(['NSW'])],
+            // ESLATE-3: optional company-profile details captured at creation time.
+            // ABN is an 11-digit Australian Business Number; we accept it with or
+            // without the conventional "XX XXX XXX XXX" spacing then strip to digits.
+            'abn'               => ['nullable', 'string', 'regex:/^\d{2}\s?\d{3}\s?\d{3}\s?\d{3}$/'],
+            'address'           => ['nullable', 'string', 'max:255'],
+            'contact_email'     => ['nullable', 'email', 'max:255'],
+            // E.164-ish: optional leading +, 7-15 digits, allow spaces, dashes, parens.
+            'contact_phone'     => ['nullable', 'string', 'max:40', 'regex:/^[+\d][\d\s\-()]{6,30}$/'],
+            'description'       => ['nullable', 'string', 'max:2000'],
+        ], [
+            'abn.regex'           => 'ABN must be 11 digits (e.g. "12 345 678 901" or "12345678901").',
+            'contact_phone.regex' => 'Phone number looks invalid. Use digits, spaces, dashes or parentheses; optional leading +.',
         ]);
+
+        // Normalise ABN to digit-only for storage.
+        if (! empty($data['abn'])) {
+            $data['abn'] = preg_replace('/\s+/', '', $data['abn']);
+        }
 
         $type = $data['type'] ?? Business::TYPE_MULTI_TUTOR;
         $isIndividual = $type === Business::TYPE_INDIVIDUAL;
@@ -339,13 +356,19 @@ class AdminController extends Controller
             ?? trim(($data['owner_first_name'] ?? '') . ' ' . ($data['owner_last_name'] ?? '')) . ' Tutoring';
 
         return DB::transaction(function () use ($data, $user, $type, $isIndividual, $businessName) {
-            $business = Business::create([
-                'type'       => $type,
-                'name'       => $businessName,
-                'state_code' => $data['state_code'],
-                'tier'       => $isIndividual ? Business::TIER_INDIVIDUAL : Business::TIER_STARTER,
+            $business = Business::create(array_filter([
+                'type'          => $type,
+                'name'          => $businessName,
+                'state_code'    => $data['state_code'],
+                'tier'          => $isIndividual ? Business::TIER_INDIVIDUAL : Business::TIER_STARTER,
+                // ESLATE-3: optional company-profile details (any/all may be null).
+                'abn'           => $data['abn'] ?? null,
+                'address'       => $data['address'] ?? null,
+                'contact_email' => $data['contact_email'] ?? null,
+                'contact_phone' => $data['contact_phone'] ?? null,
+                'description'   => $data['description'] ?? null,
                 // owner_user_id intentionally null until the owner accepts.
-            ]);
+            ], fn ($v) => $v !== null));
 
             $invitation = Invitation::create([
                 'kind'        => Invitation::KIND_BUSINESS_OWNER,
