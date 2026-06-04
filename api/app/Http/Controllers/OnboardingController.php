@@ -104,11 +104,12 @@ class OnboardingController extends Controller
     public function acceptTutorInvite(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'token'       => ['required', 'string'],
-            'password'    => ['required', 'string', 'min:8'],
-            'wwcc_number' => ['required', 'string', 'max:120'],
-            'wwcc_expiry' => ['required', 'date'],
-            'wwcc_state'  => ['required', 'string', 'size:3'],
+            'token'            => ['required', 'string'],
+            'password'         => ['required', 'string', 'min:8'],
+            'wwcc_number'      => ['required', 'string', 'max:120'],
+            'wwcc_expiry'      => ['required', 'date'],
+            'wwcc_state'       => ['required', 'string', 'size:3'],
+            'wwcc_certificate' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,heic,heif,webp', 'max:8192'],
         ]);
 
         $invitation = Invitation::where('token', $data['token'])
@@ -126,18 +127,33 @@ class OnboardingController extends Controller
             ], 422);
         }
 
-        return DB::transaction(function () use ($invitation, $data) {
+        return DB::transaction(function () use ($invitation, $data, $request) {
             $user = User::where('email', $invitation->email)->firstOrFail();
             $user->update(['password' => $data['password']]);    // hashed via cast
 
             $tutor = Tutor::where('user_id', $user->id)->firstOrFail();
-            $tutor->update([
+            $updates = [
                 'wwcc_number'       => $data['wwcc_number'],
                 'wwcc_expiry'       => $data['wwcc_expiry'],
                 'wwcc_state'        => $data['wwcc_state'],
                 'compliance_status' => Tutor::COMPLIANCE_COMPLIANT,
                 'status'            => Tutor::STATUS_ACTIVE,
-            ]);
+            ];
+
+            if ($request->hasFile('wwcc_certificate')) {
+                $file = $request->file('wwcc_certificate');
+                $ext  = $file->getClientOriginalExtension() ?: $file->extension();
+                $path = $file->storeAs(
+                    "wwcc/{$tutor->id}",
+                    Str::uuid() . '.' . $ext,
+                    'local'
+                );
+                $updates['wwcc_certificate_path']          = $path;
+                $updates['wwcc_certificate_original_name'] = $file->getClientOriginalName();
+                $updates['wwcc_certificate_uploaded_at']   = now();
+            }
+
+            $tutor->update($updates);
 
             $invitation->update([
                 'accepted_at'         => now(),

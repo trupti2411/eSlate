@@ -21,14 +21,21 @@ export function authHeaders(): Record<string, string> {
 }
 
 export async function apiRequest(endpoint: string, method: string = "GET", data?: any) {
+  // FormData bodies (file uploads) must NOT carry a manual Content-Type —
+  // the browser writes its own boundary-aware multipart header. Setting
+  // application/json here would silently break the upload on the server side.
+  const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
+
   const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+    ...(isFormData ? {} : { "Content-Type": "application/json" }),
     Accept: "application/json",
     ...authHeaders(),
   };
 
   const config: RequestInit = { method, headers };
-  if (data) config.body = JSON.stringify(data);
+  if (data !== undefined && data !== null) {
+    config.body = isFormData ? data : JSON.stringify(data);
+  }
 
   const response = await fetch(withBase(endpoint), config);
 
