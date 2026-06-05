@@ -32,6 +32,7 @@ Route::post('/onboarding/accept-tutor-invite', [OnboardingController::class, 'ac
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/me', [AuthController::class, 'me']);
     Route::post('/logout', [AuthController::class, 'logout']);
+    Route::post('/users/accept-terms', [AuthController::class, 'acceptTerms']);   // ESLATE-11
 
     // Onboarding — self-service for the authenticated tutor (v3 Path B steps 2 + 5; §8 WWCC)
     Route::post('/me/wwcc', [OnboardingController::class, 'captureWwcc']);

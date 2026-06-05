@@ -51,6 +51,51 @@ class AuthController extends Controller
     }
 
     /**
+     * POST /api/users/accept-terms — ESLATE-11.
+     *
+     * Records acceptance of all three policies (Terms of Service, Privacy
+     * Policy, User Agreement) for the authenticated user, writes one audit row
+     * per policy in policy_acceptances (with version), and stamps the user's
+     * terms_accepted_at / terms_version. All three must be accepted together —
+     * the frontend gates this, and we treat a successful call as acceptance of
+     * the full set. Returns { user } so the client can refresh /api/me.
+     */
+    public function acceptTerms(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'version' => ['required', 'string', 'max:20'],
+        ]);
+
+        $user = $request->user();
+
+        // Resolve the business this acceptance is scoped to, if any (company
+        // admins own a business; tutors belong to one).
+        $businessId = Business::where('owner_user_id', $user->id)->value('id')
+            ?? $user->tutor?->business_id;
+
+        $now = now();
+
+        DB::transaction(function () use ($user, $data, $businessId, $now) {
+            foreach (\App\Models\PolicyAcceptance::TYPES as $type) {
+                \App\Models\PolicyAcceptance::create([
+                    'user_id'        => $user->id,
+                    'business_id'    => $businessId,
+                    'policy_type'    => $type,
+                    'policy_version' => $data['version'],
+                    'accepted_at'    => $now,
+                ]);
+            }
+
+            $user->update([
+                'terms_accepted_at' => $now,
+                'terms_version'     => $data['version'],
+            ]);
+        });
+
+        return response()->json(['user' => $this->shapeUser($user->fresh())]);
+    }
+
+    /**
      * Self-registration. v3 §5.3 Path B (Individual) is the canonical self-serve path;
      * we also allow Multi-tutor owners to self-register (deviation from v3 §5.2 which says
      * Multi-tutor is admin-invite-only — relaxed for v1 user demand).
@@ -129,6 +174,9 @@ class AuthController extends Controller
             'lastName' => $lastName,
             'profileImageUrl' => null,
             'role' => $user->role === 'business' ? 'company_admin' : $user->role,
+            // ESLATE-11: drives the policy-acceptance gate in the frontend Layout.
+            'termsAcceptedAt' => $user->terms_accepted_at?->toIso8601String(),
+            'termsVersion' => $user->terms_version,
         ];
     }
 }
