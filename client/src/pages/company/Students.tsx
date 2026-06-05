@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
   GraduationCap, Bell, LogOut, ArrowLeft, Plus, X, Save, Search, School,
-  User, Mail, Phone, Star, Trash2, Pencil, AlertTriangle, Loader2,
+  User, Mail, Phone, Star, Trash2, Pencil, AlertTriangle, Loader2, Calendar, MapPin,
 } from 'lucide-react';
 
 interface AdminProfile { userId: string; companyId: string; companyName: string; }
@@ -67,6 +67,7 @@ export default function StudentsPage() {
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
+  const [viewing, setViewing] = useState<Student | null>(null);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -164,7 +165,7 @@ export default function StudentsPage() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {filtered.map(s => <StudentRow key={s.id} s={s} onEdit={() => setEditing(s)} />)}
+            {filtered.map(s => <StudentRow key={s.id} s={s} onView={() => setViewing(s)} onEdit={() => setEditing(s)} />)}
           </ul>
         )}
       </main>
@@ -183,6 +184,14 @@ export default function StudentsPage() {
           businessId={companyId}
           student={editing}
           onClose={() => setEditing(null)}
+        />
+      )}
+
+      {viewing && !editing && companyId && (
+        <StudentProfileModal
+          student={viewing}
+          onClose={() => setViewing(null)}
+          onEdit={() => { setEditing(viewing); setViewing(null); }}
         />
       )}
     </div>
@@ -207,14 +216,16 @@ function KpiTile({ value, label, tone }: { value: number; label: string; tone: k
   );
 }
 
-function StudentRow({ s, onEdit }: { s: Student; onEdit: () => void }) {
+function StudentRow({ s, onView, onEdit }: { s: Student; onView: () => void; onEdit: () => void }) {
   const name = fullName(s);
   const initials = name.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'S';
   const isArchived = s.status === 'archived';
   const parents = s.parents ?? [];
   const primary = parents.find(p => p.is_primary) ?? parents[0];
   return (
-    <li className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-4 ${isArchived ? 'border-gray-100 opacity-70' : 'border-gray-100'}`}>
+    <li
+      onClick={onView}
+      className={`bg-white rounded-2xl border shadow-sm p-4 flex items-center gap-4 cursor-pointer hover:border-emerald-200 hover:shadow-md transition ${isArchived ? 'border-gray-100 opacity-70' : 'border-gray-100'}`}>
       <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black flex-shrink-0">
         {initials}
       </div>
@@ -254,13 +265,150 @@ function StudentRow({ s, onEdit }: { s: Student; onEdit: () => void }) {
         </span>
       )}
       <button
-        onClick={onEdit}
+        onClick={(e) => { e.stopPropagation(); onEdit(); }}
         className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-white hover:bg-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl transition-colors"
         aria-label={`Edit ${name}`}
       >
         <Pencil size={12} /> Edit
       </button>
     </li>
+  );
+}
+
+/**
+ * Read-only student profile (ESLATE-14). View-by-default; the Edit button
+ * hands off to the existing StudentFormModal (DRY — one edit form).
+ * Fetches fresh via GET /students/:id so the "Last updated by" footer and
+ * full parent list are present even when the list row omitted them.
+ */
+function StudentProfileModal({
+  student, onClose, onEdit,
+}: {
+  student: Student;
+  onClose: () => void;
+  onEdit: () => void;
+}) {
+  const { data: full } = useQuery<Student>({
+    queryKey: [`/api/students/${student.id}`],
+    initialData: student,
+  });
+  const s = full ?? student;
+
+  const name = fullName(s);
+  const initials = name.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'S';
+  const age = s.date_of_birth ? ageFromDob(s.date_of_birth.slice(0, 10)) : null;
+  const parents = s.parents ?? [];
+  const primary = parents.find(p => p.is_primary) ?? parents[0];
+  const others = parents.filter(p => p !== primary);
+  const updatedByName = s.updatedBy
+    ? (s.updatedBy.name ?? `${s.updatedBy.firstName ?? ''} ${s.updatedBy.lastName ?? ''}`.trim())
+    : '';
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black flex-shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-black text-gray-900 truncate">{name}</h3>
+              <p className="text-xs text-gray-500 truncate">
+                {[s.year_group_code, s.school].filter(Boolean).join(' · ') || 'Student'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={onEdit}
+              className="inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 py-2 rounded-xl"
+            >
+              <Pencil size={14} /> Edit
+            </button>
+            <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-5 space-y-6 overflow-y-auto">
+          <ProfileSection title="About">
+            <ProfileRow icon={<Calendar size={14} />} label="Date of birth"
+              value={s.date_of_birth ? `${formatDob(s.date_of_birth)}${age !== null ? `  (Age ${age})` : ''}` : '—'} />
+            <ProfileRow icon={<GraduationCap size={14} />} label="Year group" value={s.year_group_code || '—'} />
+            <ProfileRow icon={<School size={14} />} label="School" value={s.school || '—'} />
+          </ProfileSection>
+
+          <ProfileSection title="Address">
+            <ProfileRow icon={<MapPin size={14} />} label="Address" value={s.address || '—'} />
+          </ProfileSection>
+
+          <ProfileSection title="Parents / Guardians">
+            {parents.length === 0 ? (
+              <p className="text-sm text-gray-400">No contacts on record.</p>
+            ) : (
+              <div className="space-y-3">
+                {primary && <ParentCard p={primary} isPrimary />}
+                {others.map((p, i) => <ParentCard key={i} p={p} />)}
+              </div>
+            )}
+          </ProfileSection>
+
+          <ProfileSection title="Notes">
+            <p className="text-xs font-semibold text-gray-500">General notes</p>
+            <p className="text-sm text-gray-900 whitespace-pre-wrap mt-0.5">{s.notes || '—'}</p>
+            <p className="text-xs font-semibold text-gray-500 mt-3">Learning goals</p>
+            <p className="text-sm text-gray-900 whitespace-pre-wrap mt-0.5">{s.learning_goals || '—'}</p>
+          </ProfileSection>
+
+          {updatedByName && s.updated_at && (
+            <p className="text-xs text-gray-400">
+              Last updated by {updatedByName} on {dobDisplay(s.updated_at)}
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProfileSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">{title}</h4>
+      {children}
+    </div>
+  );
+}
+
+function ProfileRow({ icon, label, value }: { icon: React.ReactNode; label: string; value?: string | null }) {
+  return (
+    <div className="flex items-center gap-3 py-1.5">
+      <span className="text-gray-400 flex-shrink-0">{icon}</span>
+      <span className="text-xs font-semibold text-gray-500 w-28 flex-shrink-0">{label}</span>
+      <span className="text-sm text-gray-900 truncate">{value}</span>
+    </div>
+  );
+}
+
+function ParentCard({ p, isPrimary }: { p: ParentRow; isPrimary?: boolean }) {
+  return (
+    <div className="rounded-xl border border-gray-100 bg-gray-50 p-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <User size={13} className="text-indigo-500" />
+        <span className="font-bold text-sm text-gray-900">{p.name}</span>
+        {p.relationship && <span className="text-xs text-gray-400">({p.relationship})</span>}
+        {isPrimary && (
+          <span className="text-[10px] font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded">Primary</span>
+        )}
+      </div>
+      <div className="text-xs text-gray-500 mt-1.5 flex items-center gap-3 flex-wrap">
+        {p.email && <span className="flex items-center gap-1"><Mail size={11} /> {p.email}</span>}
+        {p.phone && <span className="flex items-center gap-1"><Phone size={11} /> {p.phone}</span>}
+        {!p.email && !p.phone && <span className="text-gray-400">No contact details</span>}
+      </div>
+    </div>
   );
 }
 

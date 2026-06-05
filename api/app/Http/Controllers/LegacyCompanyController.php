@@ -659,6 +659,37 @@ class LegacyCompanyController extends Controller
      *    enforced via assertCanAccessBusiness — admins cannot edit students of
      *    other companies. updated_by records who made the change.
      */
+    /**
+     * GET /api/students/{student} — admin view of a single student profile (ESLATE-14).
+     */
+    public function showStudent(Request $request, Student $student): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $student->business_id);
+
+        return response()->json($this->studentResponse($student));
+    }
+
+    /**
+     * Normalised student payload for the profile view/edit screens.
+     *
+     * Eloquent snake-cases relation keys, so the `updatedBy` relation would
+     * otherwise land on `updated_by` and clobber the scalar FK. We restore the
+     * scalar and expose a flat `updatedBy` the frontend footer can read.
+     */
+    private function studentResponse(Student $student): array
+    {
+        $student->loadMissing(['user', 'parents', 'updatedBy']);
+        $arr = $student->toArray();
+        $arr['updated_by'] = $student->updated_by;
+        $arr['updatedBy'] = $student->updatedBy ? [
+            'name'      => $student->updatedBy->name,
+            'firstName' => $this->firstNameOf((string) $student->updatedBy->name),
+            'lastName'  => $this->lastNameOf((string) $student->updatedBy->name),
+        ] : null;
+
+        return $arr;
+    }
+
     public function updateStudent(Request $request, Student $student): JsonResponse
     {
         $this->assertCanAccessBusiness($request->user(), $student->business_id);
@@ -736,7 +767,7 @@ class LegacyCompanyController extends Controller
             }
         }
 
-        return response()->json($student->fresh()->load(['user', 'parents', 'updatedBy']));
+        return response()->json($this->studentResponse($student->fresh()));
     }
 
     /**

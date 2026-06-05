@@ -146,6 +146,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/company/submissions', [LegacyCompanyController::class, 'companySubmissions']);
     Route::patch('/company/submissions/{submission}/grade', [LegacyCompanyController::class, 'gradeSubmission']);
     Route::patch('/submissions/{submission}/reviewer-annotations', [LegacyCompanyController::class, 'reviewerAnnotations']);
+    Route::get('/students/{student}', [LegacyCompanyController::class, 'showStudent']);     // ESLATE-14
     Route::patch('/students/{student}', [LegacyCompanyController::class, 'updateStudent']);
     Route::get('/tutors/{tutor}', [LegacyCompanyController::class, 'showTutor']);          // ESLATE-13
     Route::patch('/tutors/{tutor}', [LegacyCompanyController::class, 'updateTutor']);       // ESLATE-13
