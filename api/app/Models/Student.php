@@ -21,6 +21,8 @@ class Student extends Model
         'first_name', 'last_name', 'date_of_birth',
         'year_group_code', 'school',
         'learning_goals', 'special_needs_notes', 'status',
+        // ESLATE-5/7/10
+        'notes', 'address', 'phone', 'email', 'updated_by',
     ];
 
     protected function casts(): array
@@ -39,6 +41,12 @@ class Student extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    /** ESLATE-7: the admin who last edited this student record. */
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function tutors(): BelongsToMany

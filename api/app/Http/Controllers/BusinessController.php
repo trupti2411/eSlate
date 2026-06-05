@@ -199,11 +199,18 @@ class BusinessController extends Controller
         $this->assertCanManage($request->user(), $business);
 
         $data = $request->validate([
-            'first_name'                  => ['required', 'string', 'max:60'],
-            'last_name'                   => ['required', 'string', 'max:60'],
+            'first_name'                  => ['required', 'string', 'max:100'],
+            'last_name'                   => ['required', 'string', 'max:100'],
             'year_group_code'             => ['required', 'string', 'max:10'],
             'date_of_birth'               => ['nullable', 'date'],
+            // ESLATE-5: address is required on the Add Student form.
+            'address'                     => ['required', 'string', 'max:255'],
             'school'                      => ['nullable', 'string', 'max:120'],
+            // ESLATE-7: optional student contact details.
+            'phone'                       => ['nullable', 'string', 'max:40', 'regex:/^(\+?61|0)[\s-]?\d(?:[\s-]?\d){8}$/'],
+            'email'                       => ['nullable', 'email', 'max:255'],
+            // ESLATE-10: general notes, distinct from learning_goals.
+            'notes'                       => ['nullable', 'string', 'max:1000'],
             'learning_goals'              => ['nullable', 'string'],
             'parents'                     => ['nullable', 'array'],
             'parents.*.name'              => ['required_with:parents.*', 'string', 'max:120'],
@@ -211,6 +218,10 @@ class BusinessController extends Controller
             'parents.*.email'             => ['nullable', 'email', 'max:255'],
             'parents.*.phone'             => ['nullable', 'string', 'max:40'],
             'parents.*.is_primary'        => ['nullable', 'boolean'],
+        ], [
+            'address.required' => 'Address is required.',
+            'phone.regex'      => 'Enter a valid Australian phone number (e.g. 04XX XXX XXX or +61 4XX XXX XXX).',
+            'notes.max'        => 'Notes cannot exceed 1000 characters.',
         ]);
 
         // Validate year group exists for this business's state
@@ -232,7 +243,11 @@ class BusinessController extends Controller
                 'last_name'       => $data['last_name'],
                 'year_group_code' => $data['year_group_code'],
                 'date_of_birth'   => $data['date_of_birth'] ?? null,
+                'address'         => $data['address'],
                 'school'          => $data['school'] ?? null,
+                'phone'           => $data['phone'] ?? null,
+                'email'           => $data['email'] ?? null,
+                'notes'           => $data['notes'] ?? null,
                 'learning_goals'  => $data['learning_goals'] ?? null,
                 'status'          => Student::STATUS_ACTIVE,
             ]);

@@ -11,6 +11,7 @@ use App\Models\Student;
 use App\Models\Submission;
 use App\Models\Tutor;
 use App\Models\User;
+use App\Models\YearGroup;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -606,21 +607,94 @@ class LegacyCompanyController extends Controller
         ]);
     }
 
+    /**
+     * PATCH /api/students/{student}
+     *
+     * Dual-purpose endpoint:
+     *  - Legacy: { tutorId } assigns a primary tutor (unchanged behaviour).
+     *  - ESLATE-7: full profile edit. All profile fields use `sometimes` so a
+     *    partial PATCH (e.g. the legacy tutor-only call) keeps working. RBAC is
+     *    enforced via assertCanAccessBusiness — admins cannot edit students of
+     *    other companies. updated_by records who made the change.
+     */
     public function updateStudent(Request $request, Student $student): JsonResponse
     {
         $this->assertCanAccessBusiness($request->user(), $student->business_id);
 
         $data = $request->validate([
-            'tutorId' => ['nullable', 'integer', 'exists:tutors,id'],
+            'tutorId'                => ['nullable', 'integer', 'exists:tutors,id'],
+            'first_name'             => ['sometimes', 'required', 'string', 'max:100'],
+            'last_name'              => ['sometimes', 'required', 'string', 'max:100'],
+            'year_group_code'        => ['sometimes', 'required', 'string', 'max:10'],
+            'date_of_birth'          => ['sometimes', 'nullable', 'date'],
+            'address'                => ['sometimes', 'required', 'string', 'max:255'],
+            'school'                 => ['sometimes', 'nullable', 'string', 'max:120'],
+            'phone'                  => ['sometimes', 'nullable', 'string', 'max:40', 'regex:/^(\+?61|0)[\s-]?\d(?:[\s-]?\d){8}$/'],
+            'email'                  => ['sometimes', 'nullable', 'email', 'max:255'],
+            'notes'                  => ['sometimes', 'nullable', 'string', 'max:1000'],
+            'learning_goals'         => ['sometimes', 'nullable', 'string'],
+            'parents'                => ['sometimes', 'nullable', 'array'],
+            'parents.*.name'         => ['required_with:parents.*', 'string', 'max:120'],
+            'parents.*.relationship' => ['nullable', 'string', 'max:40'],
+            'parents.*.email'        => ['nullable', 'email', 'max:255'],
+            'parents.*.phone'        => ['nullable', 'string', 'max:40'],
+            'parents.*.is_primary'   => ['nullable', 'boolean'],
+        ], [
+            'address.required' => 'Address is required.',
+            'phone.regex'      => 'Enter a valid Australian phone number (e.g. 04XX XXX XXX or +61 4XX XXX XXX).',
+            'notes.max'        => 'Notes cannot exceed 1000 characters.',
         ]);
 
+        // Legacy tutor assignment.
         if (array_key_exists('tutorId', $data) && $data['tutorId']) {
             $student->tutors()->syncWithoutDetaching([
                 $data['tutorId'] => ['is_primary' => true],
             ]);
         }
 
-        return response()->json($student->fresh()->load('user'));
+        // Validate year group against the student's state when it's being changed.
+        if (array_key_exists('year_group_code', $data)) {
+            $yg = YearGroup::where('state_code', $student->business->state_code)
+                ->where('code', $data['year_group_code'])
+                ->first();
+            if (! $yg) {
+                return response()->json([
+                    'message' => 'Year group not valid for this state.',
+                    'errors'  => ['year_group_code' => ['Not a valid year group.']],
+                ], 422);
+            }
+        }
+
+        $fields = ['first_name', 'last_name', 'year_group_code', 'date_of_birth',
+            'address', 'school', 'phone', 'email', 'notes', 'learning_goals'];
+        $update = [];
+        foreach ($fields as $f) {
+            if (array_key_exists($f, $data)) {
+                $update[$f] = $data[$f];
+            }
+        }
+        if ($update) {
+            $update['updated_by'] = $request->user()->id;
+            $student->update($update);
+        }
+
+        // Full replace of parents when the array is supplied.
+        if (array_key_exists('parents', $data)) {
+            $parents = $data['parents'] ?? [];
+            $student->parents()->delete();
+            $anyPrimary = collect($parents)->contains(fn ($p) => ! empty($p['is_primary']));
+            foreach ($parents as $i => $p) {
+                $student->parents()->create([
+                    'name'         => $p['name'],
+                    'relationship' => $p['relationship'] ?? null,
+                    'email'        => $p['email'] ?? null,
+                    'phone'        => $p['phone'] ?? null,
+                    'is_primary'   => $anyPrimary ? (bool) ($p['is_primary'] ?? false) : ($i === 0),
+                ]);
+            }
+        }
+
+        return response()->json($student->fresh()->load(['user', 'parents', 'updatedBy']));
     }
 
     private function lastNameOf(string $name): string

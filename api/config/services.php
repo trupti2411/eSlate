@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    // ESLATE-5: Australian schools typeahead source. Defaults to the
+    // data.gov.au CKAN datastore API; set SCHOOLS_API_RESOURCE_ID to the
+    // ACARA "Australian Schools List" resource to enable live lookups.
+    // When the resource id is absent the schools field falls back to free text.
+    'schools' => [
+        'url'         => env('SCHOOLS_API_URL', 'https://data.gov.au/data/api/3/action/datastore_search'),
+        'resource_id' => env('SCHOOLS_API_RESOURCE_ID'),
+    ],
+
 ];

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
   GraduationCap, Bell, LogOut, ArrowLeft, Plus, X, Save, Search, School,
-  User, Mail, Phone, Star, Trash2,
+  User, Mail, Phone, Star, Trash2, Pencil, AlertTriangle, Loader2,
 } from 'lucide-react';
 
 interface AdminProfile { userId: string; companyId: string; companyName: string; }
@@ -27,8 +27,15 @@ interface Student {
   year_group_code?: string | null;
   date_of_birth?: string | null;
   school?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  notes?: string | null;
+  learning_goals?: string | null;
   status?: 'active' | 'inactive' | 'archived' | string;
   parents?: ParentRow[];
+  updated_at?: string | null;
+  updatedBy?: { firstName?: string; lastName?: string; name?: string } | null;
   // Legacy compat — companyStudents may include a `user` relation
   user?: { firstName?: string; lastName?: string; email?: string };
 }
@@ -59,6 +66,7 @@ export default function StudentsPage() {
   const { user, logoutMutation } = useAuth();
   const [search, setSearch] = useState('');
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Student | null>(null);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -156,15 +164,25 @@ export default function StudentsPage() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {filtered.map(s => <StudentRow key={s.id} s={s} />)}
+            {filtered.map(s => <StudentRow key={s.id} s={s} onEdit={() => setEditing(s)} />)}
           </ul>
         )}
       </main>
 
       {addOpen && companyId && (
-        <AddStudentModal
+        <StudentFormModal
+          mode="add"
           businessId={companyId}
           onClose={() => setAddOpen(false)}
+        />
+      )}
+
+      {editing && companyId && (
+        <StudentFormModal
+          mode="edit"
+          businessId={companyId}
+          student={editing}
+          onClose={() => setEditing(null)}
         />
       )}
     </div>
@@ -189,7 +207,7 @@ function KpiTile({ value, label, tone }: { value: number; label: string; tone: k
   );
 }
 
-function StudentRow({ s }: { s: Student }) {
+function StudentRow({ s, onEdit }: { s: Student; onEdit: () => void }) {
   const name = fullName(s);
   const initials = name.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'S';
   const isArchived = s.status === 'archived';
@@ -235,6 +253,13 @@ function StudentRow({ s }: { s: Student }) {
           Archived
         </span>
       )}
+      <button
+        onClick={onEdit}
+        className="flex-shrink-0 inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-white hover:bg-indigo-600 border border-indigo-200 px-3 py-1.5 rounded-xl transition-colors"
+        aria-label={`Edit ${name}`}
+      >
+        <Pencil size={12} /> Edit
+      </button>
     </li>
   );
 }
@@ -262,32 +287,89 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
 type ParentDraft = { name: string; relationship: string; email: string; phone: string; is_primary: boolean };
 const emptyParent = (isPrimary = false): ParentDraft => ({ name: '', relationship: '', email: '', phone: '', is_primary: isPrimary });
 
-function AddStudentModal({ businessId, onClose }: { businessId: string; onClose: () => void }) {
+// AU phone: +61 / 0 prefix then 9 digits, spaces/dashes allowed. Mirrors the backend rule.
+const AU_PHONE = /^(\+?61|0)[\s-]?\d(?:[\s-]?\d){8}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const NOTES_MAX = 1000;
+
+function ageFromDob(iso: string): number | null {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return null;
+  const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
+  if (isNaN(d.getTime())) return null;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const md = now.getMonth() - d.getMonth();
+  if (md < 0 || (md === 0 && now.getDate() < d.getDate())) age--;
+  return age;
+}
+
+function dobDisplay(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : '';
+}
+
+/**
+ * Shared Add / Edit student form.
+ *   ESLATE-5  add a student (validated form, address, DOB, school typeahead)
+ *   ESLATE-7  edit a student (pre-filled, PATCH, audit, cancel-confirm)
+ *   ESLATE-10 general Notes field (above Learning Goals, 1000-char cap)
+ * One component, two modes — DRY per ESLATE-7's technical notes.
+ */
+function StudentFormModal({
+  mode, businessId, student, onClose,
+}: {
+  mode: 'add' | 'edit';
+  businessId: string;
+  student?: Student;
+  onClose: () => void;
+}) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [yearGroupCode, setYearGroupCode] = useState('');
-  const [school, setSchool] = useState('');
-  const [dob, setDob] = useState('');
-  const [learningGoals, setLearningGoals] = useState('');
-  const [parents, setParents] = useState<ParentDraft[]>([emptyParent(true)]);
+  const isEdit = mode === 'edit';
+
+  const [firstName, setFirstName] = useState(student?.first_name ?? '');
+  const [lastName, setLastName] = useState(student?.last_name ?? '');
+  const [yearGroupCode, setYearGroupCode] = useState(student?.year_group_code ?? '');
+  const [school, setSchool] = useState(student?.school ?? '');
+  const [dob, setDob] = useState((student?.date_of_birth ?? '').slice(0, 10));
+  const [address, setAddress] = useState(student?.address ?? '');
+  const [phone, setPhone] = useState(student?.phone ?? '');
+  const [email, setEmail] = useState(student?.email ?? '');
+  const [notes, setNotes] = useState(student?.notes ?? '');
+  const [learningGoals, setLearningGoals] = useState(student?.learning_goals ?? '');
+  const [parents, setParents] = useState<ParentDraft[]>(
+    student?.parents?.length
+      ? student.parents.map(p => ({
+          name: p.name ?? '',
+          relationship: p.relationship ?? '',
+          email: p.email ?? '',
+          phone: p.phone ?? '',
+          is_primary: !!p.is_primary,
+        }))
+      : [emptyParent(true)],
+  );
+  const [submitted, setSubmitted] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const touch = () => setDirty(true);
 
   const { data: yearGroups = [] } = useQuery<YearGroup[]>({
     queryKey: ['/api/year-groups?state=NSW'],
   });
 
   const updateParent = (idx: number, patch: Partial<ParentDraft>) => {
+    touch();
     setParents(prev => prev.map((p, i) => (i === idx ? { ...p, ...patch } : p)));
   };
   const setPrimary = (idx: number) => {
+    touch();
     setParents(prev => prev.map((p, i) => ({ ...p, is_primary: i === idx })));
   };
   const removeParent = (idx: number) => {
+    touch();
     setParents(prev => {
       if (prev.length === 1) return prev;
       const next = prev.filter((_, i) => i !== idx);
-      // If we removed the primary, the first remaining becomes primary
       if (!next.some(p => p.is_primary)) next[0] = { ...next[0], is_primary: true };
       return next;
     });
@@ -301,95 +383,192 @@ function AddStudentModal({ businessId, onClose }: { businessId: string; onClose:
       phone: p.phone.trim() || null,
       is_primary: p.is_primary,
     })),
-    [parents]
+    [parents],
   );
+
+  // ----- validation -----
+  const errors: Record<string, string> = {};
+  if (!firstName.trim()) errors.firstName = 'First name is required';
+  else if (firstName.trim().length > 100) errors.firstName = 'Max 100 characters';
+  if (!lastName.trim()) errors.lastName = 'Last name is required';
+  else if (lastName.trim().length > 100) errors.lastName = 'Max 100 characters';
+  if (!yearGroupCode) errors.yearGroup = 'Year group is required';
+  if (!address.trim()) errors.address = 'Address is required';
+  if (phone.trim() && !AU_PHONE.test(phone.trim())) errors.phone = 'Enter a valid Australian phone number';
+  if (email.trim() && !EMAIL_RE.test(email.trim())) errors.email = 'Enter a valid email address';
+  if (notes.length > NOTES_MAX) errors.notes = `Notes cannot exceed ${NOTES_MAX} characters`;
+  const isValid = Object.keys(errors).length === 0;
+
+  const age = dob ? ageFromDob(dob) : null;
+  const showAgeWarning = age !== null && age < 5;
+
+  const buildPayload = () => ({
+    first_name: firstName.trim(),
+    last_name: lastName.trim(),
+    year_group_code: yearGroupCode,
+    date_of_birth: dob || null,
+    address: address.trim(),
+    school: school.trim() || null,
+    phone: phone.trim() || null,
+    email: email.trim() || null,
+    notes: notes.trim() || null,
+    learning_goals: learningGoals.trim() || null,
+    parents: cleanedParents,
+  });
 
   const m = useMutation({
     mutationFn: () =>
-      apiRequest(`/api/businesses/${businessId}/students`, 'POST', {
-        first_name: firstName,
-        last_name: lastName,
-        year_group_code: yearGroupCode,
-        school: school || null,
-        date_of_birth: dob || null,
-        learning_goals: learningGoals || null,
-        parents: cleanedParents,
-      }),
+      isEdit
+        ? apiRequest(`/api/students/${student!.id}`, 'PATCH', buildPayload())
+        : apiRequest(`/api/businesses/${businessId}/students`, 'POST', buildPayload()),
     onSuccess: () => {
-      toast({ title: 'Student added' });
+      toast({ title: isEdit ? 'Student record updated successfully' : 'Student added' });
       qc.invalidateQueries({ queryKey: [`/api/companies/${businessId}/students`] });
       onClose();
     },
     onError: (e: any) => {
-      toast({ title: 'Could not add student', description: e.message ?? 'Try again.', variant: 'destructive' });
+      toast({
+        title: isEdit ? 'Could not update student' : 'Could not add student',
+        description: e.message ?? 'Try again.',
+        variant: 'destructive',
+      });
     },
   });
 
-  const valid = firstName.trim() && lastName.trim() && yearGroupCode;
+  const handleSubmit = () => {
+    setSubmitted(true);
+    if (!isValid) return;
+    m.mutate();
+  };
+
+  const handleCancel = () => {
+    if (dirty && !window.confirm('You have unsaved changes. Are you sure you want to discard them?')) return;
+    onClose();
+  };
+
+  const err = (k: string) =>
+    submitted && errors[k] ? <p className="text-xs text-red-600 mt-1">{errors[k]}</p> : null;
+  const inputCls = (k?: string) =>
+    `w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${k && submitted && errors[k] ? 'border-red-300' : 'border-gray-200'}`;
+  const req = <span className="text-red-500">*</span>;
+
+  const updatedByName = student?.updatedBy
+    ? (student.updatedBy.name
+        ?? `${student.updatedBy.firstName ?? ''} ${student.updatedBy.lastName ?? ''}`.trim())
+    : '';
+
+  // DOB bounds: allow ~100 years back, no future dates.
+  const today = new Date();
+  const maxDob = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  const minDob = `${today.getFullYear() - 100}-01-01`;
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h3 className="text-base font-black flex items-center gap-2">
-            <Plus size={16} className="text-indigo-600" /> Add a student
+            {isEdit ? <Pencil size={16} className="text-indigo-600" /> : <Plus size={16} className="text-indigo-600" />}
+            {isEdit ? 'Edit student' : 'Add a student'}
           </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+          <button onClick={handleCancel} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="p-5 space-y-6 overflow-y-auto">
           <Section title="About">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="First name">
+              <Field label={<>First name {req}</>}>
                 <input
                   value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  onChange={(e) => { touch(); setFirstName(e.target.value); }}
                   placeholder="First"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className={inputCls('firstName')}
                   autoFocus
                 />
+                {err('firstName')}
               </Field>
-              <Field label="Last name">
+              <Field label={<>Last name {req}</>}>
                 <input
                   value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  onChange={(e) => { touch(); setLastName(e.target.value); }}
                   placeholder="Last"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className={inputCls('lastName')}
                 />
+                {err('lastName')}
               </Field>
             </div>
-            <Field label="Date of birth (optional)">
+            <Field label="Date of birth">
               <input
                 type="date"
                 value={dob}
-                onChange={(e) => setDob(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                min={minDob}
+                max={maxDob}
+                onChange={(e) => { touch(); setDob(e.target.value); }}
+                className={inputCls()}
               />
+              {dob && <p className="text-xs text-gray-500 mt-1">Selected: {dobDisplay(dob)}</p>}
+              {showAgeWarning && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle size={12} /> This student appears to be under 5 years old. You can still continue.
+                </p>
+              )}
             </Field>
           </Section>
 
           <Section title="Schooling">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Year group">
+              <Field label={<>Year group {req}</>}>
                 <select
                   value={yearGroupCode}
-                  onChange={(e) => setYearGroupCode(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  onChange={(e) => { touch(); setYearGroupCode(e.target.value); }}
+                  className={inputCls('yearGroup')}
                 >
                   <option value="">Select year</option>
                   {yearGroups.map(y => (
                     <option key={y.id} value={y.code}>{y.label}</option>
                   ))}
                 </select>
+                {err('yearGroup')}
               </Field>
-              <Field label="School (optional)">
+              <Field label="School">
+                <SchoolAutocomplete value={school} onChange={(v) => { touch(); setSchool(v); }} />
+              </Field>
+            </div>
+          </Section>
+
+          <Section title="Address">
+            <Field label={<>Address {req}</>}>
+              <textarea
+                value={address}
+                onChange={(e) => { touch(); setAddress(e.target.value); }}
+                rows={2}
+                placeholder="Street, suburb, state, postcode"
+                className={inputCls('address')}
+              />
+              {err('address')}
+            </Field>
+          </Section>
+
+          <Section title="Student contact (optional)">
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Phone">
                 <input
-                  value={school}
-                  onChange={(e) => setSchool(e.target.value)}
-                  placeholder="e.g. Bondi Public"
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  value={phone}
+                  onChange={(e) => { touch(); setPhone(e.target.value); }}
+                  placeholder="04XX XXX XXX"
+                  className={inputCls('phone')}
                 />
+                {err('phone')}
+              </Field>
+              <Field label="Email">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { touch(); setEmail(e.target.value); }}
+                  placeholder="student@example.com"
+                  className={inputCls('email')}
+                />
+                {err('email')}
               </Field>
             </div>
           </Section>
@@ -399,7 +578,7 @@ function AddStudentModal({ businessId, onClose }: { businessId: string; onClose:
             action={
               <button
                 type="button"
-                onClick={() => setParents(prev => [...prev, emptyParent(false)])}
+                onClick={() => { touch(); setParents(prev => [...prev, emptyParent(false)]); }}
                 className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
               >
                 <Plus size={12} /> Add another
@@ -425,30 +604,126 @@ function AddStudentModal({ businessId, onClose }: { businessId: string; onClose:
           </Section>
 
           <Section title="Notes">
+            <Field label="Notes">
+              <textarea
+                value={notes}
+                onChange={(e) => { touch(); setNotes(e.target.value); }}
+                rows={4}
+                maxLength={NOTES_MAX + 200}
+                placeholder="Add any general notes about this student..."
+                className={inputCls('notes')}
+              />
+              <div className="flex items-center justify-between mt-1">
+                {err('notes') ?? <span />}
+                <span className={`text-xs ${notes.length > NOTES_MAX ? 'text-red-600' : 'text-gray-400'}`}>
+                  {notes.length} / {NOTES_MAX}
+                </span>
+              </div>
+            </Field>
             <Field label="Learning goals (optional)">
               <textarea
                 value={learningGoals}
-                onChange={(e) => setLearningGoals(e.target.value)}
+                onChange={(e) => { touch(); setLearningGoals(e.target.value); }}
                 rows={3}
                 placeholder="What is this student working towards?"
-                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                className={inputCls()}
               />
             </Field>
           </Section>
+
+          {isEdit && updatedByName && student?.updated_at && (
+            <p className="text-xs text-gray-400">
+              Last updated by {updatedByName} on {dobDisplay(student.updated_at)}
+            </p>
+          )}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
-          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+          <button onClick={handleCancel} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
             Cancel
           </button>
           <button
-            onClick={() => m.mutate()}
-            disabled={!valid || m.isPending}
+            onClick={handleSubmit}
+            disabled={(submitted && !isValid) || m.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
           >
-            <Save size={14} /> {m.isPending ? 'Adding…' : 'Add student'}
+            {m.isPending ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {m.isPending ? (isEdit ? 'Saving…' : 'Adding…') : (isEdit ? 'Save changes' : 'Add student')}
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * ESLATE-5: Australian schools typeahead. Debounced (300ms), min 2 chars.
+ * Always permits free-text entry; if the backend reports the lookup is
+ * unavailable (or the request errors) it silently degrades to a text input.
+ */
+function SchoolAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [results, setResults] = useState<{ name: string; suburb?: string | null; state?: string | null }[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+
+  useEffect(() => {
+    const q = value.trim();
+    if (q.length < 2) { setResults([]); setOpen(false); setUnavailable(false); return; }
+    let cancelled = false;
+    setLoading(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await apiRequest(`/api/schools/search?q=${encodeURIComponent(q)}`, 'GET');
+        if (cancelled) return;
+        if (res?.available === false) {
+          setUnavailable(true); setResults([]); setOpen(false);
+        } else {
+          const list = res?.schools ?? [];
+          setUnavailable(false); setResults(list); setOpen(list.length > 0);
+        }
+      } catch {
+        if (!cancelled) { setUnavailable(true); setResults([]); setOpen(false); }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [value]);
+
+  return (
+    <div className="relative">
+      <div className="relative">
+        <input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onFocus={() => results.length > 0 && setOpen(true)}
+          placeholder="Start typing a school name…"
+          className="w-full rounded-xl border border-gray-200 px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+        />
+        {loading && <Loader2 size={14} className="animate-spin absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />}
+      </div>
+      {open && results.length > 0 && (
+        <ul className="absolute z-20 mt-1 w-full max-h-56 overflow-y-auto bg-white rounded-xl border border-gray-200 shadow-lg">
+          {results.map((r, i) => (
+            <li key={i}>
+              <button
+                type="button"
+                onClick={() => { onChange(r.name); setOpen(false); }}
+                className="w-full text-left px-3 py-2 text-sm hover:bg-indigo-50 flex items-center gap-2"
+              >
+                <School size={12} className="text-indigo-500 flex-shrink-0" />
+                <span className="truncate">
+                  {r.name}
+                  {r.suburb ? <span className="text-gray-400"> — {r.suburb}{r.state ? `, ${r.state}` : ''}</span> : null}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {unavailable && value.trim().length >= 2 && (
+        <p className="text-xs text-gray-400 mt-1">School lookup unavailable — just type the school name.</p>
+      )}
     </div>
   );
 }
@@ -545,7 +820,7 @@ function Section({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, children }: { label: React.ReactNode; children: React.ReactNode }) {
   return (
     <div>
       <label className="text-xs font-bold uppercase tracking-wider text-gray-500">{label}</label>

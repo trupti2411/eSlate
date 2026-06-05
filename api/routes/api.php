@@ -12,6 +12,7 @@ use App\Http\Controllers\CourseOfferingController;
 use App\Http\Controllers\CourseTemplateController;
 use App\Http\Controllers\LegacyCompanyController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\SchoolController;
 use App\Http\Controllers\StatePackController;
 use App\Http\Controllers\SubjectController;
 use App\Http\Controllers\SubmissionController;
@@ -61,6 +62,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reference data
     Route::get('/subjects', [SubjectController::class, 'index']);
     Route::get('/year-groups', [YearGroupController::class, 'index']);
+    Route::get('/schools/search', [SchoolController::class, 'search']);   // ESLATE-5 schools typeahead
 
     // Academic structure
     Route::apiResource('academic-years', AcademicYearController::class);
