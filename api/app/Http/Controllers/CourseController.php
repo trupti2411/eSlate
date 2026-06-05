@@ -47,8 +47,9 @@ class CourseController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'         => ['required', 'string', 'min:2', 'max:120'],
-            'description'  => ['nullable', 'string'],
+            // ESLATE-8: name ≤150, description ≤500.
+            'name'         => ['required', 'string', 'min:2', 'max:150'],
+            'description'  => ['nullable', 'string', 'max:500'],
             'subject_ids'  => ['nullable', 'array'],
             'subject_ids.*'=> ['integer', 'exists:subjects,id'],
         ]);
@@ -89,8 +90,8 @@ class CourseController extends Controller
     {
         $this->authorizeCourse($request->user(), $course);
         $data = $request->validate([
-            'name'         => ['sometimes', 'string', 'min:2', 'max:120'],
-            'description'  => ['nullable', 'string'],
+            'name'         => ['sometimes', 'string', 'min:2', 'max:150'],
+            'description'  => ['nullable', 'string', 'max:500'],
             'subject_ids'  => ['sometimes', 'array'],
             'subject_ids.*'=> ['integer', 'exists:subjects,id'],
         ]);

@@ -1,14 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { DesignNavToggle } from '@/components/DesignSwitchBanner';
 import type { Design } from '@/hooks/useDesignPreference';
+import CreateCourseModal from '@/components/CreateCourseModal';
 import {
   Building2, Users, GraduationCap, BookOpen, ShieldCheck, ShieldAlert,
   CalendarDays, FileBarChart, Bell, LogOut, ArrowRight, UserPlus,
   ClipboardPlus, Plus, AlertTriangle, ChevronRight, Activity, Mail,
-  UserCheck, FileEdit, CircleSlash, Settings as SettingsIcon, Trophy,
+  UserCheck, FileEdit, CircleSlash, Settings as SettingsIcon, Trophy, Library,
 } from 'lucide-react';
 
 interface Props { setDesign: (d: Design) => void; }
@@ -459,38 +460,56 @@ function KpiCard({
 function QuickActionsCard({
   hasStudents, hasClasses, hasTutors,
 }: { hasStudents: boolean; hasClasses: boolean; hasTutors: boolean }) {
-  const actions = [
-    { href: '/company/tutors', label: 'Invite tutor', icon: <UserPlus size={16} />, tone: 'indigo' as const, primary: !hasTutors },
-    { href: '/company/students', label: 'Add student', icon: <Plus size={16} />, tone: 'emerald' as const, primary: hasTutors && !hasStudents },
-    { href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
-    { href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'rose' as const, primary: false },
+  // ESLATE-9: "Create course" is a standalone action — it opens the course
+  // modal in place (not a navigation), placed between Add student and Create
+  // class to reflect the build-course → create-class flow.
+  const [courseModalOpen, setCourseModalOpen] = useState(false);
+
+  type Action =
+    | { kind: 'link'; href: string; label: string; icon: JSX.Element; tone: Tone; primary: boolean }
+    | { kind: 'button'; onClick: () => void; label: string; icon: JSX.Element; tone: Tone; primary: boolean };
+  type Tone = 'indigo' | 'emerald' | 'amber' | 'rose' | 'sky';
+
+  const actions: Action[] = [
+    { kind: 'link', href: '/company/tutors', label: 'Invite tutor', icon: <UserPlus size={16} />, tone: 'indigo', primary: !hasTutors },
+    { kind: 'link', href: '/company/students', label: 'Add student', icon: <Plus size={16} />, tone: 'emerald', primary: hasTutors && !hasStudents },
+    { kind: 'button', onClick: () => setCourseModalOpen(true), label: 'Create course', icon: <Library size={16} />, tone: 'sky', primary: false },
+    { kind: 'link', href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber', primary: hasStudents && !hasClasses },
+    { kind: 'link', href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'rose', primary: false },
   ];
-  const toneClass = (k: 'indigo' | 'emerald' | 'amber' | 'rose', primary: boolean) => {
-    const map: Record<string, { primary: string; ghost: string }> = {
+  const toneClass = (k: Tone, primary: boolean) => {
+    const map: Record<Tone, { primary: string; ghost: string }> = {
       indigo: { primary: 'bg-indigo-600 hover:bg-indigo-700 text-white', ghost: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' },
       emerald: { primary: 'bg-emerald-600 hover:bg-emerald-700 text-white', ghost: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700' },
       amber: { primary: 'bg-amber-600 hover:bg-amber-700 text-white', ghost: 'bg-amber-50 hover:bg-amber-100 text-amber-700' },
       rose: { primary: 'bg-rose-600 hover:bg-rose-700 text-white', ghost: 'bg-rose-50 hover:bg-rose-100 text-rose-700' },
+      sky: { primary: 'bg-sky-600 hover:bg-sky-700 text-white', ghost: 'bg-sky-50 hover:bg-sky-100 text-sky-700' },
     };
     return primary ? map[k].primary : map[k].ghost;
   };
+  const cls = (a: Action) =>
+    `${toneClass(a.tone, a.primary)} rounded-xl px-3 py-3 text-sm font-bold flex items-center gap-2 justify-center transition-colors`;
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">Quick actions</h3>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {actions.map(a => (
-          <Link
-            key={a.label}
-            href={a.href}
-            className={`${toneClass(a.tone, a.primary)} rounded-xl px-3 py-3 text-sm font-bold flex items-center gap-2 justify-center transition-colors`}
-          >
-            {a.icon}
-            <span className="truncate">{a.label}</span>
-          </Link>
+          a.kind === 'link' ? (
+            <Link key={a.label} href={a.href} className={cls(a)}>
+              {a.icon}
+              <span className="truncate">{a.label}</span>
+            </Link>
+          ) : (
+            <button key={a.label} type="button" onClick={a.onClick} className={cls(a)}>
+              {a.icon}
+              <span className="truncate">{a.label}</span>
+            </button>
+          )
         ))}
       </div>
+      {courseModalOpen && <CreateCourseModal onClose={() => setCourseModalOpen(false)} />}
     </section>
   );
 }

@@ -4,6 +4,7 @@ import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
+import CreateCourseModal from '@/components/CreateCourseModal';
 import {
   Trophy, Bell, LogOut, ArrowLeft, Plus, X, Save, Search, User,
   Target, Calendar, GraduationCap, ChevronRight, Filter,
@@ -253,79 +254,6 @@ export default function CoursesPage() {
       {createCourseOpen && (
         <CreateCourseModal onClose={() => setCreateCourseOpen(false)} />
       )}
-    </div>
-  );
-}
-
-function CreateCourseModal({ onClose }: { onClose: () => void }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-
-  const m = useMutation({
-    mutationFn: () =>
-      apiRequest('/api/courses', 'POST', {
-        name: name.trim(),
-        description: description.trim() || null,
-      }),
-    onSuccess: () => {
-      toast({ title: 'Course created' });
-      qc.invalidateQueries({ queryKey: ['/api/courses'] });
-      onClose();
-    },
-    onError: (e: any) =>
-      toast({ title: 'Could not create course', description: e.message ?? 'Try again.', variant: 'destructive' }),
-  });
-
-  const valid = name.trim().length >= 2;
-
-  return (
-    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="text-base font-black flex items-center gap-2">
-            <Plus size={16} className="text-indigo-600" /> New course
-          </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-5 space-y-4">
-          <Field label="Name" required>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Foundation, OC Test Preparation"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              autoFocus
-            />
-          </Field>
-          <Field label="Description (optional)" hint="What this course covers — students and parents will see this.">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-          </Field>
-          <p className="text-xs text-gray-500">
-            Add offerings under this course next — each offering is a specific year/subject combo (e.g. Foundation Y4 Maths).
-          </p>
-        </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
-            Cancel
-          </button>
-          <button
-            onClick={() => m.mutate()}
-            disabled={!valid || m.isPending}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
-          >
-            <Save size={14} /> {m.isPending ? 'Creating…' : 'Create course'}
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
