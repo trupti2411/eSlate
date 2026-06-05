@@ -37,6 +37,8 @@ class BusinessController extends Controller
             ->whereNotNull('subject_id')
             ->pluck('subject_id');
 
+        $business->loadMissing('updatedBy:id,name');
+
         return response()->json([
             'id'                 => $business->id,
             'type'               => $business->type,
@@ -50,6 +52,13 @@ class BusinessController extends Controller
             'tier'               => $business->tier,
             'pack_version'       => $business->pack_version,
             'active_subject_ids' => $activeSubjectIds,
+            // ESLATE-12: company-profile contact details + audit.
+            'address'            => $business->address,
+            'contact_email'      => $business->contact_email,
+            'contact_phone'      => $business->contact_phone,
+            'description'        => $business->description,
+            'updated_at'         => $business->updated_at?->toIso8601String(),
+            'updated_by_name'    => $business->updatedBy?->name,
         ]);
     }
 
@@ -60,15 +69,33 @@ class BusinessController extends Controller
         $this->assertCanManage($request->user(), $business);
 
         $data = $request->validate([
-            'name'       => ['sometimes', 'string', 'min:2', 'max:255'],
-            'legal_name' => ['nullable', 'string', 'max:255'],
-            'logo'       => ['nullable', 'string', 'max:500'],
-            'abn'        => ['nullable', 'string', 'max:20'],
-            'timezone'   => ['sometimes', 'string', 'max:50'],
-            'currency'   => ['sometimes', 'string', 'size:3'],
+            'name'          => ['sometimes', 'string', 'min:2', 'max:150'],
+            'legal_name'    => ['nullable', 'string', 'max:255'],
+            'logo'          => ['nullable', 'string', 'max:500'],
+            'abn'           => ['nullable', 'string', 'max:20'],
+            'timezone'      => ['sometimes', 'string', 'max:50'],
+            'currency'      => ['sometimes', 'string', 'size:3'],
+            // ESLATE-12: company-profile contact details.
+            'address'       => ['sometimes', 'nullable', 'string', 'max:255'],
+            'contact_email' => ['sometimes', 'nullable', 'email', 'max:255'],
+            'contact_phone' => ['sometimes', 'nullable', 'string', 'max:40', 'regex:/^(\+?61|0)[\s-]?\d(?:[\s-]?\d){7,9}$/'],
+            'description'   => ['sometimes', 'nullable', 'string', 'max:2000'],
+        ], [
+            'contact_phone.regex' => 'Enter a valid Australian phone number.',
         ]);
 
-        // ABN required for multi_tutor (v3 §3.2)
+        // ESLATE-12: validate the ABN checksum when an ABN is supplied. ABN is
+        // also required for multi_tutor businesses (v3 §3.2).
+        if (array_key_exists('abn', $data) && ! empty($data['abn'])) {
+            $digits = preg_replace('/\s+/', '', $data['abn']);
+            if (! $this->isValidAbn($digits)) {
+                return response()->json([
+                    'message' => 'Please enter a valid ABN.',
+                    'errors'  => ['abn' => ['Please enter a valid 11-digit ABN.']],
+                ], 422);
+            }
+            $data['abn'] = $digits;
+        }
         if ($business->isMultiTutor() && array_key_exists('abn', $data) && empty($data['abn'])) {
             return response()->json([
                 'message' => 'ABN is required for multi-tutor businesses.',
@@ -76,9 +103,38 @@ class BusinessController extends Controller
             ], 422);
         }
 
+        $data['updated_by'] = $request->user()->id;
         $business->update($data);
 
-        return response()->json($business->fresh());
+        $this->audit->log(
+            event: 'company_profile_updated',
+            businessId: $business->id,
+            actor: $request->user(),
+            entityType: 'business',
+            entityId: $business->id,
+            payload: ['fields' => array_keys($data)],
+        );
+
+        return response()->json($business->fresh()->load('updatedBy:id,name'));
+    }
+
+    /**
+     * Official ABN checksum (ATO): subtract 1 from the first digit, apply the
+     * weighting [10,1,3,5,7,9,11,13,15,17,19], and the weighted sum must be
+     * divisible by 89.
+     */
+    private function isValidAbn(string $abn): bool
+    {
+        if (! preg_match('/^\d{11}$/', $abn)) {
+            return false;
+        }
+        $weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+        $sum = 0;
+        foreach (str_split($abn) as $i => $d) {
+            $sum += ((int) $d - ($i === 0 ? 1 : 0)) * $weights[$i];
+        }
+
+        return $sum % 89 === 0;
     }
 
     /** PATCH /api/businesses/{id}/subjects — toggle active master subjects (v3 Path A step 4 / Path B step 4). */

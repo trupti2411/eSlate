@@ -35,6 +35,7 @@ class Business extends Model
         'state_code', 'timezone', 'currency', 'tier', 'pack_version',
         'owner_user_id',
         'description', 'contact_email', 'contact_phone', 'address', 'is_active',
+        'updated_by',
     ];
 
     protected $casts = [
@@ -44,6 +45,12 @@ class Business extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_user_id');
+    }
+
+    /** ESLATE-12: admin who last edited the company profile. */
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function tutors(): HasMany

@@ -29,7 +29,25 @@ interface BusinessProfile {
   tier?: string;
   pack_version?: string | null;
   active_subject_ids: number[];
+  // ESLATE-12
+  address?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  updated_at?: string | null;
+  updated_by_name?: string | null;
 }
+
+// Official ATO ABN checksum: subtract 1 from the first digit, weight by
+// [10,1,3,5,7,9,11,13,15,17,19], sum must be divisible by 89.
+function isValidAbn(raw: string): boolean {
+  const abn = raw.replace(/[\s-]/g, '');
+  if (!/^\d{11}$/.test(abn)) return false;
+  const weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+  const sum = abn.split('').reduce((acc, d, i) => acc + (parseInt(d, 10) - (i === 0 ? 1 : 0)) * weights[i], 0);
+  return sum % 89 === 0;
+}
+const AU_PHONE = /^(\+?61|0)[\s-]?\d(?:[\s-]?\d){7,9}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 interface SubjectRow { id: number; code: string; name: string; state_code?: string; }
 
 const TIMEZONES = [
@@ -115,19 +133,38 @@ function BusinessProfileSection({
   const [legalName, setLegalName] = useState(profile.legal_name ?? '');
   const [abn, setAbn] = useState(profile.abn ?? '');
   const [logo, setLogo] = useState(profile.logo ?? '');
+  const [address, setAddress] = useState(profile.address ?? '');
+  const [contactEmail, setContactEmail] = useState(profile.contact_email ?? '');
+  const [contactPhone, setContactPhone] = useState(profile.contact_phone ?? '');
   const [timezone, setTimezone] = useState(profile.timezone ?? 'Australia/Sydney');
   const [currency, setCurrency] = useState(profile.currency ?? 'AUD');
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     setName(profile.name ?? '');
     setLegalName(profile.legal_name ?? '');
     setAbn(profile.abn ?? '');
     setLogo(profile.logo ?? '');
+    setAddress(profile.address ?? '');
+    setContactEmail(profile.contact_email ?? '');
+    setContactPhone(profile.contact_phone ?? '');
     setTimezone(profile.timezone ?? 'Australia/Sydney');
     setCurrency(profile.currency ?? 'AUD');
+    setSubmitted(false);
   }, [profile]);
 
   const isMultiTutor = profile.type === 'multi_tutor';
+
+  // ESLATE-12 field validation.
+  const errors: Record<string, string> = {};
+  if (name.trim().length < 2) errors.name = 'Company name is required';
+  else if (name.trim().length > 150) errors.name = 'Max 150 characters';
+  if (abn.trim() && !isValidAbn(abn)) errors.abn = 'Please enter a valid ABN';
+  else if (isMultiTutor && !abn.trim()) errors.abn = 'ABN is required';
+  if (isMultiTutor && !address.trim()) errors.address = 'Address is required';
+  if (contactEmail.trim() && !EMAIL_RE.test(contactEmail.trim())) errors.contactEmail = 'Enter a valid email address';
+  if (contactPhone.trim() && !AU_PHONE.test(contactPhone.trim())) errors.contactPhone = 'Enter a valid Australian phone number';
+  const valid = Object.keys(errors).length === 0;
 
   const m = useMutation({
     mutationFn: () =>
@@ -136,11 +173,14 @@ function BusinessProfileSection({
         legal_name: legalName.trim() || null,
         abn: abn.trim() || null,
         logo: logo.trim() || null,
+        address: address.trim() || null,
+        contact_email: contactEmail.trim() || null,
+        contact_phone: contactPhone.trim() || null,
         timezone,
         currency,
       }),
     onSuccess: () => {
-      toast({ title: 'Business profile saved' });
+      toast({ title: 'Company profile updated successfully' });
       qc.invalidateQueries({ queryKey: [`/api/businesses/${businessId}`] });
       qc.invalidateQueries({ queryKey: [`/api/admin/company-admin/${profile.id}`] });
     },
@@ -149,18 +189,29 @@ function BusinessProfileSection({
     },
   });
 
-  const valid = name.trim().length >= 2 && (!isMultiTutor || abn.trim().length > 0);
+  const handleSave = () => {
+    setSubmitted(true);
+    if (!valid) {
+      toast({ title: 'Please fix the highlighted fields', variant: 'destructive' });
+      return;
+    }
+    m.mutate();
+  };
+
+  const fieldErr = (k: string) =>
+    submitted && errors[k] ? <p className="text-xs text-red-600 mt-1">{errors[k]}</p> : null;
 
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm">
       <SectionHeader icon={<Building2 size={16} className="text-indigo-600" />} title="Business profile" />
       <div className="p-5 space-y-4">
-        <Field label="Business name" required>
+        <Field label="Company name" required>
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
           />
+          {fieldErr('name')}
         </Field>
         <Field label="Legal name (optional)" hint="Used on invoices if different from your trading name.">
           <input
@@ -179,7 +230,41 @@ function BusinessProfileSection({
               className="w-full bg-transparent focus:outline-none text-sm"
             />
           </IconInput>
+          {fieldErr('abn')}
         </Field>
+        {/* ESLATE-12: address + public contact details. */}
+        <Field label={`Address${isMultiTutor ? '' : ' (optional)'}`} required={isMultiTutor}>
+          <textarea
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            rows={2}
+            placeholder="Street, suburb, state, postcode"
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+          />
+          {fieldErr('address')}
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Contact email (optional)">
+            <input
+              type="email"
+              value={contactEmail}
+              onChange={(e) => setContactEmail(e.target.value)}
+              placeholder="hello@company.com.au"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            {fieldErr('contactEmail')}
+          </Field>
+          <Field label="Contact phone (optional)">
+            <input
+              type="tel"
+              value={contactPhone}
+              onChange={(e) => setContactPhone(e.target.value)}
+              placeholder="02 XXXX XXXX"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+            {fieldErr('contactPhone')}
+          </Field>
+        </div>
         <Field label="Logo URL (optional)" hint="Direct link to your logo image. Uploads come in a later release.">
           <IconInput icon={<Image size={14} />}>
             <input
@@ -217,9 +302,14 @@ function BusinessProfileSection({
           </Field>
         </div>
       </div>
+      {profile.updated_by_name && profile.updated_at && (
+        <p className="px-5 -mt-1 pb-1 text-xs text-gray-400">
+          Last updated by {profile.updated_by_name} on {new Date(profile.updated_at).toLocaleDateString('en-AU')}
+        </p>
+      )}
       <SectionFooter
-        onSave={() => m.mutate()}
-        disabled={!valid || m.isPending}
+        onSave={handleSave}
+        disabled={m.isPending}
         saving={m.isPending}
       />
     </section>
