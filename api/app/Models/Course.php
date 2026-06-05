@@ -17,7 +17,7 @@ class Course extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['business_id', 'name', 'description'];
+    protected $fillable = ['business_id', 'name', 'description', 'updated_by'];
 
     public function business(): BelongsTo
     {
@@ -27,6 +27,17 @@ class Course extends Model
     public function offerings(): HasMany
     {
         return $this->hasMany(CourseOffering::class);
+    }
+
+    /** Classes that use this course as their catalogue parent (ESLATE-15). */
+    public function classes(): HasMany
+    {
+        return $this->hasMany(Classroom::class, 'course_id');
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     /**

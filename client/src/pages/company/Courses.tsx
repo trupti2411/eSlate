@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import CreateCourseModal from '@/components/CreateCourseModal';
+import CourseDetailModal from '@/components/CourseDetailModal';
 import {
   Trophy, Bell, LogOut, ArrowLeft, Plus, X, Save, Search, User,
   Target, Calendar, GraduationCap, ChevronRight, Filter,
@@ -86,6 +87,7 @@ export default function CoursesPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'active' | 'completed' | 'archived'>('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [createCourseOpen, setCreateCourseOpen] = useState(false);
+  const [openCourseId, setOpenCourseId] = useState<number | null>(null);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -180,16 +182,21 @@ export default function CoursesPage() {
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {courses.map(c => (
-                <li key={c.id} className="rounded-xl border border-gray-100 p-3 flex items-start gap-3">
-                  <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black flex-shrink-0">
-                    {c.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-black text-gray-900 truncate">{c.name}</p>
-                    <p className="text-xs text-gray-500">
-                      {c.offerings?.length ?? 0} offering{(c.offerings?.length ?? 0) === 1 ? '' : 's'}
-                    </p>
-                  </div>
+                <li key={c.id}>
+                  <button
+                    onClick={() => setOpenCourseId(c.id)}
+                    className="w-full text-left rounded-xl border border-gray-100 p-3 flex items-start gap-3 hover:border-indigo-200 hover:shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black flex-shrink-0">
+                      {c.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-black text-gray-900 truncate">{c.name}</p>
+                      <p className="text-xs text-gray-500">
+                        {c.offerings?.length ?? 0} offering{(c.offerings?.length ?? 0) === 1 ? '' : 's'}
+                      </p>
+                    </div>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -253,6 +260,9 @@ export default function CoursesPage() {
       )}
       {createCourseOpen && (
         <CreateCourseModal onClose={() => setCreateCourseOpen(false)} />
+      )}
+      {openCourseId !== null && (
+        <CourseDetailModal courseId={openCourseId} onClose={() => setOpenCourseId(null)} />
       )}
     </div>
   );

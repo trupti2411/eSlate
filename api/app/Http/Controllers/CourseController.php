@@ -6,6 +6,7 @@ use App\Http\Controllers\Concerns\ResolvesScope;
 use App\Models\Course;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Owner-authored catalogue. A Course is a top-level category that the
@@ -73,19 +74,23 @@ class CourseController extends Controller
         return response()->json($course->load('subjects:id,code,name'), 201);
     }
 
-    /** GET /api/courses/{course} */
+    /** GET /api/courses/{course} — detail view incl. linked classes + audit (ESLATE-15). */
     public function show(Request $request, Course $course): JsonResponse
     {
         $this->authorizeCourse($request->user(), $course);
-        return response()->json($course->load([
-            'subjects:id,code,name',
-            'offerings.yearGroup',
-            'offerings.subject',
-            'offerings.tutor.user:id,name',
-        ]));
+
+        return response()->json($this->serializeCourse($course));
     }
 
-    /** PATCH /api/courses/{course} */
+    /**
+     * PATCH /api/courses/{course} (ESLATE-15).
+     *
+     * A course rename is non-destructive and propagates by reference (classes
+     * read the name off the course). Removing a subject is destructive: it must
+     * be stripped from every linked class that uses it. We do the cascade
+     * server-side inside a transaction and return an `impact` summary so the
+     * UI can surface which classes changed and which were left with no subject.
+     */
     public function update(Request $request, Course $course): JsonResponse
     {
         $this->authorizeCourse($request->user(), $course);
@@ -96,15 +101,70 @@ class CourseController extends Controller
             'subject_ids.*'=> ['integer', 'exists:subjects,id'],
         ]);
 
-        if (array_key_exists('subject_ids', $data)) {
-            $course->subjects()->sync($data['subject_ids']);
-            unset($data['subject_ids']);
-        }
+        $impact = ['affectedClasses' => [], 'classesLeftEmpty' => []];
 
-        if (! empty($data)) {
+        DB::transaction(function () use (&$impact, $course, &$data, $request) {
+            if (array_key_exists('subject_ids', $data)) {
+                $newIds     = array_map('intval', $data['subject_ids']);
+                $currentIds = $course->subjects()->pluck('subjects.id')->all();
+                $removed    = array_values(array_diff($currentIds, $newIds));
+
+                if ($removed) {
+                    foreach ($course->classes()->with('subjects:id,name')->get() as $class) {
+                        $classSubjectIds = $class->subjects->pluck('id')->all();
+                        $toRemove = array_values(array_intersect($classSubjectIds, $removed));
+                        if (! $toRemove) {
+                            continue;
+                        }
+
+                        $class->subjects()->detach($toRemove);
+                        $impact['affectedClasses'][] = [
+                            'id'              => (string) $class->id,
+                            'name'            => $class->name,
+                            'removedSubjects' => $class->subjects->whereIn('id', $toRemove)->pluck('name')->values()->all(),
+                        ];
+                        if (count($classSubjectIds) === count($toRemove)) {
+                            $impact['classesLeftEmpty'][] = $class->name;
+                        }
+                    }
+                }
+
+                $course->subjects()->sync($newIds);
+                unset($data['subject_ids']);
+            }
+
+            $data['updated_by'] = $request->user()->id;
             $course->update($data);
-        }
-        return response()->json($course->fresh()->load('subjects:id,code,name'));
+        });
+
+        return response()->json([
+            'course' => $this->serializeCourse($course->fresh()),
+            'impact' => $impact,
+        ]);
+    }
+
+    /** Detail payload: course + subjects + linked classes (with subjects) + audit. */
+    private function serializeCourse(Course $course): array
+    {
+        $course->loadMissing([
+            'subjects:id,code,name',
+            'classes:id,course_id,name,year_group_id',
+            'classes.subjects:id,name',
+            'classes.yearGroup:id,label',
+            'updatedBy:id,name',
+        ]);
+
+        return array_merge($course->toArray(), [
+            'updated_by' => $course->updated_by,
+            'updatedBy'  => $course->updatedBy ? ['name' => $course->updatedBy->name] : null,
+            'classes'    => $course->classes->map(fn ($c) => [
+                'id'         => (string) $c->id,
+                'name'       => $c->name,
+                'yearGroup'  => $c->yearGroup?->label,
+                'subjects'   => $c->subjects->pluck('name')->values()->all(),
+                'subjectIds' => $c->subjects->pluck('id')->map(fn ($id) => (int) $id)->values()->all(),
+            ])->values()->all(),
+        ]);
     }
 
     /** DELETE /api/courses/{course} */
