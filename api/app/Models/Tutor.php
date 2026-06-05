@@ -25,6 +25,7 @@ class Tutor extends Model
         'wwcc_number', 'wwcc_expiry', 'wwcc_state', 'compliance_status',
         'wwcc_certificate_path', 'wwcc_certificate_original_name', 'wwcc_certificate_uploaded_at',
         'bio', 'hourly_rate', 'qualifications', 'delivery_modes', 'year_levels',
+        'phone', 'address', 'updated_by',   // ESLATE-13
     ];
 
     protected function casts(): array
@@ -53,6 +54,11 @@ class Tutor extends Model
     public function business(): BelongsTo
     {
         return $this->belongsTo(Business::class);
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function students(): BelongsToMany

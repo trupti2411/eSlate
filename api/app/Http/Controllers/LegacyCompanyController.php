@@ -434,13 +434,26 @@ class LegacyCompanyController extends Controller
             'firstName'        => $firstName,
             'lastName'         => $lastName,
             'email'            => $t->user?->email,
+            'phone'            => $t->phone,
+            'address'          => $t->address,
             'role'             => 'tutor',
             'status'           => $t->status,
             'complianceStatus' => $t->compliance_status,
+            'wwccNumber'       => $t->wwcc_number,                 // decrypted via cast; admin-only endpoint
+            'wwccState'        => $t->wwcc_state,
             'wwccExpiry'       => $t->wwcc_expiry?->toDateString(),
+            'wwccStatus'       => $this->wwccStatus($t),           // active | expiring | expired | missing
+            'hasCertificate'   => $t->hasCertificate(),
+            'joinedAt'         => $t->created_at?->toDateString(),
             'specialization'   => '',                              // not stored yet
             'qualifications'   => $t->qualifications ?? '',
             'isVerified'       => $t->compliance_status === 'compliant',
+            'updatedAt'        => $t->updated_at?->toIso8601String(),
+            'updatedBy'        => $t->updatedBy ? [
+                'name'      => $t->updatedBy->name,
+                'firstName' => $this->firstNameOf((string) $t->updatedBy->name),
+                'lastName'  => $this->lastNameOf((string) $t->updatedBy->name),
+            ] : null,
             'user'             => $t->user ? [
                 'id'        => (string) $t->user->id,
                 'email'     => $t->user->email,
@@ -448,6 +461,35 @@ class LegacyCompanyController extends Controller
                 'lastName'  => $lastName,
             ] : null,
         ];
+    }
+
+    /**
+     * Derive the WWCC compliance signal the tutor profile + dashboard widget
+     * both render. Kept in one place so the colours never drift apart.
+     *   missing  — no number or no expiry captured yet
+     *   expired  — expiry date is in the past
+     *   expiring — expiry within the next 30 days
+     *   active   — valid and more than 30 days out
+     */
+    private function wwccStatus(Tutor $t): string
+    {
+        if (empty($t->wwcc_number) || ! $t->wwcc_expiry) {
+            return 'missing';
+        }
+
+        $days = now()->startOfDay()->diffInDays($t->wwcc_expiry->startOfDay(), false);
+        if ($days < 0) {
+            return 'expired';
+        }
+
+        return $days <= 30 ? 'expiring' : 'active';
+    }
+
+    private function firstNameOf(string $name): string
+    {
+        $space = strpos($name, ' ');
+
+        return $space === false ? $name : substr($name, 0, $space);
     }
 
     /**
@@ -695,6 +737,83 @@ class LegacyCompanyController extends Controller
         }
 
         return response()->json($student->fresh()->load(['user', 'parents', 'updatedBy']));
+    }
+
+    /**
+     * GET /api/tutors/{tutor} — admin view of a single tutor profile (ESLATE-13).
+     */
+    public function showTutor(Request $request, Tutor $tutor): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $tutor->business_id);
+
+        $tutor->load(['user', 'updatedBy']);
+
+        return response()->json($this->serializeTutor($tutor));
+    }
+
+    /**
+     * PATCH /api/tutors/{tutor} — admin edit of a tutor profile (ESLATE-13).
+     *
+     * Name + email live on the User row; phone/address/WWCC live on the tutor.
+     * Whenever a WWCC field changes we recompute compliance_status so the Staff
+     * list KPIs and the dashboard widget stay in sync with the profile.
+     */
+    public function updateTutor(Request $request, Tutor $tutor): JsonResponse
+    {
+        $this->assertCanAccessBusiness($request->user(), $tutor->business_id);
+
+        $data = $request->validate([
+            'first_name'  => ['sometimes', 'required', 'string', 'max:100'],
+            'last_name'   => ['sometimes', 'required', 'string', 'max:100'],
+            'email'       => ['sometimes', 'required', 'email', 'max:255'],
+            'phone'       => ['sometimes', 'nullable', 'string', 'max:40', 'regex:/^(\+?61|0)[\s-]?\d(?:[\s-]?\d){7,9}$/'],
+            'address'     => ['sometimes', 'nullable', 'string', 'max:255'],
+            'wwcc_number' => ['sometimes', 'nullable', 'string', 'max:50'],
+            'wwcc_expiry' => ['sometimes', 'nullable', 'date'],
+            'wwcc_state'  => ['sometimes', 'nullable', 'string', 'max:3'],
+        ], [
+            'email.required' => 'Email is required.',
+            'phone.regex'    => 'Enter a valid Australian phone number (e.g. 04XX XXX XXX or +61 4XX XXX XXX).',
+        ]);
+
+        // Name + email live on the User row. Recombine into the single `name`
+        // column the way serializeTutor() splits it back out (first space).
+        if ($tutor->user && (array_key_exists('first_name', $data) || array_key_exists('last_name', $data) || array_key_exists('email', $data))) {
+            $currentName = (string) $tutor->user->name;
+            $first = $data['first_name'] ?? $this->firstNameOf($currentName);
+            $last  = $data['last_name'] ?? $this->lastNameOf($currentName);
+            $userUpdate = ['name' => trim($first.' '.$last)];
+            if (array_key_exists('email', $data)) {
+                $userUpdate['email'] = $data['email'];
+            }
+            $tutor->user->update($userUpdate);
+        }
+
+        $tutorFields = ['phone', 'address', 'wwcc_number', 'wwcc_expiry', 'wwcc_state'];
+        $update = [];
+        foreach ($tutorFields as $f) {
+            if (array_key_exists($f, $data)) {
+                $update[$f] = $data[$f];
+            }
+        }
+
+        // Recompute compliance whenever a WWCC field is touched so the admin can
+        // resolve a pending/expired status straight from the edit form.
+        if (array_key_exists('wwcc_number', $data) || array_key_exists('wwcc_expiry', $data)) {
+            $tutor->fill($update);
+            $update['compliance_status'] = match ($this->wwccStatus($tutor)) {
+                'missing' => Tutor::COMPLIANCE_PENDING,
+                'expired' => Tutor::COMPLIANCE_HOLD,
+                default   => Tutor::COMPLIANCE_COMPLIANT,
+            };
+        }
+
+        if ($update) {
+            $update['updated_by'] = $request->user()->id;
+            $tutor->update($update);
+        }
+
+        return response()->json($this->serializeTutor($tutor->fresh()->load(['user', 'updatedBy'])));
     }
 
     private function lastNameOf(string $name): string
