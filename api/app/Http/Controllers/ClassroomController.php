@@ -229,7 +229,7 @@ class ClassroomController extends Controller
     {
         $this->authorizeClass($request->user(), $class);
 
-        return response()->json($class->load([
+        $class->load([
             'subject',
             'subjects:id,code,name',
             'yearGroup',
@@ -238,7 +238,16 @@ class ClassroomController extends Controller
             'course.subjects:id,code,name',
             'terms',
             'students.user',
-        ]));
+            'updatedBy:id,name',
+        ]);
+
+        // updatedBy is snake-cased to `updated_by` by Eloquent, clobbering the
+        // scalar FK — restore it and expose a flat `updatedBy` for the audit footer.
+        $arr = $class->toArray();
+        $arr['updated_by'] = $class->updated_by;
+        $arr['updatedBy'] = $class->updatedBy ? ['name' => $class->updatedBy->name] : null;
+
+        return response()->json($arr);
     }
 
     public function update(Request $request, Classroom $class): JsonResponse
@@ -315,6 +324,8 @@ class ClassroomController extends Controller
                 'conflict' => $conflict,
             ], 422);
         }
+
+        $data['updated_by'] = $request->user()->id;   // ESLATE-16 audit
 
         return DB::transaction(function () use ($data, $class) {
             // If terms changed, re-derive starts_on/ends_on and re-sync the pivot.

@@ -32,6 +32,7 @@ class Classroom extends Model
         'schedule_start_time',
         'schedule_end_time',
         'location',
+        'updated_by',   // ESLATE-16
     ];
 
     protected function casts(): array
@@ -50,6 +51,11 @@ class Classroom extends Model
     public function tutor(): BelongsTo
     {
         return $this->belongsTo(Tutor::class);
+    }
+
+    public function updatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'updated_by');
     }
 
     public function academicYear(): BelongsTo

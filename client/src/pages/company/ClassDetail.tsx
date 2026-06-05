@@ -8,7 +8,7 @@ import {
   BookOpen, Bell, LogOut, ArrowLeft, UserPlus, Trash2, X, Save,
   User, Users, GraduationCap, Calendar, CalendarDays, School,
   Pencil, Play, CheckCircle2, Archive,
-  ClipboardPlus, FileText, Download, Clock,
+  ClipboardPlus, FileText, Download, Clock, AlertTriangle,
 } from 'lucide-react';
 
 interface ClassData {
@@ -41,6 +41,9 @@ interface ClassData {
   academic_year?: { id: number; year: number } | null;
   terms?: { id: number; name: string; start_date: string; end_date: string }[];
   students?: StudentRow[];
+  created_at?: string | null;
+  updated_at?: string | null;
+  updatedBy?: { name?: string } | null;
 }
 
 interface StudentRow {
@@ -57,6 +60,12 @@ function fullName(s: StudentRow): string {
   const fn = s.first_name ?? s.user?.firstName ?? '';
   const ln = s.last_name ?? s.user?.lastName ?? '';
   return `${fn} ${ln}`.trim() || `Student #${s.id}`;
+}
+
+function sameSet(a: Set<number>, b: Set<number>): boolean {
+  if (a.size !== b.size) return false;
+  for (const v of Array.from(a)) if (!b.has(v)) return false;
+  return true;
 }
 
 function formatDate(s: string | null | undefined): string {
@@ -213,6 +222,15 @@ export default function ClassDetailPage() {
                     </span>
                   ))}
                 </div>
+              )}
+
+              {(cls.created_at || (cls.updatedBy?.name && cls.updated_at)) && (
+                <p className="mt-4 text-[11px] text-indigo-200">
+                  {cls.created_at ? `Created ${formatDate(cls.created_at)}` : ''}
+                  {cls.updatedBy?.name && cls.updated_at
+                    ? `${cls.created_at ? ' · ' : ''}Last updated by ${cls.updatedBy.name} on ${formatDate(cls.updated_at)}`
+                    : ''}
+                </p>
               )}
             </div>
 
@@ -579,11 +597,35 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
   const [startTime, setStartTime] = useState<string>(cls.schedule_start_time?.slice(0, 5) ?? '');
   const [endTime, setEndTime] = useState<string>(cls.schedule_end_time?.slice(0, 5) ?? '');
   const [location, setLocation] = useState<string>(cls.location ?? '');
+  const [yearGroupId, setYearGroupId] = useState<string>(cls.year_group_id ? String(cls.year_group_id) : '');
+  const [subjectIds, setSubjectIds] = useState<Set<number>>(new Set((cls.subjects ?? []).map(s => s.id)));
+  const [submitted, setSubmitted] = useState(false);
 
   const { data: courses = [] } = useQuery<CourseSummary[]>({ queryKey: ['/api/courses'] });
   const { data: tutors = [] } = useQuery<TutorPickerRow[]>({
     queryKey: [`/api/companies/${cls.business_id}/tutors`],
   });
+  const { data: allSubjects = [] } = useQuery<{ id: number; name: string }[]>({ queryKey: ['/api/subjects'] });
+  const { data: yearGroups = [] } = useQuery<{ id: number; label: string; code: string }[]>({
+    queryKey: ['/api/year-groups?state=NSW'],
+  });
+  // When a course is selected, subjects are constrained to that course's set.
+  const { data: courseDetail } = useQuery<{ subjects?: { id: number; name: string }[] }>({
+    queryKey: [`/api/courses/${courseId}`],
+    enabled: !!courseId,
+  });
+  const allowedSubjects = useMemo(() => {
+    const fromCourse = courseId ? (courseDetail?.subjects ?? []) : [];
+    return fromCourse.length ? fromCourse : allSubjects;
+  }, [courseId, courseDetail, allSubjects]);
+
+  const toggleSubject = (id: number) => {
+    setSubjectIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
   const { data: hierarchy } = useQuery<any>({
     queryKey: [`/api/companies/${cls.business_id}/academic-hierarchy`],
   });
@@ -604,6 +646,15 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
     });
   };
 
+  const enrolledCount = cls.students?.length ?? 0;
+  const studentNames = (cls.students ?? []).map(fullName);
+
+  const errors: Record<string, string> = {};
+  if (!name.trim()) errors.name = 'Class name is required';
+  if (!yearGroupId) errors.yearGroup = 'Year group is required';
+  if (subjectIds.size === 0) errors.subjects = 'Select at least one subject';
+  const isValid = Object.keys(errors).length === 0;
+
   const m = useMutation({
     mutationFn: () =>
       apiRequest(`/api/classes/${cls.id}`, 'PATCH', {
@@ -613,6 +664,8 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
         capacity: capacity ? Number(capacity) : null,
         course_id: courseId ? Number(courseId) : null,
         tutor_id: tutorId ? Number(tutorId) : null,
+        year_group_id: Number(yearGroupId),
+        subject_ids: Array.from(subjectIds),
         term_ids: Array.from(pickedTermIds),
         schedule_day_of_week: scheduleDay ? Number(scheduleDay) : null,
         schedule_start_time: startTime || null,
@@ -620,13 +673,61 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
         location: location.trim() || null,
       }),
     onSuccess: () => {
-      toast({ title: 'Class updated' });
+      toast({ title: 'Class updated successfully' });
+      // Surface a follow-up notice when changes touch enrolled students (ESLATE-16).
+      const subjectsChanged = !sameSet(subjectIds, new Set((cls.subjects ?? []).map(s => s.id)));
+      const yearChanged = Number(yearGroupId) !== cls.year_group_id;
+      const termsChanged = !sameSet(pickedTermIds, new Set((cls.terms ?? []).map(t => t.id)));
+      if (enrolledCount > 0 && (subjectsChanged || yearChanged || termsChanged)) {
+        toast({
+          title: 'Changes may affect enrolled students',
+          description: 'Subject, year group, or term changes can affect enrolments. Please review the roster and notify students or parents if required.',
+          variant: 'destructive',
+        });
+      }
       qc.invalidateQueries({ queryKey: [`/api/classes/${cls.id}`] });
       qc.invalidateQueries({ queryKey: ['/api/classes'] });
       onClose();
     },
     onError: (e: any) => toast({ title: 'Could not save', description: e.message, variant: 'destructive' }),
   });
+
+  const handleSave = () => {
+    setSubmitted(true);
+    if (!isValid) return;
+
+    // Impact prompts — only when students are enrolled and a change is destructive.
+    if (enrolledCount > 0) {
+      const origSubjects = cls.subjects ?? [];
+      const removedSubjects = origSubjects.filter(s => !subjectIds.has(s.id));
+      if (removedSubjects.length) {
+        const ok = window.confirm(
+          `The following students are enrolled in this class: ${studentNames.join(', ')}.\n\n` +
+          `Removing ${removedSubjects.map(s => s.name).join(', ')} will update their enrolment. Do you want to continue?`,
+        );
+        if (!ok) return;
+      }
+      if (Number(yearGroupId) !== cls.year_group_id) {
+        const ok = window.confirm(
+          `Changing the year group affects ${enrolledCount} enrolled student${enrolledCount === 1 ? '' : 's'}. ` +
+          `They will not be automatically unenrolled — please review enrolments after saving. Continue?`,
+        );
+        if (!ok) return;
+      }
+      const removedTerms = (cls.terms ?? []).filter(t => !pickedTermIds.has(t.id));
+      if (removedTerms.length) {
+        const ok = window.confirm(
+          `Students are currently enrolled in ${removedTerms.map(t => t.name).join(', ')}. ` +
+          `Removing ${removedTerms.length === 1 ? 'this term' : 'these terms'} may affect their schedule. Do you want to continue?`,
+        );
+        if (!ok) return;
+      }
+    }
+
+    m.mutate();
+  };
+
+  const err = (k: string) => (submitted && errors[k] ? <p className="text-xs text-red-600 mt-1">{errors[k]}</p> : null);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -775,6 +876,45 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
             </EditField>
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <EditField label="Year group *">
+              <select
+                value={yearGroupId}
+                onChange={(e) => setYearGroupId(e.target.value)}
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${submitted && errors.yearGroup ? 'border-red-300' : 'border-gray-200'}`}
+              >
+                <option value="">Select year group…</option>
+                {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
+              </select>
+              {err('yearGroup')}
+            </EditField>
+          </div>
+
+          <EditField label="Subjects *">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {allowedSubjects.map(s => {
+                const checked = subjectIds.has(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => toggleSubject(s.id)}
+                    className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold text-left transition-colors ${checked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 hover:bg-gray-50 text-gray-700'}`}
+                  >
+                    <span className={`w-4 h-4 rounded border flex items-center justify-center flex-shrink-0 ${checked ? 'bg-indigo-600 border-indigo-600' : 'border-gray-300'}`}>
+                      {checked && <span className="w-2 h-2 bg-white rounded-sm" />}
+                    </span>
+                    <span className="truncate">{s.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+            {courseId && (
+              <p className="text-xs text-gray-400 mt-1.5">Subjects are limited to those in the linked course.</p>
+            )}
+            {err('subjects')}
+          </EditField>
+
           <EditField label="Description">
             <textarea
               value={description}
@@ -784,17 +924,23 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
             />
           </EditField>
 
-          <p className="text-xs text-gray-400">
-            Year group, subject, and academic year are fixed for a class — create a new class if those need to change.
-          </p>
+          {enrolledCount > 0 && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 flex items-start gap-2">
+              <AlertTriangle size={15} className="text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-800">
+                {enrolledCount} student{enrolledCount === 1 ? ' is' : 's are'} enrolled. Changing subjects, year group, or
+                terms will prompt for confirmation before saving.
+              </p>
+            </div>
+          )}
         </div>
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
           <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
             Cancel
           </button>
           <button
-            onClick={() => m.mutate()}
-            disabled={!name.trim() || m.isPending}
+            onClick={handleSave}
+            disabled={(submitted && !isValid) || m.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
           >
             <Save size={14} /> {m.isPending ? 'Saving…' : 'Save changes'}
