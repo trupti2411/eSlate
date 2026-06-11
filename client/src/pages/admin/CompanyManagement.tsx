@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import Layout from "@/components/Layout";
+import StudentFormModal from "@/components/StudentFormModal";
 import { Building2, Users, UserPlus, Power, PowerOff, ArrowLeft, Plus, Mail, Phone, MapPin, Trash2, Pencil, GraduationCap, BookOpen, Settings, CheckCircle, Search } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { Link } from "wouter";
@@ -57,6 +58,8 @@ export default function CompanyManagement() {
   const [activeTab, setActiveTab] = useState("overview");
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateUserDialogOpen, setIsCreateUserDialogOpen] = useState(false);
+  // ESLATE-5: admins use the same validated student form as the company owner.
+  const [addStudentOpen, setAddStudentOpen] = useState(false);
   const [newUserData, setNewUserData] = useState({
     email: "",
     firstName: "",
@@ -764,14 +767,10 @@ export default function CompanyManagement() {
                     className="pl-10 border-gray-200"
                   />
                 </div>
-                <Dialog open={isCreateUserDialogOpen} onOpenChange={setIsCreateUserDialogOpen}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => setNewUserData(prev => ({ ...prev, role: 'student' }))}>
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Student
-                    </Button>
-                  </DialogTrigger>
-                </Dialog>
+                <Button className="bg-purple-600 hover:bg-purple-700 text-white" onClick={() => setAddStudentOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Student
+                </Button>
               </div>
 
               {studentsLoading ? (
@@ -798,7 +797,7 @@ export default function CompanyManagement() {
                       {searchQuery ? 'Try adjusting your search criteria.' : 'Add students to this company to get started.'}
                     </p>
                     {!searchQuery && (
-                      <Button onClick={() => { setNewUserData(prev => ({ ...prev, role: 'student' })); setIsCreateUserDialogOpen(true); }} className="bg-purple-600 hover:bg-purple-700 text-white">
+                      <Button onClick={() => setAddStudentOpen(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
                         <Plus className="w-4 h-4 mr-2" />
                         Add First Student
                       </Button>
@@ -1098,6 +1097,15 @@ export default function CompanyManagement() {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* ESLATE-5: validated Add Student form — same component the company owner uses. */}
+        {addStudentOpen && companyId && (
+          <StudentFormModal
+            mode="add"
+            businessId={companyId}
+            onClose={() => setAddStudentOpen(false)}
+          />
+        )}
       </div>
     </Layout>
   );
