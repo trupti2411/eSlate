@@ -373,7 +373,7 @@ export default function StudentFormModal({
           </Section>
 
           <Section title="Notes">
-            <Field label="Notes">
+            <Field label="General notes">
               <textarea
                 value={notes}
                 onChange={(e) => { touch(); setNotes(e.target.value); }}
@@ -434,6 +434,11 @@ export default function StudentFormModal({
  * DD/MM/YYYY. The calendar opens near a typical student age so the common
  * case needs minimal scrolling.
  */
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
 function DobPicker({
   value, minDate, maxDate, invalid, onChange,
 }: {
@@ -447,15 +452,29 @@ function DobPicker({
   const selected = value ? parse(value, 'yyyy-MM-dd', new Date()) : undefined;
   const fromYear = parseInt(minDate.slice(0, 4), 10);
   const toYear = parseInt(maxDate.slice(0, 4), 10);
-  // Default the calendar to ~10 years ago (typical student) when nothing picked.
-  const defaultMonth = selected ?? new Date(toYear - 10, 0, 1);
+
+  // The calendar's visible month is controlled by our own dropdowns, so the
+  // header is two clean styled selects — pick a year/month in one click, no
+  // clicking through months. Defaults to ~10y ago (typical student age).
+  const [viewMonth, setViewMonth] = useState<Date>(selected ?? new Date(toYear - 10, 0, 1));
+
+  // Keep the visible month in sync when the popover (re)opens with a value.
+  useEffect(() => {
+    if (open) setViewMonth(selected ?? new Date(toYear - 10, 0, 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  const years: number[] = [];
+  for (let y = toYear; y >= fromYear; y--) years.push(y);
+
+  const selectClass = 'rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-sm font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500';
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
-          className={`w-full rounded-xl border px-3 py-2 text-sm text-left flex items-center gap-2 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${invalid ? 'border-red-300' : 'border-gray-200'}`}
+          className={`w-full rounded-xl border px-3 py-2 text-sm text-left flex items-center gap-2 hover:border-indigo-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent ${invalid ? 'border-red-300' : 'border-gray-200'}`}
         >
           <CalendarIcon size={14} className="text-gray-400 flex-shrink-0" />
           {value
@@ -463,15 +482,33 @@ function DobPicker({
             : <span className="text-gray-400">Select date of birth</span>}
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
+      <PopoverContent className="w-auto p-3" align="start">
+        {/* Quick month + year navigation — styled, one click to jump decades. */}
+        <div className="flex items-center gap-2 mb-2">
+          <select
+            aria-label="Month"
+            value={viewMonth.getMonth()}
+            onChange={(e) => setViewMonth(new Date(viewMonth.getFullYear(), Number(e.target.value), 1))}
+            className={`flex-1 ${selectClass}`}
+          >
+            {MONTH_NAMES.map((m, i) => <option key={m} value={i}>{m}</option>)}
+          </select>
+          <select
+            aria-label="Year"
+            value={viewMonth.getFullYear()}
+            onChange={(e) => setViewMonth(new Date(Number(e.target.value), viewMonth.getMonth(), 1))}
+            className={selectClass}
+          >
+            {years.map(y => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
         <Calendar
           mode="single"
+          month={viewMonth}
+          onMonthChange={setViewMonth}
           selected={selected}
-          defaultMonth={defaultMonth}
-          captionLayout="dropdown-buttons"
-          fromYear={fromYear}
-          toYear={toYear}
           disabled={{ before: parse(minDate, 'yyyy-MM-dd', new Date()), after: parse(maxDate, 'yyyy-MM-dd', new Date()) }}
+          classNames={{ caption: 'hidden' }}
           onSelect={(d: Date | undefined) => {
             if (d) { onChange(format(d, 'yyyy-MM-dd')); setOpen(false); }
           }}

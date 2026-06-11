@@ -60,6 +60,19 @@ describe('ESLATE-5 — Add Student form', () => {
     it('formats the selected date as DD/MM/YYYY', () => {
       expect(dobDisplay('2015-03-12')).toBe('12/03/2015');
     });
+
+    it('exposes month + year dropdowns for quick navigation when opened', async () => {
+      const user = userEvent.setup();
+      renderModal();
+      await user.click(screen.getByText('Select date of birth'));
+      // Month + Year selects let you jump without clicking month-by-month.
+      expect(await screen.findByLabelText('Month')).toBeInTheDocument();
+      const year = screen.getByLabelText('Year') as HTMLSelectElement;
+      expect(year).toBeInTheDocument();
+      // Year range goes back well beyond the required 20 years.
+      const years = Array.from(year.options).map(o => Number(o.value));
+      expect(Math.max(...years) - Math.min(...years)).toBeGreaterThanOrEqual(20);
+    });
   });
 
   // ---- AC-2: Age < 5 non-blocking warning ----
@@ -136,6 +149,16 @@ describe('ESLATE-5 — Add Student form', () => {
       // First name / Last name / Year group / DOB / Address all carry a "*".
       const asterisks = screen.getAllByText('*');
       expect(asterisks.length).toBeGreaterThanOrEqual(5);
+    });
+  });
+
+  // ---- ESLATE-10 polish: the Notes label must not appear twice ----
+  describe('Notes section', () => {
+    it('has a single General notes field, not a duplicate "Notes" label', () => {
+      renderModal();
+      expect(screen.getByText('General notes')).toBeInTheDocument();
+      // "Notes" appears once (the section header), not twice.
+      expect(screen.getAllByText('Notes')).toHaveLength(1);
     });
   });
 });
