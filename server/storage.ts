@@ -1,6 +1,7 @@
 import {
   users,
   students,
+  studentContacts,
   parents,
   tutors,
   tutoringCompanies,
@@ -10,6 +11,9 @@ import {
   calendarEvents,
   academicYears,
   academicTerms,
+  courses,
+  courseSubjects,
+  classSubjects,
   classes,
   studentClassAssignments,
   assignments,
@@ -156,6 +160,7 @@ export interface IStorage {
   getAllTutoringCompanies(): Promise<TutoringCompany[]>;
   updateTutoringCompany(id: string, updates: any): Promise<TutoringCompany>;
   getCompanyStudentsByCompanyId(companyId: string): Promise<any[]>;
+  createStudentWithContacts(data: any): Promise<any>;
   getCompanyUsersByCompanyId(companyId: string): Promise<User[]>;
   updateCompanyStatus(companyId: string, isActive: boolean): Promise<void>;
 
@@ -442,6 +447,11 @@ export class DatabaseStorage implements IStorage {
         userId: students.userId,
         gradeLevel: students.gradeLevel,
         schoolName: students.schoolName,
+        yearGroupCode: students.yearGroupCode,
+        dateOfBirth: students.dateOfBirth,
+        address: students.address,
+        learningGoals: students.learningGoals,
+        notes: students.notes,
         parentId: students.parentId,
         tutorId: students.tutorId,
         companyId: students.companyId,
@@ -449,6 +459,8 @@ export class DatabaseStorage implements IStorage {
         termId: students.termId,
         classId: students.classId,
         createdAt: students.createdAt,
+        updatedAt: students.updatedAt,
+        updatedByName: students.updatedByName,
         user: {
           id: users.id,
           email: users.email,
@@ -463,7 +475,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(students.id, id))
       .limit(1);
 
-    return result[0] || undefined;
+    const row = result[0];
+    if (!row) return undefined;
+
+    const contacts = await db.select().from(studentContacts).where(eq(studentContacts.studentId, id));
+    return {
+      ...row,
+      // snake_case aliases for frontend compat
+      year_group_code: row.yearGroupCode,
+      date_of_birth: row.dateOfBirth,
+      school: row.schoolName,
+      first_name: row.user?.firstName ?? null,
+      last_name: row.user?.lastName ?? null,
+      updated_at: row.updatedAt,
+      updated_by_name: row.updatedByName,
+      parents: contacts.map(c => ({
+        id: c.id,
+        name: c.name,
+        relationship: c.relationship,
+        email: c.email,
+        phone: c.phone,
+        is_primary: c.isPrimary,
+      })),
+    };
   }
 
   async getStudentByUserId(userId: string): Promise<Student | undefined> {
@@ -1058,17 +1092,27 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Transform the result to match expected structure
+      // Fetch contacts for all students
+      const allStudentIds = companyStudents.map((row: any) => row.students.id);
+      const contactRows = allStudentIds.length > 0
+        ? await db.select().from(studentContacts).where(inArray(studentContacts.studentId, allStudentIds))
+        : [];
+      const contactsByStudentId = new Map<string, any[]>();
+      for (const c of contactRows) {
+        const existing = contactsByStudentId.get(c.studentId) ?? [];
+        existing.push(c);
+        contactsByStudentId.set(c.studentId, existing);
+      }
+
       return companyStudents.map((row: any) => {
         const tutorUser = row.tutors?.userId ? tutorUserMap.get(row.tutors.userId) : null;
-        
-        // Use direct classId if available, otherwise check enrollments
+
         let classInfo = row.classes ? {
           id: row.classes.id,
           name: row.classes.name,
           academicYearId: row.classes.academicYearId
         } : null;
-        
-        // If no direct class, check class enrollments
+
         if (!classInfo && enrollmentMap.has(row.students.id)) {
           const enrolledClass = enrollmentMap.get(row.students.id);
           classInfo = {
@@ -1077,17 +1121,35 @@ export class DatabaseStorage implements IStorage {
             academicYearId: enrolledClass.academicYearId
           };
         }
-        
+
+        const contacts = contactsByStudentId.get(row.students.id) ?? [];
+
         return {
           id: row.students.id,
           userId: row.students.userId,
           gradeLevel: row.students.gradeLevel,
+          yearGroupCode: row.students.yearGroupCode,
+          schoolName: row.students.schoolName,
+          dateOfBirth: row.students.dateOfBirth,
+          address: row.students.address,
+          learningGoals: row.students.learningGoals,
+          notes: row.students.notes,
           parentId: row.students.parentId,
           tutorId: row.students.tutorId,
           companyId: row.students.companyId,
           classId: row.students.classId,
-          schoolName: row.students.schoolName,
-          dateOfBirth: row.students.dateOfBirth,
+          // Expose as year_group_code, school, date_of_birth for company/Students.tsx
+          year_group_code: row.students.yearGroupCode,
+          school: row.students.schoolName,
+          date_of_birth: row.students.dateOfBirth,
+          parents: contacts.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            relationship: c.relationship,
+            email: c.email,
+            phone: c.phone,
+            is_primary: c.isPrimary,
+          })),
           user: {
             id: row.users.id,
             email: row.users.email,
@@ -1096,6 +1158,11 @@ export class DatabaseStorage implements IStorage {
             isActive: row.users.isActive,
             createdAt: row.users.createdAt
           },
+          // Legacy compat fields
+          first_name: row.users.firstName,
+          last_name: row.users.lastName,
+          updated_at: row.students.updatedAt,
+          updated_by_name: row.students.updatedByName,
           class: classInfo,
           tutor: row.tutors ? {
             id: row.tutors.id,
@@ -1113,6 +1180,203 @@ export class DatabaseStorage implements IStorage {
   }
 
 
+
+  async createStudentWithContacts(data: {
+    userId: string;
+    companyId: string;
+    gradeLevel?: string | null;
+    schoolName?: string | null;
+    yearGroupCode?: string | null;
+    dateOfBirth?: Date | null;
+    address?: string | null;
+    learningGoals?: string | null;
+    notes?: string | null;
+    contacts?: Array<{ name: string; relationship?: string | null; email?: string | null; phone?: string | null; isPrimary: boolean }>;
+  }): Promise<any> {
+    const { contacts, ...studentData } = data;
+    const [student] = await db.insert(students).values(studentData).returning();
+    if (contacts && contacts.length > 0) {
+      await db.insert(studentContacts).values(
+        contacts.map(c => ({ ...c, studentId: student.id }))
+      );
+    }
+    return student;
+  }
+
+  async updateStudentWithContacts(
+    studentId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      schoolName?: string | null;
+      yearGroupCode?: string | null;
+      dateOfBirth?: Date | null;
+      address?: string | null;
+      learningGoals?: string | null;
+      notes?: string | null;
+      updatedAt?: Date;
+      updatedByName?: string | null;
+    },
+    contacts?: Array<{ name: string; relationship?: string | null; email?: string | null; phone?: string | null; isPrimary: boolean }>,
+    userId?: string,
+  ): Promise<any> {
+    const { firstName, lastName, ...studentFields } = data;
+
+    if (firstName !== undefined || lastName !== undefined) {
+      const student = await db.select({ userId: students.userId }).from(students).where(eq(students.id, studentId)).limit(1);
+      if (student[0]?.userId) {
+        await db.update(users)
+          .set({
+            ...(firstName !== undefined ? { firstName } : {}),
+            ...(lastName !== undefined ? { lastName } : {}),
+          })
+          .where(eq(users.id, student[0].userId));
+      }
+    }
+
+    await db.update(students).set(studentFields).where(eq(students.id, studentId));
+
+    if (contacts !== undefined) {
+      await db.delete(studentContacts).where(eq(studentContacts.studentId, studentId));
+      if (contacts.length > 0) {
+        await db.insert(studentContacts).values(contacts.map(c => ({ ...c, studentId })));
+      }
+    }
+
+    return this.getStudent(studentId);
+  }
+
+  async getCoursesByCompany(companyId: string): Promise<any[]> {
+    const rows = await db.select().from(courses).where(eq(courses.companyId, companyId)).orderBy(courses.name);
+    const ids = rows.map(r => r.id);
+    const subjectRows = ids.length > 0
+      ? await db.select().from(courseSubjects).where(inArray(courseSubjects.courseId, ids))
+      : [];
+    const byId = new Map<string, number[]>();
+    for (const s of subjectRows) {
+      const arr = byId.get(s.courseId) ?? [];
+      arr.push(s.subjectId);
+      byId.set(s.courseId, arr);
+    }
+    return rows.map(r => ({ ...r, subjectIds: byId.get(r.id) ?? [] }));
+  }
+
+  async createCourse(data: { companyId: string; name: string; description?: string | null; subjectIds?: number[] }): Promise<any> {
+    const { subjectIds, ...courseData } = data;
+    const [course] = await db.insert(courses).values(courseData).returning();
+    if (subjectIds && subjectIds.length > 0) {
+      await db.insert(courseSubjects).values(subjectIds.map(sid => ({ courseId: course.id, subjectId: sid })));
+    }
+    return { ...course, subjectIds: subjectIds ?? [] };
+  }
+
+  async createClassWithSubjects(classData: any, subjectIds: number[]): Promise<any> {
+    const [newClass] = await db.insert(classes).values(classData).returning();
+    if (subjectIds.length > 0) {
+      await db.insert(classSubjects).values(
+        subjectIds.map((sid, i) => ({ classId: newClass.id, subjectId: sid, isPrimary: i === 0 }))
+      );
+    }
+    return newClass;
+  }
+
+  async getClassesWithDetailsForCompany(companyId: string): Promise<any[]> {
+    const classList = await db
+      .select({
+        id: classes.id,
+        name: classes.name,
+        companyId: classes.companyId,
+        termId: classes.termId,
+        tutorId: classes.tutorId,
+        courseId: classes.courseId,
+        yearGroupCode: classes.yearGroupCode,
+        level: classes.level,
+        status: classes.status,
+        location: classes.location,
+        startTime: classes.startTime,
+        endTime: classes.endTime,
+        dayOfWeek: classes.dayOfWeek,
+        description: classes.description,
+        maxStudents: classes.maxStudents,
+        createdAt: classes.createdAt,
+      })
+      .from(classes)
+      .where(and(eq(classes.companyId, companyId), eq(classes.isActive, true)))
+      .orderBy(classes.name);
+
+    if (classList.length === 0) return [];
+
+    const classIds = classList.map(c => c.id);
+    const tutorIds = Array.from(new Set(classList.map(c => c.tutorId).filter(Boolean) as string[]));
+    const termIds = Array.from(new Set(classList.map(c => c.termId)));
+
+    const [subjectRows, tutorRows, termRows] = await Promise.all([
+      db.select().from(classSubjects).where(inArray(classSubjects.classId, classIds)),
+      tutorIds.length > 0
+        ? db.select({ id: tutors.id, userId: tutors.userId }).from(tutors).where(inArray(tutors.id, tutorIds))
+        : Promise.resolve([] as { id: string; userId: string }[]),
+      db.select({ id: academicTerms.id, academicYearId: academicTerms.academicYearId }).from(academicTerms).where(inArray(academicTerms.id, termIds)),
+    ]);
+
+    const tutorUserIds = tutorRows.map(t => t.userId);
+    const tutorUsers = tutorUserIds.length > 0
+      ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, tutorUserIds))
+      : [];
+    const tutorUserMap = new Map(tutorUsers.map(u => [u.id, u]));
+    const tutorMap = new Map(tutorRows.map(t => ({ ...t, user: tutorUserMap.get(t.userId) })).map(t => [t.id, t]));
+
+    const yearIds = Array.from(new Set(termRows.map((t: any) => t.academicYearId)));
+    const yearRows = yearIds.length > 0
+      ? await db.select({ id: academicYears.id, year: academicYears.yearNumber, name: academicYears.name }).from(academicYears).where(inArray(academicYears.id, yearIds))
+      : [];
+    const yearMap = new Map(yearRows.map(y => [y.id, y]));
+    const termYearMap = new Map(termRows.map((t: any) => [t.id, yearMap.get(t.academicYearId)]));
+
+    const subjectsByClass = new Map<string, { id: number; isPrimary: boolean }[]>();
+    for (const s of subjectRows) {
+      const arr = subjectsByClass.get(s.classId) ?? [];
+      arr.push({ id: s.subjectId, isPrimary: s.isPrimary });
+      subjectsByClass.set(s.classId, arr);
+    }
+
+    const SUBJECTS = [
+      { id: 1, code: 'ENG', name: 'English' },
+      { id: 2, code: 'MATH', name: 'Mathematics' },
+      { id: 3, code: 'READ', name: 'Reading' },
+      { id: 4, code: 'SCI', name: 'Science' },
+      { id: 5, code: 'THINK', name: 'Thinking Skills' },
+      { id: 6, code: 'WRITE', name: 'Writing' },
+    ];
+    const subjectById = new Map(SUBJECTS.map(s => [s.id, s]));
+
+    return classList.map(c => {
+      const tutor = c.tutorId ? tutorMap.get(c.tutorId) : null;
+      const academicYear = termYearMap.get(c.termId);
+      const subs = subjectsByClass.get(c.id) ?? [];
+      const subjects = subs.map(s => ({ ...subjectById.get(s.id), pivot: { is_primary: s.isPrimary } })).filter(s => s.id);
+      const primarySub = subs.find(s => s.isPrimary);
+
+      return {
+        id: c.id,
+        name: c.name,
+        business_id: c.companyId,
+        tutor_id: c.tutorId,
+        course_id: c.courseId,
+        year_group_code: c.yearGroupCode,
+        level: c.level,
+        status: c.status,
+        location: c.location,
+        description: c.description,
+        yearGroup: c.yearGroupCode
+          ? { id: 0, label: c.yearGroupCode, code: c.yearGroupCode }
+          : undefined,
+        subjects,
+        subject: primarySub ? subjectById.get(primarySub.id) : undefined,
+        tutor: tutor ? { id: tutor.id, user: tutor.user } : undefined,
+        academicYear: academicYear ?? undefined,
+      };
+    });
+  }
 
   async createTutoringCompany(companyData: any): Promise<TutoringCompany> {
     const [company] = await db.insert(tutoringCompanies).values(companyData).returning();

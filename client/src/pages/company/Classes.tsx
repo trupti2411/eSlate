@@ -9,7 +9,7 @@ import {
   User, GraduationCap, CalendarDays,
 } from 'lucide-react';
 
-interface AdminProfile { userId: string; companyId: string; companyName: string; }
+interface AdminProfile { userId: string; companyId: string; companyName?: string; company?: { id: string; name: string } }
 interface SubjectRow { id: number; code: string; name: string; state_code?: string; }
 interface YearGroupRow { id: number; code: string; label: string; state_code: string; order: number; }
 interface TutorRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; }
@@ -41,11 +41,11 @@ export default function ClassesPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
-    queryKey: [`/api/admin/company-admin/${user?.id}`],
+    queryKey: ['/api/company-admin/profile'],
     enabled: !!user?.id,
   });
   const companyId = adminProfile?.companyId;
-  const companyName = adminProfile?.companyName;
+  const companyName = adminProfile?.company?.name ?? adminProfile?.companyName;
 
   const { data: classes = [], isLoading } = useQuery<ClassRow[]>({
     queryKey: ['/api/classes'],

@@ -286,6 +286,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Auth middleware
   setupCustomAuth(app);
 
+  // Current user endpoint
+  app.get('/api/me', isAuthenticated, async (req: any, res: any) => {
+    const { password, ...user } = req.user;
+    res.json(user);
+  });
+
   // Configure multer for file uploads
   const upload = multer({
     storage: multer.memoryStorage(),
@@ -1994,12 +2000,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!user) return res.status(401).json({ message: "Authentication required" });
 
     try {
-      console.log("Student update request:", { studentId, body: req.body, userRole: user.role });
-
       const student = await storage.getStudent(studentId);
       if (!student) return res.status(404).json({ message: "Student not found" });
 
-      // Check permissions - only allow company admins, tutors from same company
       if (user.role === 'company_admin') {
         const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
         if (!companyAdmin || student.companyId !== companyAdmin.companyId) {
@@ -2014,44 +2017,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      // Separate user fields from student fields
-      const userFields = ['firstName', 'lastName', 'email'];
-      const studentFields = ['schoolName', 'classId', 'tutorId', 'gradeLevel'];
-      
-      const userUpdateData: any = {};
-      const studentUpdateData: any = {};
-      
-      for (const field of userFields) {
-        if (req.body[field] !== undefined && req.body[field] !== '') {
-          userUpdateData[field] = req.body[field];
-        }
+      const { first_name, last_name, year_group_code, school, date_of_birth, address, notes, learning_goals, parents } = req.body;
+
+      if (first_name !== undefined && !String(first_name).trim()) {
+        return res.status(400).json({ message: "First name cannot be blank" });
       }
-      
-      for (const field of studentFields) {
-        if (req.body[field] !== undefined) {
-          studentUpdateData[field] = req.body[field] === "" ? null : req.body[field];
-        }
+      if (last_name !== undefined && !String(last_name).trim()) {
+        return res.status(400).json({ message: "Last name cannot be blank" });
       }
 
-      console.log("User update data:", userUpdateData);
-      console.log("Student update data:", studentUpdateData);
-      
-      // Update user record if there are user fields to update
-      if (Object.keys(userUpdateData).length > 0 && student.userId) {
-        await storage.updateUser(student.userId, userUpdateData);
-        console.log("User updated successfully");
-      }
-      
-      // Update student record if there are student fields to update
-      let updatedStudent = student;
-      if (Object.keys(studentUpdateData).length > 0) {
-        updatedStudent = await storage.updateStudent(studentId, studentUpdateData);
-        console.log("Student updated successfully:", updatedStudent.id);
-      }
-      
-      // Re-fetch full student data to return updated info
-      const refreshedStudent = await storage.getStudent(studentId);
-      res.json(refreshedStudent);
+      const updaterName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+
+      const contacts = Array.isArray(parents)
+        ? parents
+            .filter((p: any) => p?.name?.trim())
+            .map((p: any, i: number) => ({
+              name: p.name.trim(),
+              relationship: p.relationship?.trim() || null,
+              email: p.email?.trim() || null,
+              phone: p.phone?.trim() || null,
+              isPrimary: !!p.is_primary || i === 0,
+            }))
+        : undefined;
+
+      const updatedStudent = await storage.updateStudentWithContacts(
+        studentId,
+        {
+          ...(first_name !== undefined ? { firstName: String(first_name).trim() } : {}),
+          ...(last_name !== undefined ? { lastName: String(last_name).trim() } : {}),
+          ...(school !== undefined ? { schoolName: school?.trim() || null } : {}),
+          ...(year_group_code !== undefined ? { yearGroupCode: year_group_code || null } : {}),
+          ...(date_of_birth !== undefined ? { dateOfBirth: date_of_birth ? new Date(date_of_birth) : null } : {}),
+          ...(address !== undefined ? { address: address?.trim() || null } : {}),
+          ...(notes !== undefined ? { notes: notes?.trim() || null } : {}),
+          ...(learning_goals !== undefined ? { learningGoals: learning_goals?.trim() || null } : {}),
+          updatedAt: new Date(),
+          updatedByName: updaterName,
+        },
+        contacts,
+      );
+
+      res.json(updatedStudent);
     } catch (error) {
       console.error("Error updating student:", error);
       res.status(500).json({ message: "Internal server error", error: error instanceof Error ? error.message : 'Unknown error' });
@@ -3557,6 +3563,172 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a tutoring-company profile and generate an owner invite link (admin only).
+  // Solo tutor (individual) profiles are not creatable by admins — rejected with 400.
+  app.post('/api/admin/businesses/invite', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+
+      const { type, name, abn, address, contact_phone, contact_email, owner_email, owner_first_name, owner_last_name } = req.body;
+
+      if (type === 'individual') {
+        return res.status(400).json({ message: "Admins can only create Tutoring Company profiles, not Solo Tutor profiles." });
+      }
+      if (type !== 'multi_tutor') {
+        return res.status(400).json({ message: "Invalid business type. Only 'multi_tutor' is supported." });
+      }
+      if (!name?.trim()) {
+        return res.status(400).json({ message: "Business name is required." });
+      }
+      if (!owner_email || !owner_first_name || !owner_last_name) {
+        return res.status(400).json({ message: "Owner email, first name, and last name are required." });
+      }
+
+      // Validate optional fields
+      if (abn) {
+        const abnDigits = String(abn).replace(/\s/g, '');
+        if (!/^\d{11}$/.test(abnDigits)) {
+          return res.status(400).json({ message: "ABN must be 11 digits." });
+        }
+      }
+      if (contact_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact_email)) {
+        return res.status(400).json({ message: "Contact email is not a valid email address." });
+      }
+      if (contact_phone) {
+        const phoneDigits = String(contact_phone).replace(/[\s\-().+]/g, '');
+        if (!/^\d{8,15}$/.test(phoneDigits)) {
+          return res.status(400).json({ message: "Contact phone must be a valid phone number." });
+        }
+      }
+
+      const existingUser = await storage.getUserByEmail(owner_email);
+      if (existingUser) {
+        return res.status(400).json({ message: "A user with this email already exists." });
+      }
+
+      // Create the company (inactive until owner accepts invite)
+      const company = await storage.createTutoringCompany({
+        name: name.trim(),
+        ...(abn ? { abn: String(abn).replace(/\s/g, '') } : {}),
+        ...(address ? { address: address.trim() } : {}),
+        ...(contact_phone ? { contactPhone: contact_phone.trim() } : {}),
+        ...(contact_email ? { contactEmail: contact_email.trim().toLowerCase() } : {}),
+        isActive: false,
+      });
+
+      // Generate a 7-day invite token
+      const { generateVerificationToken } = await import('./customAuth');
+      const token = generateVerificationToken();
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+      // Create a placeholder owner account (inactive, no password)
+      const placeholderUser = await storage.createUserWithRole({
+        email: owner_email,
+        firstName: owner_first_name,
+        lastName: owner_last_name,
+        role: 'company_admin',
+        isActive: false,
+        isEmailVerified: false,
+      });
+
+      // Store the invite token and expiry on the placeholder user
+      await storage.updateUser(placeholderUser.id, {
+        emailVerificationToken: token,
+        passwordResetExpires: expiresAt,
+      });
+
+      // Link the user to the company as its owner
+      await storage.createCompanyAdmin({
+        userId: placeholderUser.id,
+        companyId: company.id,
+      });
+
+      res.json({
+        invitation_id: placeholderUser.id,
+        business_id: company.id,
+        business_type: 'multi_tutor',
+        business_name: company.name,
+        token,
+        expires_at: expiresAt.toISOString(),
+      });
+    } catch (error) {
+      console.error("Error creating business invite:", error);
+      res.status(500).json({ message: "Failed to create invitation", error: (error as Error).message });
+    }
+  });
+
+  // Accept a business owner invite — sets password, activates user + company.
+  app.post('/api/onboarding/accept-business-invite', async (req: any, res: any) => {
+    try {
+      const { token, password, first_name, last_name } = req.body;
+
+      if (!token || !password || !first_name || !last_name) {
+        return res.status(400).json({ message: "token, password, first_name and last_name are required." });
+      }
+      if (password.length < 8) {
+        return res.status(400).json({ message: "Password must be at least 8 characters." });
+      }
+
+      // Find the user by invite token
+      const { db } = await import('./db');
+      const { users: usersTable } = await import('@shared/schema');
+      const { eq } = await import('drizzle-orm');
+      const [invitedUser] = await db.select().from(usersTable)
+        .where(eq(usersTable.emailVerificationToken, token));
+
+      if (!invitedUser) {
+        return res.status(400).json({ message: "Invalid or expired invite link." });
+      }
+      if (invitedUser.passwordResetExpires && new Date() > invitedUser.passwordResetExpires) {
+        return res.status(400).json({ message: "Invite link has expired. Ask the admin to send a new one." });
+      }
+
+      // Set password and activate
+      const { hashPassword } = await import('./customAuth');
+      const hashed = await hashPassword(password);
+      await storage.updateUser(invitedUser.id, {
+        firstName: first_name,
+        lastName: last_name,
+        password: hashed,
+        isActive: true,
+        isEmailVerified: true,
+        emailVerificationToken: null,
+        passwordResetExpires: null,
+      });
+
+      // Activate the company
+      const companyAdmin = await storage.getCompanyAdminByUserId(invitedUser.id);
+      if (companyAdmin) {
+        await storage.updateCompanyStatus(companyAdmin.companyId, true);
+      }
+
+      // Start a session for the new user
+      const updatedUser = await storage.getUser(invitedUser.id);
+      (req as any).session.userId = updatedUser!.id;
+      await storage.updateUserLastLogin(updatedUser!.id);
+
+      const { generateJWT } = await import('./customAuth');
+      const authToken = generateJWT(updatedUser!.id);
+
+      res.json({
+        token: authToken,
+        user: {
+          id: updatedUser!.id,
+          email: updatedUser!.email,
+          name: `${updatedUser!.firstName} ${updatedUser!.lastName}`.trim(),
+          role: updatedUser!.role,
+        },
+        business_id: companyAdmin?.companyId,
+      });
+    } catch (error) {
+      console.error("Error accepting business invite:", error);
+      res.status(500).json({ message: "Failed to accept invite", error: (error as Error).message });
+    }
+  });
+
   // Company management routes
   app.get('/api/companies', isAuthenticated, async (req: any, res: any) => {
     try {
@@ -3631,6 +3803,307 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching company students:", error);
       res.status(500).json({ message: "Failed to fetch students" });
+    }
+  });
+
+  // NSW year groups (static)
+  app.get('/api/year-groups', async (_req: any, res: any) => {
+    res.json([
+      { id: 1, state_code: 'NSW', order: 0, label: 'Kindergarten', code: 'K' },
+      { id: 2, state_code: 'NSW', order: 1, label: 'Year 1', code: 'Y1' },
+      { id: 3, state_code: 'NSW', order: 2, label: 'Year 2', code: 'Y2' },
+      { id: 4, state_code: 'NSW', order: 3, label: 'Year 3', code: 'Y3' },
+      { id: 5, state_code: 'NSW', order: 4, label: 'Year 4', code: 'Y4' },
+      { id: 6, state_code: 'NSW', order: 5, label: 'Year 5', code: 'Y5' },
+      { id: 7, state_code: 'NSW', order: 6, label: 'Year 6', code: 'Y6' },
+      { id: 8, state_code: 'NSW', order: 7, label: 'Year 7', code: 'Y7' },
+      { id: 9, state_code: 'NSW', order: 8, label: 'Year 8', code: 'Y8' },
+      { id: 10, state_code: 'NSW', order: 9, label: 'Year 9', code: 'Y9' },
+      { id: 11, state_code: 'NSW', order: 10, label: 'Year 10', code: 'Y10' },
+      { id: 12, state_code: 'NSW', order: 11, label: 'Year 11', code: 'Y11' },
+      { id: 13, state_code: 'NSW', order: 12, label: 'Year 12', code: 'Y12' },
+    ]);
+  });
+
+  // Schools — Data.NSW ArcGIS ACARA feature service, with static fallback
+  const NSW_SCHOOLS_FALLBACK = [
+    { name: 'Sydney Grammar School', suburb: 'Darlinghurst', state: 'NSW', postcode: '2010' },
+    { name: 'Sydney Boys High School', suburb: 'Moore Park', state: 'NSW', postcode: '2021' },
+    { name: 'Sydney Girls High School', suburb: 'Surry Hills', state: 'NSW', postcode: '2010' },
+    { name: 'James Ruse Agricultural High School', suburb: 'Carlingford', state: 'NSW', postcode: '2118' },
+    { name: 'North Sydney Boys High School', suburb: 'North Sydney', state: 'NSW', postcode: '2060' },
+    { name: 'Parramatta High School', suburb: 'Parramatta', state: 'NSW', postcode: '2150' },
+    { name: 'Blacktown Boys High School', suburb: 'Blacktown', state: 'NSW', postcode: '2148' },
+    { name: 'Penrith High School', suburb: 'Penrith', state: 'NSW', postcode: '2750' },
+    { name: 'Newington College', suburb: 'Stanmore', state: 'NSW', postcode: '2048' },
+    { name: 'Knox Grammar School', suburb: 'Wahroonga', state: 'NSW', postcode: '2076' },
+  ];
+
+  async function arcGISSchools(where: string, limit: number) {
+    const params = new URLSearchParams({ where, outFields: 'school_name,suburb,state,postcode', f: 'json', resultRecordCount: String(limit) });
+    const resp = await fetch(`https://portal.data.nsw.gov.au/arcgis/rest/services/Hosted/ACARA_Schools_NSW/FeatureServer/0/query?${params}`, { signal: AbortSignal.timeout(6000) } as any);
+    const data = await (resp as any).json() as any;
+    return ((data.features ?? []) as any[]).map(f => ({
+      name: f.attributes.school_name as string,
+      suburb: f.attributes.suburb as string,
+      state: (f.attributes.state ?? 'NSW') as string,
+      postcode: String(f.attributes.postcode ?? ''),
+    }));
+  }
+
+  app.get('/api/schools/search', async (req: any, res: any) => {
+    const q = String(req.query.q ?? '').trim();
+    if (q.length < 2) return res.json([]);
+    const safe = q.replace(/'/g, "''");
+    const upper = safe.toUpperCase();
+    const where = `status='Open' AND (UPPER(school_name) LIKE '%${upper}%' OR UPPER(suburb) LIKE '%${upper}%')`;
+    try {
+      return res.json(await arcGISSchools(where, 10));
+    } catch {
+      const lower = q.toLowerCase();
+      return res.json(NSW_SCHOOLS_FALLBACK.filter(s =>
+        s.name.toLowerCase().includes(lower) || s.suburb.toLowerCase().includes(lower)
+      ).slice(0, 10));
+    }
+  });
+
+  app.get('/api/schools/by-suburb', async (req: any, res: any) => {
+    const suburb = String(req.query.suburb ?? '').trim();
+    if (suburb.length < 2) return res.json([]);
+    const safe = suburb.replace(/'/g, "''");
+    const where = `status='Open' AND UPPER(suburb)='${safe.toUpperCase()}'`;
+    try {
+      return res.json(await arcGISSchools(where, 15));
+    } catch {
+      const lower = suburb.toLowerCase();
+      return res.json(NSW_SCHOOLS_FALLBACK.filter(s =>
+        s.suburb.toLowerCase() === lower
+      ).slice(0, 15));
+    }
+  });
+
+  // ── ESLATE-8: Subjects, Courses, Classes ─────────────────────────────────
+
+  const SUBJECTS = [
+    { id: 1, code: 'ENG',   name: 'English' },
+    { id: 2, code: 'MATH',  name: 'Mathematics' },
+    { id: 3, code: 'READ',  name: 'Reading' },
+    { id: 4, code: 'SCI',   name: 'Science' },
+    { id: 5, code: 'THINK', name: 'Thinking Skills' },
+    { id: 6, code: 'WRITE', name: 'Writing' },
+  ];
+  const subjectById = new Map(SUBJECTS.map(s => [s.id, s]));
+
+  app.get('/api/subjects', async (_req: any, res: any) => {
+    res.json(SUBJECTS);
+  });
+
+  // GET /api/courses — list courses for the logged-in company (with their subject IDs)
+  app.get('/api/courses', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      let companyId: string;
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+        companyId = ca.companyId;
+      } else {
+        const { company_id } = req.query;
+        if (!company_id) return res.json([]);
+        companyId = company_id as string;
+      }
+      const rows = await storage.getCoursesByCompany(companyId);
+      // Enrich with subject objects for the frontend CourseSummary interface
+      const enriched = rows.map(r => ({
+        ...r,
+        subjects: (r.subjectIds as number[]).map(id => subjectById.get(id)).filter(Boolean),
+      }));
+      res.json(enriched);
+    } catch (err) {
+      console.error("Error fetching courses:", err);
+      res.status(500).json({ message: "Failed to fetch courses" });
+    }
+  });
+
+  // POST /api/courses — create a course (inline within class creation or standalone)
+  app.post('/api/courses', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+
+      const { name, description, subject_ids } = req.body;
+      if (!name?.trim()) return res.status(400).json({ message: "Course name is required" });
+      if (name.trim().length > 150) return res.status(400).json({ message: "Course name must be 150 characters or fewer" });
+      if (description && description.length > 500) return res.status(400).json({ message: "Description must be 500 characters or fewer" });
+      if (!Array.isArray(subject_ids) || subject_ids.length === 0) {
+        return res.status(400).json({ message: "At least one subject must be selected" });
+      }
+
+      const course = await storage.createCourse({
+        companyId: ca.companyId,
+        name: name.trim(),
+        description: description?.trim() || null,
+        subjectIds: subject_ids.map(Number).filter(id => subjectById.has(id)),
+      });
+      res.status(201).json({
+        ...course,
+        subjects: (course.subjectIds as number[]).map(id => subjectById.get(id)).filter(Boolean),
+      });
+    } catch (err) {
+      console.error("Error creating course:", err);
+      res.status(500).json({ message: "Failed to create course" });
+    }
+  });
+
+  // GET /api/classes — enriched class list for the logged-in company
+  app.get('/api/classes', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.json([]);
+      res.json(await storage.getClassesWithDetailsForCompany(ca.companyId));
+    } catch (err) {
+      console.error("Error fetching classes:", err);
+      res.status(500).json({ message: "Failed to fetch classes" });
+    }
+  });
+
+  // POST /api/classes — create a class with multi-subject, multi-term payload
+  app.post('/api/classes', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+
+      const {
+        name, course_id, subject_ids = [], year_group_id, tutor_id,
+        term_ids = [], capacity, description, level, status,
+        schedule_day_of_week, schedule_start_time, schedule_end_time, location,
+      } = req.body;
+
+      if (!name?.trim()) return res.status(400).json({ message: "Class name is required" });
+      if (!term_ids.length) return res.status(400).json({ message: "At least one term is required" });
+
+      const primaryTermId = String(term_ids[0]);
+
+      // Resolve primary subject name for the legacy classes.subject column
+      const primarySubjectId = subject_ids[0] ? Number(subject_ids[0]) : null;
+      const primarySubjectName = primarySubjectId ? (subjectById.get(primarySubjectId)?.name ?? 'TBD') : 'TBD';
+
+      const newClass = await storage.createClassWithSubjects(
+        {
+          name: name.trim(),
+          companyId: ca.companyId,
+          termId: primaryTermId,
+          subject: primarySubjectName,
+          tutorId: tutor_id ? String(tutor_id) : null,
+          description: description?.trim() || null,
+          location: location?.trim() || null,
+          dayOfWeek: schedule_day_of_week ? Number(schedule_day_of_week) : null,
+          startTime: schedule_start_time || '',
+          endTime: schedule_end_time || '',
+          maxStudents: capacity ? Number(capacity) : 20,
+          isActive: true,
+          courseId: course_id ? String(course_id) : null,
+          yearGroupCode: year_group_id ? String(year_group_id) : null,
+          level: level?.trim() || null,
+          status: status || 'draft',
+        },
+        subject_ids.map(Number).filter((id: number) => id > 0),
+      );
+
+      res.status(201).json(newClass);
+    } catch (err: any) {
+      console.error("Error creating class:", err);
+      res.status(500).json({ message: err.message ?? "Failed to create class" });
+    }
+  });
+
+  // ── end ESLATE-8 ──────────────────────────────────────────────────────────
+
+  // Create student for a business (company admin or admin)
+  app.post('/api/businesses/:businessId/students', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { businessId } = req.params;
+
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Company admin or admin access required" });
+      }
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca || ca.companyId !== businessId) {
+          return res.status(403).json({ message: "Access denied to this company" });
+        }
+      }
+
+      const { first_name, last_name, year_group_code, school, date_of_birth, address, learning_goals, notes, parents } = req.body;
+
+      if (!first_name?.trim() || !last_name?.trim()) {
+        return res.status(400).json({ message: "First name and last name are required" });
+      }
+      if (!address?.trim()) {
+        return res.status(400).json({ message: "Address is required" });
+      }
+
+      // Build a placeholder email from name + company + timestamp
+      const slug = `${first_name.trim().toLowerCase()}.${last_name.trim().toLowerCase()}`.replace(/[^a-z.]/g, '');
+      const placeholderEmail = `${slug}.${Date.now()}@student.eslate.internal`;
+
+      const { hashPassword } = await import('./customAuth');
+      const newUser = await storage.createUserWithRole({
+        email: placeholderEmail,
+        firstName: first_name.trim(),
+        lastName: last_name.trim(),
+        password: await hashPassword('TempPass123!'),
+        role: 'student',
+        isActive: true,
+        isEmailVerified: true,
+      });
+
+      const dob = date_of_birth ? new Date(date_of_birth) : null;
+
+      const contacts = Array.isArray(parents)
+        ? parents
+            .filter((p: any) => p?.name?.trim())
+            .map((p: any, i: number) => ({
+              name: p.name.trim(),
+              relationship: p.relationship?.trim() || null,
+              email: p.email?.trim() || null,
+              phone: p.phone?.trim() || null,
+              isPrimary: !!p.is_primary || i === 0,
+            }))
+        : [];
+
+      const student = await storage.createStudentWithContacts({
+        userId: newUser.id,
+        companyId: businessId,
+        schoolName: school?.trim() || null,
+        yearGroupCode: year_group_code || null,
+        dateOfBirth: dob,
+        address: address.trim(),
+        learningGoals: learning_goals?.trim() || null,
+        notes: notes?.trim() || null,
+        contacts,
+      });
+
+      res.status(201).json({ message: "Student created", student });
+    } catch (error) {
+      console.error("Error creating student:", error);
+      res.status(500).json({ message: "Failed to create student", error: (error as Error).message });
     }
   });
 
@@ -3747,7 +4220,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const companyAdmin = await storage.getCompanyAdminByUserId(userId);
-      res.json(companyAdmin);
+      if (!companyAdmin) return res.status(404).json({ message: "Company admin not found" });
+
+      const company = await storage.getTutoringCompany(companyAdmin.companyId);
+      res.json({
+        ...companyAdmin,
+        companyName: company?.name ?? null,
+      });
     } catch (error) {
       console.error("Error fetching company admin:", error);
       res.status(500).json({ message: "Failed to fetch company admin" });

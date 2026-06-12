@@ -65,12 +65,31 @@ export const students = pgTable("students", {
   userId: varchar("user_id").notNull().references(() => users.id),
   gradeLevel: varchar("grade_level"),
   schoolName: varchar("school_name"),
+  yearGroupCode: varchar("year_group_code"),
+  dateOfBirth: timestamp("date_of_birth"),
+  address: text("address"),
+  learningGoals: text("learning_goals"),
+  notes: text("notes"),
   parentId: varchar("parent_id").references(() => parents.id),
   tutorId: varchar("tutor_id").references(() => tutors.id),
   companyId: varchar("company_id").references(() => tutoringCompanies.id), // Direct company assignment
   yearId: varchar("year_id").references(() => academicYears.id), // Academic year assignment
   termId: varchar("term_id").references(() => academicTerms.id), // Academic term assignment
   classId: varchar("class_id").references(() => classes.id), // Class assignment
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at"),
+  updatedByName: varchar("updated_by_name"),
+});
+
+// Student contacts (parents/guardians) — standalone, no user account required
+export const studentContacts = pgTable("student_contacts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  name: varchar("name").notNull(),
+  relationship: varchar("relationship"),
+  email: varchar("email"),
+  phone: varchar("phone"),
+  isPrimary: boolean("is_primary").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -89,6 +108,7 @@ export const tutoringCompanies = pgTable("tutoring_companies", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: varchar("name").notNull(),
   description: text("description"),
+  abn: varchar("abn"),
   contactEmail: varchar("contact_email"),
   contactPhone: varchar("contact_phone"),
   address: text("address"),
@@ -96,6 +116,30 @@ export const tutoringCompanies = pgTable("tutoring_companies", {
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Courses — catalogue parents for classes (scoped per tutoring company)
+export const courses = pgTable("courses", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 150 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Subjects a course covers — drives the subject filter in the class form
+export const courseSubjects = pgTable("course_subjects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
+  subjectId: integer("subject_id").notNull(),
+});
+
+// Multi-subject pivot for classes — first row with isPrimary=true mirrors classes.subject
+export const classSubjects = pgTable("class_subjects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
+  subjectId: integer("subject_id").notNull(),
+  isPrimary: boolean("is_primary").notNull().default(false),
 });
 
 export const companySupportContacts = pgTable("company_support_contacts", {
@@ -539,16 +583,21 @@ export const classes = pgTable("classes", {
   termId: varchar("term_id").notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
   companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
   name: varchar("name").notNull(), // e.g., "Mathematics A", "English Literature"
-  subject: varchar("subject").notNull(),
+  subject: varchar("subject").notNull().default('TBD'),
   description: text("description"),
   location: varchar("location"),
   tutorId: varchar("tutor_id").references(() => tutors.id, { onDelete: "set null" }),
-  dayOfWeek: integer("day_of_week"), // 0 = Sunday, 1 = Monday, etc. (nullable for backwards compatibility)
-  daysOfWeek: integer("days_of_week").array().notNull().default([]), // Array of days for multi-day classes
-  startTime: varchar("start_time").notNull(), // e.g., "09:00"
-  endTime: varchar("end_time").notNull(), // e.g., "10:30"
+  dayOfWeek: integer("day_of_week"),
+  daysOfWeek: integer("days_of_week").array().notNull().default([]),
+  startTime: varchar("start_time").notNull().default(''),
+  endTime: varchar("end_time").notNull().default(''),
   maxStudents: integer("max_students").default(20),
   isActive: boolean("is_active").default(true),
+  // ESLATE-8 additions
+  courseId: varchar("course_id").references(() => courses.id, { onDelete: "set null" }),
+  yearGroupCode: varchar("year_group_code"),
+  level: varchar("level"),
+  status: varchar("status").default('draft'),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
