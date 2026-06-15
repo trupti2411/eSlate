@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>eSlate — Process Maps &amp; Feature Inventory</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:#f1f5f9;color:#1e293b;font-size:13px}
+.page{width:210mm;min-height:297mm;margin:0 auto 8mm;background:#fff;padding:14mm 16mm;position:relative;page-break-after:always;overflow:hidden}
+@media print{.page{margin:0;box-shadow:none}}
+.cover{background:linear-gradient(145deg,#0f172a,#1e3a5f 55%,#0f2942);color:#fff;display:flex;flex-direction:column;justify-content:center;padding:22mm 20mm}
+.badge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:4px 14px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#93c5fd;margin-bottom:16px;display:inline-block}
+.cover h1{font-size:34px;font-weight:800;line-height:1.15;margin-bottom:8px}
+.cover h2{font-size:17px;color:#93c5fd;margin-bottom:26px;font-weight:400}
+.cdiv{width:60px;height:3px;background:#3b82f6;border-radius:2px;margin-bottom:24px}
+.cmeta{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.cmi{background:rgba(255,255,255,.08);border-radius:8px;padding:10px 13px}
+.cmi label{font-size:9px;color:#94a3b8;text-transform:uppercase;letter-spacing:.8px;display:block;margin-bottom:2px}
+.cmi span{font-size:12px;font-weight:600;color:#e2e8f0}
+.chips{margin-top:22px;display:flex;flex-wrap:wrap;gap:7px}
+.chip2{background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.4);border-radius:14px;padding:3px 11px;font-size:11px;color:#93c5fd}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid #e2e8f0}
+.si{width:38px;height:38px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.st{font-size:19px;font-weight:700;color:#0f172a}
+.ss{font-size:11px;color:#64748b;margin-top:2px}
+.thr{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#94a3b8;margin:13px 0 5px}
+.tr{display:flex;justify-content:space-between;align-items:center;padding:6px 9px;border-radius:5px;margin-bottom:2px;font-size:12px}
+.tr:nth-child(odd){background:#f8fafc}
+.td{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:7px}
+.pmt{font-size:12px;font-weight:600;margin:10px 0 6px;border-left:3px solid currentColor;padding-left:7px}
+svg.pm{width:100%;border-radius:7px;border:1px solid #e2e8f0;background:#fafafa}
+.fc{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+.fb{border-radius:8px;padding:11px 13px}
+.fb h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-bottom:7px}
+.fi{display:flex;align-items:flex-start;gap:6px;margin-bottom:5px;font-size:11px;color:#374151;line-height:1.4}
+.dot{width:15px;height:15px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;flex-shrink:0;margin-top:1px}
+.db{background:#dcfce7;color:#15803d}
+.dp{background:#fef9c3;color:#854d0e}
+.dn{background:#fee2e2;color:#b91c1c}
+.gt{width:100%;border-collapse:collapse;font-size:11px;margin-top:10px}
+.gt th{background:#1e293b;color:#e2e8f0;padding:7px 9px;text-align:left;font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.6px}
+.gt td{padding:6px 9px;border-bottom:1px solid #f1f5f9;vertical-align:top}
+.gt tr:nth-child(even) td{background:#f8fafc}
+.bar{height:5px;border-radius:3px;background:#e2e8f0;margin-top:3px}
+.bf{height:5px;border-radius:3px}
+.sc{display:inline-block;padding:2px 7px;border-radius:9px;font-size:9.5px;font-weight:600}
+.scd{background:#dcfce7;color:#15803d}
+.scp{background:#fef9c3;color:#854d0e}
+.scn{background:#fee2e2;color:#b91c1c}
+.pg{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:11px}
+.pc{border-radius:8px;padding:11px}
+.pc h5{font-size:11px;font-weight:700;margin-bottom:7px}
+.pi{padding:4px 7px;border-radius:5px;margin-bottom:3px;font-size:10.5px;color:#374151;background:rgba(255,255,255,.7)}
+.sprints{display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-top:13px}
+.sp{border-radius:6px;padding:9px}
+.spt{font-weight:700;font-size:11px;margin-bottom:5px}
+.sp div{font-size:10.5px;color:#374151;margin-bottom:2px}
+.cl{border-radius:7px;padding:9px 12px;margin:9px 0;font-size:11px;display:flex;gap:7px}
+.pn{position:absolute;bottom:9mm;right:16mm;font-size:10px;color:#94a3b8}
+</style>
+</head>
+<body>
+
+<div class="page cover">
+  <div class="badge">Internal Product Document</div>
+  <h1>eSlate Platform<br>Process Maps &amp; Feature Inventory</h1>
+  <h2>Persona Workflows · Built vs. Needed · Sprint Roadmap</h2>
+  <div class="cdiv"></div>
+  <div class="cmeta">
+    <div class="cmi"><label>Document Type</label><span>Process Maps + Gap Analysis</span></div>
+    <div class="cmi"><label>Branch</label><span>trupti-dev</span></div>
+    <div class="cmi"><label>Date</label><span>June 2026</span></div>
+    <div class="cmi"><label>Version</label><span>1.0</span></div>
+  </div>
+  <div class="chips">
+    <span class="chip2">👤 Admin</span><span class="chip2">🏢 Tutoring Business</span>
+    <span class="chip2">📚 Tutor</span><span class="chip2">🎓 Student</span><span class="chip2">👨‍👩‍👧 Parent</span>
+  </div>
+</div>
+
+<div class="page">
+  <div style="font-size:22px;font-weight:700;margin-bottom:5px">Table of Contents</div>
+  <div style="font-size:12px;color:#64748b;margin-bottom:20px">Process maps, built features, gaps and build roadmap for all 5 personas on the eSlate platform.</div>
+  <div class="thr">Persona Sections</div>
+  <div class="tr"><span><span class="td" style="background:#4f46e5"></span>1 · Admin — Platform Administrator</span><span style="color:#94a3b8">3–4</span></div>
+  <div class="tr"><span><span class="td" style="background:#0369a1"></span>2 · Tutoring Business / Company Admin</span><span style="color:#94a3b8">5–6</span></div>
+  <div class="tr"><span><span class="td" style="background:#0f766e"></span>3 · Tutor</span><span style="color:#94a3b8">7</span></div>
+  <div class="tr"><span><span class="td" style="background:#b45309"></span>4 · Student</span><span style="color:#94a3b8">8</span></div>
+  <div class="tr"><span><span class="td" style="background:#9333ea"></span>5 · Parent / Guardian</span><span style="color:#94a3b8">9</span></div>
+  <div class="thr">Summary &amp; Roadmap</div>
+  <div class="tr"><span><span class="td" style="background:#1e293b"></span>6 · Gap Analysis — All Personas</span><span style="color:#94a3b8">10</span></div>
+  <div class="tr"><span><span class="td" style="background:#1e293b"></span>7 · Priority Matrix &amp; Sprint Roadmap</span><span style="color:#94a3b8">11</span></div>
+  <div class="thr" style="margin-top:20px">Legend</div>
+  <div style="display:flex;gap:18px;margin-top:5px">
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="dot db">✓</span>Built &amp; working end-to-end</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="dot dp">~</span>Partially built / stub</div>
+    <div style="display:flex;align-items:center;gap:6px;font-size:12px"><span class="dot dn">✗</span>Not yet built</div>
+  </div>
+  <div class="cl" style="background:#f0f9ff;border-left:4px solid #0369a1;margin-top:20px">
+    <span style="font-size:13px">ℹ️</span>
+    <div><strong>Architecture:</strong> eSlate has two backends — <strong>Express/Node.js</strong> (PostgreSQL, port 3000) for the React frontend, and a <strong>Laravel PHP API</strong> (SQLite, Herd at eslate-api.test). Both are covered here.</div>
+  </div>
+  <div class="pn">2</div>
+</div>
+
+<!-- ADMIN MAP -->
+<div class="page">
+  <div class="sh">
+    <div class="si" style="background:#4f46e5;color:#fff">👤</div>
+    <div><div class="st">Admin — Platform Administrator</div><div class="ss">Role: <code>admin</code> · Single superuser (admin@eslate.com) · Full platform access</div></div>
+  </div>
+  <div class="pmt" style="color:#4f46e5">Admin Process Map — 4 Core Domains</div>
+  <svg class="pm" viewBox="0 0 660 295" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a1" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#4f46e5"/></marker>
+      <marker id="a1p" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#a5b4fc"/></marker>
+    </defs>
+    <rect width="660" height="295" fill="#fafafa" rx="6"/>
+    <rect x="0" y="0" width="660" height="28" fill="#eef2ff" rx="6"/>
+    <text x="82" y="18" font-size="8.5" font-weight="700" fill="#4f46e5" text-anchor="middle" font-family="Inter,sans-serif">USER &amp; BUSINESS</text>
+    <text x="247" y="18" font-size="8.5" font-weight="700" fill="#4f46e5" text-anchor="middle" font-family="Inter,sans-serif">ONBOARDING</text>
+    <text x="412" y="18" font-size="8.5" font-weight="700" fill="#4f46e5" text-anchor="middle" font-family="Inter,sans-serif">ACADEMIC SETUP</text>
+    <text x="578" y="18" font-size="8.5" font-weight="700" fill="#4f46e5" text-anchor="middle" font-family="Inter,sans-serif">MONITORING</text>
+    <line x1="165" y1="28" x2="165" y2="295" stroke="#c7d2fe" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="330" y1="28" x2="330" y2="295" stroke="#c7d2fe" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="495" y1="28" x2="495" y2="295" stroke="#c7d2fe" stroke-width="1" stroke-dasharray="3,3"/>
+    <rect x="10" y="38" width="145" height="26" rx="5" fill="#4f46e5"/><text x="82" y="54" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Login / Authenticate</text>
+    <line x1="82" y1="64" x2="82" y2="74" stroke="#4f46e5" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="10" y="74" width="145" height="26" rx="5" fill="#6366f1"/><text x="82" y="90" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View System Stats</text>
+    <line x1="82" y1="100" x2="82" y2="110" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="10" y="110" width="145" height="26" rx="5" fill="#6366f1"/><text x="82" y="126" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">List / Search All Users</text>
+    <line x1="82" y1="136" x2="82" y2="146" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="10" y="146" width="145" height="32" rx="5" fill="#a5b4fc"/><text x="82" y="159" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">Toggle User Status ⚠</text><text x="82" y="172" font-size="7.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">is_active col missing — returns 422</text>
+    <line x1="82" y1="178" x2="82" y2="188" stroke="#a5b4fc" stroke-width="1.5" marker-end="url(#a1p)"/>
+    <rect x="10" y="188" width="145" height="26" rx="5" fill="#6366f1"/><text x="82" y="204" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Invite Business Owner</text>
+    <line x1="82" y1="214" x2="82" y2="224" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="10" y="224" width="145" height="26" rx="5" fill="#6366f1"/><text x="82" y="240" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Manage Support Contacts</text>
+    <rect x="175" y="38" width="145" height="26" rx="5" fill="#6366f1"/><text x="247" y="54" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Monitor Pending Invites</text>
+    <line x1="247" y1="64" x2="247" y2="74" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="175" y="74" width="145" height="26" rx="5" fill="#6366f1"/><text x="247" y="90" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Track WWCC Compliance</text>
+    <line x1="247" y1="100" x2="247" y2="110" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="175" y="110" width="145" height="32" rx="5" fill="#a5b4fc"/><text x="247" y="123" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">Enforce Tier Limits ⚠</text><text x="247" y="136" font-size="7.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">enforced; no upgrade UI</text>
+    <line x1="247" y1="142" x2="247" y2="152" stroke="#a5b4fc" stroke-width="1.5" marker-end="url(#a1p)"/>
+    <rect x="175" y="152" width="145" height="26" rx="5" fill="#e0e7ff"/><text x="247" y="168" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">✗ Billing / Subscriptions</text>
+    <line x1="247" y1="178" x2="247" y2="188" stroke="#c7d2fe" stroke-width="1"/>
+    <rect x="175" y="188" width="145" height="26" rx="5" fill="#e0e7ff"/><text x="247" y="204" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">✗ Global Compliance Dash</text>
+    <rect x="340" y="38" width="145" height="26" rx="5" fill="#6366f1"/><text x="412" y="54" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Manage Academic Years</text>
+    <line x1="412" y1="64" x2="412" y2="74" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="340" y="74" width="145" height="26" rx="5" fill="#6366f1"/><text x="412" y="90" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Manage Terms</text>
+    <line x1="412" y1="100" x2="412" y2="110" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="340" y="110" width="145" height="26" rx="5" fill="#6366f1"/><text x="412" y="126" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Manage Subjects</text>
+    <line x1="412" y1="136" x2="412" y2="146" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="340" y="146" width="145" height="26" rx="5" fill="#6366f1"/><text x="412" y="162" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Apply State Packs (NSW)</text>
+    <line x1="412" y1="172" x2="412" y2="182" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="340" y="182" width="145" height="26" rx="5" fill="#e0e7ff"/><text x="412" y="198" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">✗ Global Course Library</text>
+    <rect x="505" y="38" width="145" height="26" rx="5" fill="#6366f1"/><text x="578" y="54" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View Audit Logs</text>
+    <line x1="578" y1="64" x2="578" y2="74" stroke="#6366f1" stroke-width="1.5" marker-end="url(#a1)"/>
+    <rect x="505" y="74" width="145" height="32" rx="5" fill="#a5b4fc"/><text x="578" y="87" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">Platform Reports ⚠</text><text x="578" y="100" font-size="7.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">per-company only, no aggregate</text>
+    <line x1="578" y1="106" x2="578" y2="116" stroke="#a5b4fc" stroke-width="1.5" marker-end="url(#a1p)"/>
+    <rect x="505" y="116" width="145" height="26" rx="5" fill="#e0e7ff"/><text x="578" y="132" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">✗ System Health Monitor</text>
+    <line x1="578" y1="142" x2="578" y2="152" stroke="#c7d2fe" stroke-width="1"/>
+    <rect x="505" y="152" width="145" height="26" rx="5" fill="#e0e7ff"/><text x="578" y="168" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">✗ Platform-wide Analytics</text>
+    <line x1="578" y1="178" x2="578" y2="188" stroke="#c7d2fe" stroke-width="1"/>
+    <rect x="505" y="188" width="145" height="26" rx="5" fill="#e0e7ff"/><text x="578" y="204" font-size="8.5" fill="#3730a3" text-anchor="middle" font-family="Inter,sans-serif">✗ Admin Impersonation</text>
+    <rect x="10" y="268" width="10" height="10" rx="2" fill="#6366f1"/><text x="24" y="277" font-size="8" fill="#4b5563" font-family="Inter,sans-serif">Built</text>
+    <rect x="65" y="268" width="10" height="10" rx="2" fill="#a5b4fc"/><text x="79" y="277" font-size="8" fill="#4b5563" font-family="Inter,sans-serif">Partial ⚠</text>
+    <rect x="140" y="268" width="10" height="10" rx="2" fill="#e0e7ff"/><text x="154" y="277" font-size="8" fill="#4b5563" font-family="Inter,sans-serif">Not Built ✗</text>
+  </svg>
+  <div class="pn">3</div>
+</div>
+
+<div class="page">
+  <div class="sh"><div class="si" style="background:#4f46e5;color:#fff">👤</div><div><div class="st">Admin — Features Built vs. Needed</div></div></div>
+  <div class="fc">
+    <div class="fb" style="background:#eef2ff;border-left:4px solid #4f46e5">
+      <h4 style="color:#3730a3">✓ Built &amp; Working</h4>
+      <div class="fi"><span class="dot db">✓</span>Login + JWT auth with rate-limit lockout (login_attempts table)</div>
+      <div class="fi"><span class="dot db">✓</span>Dashboard — live user/business/class/invite counts</div>
+      <div class="fi"><span class="dot db">✓</span>List all users with role + company filter</div>
+      <div class="fi"><span class="dot db">✓</span>Invite multi-tutor business owner — creates business + token + email</div>
+      <div class="fi"><span class="dot db">✓</span>Academic years, terms, subjects CRUD (Laravel)</div>
+      <div class="fi"><span class="dot db">✓</span>NSW State Packs — curriculum data (GET + apply)</div>
+      <div class="fi"><span class="dot db">✓</span>View audit logs per company / user</div>
+      <div class="fi"><span class="dot db">✓</span>Tier enforcement: individual→1, starter→5, pro→20, enterprise→∞</div>
+      <div class="fi"><span class="dot db">✓</span>Worksheet management + editor</div>
+      <div class="fi"><span class="dot db">✓</span>Support contacts management (add / remove / list)</div>
+      <div class="fi"><span class="dot db">✓</span>Company settings CRUD</div>
+      <div class="fi"><span class="dot db">✓</span>WWCC compliance visibility via tutor records</div>
+    </div>
+    <div class="fb" style="background:#fef2f2;border-left:4px solid #ef4444">
+      <h4 style="color:#b91c1c">✗ Needs to Be Built</h4>
+      <div class="fi"><span class="dot dn">✗</span><strong>User status toggle</strong> — <code>is_active</code> col missing; endpoint returns 422. Critical fix.</div>
+      <div class="fi"><span class="dot dn">✗</span>Billing &amp; subscription management — no Stripe or payment integration</div>
+      <div class="fi"><span class="dot dn">✗</span>Global compliance dashboard — all tutors' WWCC across all businesses</div>
+      <div class="fi"><span class="dot dn">✗</span>Platform-wide analytics — cross-business trends, DAU/MAU</div>
+      <div class="fi"><span class="dot dn">✗</span>System health monitoring — API errors, DB pool, uptime</div>
+      <div class="fi"><span class="dot dn">✗</span>Global broadcast notifications to all businesses/tutors</div>
+      <div class="fi"><span class="dot dn">✗</span>Global course template library (platform-owned)</div>
+      <div class="fi"><span class="dot dn">✗</span>Admin impersonation — log in as any user for support</div>
+      <div class="fi"><span class="dot dn">✗</span>Tier upgrade/downgrade UI — currently manual</div>
+      <div class="fi"><span class="dot dn">✗</span>Bulk user import via CSV</div>
+      <div class="fi"><span class="dot dp">~</span>Platform reports — per-company only; no aggregate cross-business view</div>
+    </div>
+  </div>
+  <div class="cl" style="background:#fef3c7;border-left:4px solid #f59e0b;margin-top:12px">
+    <span style="font-size:13px">⚠️</span>
+    <div><strong>Critical fix:</strong> <code>PATCH /api/admin/users/{user}/status</code> fails 422 — <code>is_active</code> column missing from PostgreSQL users table. One migration, 30-minute fix.</div>
+  </div>
+  <div class="pn">4</div>
+</div>
+
+<!-- BUSINESS MAP -->
+<div class="page">
+  <div class="sh"><div class="si" style="background:#0369a1;color:#fff">🏢</div><div><div class="st">Tutoring Business / Company Admin</div><div class="ss">Role: <code>company_admin</code> · Manages staff, students, classes, assignments &amp; reporting</div></div></div>
+  <div class="pmt" style="color:#0369a1">Onboarding Flow</div>
+  <svg class="pm" viewBox="0 0 660 120" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ab" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#0369a1"/></marker></defs>
+    <rect width="660" height="120" fill="#fafafa" rx="6"/>
+    <rect x="8" y="12" width="95" height="96" rx="7" fill="#0369a1"/><text x="55" y="57" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Admin Sends</text><text x="55" y="69" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Invite Email</text><text x="55" y="83" font-size="7.5" fill="#bae6fd" text-anchor="middle" font-family="Inter,sans-serif">signed token</text>
+    <line x1="103" y1="60" x2="118" y2="60" stroke="#0369a1" stroke-width="2" marker-end="url(#ab)"/>
+    <rect x="118" y="12" width="95" height="96" rx="7" fill="#0284c7"/><text x="165" y="54" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Owner Accepts</text><text x="165" y="66" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Sets Password</text>
+    <line x1="213" y1="60" x2="228" y2="60" stroke="#0284c7" stroke-width="2" marker-end="url(#ab)"/>
+    <rect x="228" y="12" width="95" height="96" rx="7" fill="#0284c7"/><text x="275" y="51" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Complete</text><text x="275" y="63" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Business Profile</text><text x="275" y="77" font-size="7.5" fill="#bae6fd" text-anchor="middle" font-family="Inter,sans-serif">logo, ABN, timezone</text>
+    <line x1="323" y1="60" x2="338" y2="60" stroke="#0284c7" stroke-width="2" marker-end="url(#ab)"/>
+    <rect x="338" y="12" width="95" height="96" rx="7" fill="#0284c7"/><text x="385" y="54" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Select Active</text><text x="385" y="66" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Subjects</text><text x="385" y="80" font-size="7.5" fill="#bae6fd" text-anchor="middle" font-family="Inter,sans-serif">state pack curriculum</text>
+    <line x1="433" y1="60" x2="448" y2="60" stroke="#0284c7" stroke-width="2" marker-end="url(#ab)"/>
+    <rect x="448" y="12" width="95" height="96" rx="7" fill="#0284c7"/><text x="495" y="54" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Invite Tutors</text><text x="495" y="66" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">&amp; Add Students</text><text x="495" y="80" font-size="7.5" fill="#bae6fd" text-anchor="middle" font-family="Inter,sans-serif">tier limits enforced</text>
+    <line x1="543" y1="60" x2="558" y2="60" stroke="#0284c7" stroke-width="2" marker-end="url(#ab)"/>
+    <rect x="558" y="12" width="95" height="96" rx="7" fill="#075985"/><text x="605" y="51" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Create Classes,</text><text x="605" y="63" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Assign Work,</text><text x="605" y="75" font-size="8.5" font-weight="700" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Report</text>
+  </svg>
+  <div class="pmt" style="color:#0369a1;margin-top:10px">Ongoing Operations — Class → Assignment → Grading → Reporting</div>
+  <svg class="pm" viewBox="0 0 660 190" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ab2" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#0369a1"/></marker></defs>
+    <rect width="660" height="190" fill="#fafafa" rx="6"/>
+    <rect x="0" y="0" width="660" height="22" fill="#e0f2fe" rx="6"/>
+    <text x="82" y="14" font-size="8" font-weight="700" fill="#0369a1" text-anchor="middle" font-family="Inter,sans-serif">CLASS SETUP</text>
+    <text x="247" y="14" font-size="8" font-weight="700" fill="#0369a1" text-anchor="middle" font-family="Inter,sans-serif">ASSIGNMENT</text>
+    <text x="412" y="14" font-size="8" font-weight="700" fill="#0369a1" text-anchor="middle" font-family="Inter,sans-serif">GRADING &amp; AI</text>
+    <text x="578" y="14" font-size="8" font-weight="700" fill="#0369a1" text-anchor="middle" font-family="Inter,sans-serif">REPORTING</text>
+    <line x1="165" y1="22" x2="165" y2="190" stroke="#bae6fd" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="330" y1="22" x2="330" y2="190" stroke="#bae6fd" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="495" y1="22" x2="495" y2="190" stroke="#bae6fd" stroke-width="1" stroke-dasharray="3,3"/>
+    <rect x="10" y="30" width="145" height="22" rx="5" fill="#0369a1"/><text x="82" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Create Year + Terms</text>
+    <line x1="82" y1="52" x2="82" y2="60" stroke="#0369a1" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="10" y="60" width="145" height="22" rx="5" fill="#0284c7"/><text x="82" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Create Class (subj, time, tutor)</text>
+    <line x1="82" y1="82" x2="82" y2="90" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="10" y="90" width="145" height="22" rx="5" fill="#0284c7"/><text x="82" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Enrol Students in Class</text>
+    <line x1="82" y1="112" x2="82" y2="120" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="10" y="120" width="145" height="22" rx="5" fill="#0284c7"/><text x="82" y="134" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Enrol in Course Offering</text>
+    <line x1="82" y1="142" x2="82" y2="150" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="10" y="150" width="145" height="22" rx="5" fill="#bae6fd"/><text x="82" y="164" font-size="8.5" fill="#0c4a6e" text-anchor="middle" font-family="Inter,sans-serif">✗ Attendance Marking UI</text>
+    <rect x="175" y="30" width="145" height="22" rx="5" fill="#0369a1"/><text x="247" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Create Assignment (PDF/WS)</text>
+    <line x1="247" y1="52" x2="247" y2="60" stroke="#0369a1" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="175" y="60" width="145" height="22" rx="5" fill="#0284c7"/><text x="247" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Set Due Date + Target Class</text>
+    <line x1="247" y1="82" x2="247" y2="90" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="175" y="90" width="145" height="22" rx="5" fill="#0284c7"/><text x="247" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Students Notified (email)</text>
+    <line x1="247" y1="112" x2="247" y2="120" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="175" y="120" width="145" height="22" rx="5" fill="#0284c7"/><text x="247" y="134" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Students Submit Work</text>
+    <line x1="247" y1="142" x2="247" y2="150" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="175" y="150" width="145" height="22" rx="5" fill="#0284c7"/><text x="247" y="164" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Late Submissions Flagged</text>
+    <rect x="340" y="30" width="145" height="22" rx="5" fill="#0369a1"/><text x="412" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View Submitted Work</text>
+    <line x1="412" y1="52" x2="412" y2="60" stroke="#0369a1" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="340" y="60" width="145" height="22" rx="5" fill="#0284c7"/><text x="412" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Annotate PDF (tick/cross)</text>
+    <line x1="412" y1="82" x2="412" y2="90" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="340" y="90" width="145" height="22" rx="5" fill="#0284c7"/><text x="412" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">AI Grading Assistant</text>
+    <line x1="412" y1="112" x2="412" y2="120" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="340" y="120" width="145" height="22" rx="5" fill="#0284c7"/><text x="412" y="134" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Score + Feedback → Save</text>
+    <line x1="412" y1="142" x2="412" y2="150" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="340" y="150" width="145" height="22" rx="5" fill="#0284c7"/><text x="412" y="164" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Parent Notified (email)</text>
+    <rect x="505" y="30" width="145" height="22" rx="5" fill="#0369a1"/><text x="578" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Select Report Type</text>
+    <line x1="578" y1="52" x2="578" y2="60" stroke="#0369a1" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="505" y="60" width="145" height="22" rx="5" fill="#0284c7"/><text x="578" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Set Filters (term, class)</text>
+    <line x1="578" y1="82" x2="578" y2="90" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="505" y="90" width="145" height="22" rx="5" fill="#0284c7"/><text x="578" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Run / Schedule Report</text>
+    <line x1="578" y1="112" x2="578" y2="120" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="505" y="120" width="145" height="22" rx="5" fill="#0284c7"/><text x="578" y="134" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Export CSV / PDF / XLSX</text>
+    <line x1="578" y1="142" x2="578" y2="150" stroke="#0284c7" stroke-width="1.5" marker-end="url(#ab2)"/>
+    <rect x="505" y="150" width="145" height="22" rx="5" fill="#bae6fd"/><text x="578" y="164" font-size="8.5" fill="#0c4a6e" text-anchor="middle" font-family="Inter,sans-serif">✗ Enrolment Trends (not wired)</text>
+  </svg>
+  <div class="pn">5</div>
+</div>
+
+<div class="page">
+  <div class="sh"><div class="si" style="background:#0369a1;color:#fff">🏢</div><div><div class="st">Tutoring Business — Features Built vs. Needed</div></div></div>
+  <div class="fc">
+    <div class="fb" style="background:#e0f2fe;border-left:4px solid #0369a1">
+      <h4 style="color:#075985">✓ Built &amp; Working</h4>
+      <div class="fi"><span class="dot db">✓</span>Token-based business onboarding (invite → accept → profile)</div>
+      <div class="fi"><span class="dot db">✓</span>Business profile — logo, ABN, timezone, currency</div>
+      <div class="fi"><span class="dot db">✓</span>Active subject management (toggle from master list)</div>
+      <div class="fi"><span class="dot db">✓</span>Academic years + terms CRUD</div>
+      <div class="fi"><span class="dot db">✓</span>Classes — create, schedule, assign tutor, capacity, conflict detection</div>
+      <div class="fi"><span class="dot db">✓</span>Enrol / unenrol students in classes</div>
+      <div class="fi"><span class="dot db">✓</span>Course catalogue — courses + offerings (year × subject × level)</div>
+      <div class="fi"><span class="dot db">✓</span>Enrol / withdraw students from course offerings</div>
+      <div class="fi"><span class="dot db">✓</span>Invite tutors — placeholder user + tutor row + email</div>
+      <div class="fi"><span class="dot db">✓</span>WWCC compliance tracking per tutor (number, expiry, state, status)</div>
+      <div class="fi"><span class="dot db">✓</span>Add students (record-only, no login required initially)</div>
+      <div class="fi"><span class="dot db">✓</span>Assignment creation — file-upload or worksheet type</div>
+      <div class="fi"><span class="dot db">✓</span>File upload to GCS (multer, max 30 MB, PDF/img/doc)</div>
+      <div class="fi"><span class="dot db">✓</span>View all submissions (by class or business-wide)</div>
+      <div class="fi"><span class="dot db">✓</span>PDF marking — pen annotation, tick/cross, page rotation</div>
+      <div class="fi"><span class="dot db">✓</span>AI grading: Gemini → Groq → GPT-4o fallback chain</div>
+      <div class="fi"><span class="dot db">✓</span>Score + written feedback + reviewer annotations per submission</div>
+      <div class="fi"><span class="dot db">✓</span>Parent email on graded submission</div>
+      <div class="fi"><span class="dot db">✓</span>6 report types + ad-hoc + scheduled runs + CSV/PDF/XLSX export</div>
+      <div class="fi"><span class="dot db">✓</span>Audit log (all key business actions tracked)</div>
+      <div class="fi"><span class="dot db">✓</span>Tier enforcement + weekly timetable view</div>
+    </div>
+    <div class="fb" style="background:#fef2f2;border-left:4px solid #ef4444">
+      <h4 style="color:#b91c1c">✗ Needs to Be Built</h4>
+      <div class="fi"><span class="dot dn">✗</span>Billing &amp; payment integration — no Stripe or invoice generation</div>
+      <div class="fi"><span class="dot dn">✗</span>Real-time messaging — no WebSocket; polling only</div>
+      <div class="fi"><span class="dot dn">✗</span>Calendar sync — no Google Calendar / Outlook integration</div>
+      <div class="fi"><span class="dot dn">✗</span>Automated student progress PDF per student per term</div>
+      <div class="fi"><span class="dot dn">✗</span>Resource / material library — shared file store per business</div>
+      <div class="fi"><span class="dot dn">✗</span>Mobile app (iOS / Android)</div>
+      <div class="fi"><span class="dot dn">✗</span>Live online class / video integration (Zoom / Meet)</div>
+      <div class="fi"><span class="dot dn">✗</span>Tutor payroll / invoicing — hours → pay calculations</div>
+      <div class="fi"><span class="dot dn">✗</span>Enrolment trends report — schema exists, runner not wired</div>
+      <div class="fi"><span class="dot dn">✗</span>Parent self-registration / invite flow</div>
+      <div class="fi"><span class="dot dn">✗</span>Push notifications (browser / mobile)</div>
+      <div class="fi"><span class="dot dn">✗</span>Bulk student import via CSV</div>
+      <div class="fi"><span class="dot dn">✗</span>Multi-branch management UI (branch field on tutors exists)</div>
+      <div class="fi"><span class="dot dp">~</span>Attendance marking UI — <code>classSessions</code> + <code>sessionAttendance</code> tables built; front-end not wired</div>
+      <div class="fi"><span class="dot dp">~</span>Holiday / calendar events — tables built; admin form incomplete</div>
+      <div class="fi"><span class="dot dp">~</span>Notification preferences — schema built; UI trigger coverage partial</div>
+    </div>
+  </div>
+  <div class="pn">6</div>
+</div>
+
+<!-- TUTOR -->
+<div class="page">
+  <div class="sh"><div class="si" style="background:#0f766e;color:#fff">📚</div><div><div class="st">Tutor</div><div class="ss">Role: <code>tutor</code> · WWCC compliance required · Assigned to classes by company admin</div></div></div>
+  <div class="pmt" style="color:#0f766e">Tutor Lifecycle &amp; Teaching Process</div>
+  <svg class="pm" viewBox="0 0 660 228" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="at" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#0f766e"/></marker><marker id="atp" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#5eead4"/></marker></defs>
+    <rect width="660" height="228" fill="#fafafa" rx="6"/>
+    <rect x="0" y="0" width="660" height="22" fill="#ccfbf1" rx="6"/>
+    <text x="82" y="14" font-size="8" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="Inter,sans-serif">ONBOARDING</text>
+    <text x="247" y="14" font-size="8" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="Inter,sans-serif">PROFILE &amp; COMPLIANCE</text>
+    <text x="412" y="14" font-size="8" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="Inter,sans-serif">TEACHING CYCLE</text>
+    <text x="578" y="14" font-size="8" font-weight="700" fill="#0f766e" text-anchor="middle" font-family="Inter,sans-serif">GRADING</text>
+    <line x1="165" y1="22" x2="165" y2="228" stroke="#99f6e4" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="330" y1="22" x2="330" y2="228" stroke="#99f6e4" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="495" y1="22" x2="495" y2="228" stroke="#99f6e4" stroke-width="1" stroke-dasharray="3,3"/>
+    <rect x="10" y="30" width="145" height="22" rx="5" fill="#0f766e"/><text x="82" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Receive Invite (token)</text>
+    <line x1="82" y1="52" x2="82" y2="60" stroke="#0f766e" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="10" y="60" width="145" height="22" rx="5" fill="#0f9280"/><text x="82" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Set Password</text>
+    <line x1="82" y1="82" x2="82" y2="90" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="10" y="90" width="145" height="28" rx="5" fill="#0f9280"/><text x="82" y="102" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Capture WWCC Details</text><text x="82" y="114" font-size="7.5" fill="#99f6e4" text-anchor="middle" font-family="Inter,sans-serif">number, expiry, state (NSW)</text>
+    <line x1="82" y1="118" x2="82" y2="126" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="10" y="126" width="145" height="22" rx="5" fill="#0f9280"/><text x="82" y="140" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Status: Active + Compliant</text>
+    <line x1="82" y1="148" x2="82" y2="156" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="10" y="156" width="145" height="22" rx="5" fill="#5eead4"/><text x="82" y="170" font-size="8.5" fill="#134e4a" text-anchor="middle" font-family="Inter,sans-serif">Assigned to Classes by Admin</text>
+    <rect x="175" y="30" width="145" height="22" rx="5" fill="#0f766e"/><text x="247" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Edit Teaching Profile</text>
+    <line x1="247" y1="52" x2="247" y2="60" stroke="#0f766e" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="175" y="60" width="145" height="22" rx="5" fill="#0f9280"/><text x="247" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View Classes + Timetable</text>
+    <line x1="247" y1="82" x2="247" y2="90" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="175" y="90" width="145" height="28" rx="5" fill="#5eead4"/><text x="247" y="102" font-size="8.5" fill="#134e4a" text-anchor="middle" font-family="Inter,sans-serif">Mark Attendance ⚠</text><text x="247" y="114" font-size="7.5" fill="#0f766e" text-anchor="middle" font-family="Inter,sans-serif">tables built, UI not wired</text>
+    <line x1="247" y1="118" x2="247" y2="126" stroke="#5eead4" stroke-width="1.5" marker-end="url(#atp)"/>
+    <rect x="175" y="126" width="145" height="28" rx="5" fill="#5eead4"/><text x="247" y="138" font-size="8.5" fill="#134e4a" text-anchor="middle" font-family="Inter,sans-serif">Student Progress View ⚠</text><text x="247" y="150" font-size="7.5" fill="#0f766e" text-anchor="middle" font-family="Inter,sans-serif">table built, charts partial</text>
+    <line x1="247" y1="154" x2="247" y2="162" stroke="#5eead4" stroke-width="1.5" marker-end="url(#atp)"/>
+    <rect x="175" y="162" width="145" height="22" rx="5" fill="#ccfbf1"/><text x="247" y="176" font-size="8.5" fill="#134e4a" text-anchor="middle" font-family="Inter,sans-serif">✗ Lesson Planning Tools</text>
+    <rect x="340" y="30" width="145" height="22" rx="5" fill="#0f766e"/><text x="412" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Create Assignment (PDF)</text>
+    <line x1="412" y1="52" x2="412" y2="60" stroke="#0f766e" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="340" y="60" width="145" height="22" rx="5" fill="#0f9280"/><text x="412" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Upload File to GCS</text>
+    <line x1="412" y1="82" x2="412" y2="90" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="340" y="90" width="145" height="22" rx="5" fill="#0f9280"/><text x="412" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Set Due Date + Target Class</text>
+    <line x1="412" y1="112" x2="412" y2="120" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="340" y="120" width="145" height="22" rx="5" fill="#0f9280"/><text x="412" y="134" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Students Notified (email)</text>
+    <line x1="412" y1="142" x2="412" y2="150" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="340" y="150" width="145" height="22" rx="5" fill="#ccfbf1"/><text x="412" y="164" font-size="8.5" fill="#134e4a" text-anchor="middle" font-family="Inter,sans-serif">✗ Share Resource Library</text>
+    <rect x="505" y="30" width="145" height="22" rx="5" fill="#0f766e"/><text x="578" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Open Submission</text>
+    <line x1="578" y1="52" x2="578" y2="60" stroke="#0f766e" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="505" y="60" width="145" height="22" rx="5" fill="#0f9280"/><text x="578" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Annotate PDF (tick/cross)</text>
+    <line x1="578" y1="82" x2="578" y2="90" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="505" y="90" width="145" height="22" rx="5" fill="#0f9280"/><text x="578" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Run AI Grading Check</text>
+    <line x1="578" y1="112" x2="578" y2="120" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="505" y="120" width="145" height="22" rx="5" fill="#0f9280"/><text x="578" y="134" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Score + Feedback → Save</text>
+    <line x1="578" y1="142" x2="578" y2="150" stroke="#0f9280" stroke-width="1.5" marker-end="url(#at)"/>
+    <rect x="505" y="150" width="145" height="22" rx="5" fill="#0f9280"/><text x="578" y="164" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Parent Notified (email)</text>
+  </svg>
+  <div class="fc" style="margin-top:10px">
+    <div class="fb" style="background:#ccfbf1;border-left:4px solid #0f766e">
+      <h4 style="color:#134e4a">✓ Built</h4>
+      <div class="fi"><span class="dot db">✓</span>Accept invite → set password → capture WWCC → status: compliant</div>
+      <div class="fi"><span class="dot db">✓</span>30-day WWCC expiry warning</div>
+      <div class="fi"><span class="dot db">✓</span>Self-edit profile (bio, rate, delivery modes, year levels)</div>
+      <div class="fi"><span class="dot db">✓</span>View assigned classes + timetable</div>
+      <div class="fi"><span class="dot db">✓</span>Create / update / delete assignments (PDF upload)</div>
+      <div class="fi"><span class="dot db">✓</span>PDF marking: pen strokes, tick/cross, page rotation</div>
+      <div class="fi"><span class="dot db">✓</span>AI grading (Gemini → Groq → GPT-4o) with reviewer annotations</div>
+      <div class="fi"><span class="dot db">✓</span>Parent email notification on graded submission</div>
+    </div>
+    <div class="fb" style="background:#fef2f2;border-left:4px solid #ef4444">
+      <h4 style="color:#b91c1c">✗ Needs to Be Built</h4>
+      <div class="fi"><span class="dot dn">✗</span>Lesson planning tools — no planner or curriculum map</div>
+      <div class="fi"><span class="dot dn">✗</span>Resource / material library — can't share files with students</div>
+      <div class="fi"><span class="dot dn">✗</span>Direct parent messaging channel</div>
+      <div class="fi"><span class="dot dn">✗</span>Tutor invoicing / pay tracking</div>
+      <div class="fi"><span class="dot dn">✗</span>Makeup class / calendar management</div>
+      <div class="fi"><span class="dot dn">✗</span>Assignment templates (save &amp; reuse)</div>
+      <div class="fi"><span class="dot dn">✗</span>Video / live class integration</div>
+      <div class="fi"><span class="dot dp">~</span>Attendance marking UI — DB tables exist; form not built</div>
+      <div class="fi"><span class="dot dp">~</span>Student progress charts — table built; UI partial</div>
+      <div class="fi"><span class="dot dp">~</span>Worksheet builder — schema done; tutor UI incomplete</div>
+    </div>
+  </div>
+  <div class="pn">7</div>
+</div>
+
+<!-- STUDENT -->
+<div class="page">
+  <div class="sh"><div class="si" style="background:#b45309;color:#fff">🎓</div><div><div class="st">Student</div><div class="ss">Role: <code>student</code> · Enrolled by admin · Submits assignments + worksheets · Receives AI hints</div></div></div>
+  <div class="pmt" style="color:#b45309">Student Learning Process Map</div>
+  <svg class="pm" viewBox="0 0 660 215" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="as" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#b45309"/></marker><marker id="asd" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#fbbf24"/></marker></defs>
+    <rect width="660" height="215" fill="#fafafa" rx="6"/>
+    <rect x="0" y="0" width="660" height="22" fill="#fef3c7" rx="6"/>
+    <text x="82" y="14" font-size="8" font-weight="700" fill="#b45309" text-anchor="middle" font-family="Inter,sans-serif">ACCESS</text>
+    <text x="247" y="14" font-size="8" font-weight="700" fill="#b45309" text-anchor="middle" font-family="Inter,sans-serif">ASSIGNMENT</text>
+    <text x="412" y="14" font-size="8" font-weight="700" fill="#b45309" text-anchor="middle" font-family="Inter,sans-serif">SUBMISSION</text>
+    <text x="578" y="14" font-size="8" font-weight="700" fill="#b45309" text-anchor="middle" font-family="Inter,sans-serif">FEEDBACK</text>
+    <line x1="165" y1="22" x2="165" y2="215" stroke="#fde68a" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="330" y1="22" x2="330" y2="215" stroke="#fde68a" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="495" y1="22" x2="495" y2="215" stroke="#fde68a" stroke-width="1" stroke-dasharray="3,3"/>
+    <rect x="10" y="30" width="145" height="22" rx="5" fill="#b45309"/><text x="82" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Admin Creates Record</text>
+    <line x1="82" y1="52" x2="82" y2="60" stroke="#b45309" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="10" y="60" width="145" height="22" rx="5" fill="#ca6f1e"/><text x="82" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Enrol in Class / Offering</text>
+    <line x1="82" y1="82" x2="82" y2="90" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="10" y="90" width="145" height="22" rx="5" fill="#ca6f1e"/><text x="82" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Login → Student Dashboard</text>
+    <line x1="82" y1="112" x2="82" y2="120" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="10" y="120" width="145" height="22" rx="5" fill="#fef3c7"/><text x="82" y="134" font-size="8.5" fill="#92400e" text-anchor="middle" font-family="Inter,sans-serif">✗ Self-Register (not built)</text>
+    <rect x="175" y="30" width="145" height="22" rx="5" fill="#b45309"/><text x="247" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Receive Alert (email)</text>
+    <line x1="247" y1="52" x2="247" y2="60" stroke="#b45309" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="175" y="60" width="145" height="22" rx="5" fill="#ca6f1e"/><text x="247" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Open Assignment</text>
+    <line x1="247" y1="82" x2="247" y2="90" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <polygon points="247,100 270,116 247,132 224,116" fill="#fbbf24" stroke="#b45309" stroke-width="1.5"/>
+    <text x="247" y="112" font-size="8" fill="#7c2d12" text-anchor="middle" font-family="Inter,sans-serif">PDF or WS?</text>
+    <line x1="224" y1="116" x2="197" y2="136" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#asd)"/>
+    <line x1="270" y1="116" x2="294" y2="136" stroke="#fbbf24" stroke-width="1.5" marker-end="url(#asd)"/>
+    <rect x="175" y="136" width="60" height="20" rx="5" fill="#ca6f1e"/><text x="205" y="149" font-size="8" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Upload File</text>
+    <rect x="254" y="136" width="66" height="20" rx="5" fill="#ca6f1e"/><text x="287" y="149" font-size="8" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Answer Qs</text>
+    <line x1="247" y1="156" x2="247" y2="164" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="175" y="164" width="145" height="22" rx="5" fill="#ca6f1e"/><text x="247" y="178" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Save Draft / Submit Final</text>
+    <rect x="340" y="30" width="145" height="22" rx="5" fill="#b45309"/><text x="412" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Submit Before Due Date</text>
+    <line x1="412" y1="52" x2="412" y2="60" stroke="#b45309" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="340" y="60" width="145" height="22" rx="5" fill="#ca6f1e"/><text x="412" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Late Sub Flagged (isLate)</text>
+    <line x1="412" y1="82" x2="412" y2="90" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="340" y="90" width="145" height="28" rx="5" fill="#ca6f1e"/><text x="412" y="102" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Request AI Hint (worksheet)</text><text x="412" y="114" font-size="7.5" fill="#fde68a" text-anchor="middle" font-family="Inter,sans-serif">parent-capped, Gemini</text>
+    <line x1="412" y1="118" x2="412" y2="126" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="340" y="126" width="145" height="28" rx="5" fill="#ca6f1e"/><text x="412" y="138" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Annotate PDF with Pen</text><text x="412" y="150" font-size="7.5" fill="#fde68a" text-anchor="middle" font-family="Inter,sans-serif">e-ink / tablet / desktop</text>
+    <line x1="412" y1="154" x2="412" y2="162" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="340" y="162" width="145" height="22" rx="5" fill="#fef3c7"/><text x="412" y="176" font-size="8.5" fill="#92400e" text-anchor="middle" font-family="Inter,sans-serif">✗ Practice / Mock Tests</text>
+    <rect x="505" y="30" width="145" height="22" rx="5" fill="#b45309"/><text x="578" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View Graded Submission</text>
+    <line x1="578" y1="52" x2="578" y2="60" stroke="#b45309" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="505" y="60" width="145" height="22" rx="5" fill="#ca6f1e"/><text x="578" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Score + Written Feedback</text>
+    <line x1="578" y1="82" x2="578" y2="90" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="505" y="90" width="145" height="22" rx="5" fill="#ca6f1e"/><text x="578" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">See Tutor Annotations</text>
+    <line x1="578" y1="112" x2="578" y2="120" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="505" y="120" width="145" height="28" rx="5" fill="#ca6f1e"/><text x="578" y="132" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Track Progress</text><text x="578" y="144" font-size="7.5" fill="#fde68a" text-anchor="middle" font-family="Inter,sans-serif">% complete, time spent</text>
+    <line x1="578" y1="148" x2="578" y2="156" stroke="#ca6f1e" stroke-width="1.5" marker-end="url(#as)"/>
+    <rect x="505" y="156" width="145" height="22" rx="5" fill="#fef3c7"/><text x="578" y="170" font-size="8.5" fill="#92400e" text-anchor="middle" font-family="Inter,sans-serif">✗ Achievements / Badges</text>
+  </svg>
+  <div class="fc" style="margin-top:10px">
+    <div class="fb" style="background:#fef3c7;border-left:4px solid #b45309">
+      <h4 style="color:#7c2d12">✓ Built</h4>
+      <div class="fi"><span class="dot db">✓</span>Dashboard — classes, assignments, messages</div>
+      <div class="fi"><span class="dot db">✓</span>View assignments (solutions hidden from student)</div>
+      <div class="fi"><span class="dot db">✓</span>File-upload submission (PDF/img/doc, max 30 MB)</div>
+      <div class="fi"><span class="dot db">✓</span>Draft saving (<code>isDraft=true</code>) until ready to submit</div>
+      <div class="fi"><span class="dot db">✓</span>Late submission detection + flagging</div>
+      <div class="fi"><span class="dot db">✓</span>Interactive worksheet — MCQ, fill-blank, text, handwriting</div>
+      <div class="fi"><span class="dot db">✓</span>PDF pen annotation (e-ink / tablet / desktop) + page rotation</div>
+      <div class="fi"><span class="dot db">✓</span>AI hints on worksheet questions (parent-capped, Gemini)</div>
+      <div class="fi"><span class="dot db">✓</span>View score + feedback + tutor annotations on returned work</div>
+      <div class="fi"><span class="dot db">✓</span>Progress tracking (completion %, time spent)</div>
+    </div>
+    <div class="fb" style="background:#fef2f2;border-left:4px solid #ef4444">
+      <h4 style="color:#b91c1c">✗ Needs to Be Built</h4>
+      <div class="fi"><span class="dot dn">✗</span>Student self-registration — admin must create record; no self-signup</div>
+      <div class="fi"><span class="dot dn">✗</span>Practice / self-study mode outside assigned work</div>
+      <div class="fi"><span class="dot dn">✗</span>Mock exam mode — timed, shuffled, auto-grade MCQ</div>
+      <div class="fi"><span class="dot dn">✗</span>Achievements / badges / streaks (gamification)</div>
+      <div class="fi"><span class="dot dn">✗</span>Study planner — manage own deadlines</div>
+      <div class="fi"><span class="dot dn">✗</span>Push notifications (browser/SMS) — email only currently</div>
+      <div class="fi"><span class="dot dn">✗</span>Offline / PWA mode</div>
+      <div class="fi"><span class="dot dn">✗</span>Parent grade sign-off UI (<code>parent_verified</code> DB field, no UI)</div>
+      <div class="fi"><span class="dot dn">✗</span>Re-submission after revision (<code>needs_revision</code> status incomplete)</div>
+      <div class="fi"><span class="dot dp">~</span>Test / exam UI — full schema built; attempt flow incomplete</div>
+      <div class="fi"><span class="dot dp">~</span>Real-time messaging — MessageCenter built; no WebSocket</div>
+    </div>
+  </div>
+  <div class="pn">8</div>
+</div>
+
+<!-- PARENT -->
+<div class="page">
+  <div class="sh"><div class="si" style="background:#9333ea;color:#fff">👨‍👩‍👧</div><div><div class="st">Parent / Guardian</div><div class="ss">Role: <code>parent</code> · Monitors child's progress · Controls AI hints · Communicates with tutors</div></div></div>
+  <div class="pmt" style="color:#9333ea">Parent Engagement Process Map</div>
+  <svg class="pm" viewBox="0 0 660 200" xmlns="http://www.w3.org/2000/svg">
+    <defs><marker id="ap" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#9333ea"/></marker><marker id="apn" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#e9d5ff"/></marker></defs>
+    <rect width="660" height="200" fill="#fafafa" rx="6"/>
+    <rect x="0" y="0" width="660" height="22" fill="#f3e8ff" rx="6"/>
+    <text x="82" y="14" font-size="8" font-weight="700" fill="#9333ea" text-anchor="middle" font-family="Inter,sans-serif">SETUP</text>
+    <text x="247" y="14" font-size="8" font-weight="700" fill="#9333ea" text-anchor="middle" font-family="Inter,sans-serif">MONITORING</text>
+    <text x="412" y="14" font-size="8" font-weight="700" fill="#9333ea" text-anchor="middle" font-family="Inter,sans-serif">AI CONTROLS</text>
+    <text x="578" y="14" font-size="8" font-weight="700" fill="#9333ea" text-anchor="middle" font-family="Inter,sans-serif">COMMUNICATION</text>
+    <line x1="165" y1="22" x2="165" y2="200" stroke="#e9d5ff" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="330" y1="22" x2="330" y2="200" stroke="#e9d5ff" stroke-width="1" stroke-dasharray="3,3"/>
+    <line x1="495" y1="22" x2="495" y2="200" stroke="#e9d5ff" stroke-width="1" stroke-dasharray="3,3"/>
+    <rect x="10" y="30" width="145" height="22" rx="5" fill="#9333ea"/><text x="82" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Admin Links Child to Parent</text>
+    <line x1="82" y1="52" x2="82" y2="60" stroke="#9333ea" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="10" y="60" width="145" height="22" rx="5" fill="#a855f7"/><text x="82" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Parent Logs In</text>
+    <line x1="82" y1="82" x2="82" y2="90" stroke="#a855f7" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="10" y="90" width="145" height="22" rx="5" fill="#a855f7"/><text x="82" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Set Notification Prefs</text>
+    <line x1="82" y1="112" x2="82" y2="120" stroke="#a855f7" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="10" y="120" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="82" y="134" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ Self-Register / Invite Flow</text>
+    <rect x="175" y="30" width="145" height="22" rx="5" fill="#9333ea"/><text x="247" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View Parent Dashboard</text>
+    <line x1="247" y1="52" x2="247" y2="60" stroke="#9333ea" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="175" y="60" width="145" height="22" rx="5" fill="#a855f7"/><text x="247" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View Child's Assignments</text>
+    <line x1="247" y1="82" x2="247" y2="90" stroke="#a855f7" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="175" y="90" width="145" height="22" rx="5" fill="#a855f7"/><text x="247" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">View Submission Feedback</text>
+    <line x1="247" y1="112" x2="247" y2="120" stroke="#a855f7" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="175" y="120" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="247" y="134" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ Progress Trend Charts</text>
+    <line x1="247" y1="142" x2="247" y2="150" stroke="#e9d5ff" stroke-width="1"/>
+    <rect x="175" y="150" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="247" y="164" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ Attendance Report</text>
+    <rect x="340" y="30" width="145" height="22" rx="5" fill="#9333ea"/><text x="412" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Enable / Disable AI Hints</text>
+    <line x1="412" y1="52" x2="412" y2="60" stroke="#9333ea" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="340" y="60" width="145" height="22" rx="5" fill="#a855f7"/><text x="412" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Set Max Hints / Question</text>
+    <line x1="412" y1="82" x2="412" y2="90" stroke="#a855f7" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="340" y="90" width="145" height="22" rx="5" fill="#a855f7"/><text x="412" y="104" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Track Hint Usage</text>
+    <line x1="412" y1="112" x2="412" y2="120" stroke="#a855f7" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="340" y="120" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="412" y="134" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ Grade Sign-Off UI</text>
+    <line x1="412" y1="142" x2="412" y2="150" stroke="#e9d5ff" stroke-width="1"/>
+    <rect x="340" y="150" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="412" y="164" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ Invoice / Payment View</text>
+    <rect x="505" y="30" width="145" height="22" rx="5" fill="#9333ea"/><text x="578" y="44" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Receive Grade Alert (email)</text>
+    <line x1="578" y1="52" x2="578" y2="60" stroke="#9333ea" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="505" y="60" width="145" height="22" rx="5" fill="#a855f7"/><text x="578" y="74" font-size="8.5" fill="#fff" text-anchor="middle" font-family="Inter,sans-serif">Leave Comment on Work</text>
+    <line x1="578" y1="82" x2="578" y2="90" stroke="#a855f7" stroke-width="1.5" marker-end="url(#ap)"/>
+    <rect x="505" y="90" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="578" y="104" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ Message Tutor Directly</text>
+    <line x1="578" y1="112" x2="578" y2="120" stroke="#e9d5ff" stroke-width="1"/>
+    <rect x="505" y="120" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="578" y="134" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ Book Parent-Teacher Conf</text>
+    <line x1="578" y1="142" x2="578" y2="150" stroke="#e9d5ff" stroke-width="1"/>
+    <rect x="505" y="150" width="145" height="22" rx="5" fill="#f3e8ff"/><text x="578" y="164" font-size="8.5" fill="#6b21a8" text-anchor="middle" font-family="Inter,sans-serif">✗ SMS / Push Alerts</text>
+  </svg>
+  <div class="fc" style="margin-top:10px">
+    <div class="fb" style="background:#f3e8ff;border-left:4px solid #9333ea">
+      <h4 style="color:#581c87">✓ Built</h4>
+      <div class="fi"><span class="dot db">✓</span>Parent dashboard — all linked children's overview</div>
+      <div class="fi"><span class="dot db">✓</span>View children's assignments (due dates, status)</div>
+      <div class="fi"><span class="dot db">✓</span>View submitted work + tutor score + feedback</div>
+      <div class="fi"><span class="dot db">✓</span>Email notification when child's work is graded</div>
+      <div class="fi"><span class="dot db">✓</span>Enable / disable AI hints per child</div>
+      <div class="fi"><span class="dot db">✓</span>Set max hints per question + track usage</div>
+      <div class="fi"><span class="dot db">✓</span>Leave comment on graded submission</div>
+      <div class="fi"><span class="dot db">✓</span>Notification preference settings (email, in-app, quiet hours)</div>
+    </div>
+    <div class="fb" style="background:#fef2f2;border-left:4px solid #ef4444">
+      <h4 style="color:#b91c1c">✗ Needs to Be Built</h4>
+      <div class="fi"><span class="dot dn">✗</span>Parent self-registration / invite flow — admin creates manually</div>
+      <div class="fi"><span class="dot dn">✗</span>Progress trend charts — over-time score / completion analytics</div>
+      <div class="fi"><span class="dot dn">✗</span>Attendance report — child's record per class</div>
+      <div class="fi"><span class="dot dn">✗</span>Parent-tutor direct messaging</div>
+      <div class="fi"><span class="dot dn">✗</span>Parent-teacher conference booking</div>
+      <div class="fi"><span class="dot dn">✗</span>Invoice / payment history view</div>
+      <div class="fi"><span class="dot dn">✗</span>SMS / push notifications (Twilio / Firebase)</div>
+      <div class="fi"><span class="dot dn">✗</span>Grade sign-off UI (<code>parent_verified</code> DB field exists, no UI)</div>
+      <div class="fi"><span class="dot dn">✗</span>Multi-child switcher fully implemented</div>
+    </div>
+  </div>
+  <div class="pn">9</div>
+</div>
+
+<!-- GAP ANALYSIS -->
+<div class="page">
+  <div class="sh"><div class="si" style="background:#1e293b;color:#fff">📊</div><div><div class="st">Gap Analysis — All Personas</div><div class="ss">Completion status across all personas and feature categories</div></div></div>
+  <table class="gt">
+    <thead><tr><th style="width:13%">Persona</th><th style="width:25%">Feature Category</th><th style="width:11%">Status</th><th style="width:10%">Done</th><th>Key Gaps</th></tr></thead>
+    <tbody>
+      <tr><td style="background:#eef2ff;color:#4f46e5;font-weight:700" rowspan="5">👤 Admin</td><td>User &amp; Business Mgmt</td><td><span class="sc scp">Partial</span></td><td>75%<div class="bar"><div class="bf" style="width:75%;background:#4f46e5"></div></div></td><td style="font-size:10.5px">User status toggle broken — <code>is_active</code> col missing</td></tr>
+      <tr><td>Onboarding &amp; Compliance</td><td><span class="sc scp">Partial</span></td><td>60%<div class="bar"><div class="bf" style="width:60%;background:#4f46e5"></div></div></td><td style="font-size:10.5px">Global compliance dashboard absent; billing completely missing</td></tr>
+      <tr><td>Academic Setup</td><td><span class="sc scd">Done</span></td><td>85%<div class="bar"><div class="bf" style="width:85%;background:#4f46e5"></div></div></td><td style="font-size:10.5px">Global course template library not built</td></tr>
+      <tr><td>Monitoring &amp; Reports</td><td><span class="sc scn">Gap</span></td><td>40%<div class="bar"><div class="bf" style="width:40%;background:#4f46e5"></div></div></td><td style="font-size:10.5px">No system health monitoring, no platform-wide analytics</td></tr>
+      <tr><td>Security &amp; RBAC</td><td><span class="sc scd">Done</span></td><td>90%<div class="bar"><div class="bf" style="width:90%;background:#4f46e5"></div></div></td><td style="font-size:10.5px">No admin impersonation feature</td></tr>
+      <tr><td style="background:#e0f2fe;color:#0369a1;font-weight:700" rowspan="5">🏢 Business</td><td>Onboarding &amp; Profile</td><td><span class="sc scd">Done</span></td><td>90%<div class="bar"><div class="bf" style="width:90%;background:#0369a1"></div></div></td><td style="font-size:10.5px">Parent invite not linked to business onboarding</td></tr>
+      <tr><td>Class &amp; Course Mgmt</td><td><span class="sc scd">Done</span></td><td>82%<div class="bar"><div class="bf" style="width:82%;background:#0369a1"></div></div></td><td style="font-size:10.5px">Attendance UI not wired; calendar sync absent</td></tr>
+      <tr><td>Assignment &amp; Grading</td><td><span class="sc scd">Done</span></td><td>85%<div class="bar"><div class="bf" style="width:85%;background:#0369a1"></div></div></td><td style="font-size:10.5px">Bulk marking absent; re-submission workflow incomplete</td></tr>
+      <tr><td>Staff Management</td><td><span class="sc scp">Partial</span></td><td>70%<div class="bar"><div class="bf" style="width:70%;background:#0369a1"></div></div></td><td style="font-size:10.5px">Tutor payroll absent; branch management UI not built</td></tr>
+      <tr><td>Billing &amp; Communication</td><td><span class="sc scn">Gap</span></td><td>20%<div class="bar"><div class="bf" style="width:20%;background:#0369a1"></div></div></td><td style="font-size:10.5px">No billing, no real-time messaging, no mobile app</td></tr>
+      <tr><td style="background:#ccfbf1;color:#0f766e;font-weight:700" rowspan="3">📚 Tutor</td><td>Onboarding &amp; Compliance</td><td><span class="sc scd">Done</span></td><td>95%<div class="bar"><div class="bf" style="width:95%;background:#0f766e"></div></div></td><td style="font-size:10.5px">Complete — WWCC, profile, status lifecycle all working</td></tr>
+      <tr><td>Assignment &amp; Marking</td><td><span class="sc scd">Done</span></td><td>83%<div class="bar"><div class="bf" style="width:83%;background:#0f766e"></div></div></td><td style="font-size:10.5px">Worksheet builder UI incomplete; bulk marking absent</td></tr>
+      <tr><td>Planning &amp; Resources</td><td><span class="sc scn">Gap</span></td><td>8%<div class="bar"><div class="bf" style="width:8%;background:#0f766e"></div></div></td><td style="font-size:10.5px">No lesson planner, resource library or scheduling tools</td></tr>
+      <tr><td style="background:#fef3c7;color:#b45309;font-weight:700" rowspan="3">🎓 Student</td><td>Assignment &amp; Submission</td><td><span class="sc scd">Done</span></td><td>88%<div class="bar"><div class="bf" style="width:88%;background:#b45309"></div></div></td><td style="font-size:10.5px">Re-submission + parent sign-off UI missing</td></tr>
+      <tr><td>Interactive Learning</td><td><span class="sc scp">Partial</span></td><td>58%<div class="bar"><div class="bf" style="width:58%;background:#b45309"></div></div></td><td style="font-size:10.5px">Test/exam UI incomplete; mock exam mode not built</td></tr>
+      <tr><td>Engagement &amp; Self-Study</td><td><span class="sc scn">Gap</span></td><td>10%<div class="bar"><div class="bf" style="width:10%;background:#b45309"></div></div></td><td style="font-size:10.5px">No practice mode, no push notifications, no self-registration</td></tr>
+      <tr><td style="background:#f3e8ff;color:#9333ea;font-weight:700" rowspan="3">👨‍👩‍👧 Parent</td><td>Monitoring &amp; Visibility</td><td><span class="sc scp">Partial</span></td><td>52%<div class="bar"><div class="bf" style="width:52%;background:#9333ea"></div></div></td><td style="font-size:10.5px">No progress trend charts, no attendance view</td></tr>
+      <tr><td>AI Controls</td><td><span class="sc scd">Done</span></td><td>78%<div class="bar"><div class="bf" style="width:78%;background:#9333ea"></div></div></td><td style="font-size:10.5px">Grade sign-off UI missing; hint tracking complete</td></tr>
+      <tr><td>Communication &amp; Billing</td><td><span class="sc scn">Gap</span></td><td>15%<div class="bar"><div class="bf" style="width:15%;background:#9333ea"></div></div></td><td style="font-size:10.5px">No parent-tutor DM, no billing, no SMS/push, no self-registration</td></tr>
+    </tbody>
+  </table>
+  <div class="pn">10</div>
+</div>
+
+<!-- PRIORITY MATRIX -->
+<div class="page">
+  <div class="sh"><div class="si" style="background:#1e293b;color:#fff">🗺</div><div><div class="st">Priority Matrix &amp; Sprint Roadmap</div><div class="ss">Ranked by impact vs. effort — what to build next for maximum value</div></div></div>
+  <div class="pg">
+    <div class="pc" style="background:#dcfce7;border:2px solid #16a34a">
+      <h5 style="color:#15803d">🚀 Quick Wins — High Impact, Low Effort</h5>
+      <div class="pi">Fix user status toggle — add <code>is_active</code> col to users table (30 min)</div>
+      <div class="pi">Student self-registration — reuse existing auth + invite route</div>
+      <div class="pi">Parent self-registration + link-to-child (extend tutor onboarding pattern)</div>
+      <div class="pi">Attendance marking UI — tables + API exist; just need front-end form</div>
+      <div class="pi">Re-submission workflow — DB status exists; missing UI state machine</div>
+      <div class="pi">Parent grade sign-off UI — <code>parent_verified</code> field exists; need button</div>
+      <div class="pi">Calendar events UI — tables fully built; wire to a calendar view</div>
+      <div class="pi">Real-time messaging — replace polling with WebSocket (socket.io)</div>
+    </div>
+    <div class="pc" style="background:#dbeafe;border:2px solid #2563eb">
+      <h5 style="color:#1d4ed8">🏗 Major Features — High Impact, High Effort</h5>
+      <div class="pi">Billing &amp; subscriptions — Stripe, invoices, tier upgrades/downgrades</div>
+      <div class="pi">Test / exam module (student UI) — attempt flow, timer, auto-grade MCQ</div>
+      <div class="pi">Tutor lesson planner + resource / material library</div>
+      <div class="pi">Video / live class integration (Zoom / Meet embed)</div>
+      <div class="pi">Mobile app (React Native or PWA)</div>
+      <div class="pi">Automated student progress report PDF per term</div>
+      <div class="pi">Platform-wide admin analytics dashboard</div>
+      <div class="pi">Bulk student import via CSV</div>
+    </div>
+    <div class="pc" style="background:#fef9c3;border:2px solid #ca8a04">
+      <h5 style="color:#854d0e">⚡ Nice-to-Have — Lower Urgency</h5>
+      <div class="pi">Admin impersonation (log in as any user for support)</div>
+      <div class="pi">Assignment templates (save &amp; reuse)</div>
+      <div class="pi">Global course template library (platform-owned)</div>
+      <div class="pi">Tutor invoice / pay stub generation</div>
+      <div class="pi">Enrolment trends report wiring (schema done)</div>
+      <div class="pi">Holiday calendar admin form (DB table built)</div>
+      <div class="pi">Parent-teacher conference booking flow</div>
+    </div>
+    <div class="pc" style="background:#f3f4f6;border:2px solid #9ca3af">
+      <h5 style="color:#374151">🔮 Future / Deferred</h5>
+      <div class="pi">SMS notifications (Twilio) — email working; SMS nice-to-have</div>
+      <div class="pi">Student gamification — badges, streaks, leaderboards</div>
+      <div class="pi">Offline / PWA mode for students</div>
+      <div class="pi">Google Calendar / Outlook sync</div>
+      <div class="pi">Multi-branch management UI</div>
+      <div class="pi">AI question generator for tutors</div>
+      <div class="pi">System health monitoring dashboard</div>
+    </div>
+  </div>
+  <div style="margin-top:13px;background:#f8fafc;border-radius:8px;padding:12px;border:1px solid #e2e8f0">
+    <div style="font-size:12px;font-weight:700;color:#0f172a;margin-bottom:8px">Suggested Sprint Order</div>
+    <div class="sprints">
+      <div class="sp" style="background:#dcfce7"><div class="spt" style="color:#15803d">Sprint 1 — Fix &amp; Unlock</div><div>Fix user status toggle</div><div>Student self-register</div><div>Parent self-register</div><div>Attendance marking UI</div></div>
+      <div class="sp" style="background:#dbeafe"><div class="spt" style="color:#1d4ed8">Sprint 2 — Engagement</div><div>Real-time messaging (WS)</div><div>Parent grade sign-off UI</div><div>Re-submission workflow</div><div>Calendar events UI</div></div>
+      <div class="sp" style="background:#fef3c7"><div class="spt" style="color:#854d0e">Sprint 3 — Learning</div><div>Test / exam module</div><div>Progress trend charts</div><div>Worksheet builder polish</div><div>Tutor resource library</div></div>
+      <div class="sp" style="background:#f3e8ff"><div class="spt" style="color:#7e22ce">Sprint 4+ — Scale</div><div>Billing integration</div><div>Auto progress reports</div><div>Video / live class</div><div>Mobile / PWA</div></div>
+    </div>
+  </div>
+  <div class="pn">11</div>
+</div>
+
+</body>
+</html>
