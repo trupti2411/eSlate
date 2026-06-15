@@ -14,6 +14,7 @@ import {
   courses,
   courseSubjects,
   classSubjects,
+  companySubjects,
   classes,
   studentClassAssignments,
   assignments,
@@ -171,6 +172,15 @@ export interface IStorage {
   createCompanyAdmin(adminData: InsertCompanyAdmin): Promise<CompanyAdmin>;
   updateCompanyAdmin(id: string, updates: Partial<InsertCompanyAdmin>): Promise<CompanyAdmin>;
   getTutorsByCompany(companyId: string): Promise<any[]>;
+  getTutorById(tutorId: string, companyId: string): Promise<any | null>;
+  updateTutorProfile(tutorId: string, companyId: string, data: {
+    firstName?: string;
+    lastName?: string;
+    specialization?: string | null;
+    qualifications?: string | null;
+    availability?: string | null;
+    branch?: string | null;
+  }): Promise<any | null>;
 
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
@@ -210,6 +220,7 @@ export interface IStorage {
   getClassesByCompany(companyId: string): Promise<Class[]>;
   getClassesByTutor(tutorId: string): Promise<Class[]>;
   getClass(id: string): Promise<Class | undefined>;
+  getClassDetailById(classId: string, companyId: string): Promise<any | null>;
   updateClass(id: string, updates: Partial<InsertClass>): Promise<Class>;
   deleteClass(id: string): Promise<void>;
   permanentlyDeleteClass(id: string): Promise<void>;
@@ -1261,7 +1272,28 @@ export class DatabaseStorage implements IStorage {
     return rows.map(r => ({ ...r, subjectIds: byId.get(r.id) ?? [] }));
   }
 
-  async createCourse(data: { companyId: string; name: string; description?: string | null; subjectIds?: number[] }): Promise<any> {
+  async getCourseById(id: string, companyId: string): Promise<any | null> {
+    const [row] = await db.select().from(courses).where(and(eq(courses.id, id), eq(courses.companyId, companyId)));
+    if (!row) return null;
+    const subjectRows = await db.select().from(courseSubjects).where(eq(courseSubjects.courseId, id));
+    return { ...row, subjectIds: subjectRows.map(s => s.subjectId) };
+  }
+
+  async updateCourse(id: string, companyId: string, data: { name?: string; description?: string | null; subjectIds?: number[] }): Promise<any | null> {
+    const { subjectIds, ...fields } = data;
+    if (Object.keys(fields).length > 0) {
+      await db.update(courses).set(fields).where(and(eq(courses.id, id), eq(courses.companyId, companyId)));
+    }
+    if (subjectIds !== undefined) {
+      await db.delete(courseSubjects).where(eq(courseSubjects.courseId, id));
+      if (subjectIds.length > 0) {
+        await db.insert(courseSubjects).values(subjectIds.map(sid => ({ courseId: id, subjectId: sid })));
+      }
+    }
+    return this.getCourseById(id, companyId);
+  }
+
+  async createCourse(data: { companyId: string; name: string; description?: string | null; yearGroupCode?: string | null; subjectIds?: number[] }): Promise<any> {
     const { subjectIds, ...courseData } = data;
     const [course] = await db.insert(courses).values(courseData).returning();
     if (subjectIds && subjectIds.length > 0) {
@@ -1376,6 +1408,115 @@ export class DatabaseStorage implements IStorage {
         academicYear: academicYear ?? undefined,
       };
     });
+  }
+
+  async getClassDetailById(classId: string, companyId: string): Promise<any | null> {
+    const SUBJECTS = [
+      { id: 1, code: 'ENG', name: 'English' },
+      { id: 2, code: 'MATH', name: 'Mathematics' },
+      { id: 3, code: 'READ', name: 'Reading' },
+      { id: 4, code: 'SCI', name: 'Science' },
+      { id: 5, code: 'THINK', name: 'Thinking Skills' },
+      { id: 6, code: 'WRITE', name: 'Writing' },
+    ];
+    const subjectById = new Map(SUBJECTS.map(s => [s.id, s]));
+
+    const [cls] = await db.select().from(classes)
+      .where(and(eq(classes.id, classId), eq(classes.companyId, companyId), eq(classes.isActive, true)));
+    if (!cls) return null;
+
+    const [term, subjectRows, enrollmentRows] = await Promise.all([
+      db.select().from(academicTerms).where(eq(academicTerms.id, cls.termId)).then(r => r[0] ?? null),
+      db.select().from(classSubjects).where(eq(classSubjects.classId, classId)),
+      db.select().from(studentClassAssignments)
+        .where(and(eq(studentClassAssignments.classId, classId), eq(studentClassAssignments.isActive, true))),
+    ]);
+
+    const academicYear = term
+      ? await db.select().from(academicYears).where(eq(academicYears.id, term.academicYearId)).then(r => r[0] ?? null)
+      : null;
+
+    const course = cls.courseId
+      ? await db.select().from(courses).where(eq(courses.id, cls.courseId)).then(r => r[0] ?? null)
+      : null;
+
+    let tutorDetail: any = null;
+    if (cls.tutorId) {
+      const [tRow] = await db.select({ id: tutors.id, userId: tutors.userId })
+        .from(tutors).where(eq(tutors.id, cls.tutorId));
+      if (tRow) {
+        const [uRow] = await db.select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+          .from(users).where(eq(users.id, tRow.userId));
+        tutorDetail = { id: tRow.id, user: uRow ?? undefined };
+      }
+    }
+
+    const studentIds = enrollmentRows.map(e => e.studentId);
+    const studentDetails = studentIds.length > 0
+      ? await db.select({
+          id: students.id,
+          userId: students.userId,
+          yearGroupCode: students.yearGroupCode,
+          schoolName: students.schoolName,
+          createdAt: students.createdAt,
+        }).from(students).where(inArray(students.id, studentIds))
+      : [];
+    const studentUserIds = studentDetails.map(s => s.userId);
+    const studentUsers = studentUserIds.length > 0
+      ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+          .from(users).where(inArray(users.id, studentUserIds))
+      : [];
+    const studentUserMap = new Map(studentUsers.map(u => [u.id, u]));
+    const enrollmentMap = new Map(enrollmentRows.map(e => [e.studentId, e]));
+
+    const studentList = studentDetails.map(s => {
+      const u = studentUserMap.get(s.userId);
+      const enrl = enrollmentMap.get(s.id);
+      return {
+        id: s.id,
+        first_name: u?.firstName ?? null,
+        last_name: u?.lastName ?? null,
+        year_group_code: s.yearGroupCode ?? null,
+        school: s.schoolName ?? null,
+        user: u ?? null,
+        pivot: enrl?.assignedDate ? { enrolled_at: enrl.assignedDate.toISOString() } : undefined,
+      };
+    });
+
+    const subjects = subjectRows.map(s => ({
+      ...subjectById.get(s.subjectId),
+      pivot: { is_primary: s.isPrimary },
+    })).filter(s => s.id);
+    const primarySub = subjectRows.find(s => s.isPrimary);
+
+    return {
+      id: cls.id,
+      business_id: cls.companyId,
+      course_id: cls.courseId ?? null,
+      tutor_id: cls.tutorId ?? null,
+      academic_year_id: academicYear?.id ?? null,
+      year_group_id: cls.yearGroupCode ?? null,
+      subject_id: primarySub?.subjectId ?? null,
+      name: cls.name,
+      starts_on: term?.startDate ? term.startDate.toISOString().slice(0, 10) : null,
+      ends_on: term?.endDate ? term.endDate.toISOString().slice(0, 10) : null,
+      capacity: cls.maxStudents ?? null,
+      status: cls.status ?? 'draft',
+      description: cls.description ?? null,
+      level: cls.level ?? null,
+      schedule_day_of_week: cls.dayOfWeek ?? null,
+      schedule_start_time: cls.startTime || null,
+      schedule_end_time: cls.endTime || null,
+      location: cls.location ?? null,
+      course: course ? { id: course.id, name: course.name, description: course.description } : null,
+      subject: primarySub ? subjectById.get(primarySub.subjectId) ?? null : null,
+      subjects,
+      yearGroup: cls.yearGroupCode ? { id: 0, label: cls.yearGroupCode, code: cls.yearGroupCode } : null,
+      tutor: tutorDetail,
+      academicYear: academicYear ? { id: academicYear.id, year: academicYear.yearNumber } : null,
+      terms: term ? [{ id: term.id, name: term.name, start_date: term.startDate?.toISOString().slice(0, 10) ?? '', end_date: term.endDate?.toISOString().slice(0, 10) ?? '' }] : [],
+      students: studentList,
+    };
   }
 
   async createTutoringCompany(companyData: any): Promise<TutoringCompany> {
@@ -1502,26 +1643,98 @@ export class DatabaseStorage implements IStorage {
         tutorSchedulesMap.get(session.tutorId)!.add(scheduleKey);
       }
 
-      // Add schedules and student count to tutors
+      // Add schedules and student count to tutors — flatten user sub-object
       return companyTutors.map(tutor => {
         const scheduleSet = tutorSchedulesMap.get(tutor.id);
-        const schedules = scheduleSet 
+        const schedules = scheduleSet
           ? Array.from(scheduleSet).map(key => {
               const [className, dayOfWeek, startTime, endTime] = key.split('|');
               return { className, dayOfWeek, startTime, endTime };
             })
           : [];
-        
+
         return {
-          ...tutor,
+          id: tutor.id,
+          userId: tutor.userId,
+          companyId: tutor.companyId,
+          firstName: tutor.user.firstName,
+          lastName: tutor.user.lastName,
+          email: tutor.user.email,
+          specialization: tutor.specialization,
+          qualifications: tutor.qualifications,
+          isVerified: tutor.isVerified,
+          status: tutor.user.isActive ? 'active' : 'invited',
+          complianceStatus: tutor.isVerified ? 'compliant' : 'pending_compliance',
           schedules,
-          studentCount: studentCountMap.get(tutor.id) || 0
+          studentCount: studentCountMap.get(tutor.id) || 0,
         };
       });
     } catch (error) {
       console.error("Error fetching company tutors:", error);
       return [];
     }
+  }
+
+  async getTutorById(tutorId: string, companyId: string): Promise<any | null> {
+    const [row] = await db.select({
+      id: tutors.id,
+      userId: tutors.userId,
+      specialization: tutors.specialization,
+      qualifications: tutors.qualifications,
+      availability: tutors.availability,
+      branch: tutors.branch,
+      isVerified: tutors.isVerified,
+      companyId: tutors.companyId,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      isActive: users.isActive,
+    })
+    .from(tutors)
+    .innerJoin(users, eq(tutors.userId, users.id))
+    .where(and(eq(tutors.id, tutorId), eq(tutors.companyId, companyId)));
+
+    if (!row) return null;
+    return {
+      ...row,
+      status: row.isActive ? 'active' : 'invited',
+      complianceStatus: row.isVerified ? 'compliant' : 'pending_compliance',
+    };
+  }
+
+  async updateTutorProfile(tutorId: string, companyId: string, data: {
+    firstName?: string;
+    lastName?: string;
+    specialization?: string | null;
+    qualifications?: string | null;
+    availability?: string | null;
+    branch?: string | null;
+  }): Promise<any | null> {
+    const [tutor] = await db.select().from(tutors)
+      .where(and(eq(tutors.id, tutorId), eq(tutors.companyId, companyId)));
+    if (!tutor) return null;
+
+    const { firstName, lastName, ...tutorFields } = data;
+
+    if (firstName !== undefined || lastName !== undefined) {
+      const userUpdates: Record<string, any> = { updatedAt: new Date() };
+      if (firstName !== undefined) userUpdates.firstName = firstName;
+      if (lastName !== undefined) userUpdates.lastName = lastName;
+      await db.update(users).set(userUpdates).where(eq(users.id, tutor.userId));
+    }
+
+    const tutorUpdates: Record<string, any> = {};
+    if (tutorFields.specialization !== undefined) tutorUpdates.specialization = tutorFields.specialization;
+    if (tutorFields.qualifications !== undefined) tutorUpdates.qualifications = tutorFields.qualifications;
+    if (tutorFields.availability !== undefined) tutorUpdates.availability = tutorFields.availability;
+    if (tutorFields.branch !== undefined) tutorUpdates.branch = tutorFields.branch;
+
+    if (Object.keys(tutorUpdates).length > 0) {
+      await db.update(tutors).set(tutorUpdates)
+        .where(and(eq(tutors.id, tutorId), eq(tutors.companyId, companyId)));
+    }
+
+    return this.getTutorById(tutorId, companyId);
   }
 
   // Admin user management methods
@@ -3646,10 +3859,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(academicYears.companyId, companyId));
     
     if (years.length === 0) return [];
-    
+
     const yearIds = years.map(y => y.id);
     return db.select().from(academicTerms)
       .where(inArray(academicTerms.academicYearId, yearIds));
+  }
+
+  async getCompanySubjects(companyId: string) {
+    return db.select().from(companySubjects)
+      .where(eq(companySubjects.companyId, companyId))
+      .orderBy(companySubjects.createdAt);
+  }
+
+  async createCompanySubject(companyId: string, name: string, code: string, description?: string | null) {
+    const [row] = await db.insert(companySubjects).values({
+      companyId,
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      description: description?.trim() || null,
+    }).returning();
+    return row;
+  }
+
+  async deleteCompanySubject(id: string, companyId: string) {
+    const [row] = await db.delete(companySubjects)
+      .where(eq(companySubjects.id, id) && eq(companySubjects.companyId, companyId))
+      .returning();
+    return row;
   }
 }
 

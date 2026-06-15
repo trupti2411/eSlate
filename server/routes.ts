@@ -292,6 +292,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.json(user);
   });
 
+  app.post('/api/me/accept-policies', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      await storage.updateUser(user.id, {
+        termsAcceptedAt: new Date(),
+        termsVersion: '1.0',
+      } as any);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("Error accepting policies:", error);
+      res.status(500).json({ message: "Failed to save policy acceptance" });
+    }
+  });
+
   // Configure multer for file uploads
   const upload = multer({
     storage: multer.memoryStorage(),
@@ -3782,6 +3796,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get('/api/companies/:companyId/tutors/:tutorId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, tutorId } = req.params;
+      const user = req.user!;
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca || ca.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const tutor = await storage.getTutorById(tutorId, companyId);
+      if (!tutor) return res.status(404).json({ message: "Tutor not found" });
+      res.json(tutor);
+    } catch (error) {
+      console.error("Error fetching tutor profile:", error);
+      res.status(500).json({ message: "Failed to fetch tutor" });
+    }
+  });
+
+  app.patch('/api/companies/:companyId/tutors/:tutorId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId, tutorId } = req.params;
+      const user = req.user!;
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca || ca.companyId !== companyId) return res.status(403).json({ message: "Access denied" });
+      } else if (user.role !== 'admin') {
+        return res.status(403).json({ message: "Admin access required" });
+      }
+      const { firstName, lastName, specialization, qualifications, availability, branch } = req.body;
+      const updated = await storage.updateTutorProfile(tutorId, companyId, {
+        firstName: firstName?.trim() || undefined,
+        lastName: lastName?.trim() || undefined,
+        specialization: specialization ?? undefined,
+        qualifications: qualifications ?? undefined,
+        availability: availability ?? undefined,
+        branch: branch ?? undefined,
+      });
+      if (!updated) return res.status(404).json({ message: "Tutor not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating tutor profile:", error);
+      res.status(500).json({ message: "Failed to update tutor" });
+    }
+  });
+
   app.get('/api/companies/:companyId/students', isAuthenticated, async (req: any, res: any) => {
     try {
       const { companyId } = req.params;
@@ -3894,8 +3954,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
   ];
   const subjectById = new Map(SUBJECTS.map(s => [s.id, s]));
 
-  app.get('/api/subjects', async (_req: any, res: any) => {
-    res.json(SUBJECTS);
+  app.get('/api/subjects', async (req: any, res: any) => {
+    const builtIn = SUBJECTS.map(s => ({ ...s, type: 'builtin' as const }));
+    if (!req.isAuthenticated?.() || !req.user) return res.json(builtIn);
+    const user = req.user;
+    try {
+      let companyId: string | null = null;
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        companyId = ca?.companyId ?? null;
+      }
+      if (!companyId) return res.json(builtIn);
+      const custom = await storage.getCompanySubjects(companyId);
+      return res.json([
+        ...builtIn,
+        ...custom.map(s => ({ id: s.id, code: s.code, name: s.name, description: s.description, type: 'custom' as const })),
+      ]);
+    } catch {
+      return res.json(builtIn);
+    }
+  });
+
+  app.post('/api/subjects', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') return res.status(403).json({ message: 'Access denied' });
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: 'Company admin profile not found' });
+      const { name, code, description } = req.body;
+      if (!name?.trim() || name.trim().length < 2) return res.status(400).json({ message: 'Name is required (min 2 characters)' });
+      if (!code?.trim() || code.trim().length < 2) return res.status(400).json({ message: 'Code is required (min 2 characters)' });
+      if (name.trim().length > 100) return res.status(400).json({ message: 'Name must be 100 characters or less' });
+      if (code.trim().length > 20) return res.status(400).json({ message: 'Code must be 20 characters or less' });
+      const subject = await storage.createCompanySubject(ca.companyId, name, code, description);
+      return res.status(201).json(subject);
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message ?? 'Failed to create subject' });
+    }
+  });
+
+  app.delete('/api/subjects/:id', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin') return res.status(403).json({ message: 'Access denied' });
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: 'Company admin profile not found' });
+      const deleted = await storage.deleteCompanySubject(req.params.id, ca.companyId);
+      if (!deleted) return res.status(404).json({ message: 'Subject not found or not yours to delete' });
+      return res.json({ success: true });
+    } catch (e: any) {
+      return res.status(500).json({ message: e.message ?? 'Failed to delete subject' });
+    }
+  });
+
+  // ── State packs ─────────────────────────────────────────────────────────────
+
+  const NSW_2026_TERMS = [
+    { name: 'Term 1', start_date: '2026-01-28', end_date: '2026-04-09' },
+    { name: 'Term 2', start_date: '2026-04-28', end_date: '2026-07-03' },
+    { name: 'Term 3', start_date: '2026-07-21', end_date: '2026-09-25' },
+    { name: 'Term 4', start_date: '2026-10-12', end_date: '2026-12-18' },
+  ];
+
+  // GET /api/state-packs/:state/:year — preview pack data
+  app.get('/api/state-packs/:state/:year', (req: any, res: any) => {
+    const { state, year } = req.params;
+    if (state.toUpperCase() !== 'NSW' || year !== '2026') {
+      return res.status(404).json({ message: 'Pack not found' });
+    }
+    return res.json({
+      state_code: 'NSW',
+      year: 2026,
+      pack_version: '1.0',
+      academic_year: {
+        yearNumber: 2026,
+        name: 'NSW 2026',
+        terms: NSW_2026_TERMS,
+      },
+    });
+  });
+
+  // POST /api/state-packs/apply — create academic year + terms for the authenticated company
+  app.post('/api/state-packs/apply', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { state_code, year } = req.body as { state_code: string; year: number };
+
+      if (!state_code || !year) {
+        return res.status(400).json({ message: 'state_code and year are required' });
+      }
+      if (state_code.toUpperCase() !== 'NSW' || year !== 2026) {
+        return res.status(404).json({ message: 'Pack not found' });
+      }
+
+      let companyId: string | undefined;
+      if (user.role === 'company_admin') {
+        const companyAdmin = await storage.getCompanyAdminByUserId(user.id);
+        if (!companyAdmin) return res.status(403).json({ message: 'Company admin profile not found' });
+        companyId = companyAdmin.companyId;
+      } else if (user.role === 'admin') {
+        const { company_id } = req.body;
+        if (!company_id) return res.status(400).json({ message: 'company_id required for admin' });
+        companyId = company_id;
+      } else {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const academicYear = await storage.createAcademicYear({
+        companyId,
+        yearNumber: 2026,
+        name: 'NSW 2026',
+        isActive: true,
+      });
+
+      const terms = await Promise.all(
+        NSW_2026_TERMS.map(t =>
+          storage.createAcademicTerm({
+            companyId,
+            academicYearId: academicYear.id,
+            name: t.name,
+            startDate: new Date(t.start_date),
+            endDate: new Date(t.end_date),
+            isActive: true,
+          })
+        )
+      );
+
+      return res.json({ academic_year: academicYear, terms });
+    } catch (error) {
+      console.error('Error applying state pack:', error);
+      return res.status(500).json({ message: 'Failed to apply state pack' });
+    }
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // GET /api/course-templates — static NSW tutoring programme templates
+  app.get('/api/course-templates', (req: any, res: any) => {
+    const NSW_COURSE_TEMPLATES = [
+      // OC Test Prep — Year 3 & 4
+      { id: 1,  state_code: 'NSW', year_group_code: 'Y3', kind: 'theory',      test_alignment: 'oc',        code: 'OC-Y3-TH',  name: 'OC Test Prep — Year 3',            short_name: 'OC Y3',       description: 'Opportunity Class placement test preparation for Year 3 students. Covers English, Mathematics, and Thinking Skills.', sort_order: 10 },
+      { id: 2,  state_code: 'NSW', year_group_code: 'Y4', kind: 'theory',      test_alignment: 'oc',        code: 'OC-Y4-TH',  name: 'OC Test Prep — Year 4',            short_name: 'OC Y4',       description: 'Opportunity Class placement test preparation for Year 4 students. Covers English, Mathematics, and Thinking Skills.', sort_order: 11 },
+      { id: 3,  state_code: 'NSW', year_group_code: 'Y3', kind: 'mock_tests',  test_alignment: 'oc',        code: 'OC-Y3-MK',  name: 'OC Mock Tests — Year 3',           short_name: 'OC Mock Y3',  description: 'Timed mock exam sessions in OC test format for Year 3. Builds exam technique and time management.', sort_order: 12 },
+      { id: 4,  state_code: 'NSW', year_group_code: 'Y4', kind: 'mock_tests',  test_alignment: 'oc',        code: 'OC-Y4-MK',  name: 'OC Mock Tests — Year 4',           short_name: 'OC Mock Y4',  description: 'Timed mock exam sessions in OC test format for Year 4. Builds exam technique and time management.', sort_order: 13 },
+      // Selective Entry — Year 5 & 6
+      { id: 5,  state_code: 'NSW', year_group_code: 'Y5', kind: 'theory',      test_alignment: 'selective', code: 'SEL-Y5-TH', name: 'Selective School Prep — Year 5',   short_name: 'Selective Y5', description: 'Selective Entry High School preparation for Year 5. Covers Reading, Maths, Thinking Skills, and Writing.', sort_order: 20 },
+      { id: 6,  state_code: 'NSW', year_group_code: 'Y6', kind: 'theory',      test_alignment: 'selective', code: 'SEL-Y6-TH', name: 'Selective School Prep — Year 6',   short_name: 'Selective Y6', description: 'Selective Entry High School preparation for Year 6. Covers Reading, Maths, Thinking Skills, and Writing.', sort_order: 21 },
+      { id: 7,  state_code: 'NSW', year_group_code: 'Y5', kind: 'mock_tests',  test_alignment: 'selective', code: 'SEL-Y5-MK', name: 'Selective Mock Tests — Year 5',    short_name: 'Sel Mock Y5', description: 'Full-length mock exams in Selective test format for Year 5. Includes detailed performance feedback.', sort_order: 22 },
+      { id: 8,  state_code: 'NSW', year_group_code: 'Y6', kind: 'mock_tests',  test_alignment: 'selective', code: 'SEL-Y6-MK', name: 'Selective Mock Tests — Year 6',    short_name: 'Sel Mock Y6', description: 'Full-length mock exams in Selective test format for Year 6. Includes detailed performance feedback.', sort_order: 23 },
+      // NAPLAN — Year 3, 5, 7, 9
+      { id: 9,  state_code: 'NSW', year_group_code: 'Y3', kind: 'theory',      test_alignment: 'naplan_y3', code: 'NAP-Y3-TH', name: 'NAPLAN Prep — Year 3',             short_name: 'NAPLAN Y3',   description: 'NAPLAN preparation for Year 3. Covers Literacy (Reading, Writing, Language Conventions) and Numeracy.', sort_order: 30 },
+      { id: 10, state_code: 'NSW', year_group_code: 'Y5', kind: 'theory',      test_alignment: 'naplan_y5', code: 'NAP-Y5-TH', name: 'NAPLAN Prep — Year 5',             short_name: 'NAPLAN Y5',   description: 'NAPLAN preparation for Year 5. Covers Literacy (Reading, Writing, Language Conventions) and Numeracy.', sort_order: 31 },
+      { id: 11, state_code: 'NSW', year_group_code: 'Y7', kind: 'theory',      test_alignment: 'naplan_y7', code: 'NAP-Y7-TH', name: 'NAPLAN Prep — Year 7',             short_name: 'NAPLAN Y7',   description: 'NAPLAN preparation for Year 7. Covers Literacy (Reading, Writing, Language Conventions) and Numeracy.', sort_order: 32 },
+      { id: 12, state_code: 'NSW', year_group_code: 'Y9', kind: 'theory',      test_alignment: 'naplan_y9', code: 'NAP-Y9-TH', name: 'NAPLAN Prep — Year 9',             short_name: 'NAPLAN Y9',   description: 'NAPLAN preparation for Year 9. Covers Literacy (Reading, Writing, Language Conventions) and Numeracy.', sort_order: 33 },
+      // WEMT — Year 3–6
+      { id: 13, state_code: 'NSW', year_group_code: 'Y3', kind: 'theory',      test_alignment: null,        code: 'WEMT-Y3',   name: 'WEMT Program — Year 3',            short_name: 'WEMT Y3',     description: 'Writing, English, Mathematics, and Thinking Skills for Year 3. Builds core academic skills.', sort_order: 40 },
+      { id: 14, state_code: 'NSW', year_group_code: 'Y4', kind: 'theory',      test_alignment: null,        code: 'WEMT-Y4',   name: 'WEMT Program — Year 4',            short_name: 'WEMT Y4',     description: 'Writing, English, Mathematics, and Thinking Skills for Year 4. Builds core academic skills.', sort_order: 41 },
+      { id: 15, state_code: 'NSW', year_group_code: 'Y5', kind: 'theory',      test_alignment: null,        code: 'WEMT-Y5',   name: 'WEMT Program — Year 5',            short_name: 'WEMT Y5',     description: 'Writing, English, Mathematics, and Thinking Skills for Year 5. Ideal alongside Selective preparation.', sort_order: 42 },
+      { id: 16, state_code: 'NSW', year_group_code: 'Y6', kind: 'theory',      test_alignment: null,        code: 'WEMT-Y6',   name: 'WEMT Program — Year 6',            short_name: 'WEMT Y6',     description: 'Writing, English, Mathematics, and Thinking Skills for Year 6. Ideal alongside Selective preparation.', sort_order: 43 },
+      // Foundation — Year 2–6
+      { id: 17, state_code: 'NSW', year_group_code: 'Y2', kind: 'foundations', test_alignment: null,        code: 'FDN-Y2',    name: 'Foundation Program — Year 2',      short_name: 'Foundation Y2', description: 'Foundational literacy and numeracy for Year 2. Closes learning gaps and builds confidence.', sort_order: 50 },
+      { id: 18, state_code: 'NSW', year_group_code: 'Y3', kind: 'foundations', test_alignment: null,        code: 'FDN-Y3',    name: 'Foundation Program — Year 3',      short_name: 'Foundation Y3', description: 'Foundational literacy and numeracy for Year 3. Closes learning gaps and builds confidence.', sort_order: 51 },
+      { id: 19, state_code: 'NSW', year_group_code: 'Y4', kind: 'foundations', test_alignment: null,        code: 'FDN-Y4',    name: 'Foundation Program — Year 4',      short_name: 'Foundation Y4', description: 'Foundational literacy and numeracy for Year 4. Closes learning gaps and builds confidence.', sort_order: 52 },
+      { id: 20, state_code: 'NSW', year_group_code: 'Y5', kind: 'foundations', test_alignment: null,        code: 'FDN-Y5',    name: 'Foundation Program — Year 5',      short_name: 'Foundation Y5', description: 'Foundational literacy and numeracy for Year 5. Closes learning gaps and builds confidence.', sort_order: 53 },
+      { id: 21, state_code: 'NSW', year_group_code: 'Y6', kind: 'foundations', test_alignment: null,        code: 'FDN-Y6',    name: 'Foundation Program — Year 6',      short_name: 'Foundation Y6', description: 'Foundational literacy and numeracy for Year 6. Closes learning gaps and builds confidence.', sort_order: 54 },
+    ];
+    const { state } = req.query;
+    const result = state ? NSW_COURSE_TEMPLATES.filter(t => t.state_code === String(state).toUpperCase()) : NSW_COURSE_TEMPLATES;
+    res.json(result);
   });
 
   // GET /api/courses — list courses for the logged-in company (with their subject IDs)
@@ -3916,15 +4142,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId = company_id as string;
       }
       const rows = await storage.getCoursesByCompany(companyId);
-      // Enrich with subject objects for the frontend CourseSummary interface
       const enriched = rows.map(r => ({
         ...r,
+        year_group_code: r.yearGroupCode ?? null,
         subjects: (r.subjectIds as number[]).map(id => subjectById.get(id)).filter(Boolean),
       }));
       res.json(enriched);
     } catch (err) {
       console.error("Error fetching courses:", err);
       res.status(500).json({ message: "Failed to fetch courses" });
+    }
+  });
+
+  // GET /api/courses/:id — fetch a single course with its subjects
+  app.get('/api/courses/:id', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: "Access denied" });
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+      const course = await storage.getCourseById(req.params.id, ca.companyId);
+      if (!course) return res.status(404).json({ message: "Course not found" });
+      res.json({ ...course, subject_ids: course.subjectIds });
+    } catch (err) {
+      console.error("Error fetching course:", err);
+      res.status(500).json({ message: "Failed to fetch course" });
+    }
+  });
+
+  // PATCH /api/courses/:id — update a course's name, description, or subjects
+  app.patch('/api/courses/:id', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: "Access denied" });
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+      const { name, description, subject_ids } = req.body;
+      if (name !== undefined && !name?.trim()) return res.status(400).json({ message: "Course name cannot be blank" });
+      if (subject_ids !== undefined && (!Array.isArray(subject_ids) || subject_ids.length === 0)) {
+        return res.status(400).json({ message: "At least one subject must be selected" });
+      }
+      const updated = await storage.updateCourse(req.params.id, ca.companyId, {
+        name: name?.trim(),
+        description: description ?? undefined,
+        subjectIds: subject_ids?.map(Number),
+      });
+      if (!updated) return res.status(404).json({ message: "Course not found" });
+      res.json({ ...updated, subject_ids: updated.subjectIds });
+    } catch (err) {
+      console.error("Error updating course:", err);
+      res.status(500).json({ message: "Failed to update course" });
     }
   });
 
@@ -3938,7 +4205,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ca = await storage.getCompanyAdminByUserId(user.id);
       if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
 
-      const { name, description, subject_ids } = req.body;
+      const { name, description, subject_ids, year_group_code } = req.body;
       if (!name?.trim()) return res.status(400).json({ message: "Course name is required" });
       if (name.trim().length > 150) return res.status(400).json({ message: "Course name must be 150 characters or fewer" });
       if (description && description.length > 500) return res.status(400).json({ message: "Description must be 500 characters or fewer" });
@@ -3950,6 +4217,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: ca.companyId,
         name: name.trim(),
         description: description?.trim() || null,
+        yearGroupCode: year_group_code?.trim() || null,
         subjectIds: subject_ids.map(Number).filter(id => subjectById.has(id)),
       });
       res.status(201).json({
@@ -4029,6 +4297,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error("Error creating class:", err);
       res.status(500).json({ message: err.message ?? "Failed to create class" });
+    }
+  });
+
+  // GET /api/classes/:classId — full class detail (ESLATE-16)
+  app.get('/api/classes/:classId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+      const cls = await storage.getClassDetailById(classId, ca.companyId);
+      if (!cls) return res.status(404).json({ message: "Class not found" });
+      res.json(cls);
+    } catch (err) {
+      console.error("Error fetching class detail:", err);
+      res.status(500).json({ message: "Failed to fetch class" });
+    }
+  });
+
+  // PATCH /api/classes/:classId — update class fields or status (ESLATE-16)
+  app.patch('/api/classes/:classId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+
+      const existing = await storage.getClassDetailById(classId, ca.companyId);
+      if (!existing) return res.status(404).json({ message: "Class not found" });
+
+      const {
+        name, description, level, capacity, course_id, tutor_id,
+        term_ids, schedule_day_of_week, schedule_start_time, schedule_end_time,
+        location, status,
+      } = req.body;
+
+      const updates: Record<string, any> = {};
+      if (name !== undefined) updates.name = name.trim();
+      if (description !== undefined) updates.description = description?.trim() || null;
+      if (level !== undefined) updates.level = level?.trim() || null;
+      if (capacity !== undefined) updates.maxStudents = capacity ? Number(capacity) : null;
+      if (course_id !== undefined) updates.courseId = course_id ? String(course_id) : null;
+      if (tutor_id !== undefined) updates.tutorId = tutor_id ? String(tutor_id) : null;
+      if (schedule_day_of_week !== undefined) updates.dayOfWeek = schedule_day_of_week ? Number(schedule_day_of_week) : null;
+      if (schedule_start_time !== undefined) updates.startTime = schedule_start_time || '';
+      if (schedule_end_time !== undefined) updates.endTime = schedule_end_time || '';
+      if (location !== undefined) updates.location = location?.trim() || null;
+      if (status !== undefined) updates.status = status;
+      if (Array.isArray(term_ids) && term_ids.length > 0) updates.termId = String(term_ids[0]);
+
+      await storage.updateClass(classId, updates);
+      const updated = await storage.getClassDetailById(classId, ca.companyId);
+      res.json(updated);
+    } catch (err: any) {
+      console.error("Error updating class:", err);
+      res.status(500).json({ message: err.message ?? "Failed to update class" });
     }
   });
 
@@ -4853,6 +5183,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!companyAdmin || companyAdmin.companyId !== companyId) {
           return res.status(403).json({ message: "Access denied" });
         }
+      }
+
+      const cls = await storage.getClass(classId);
+      if (!cls || cls.companyId !== companyId) {
+        return res.status(404).json({ message: "Class not found" });
       }
 
       await storage.permanentlyDeleteClass(classId);

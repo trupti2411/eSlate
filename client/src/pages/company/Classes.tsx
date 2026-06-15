@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,11 +14,10 @@ interface SubjectRow { id: number; code: string; name: string; state_code?: stri
 interface YearGroupRow { id: number; code: string; label: string; state_code: string; order: number; }
 interface TutorRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; }
 interface AcademicYearRow {
-  id: number;
-  year: number;
-  state_code: string;
-  start_date?: string;
-  end_date?: string;
+  id: string;
+  yearNumber: number;
+  name: string;
+  isActive?: boolean;
 }
 interface ClassRow {
   id: number;
@@ -212,22 +211,23 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 }
 
 interface CourseSummary {
-  id: number;
+  id: string;
   name: string;
+  year_group_code?: string | null;
   subjects?: SubjectRow[];   // course's allowed subject set (from course_subjects pivot)
 }
 interface TermRow {
-  id: number;
+  id: string;
   name: string;
-  start_date: string;
-  end_date: string;
-  academic_year_id: number;
+  startDate: string;
+  endDate: string;
+  academicYearId: string;
 }
 interface YearWithTerms extends AcademicYearRow {
   terms?: TermRow[];
 }
 
-const dateOnly = (s: string) => s.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? s;
+const dateOnly = (s: string) => (s ?? '').match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? s ?? '';
 
 function CreateClassModal({ businessId, onClose }: { businessId: string; onClose: () => void }) {
   const { toast } = useToast();
@@ -240,6 +240,30 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   // For a new course, owner picks its allowed subject set (e.g. WEMT → Reading/Maths/Thinking/Writing).
   const [newCourseSubjectIds, setNewCourseSubjectIds] = useState<Set<number>>(new Set());
 
+  const COURSE_TEMPLATES = [
+    { key: 'OC',        label: 'OC Test Prep',      subjects: ['English', 'Mathematics', 'Thinking Skills'] },
+    { key: 'SELECTIVE', label: 'Selective Prep',     subjects: ['Mathematics', 'Reading', 'Thinking Skills', 'Writing'] },
+    { key: 'NAPLAN',    label: 'NAPLAN Prep',        subjects: ['English', 'Mathematics', 'Reading', 'Writing'] },
+    { key: 'WEMT',      label: 'WEMT',               subjects: ['English', 'Mathematics', 'Thinking Skills', 'Writing'] },
+    { key: 'FOUNDATION',label: 'Foundation Skills',  subjects: ['English', 'Mathematics', 'Reading', 'Writing'] },
+    { key: 'MOCK',      label: 'Mock Tests',         subjects: ['English', 'Mathematics', 'Reading', 'Science', 'Thinking Skills', 'Writing'] },
+  ];
+
+  const [selectDisplayValue, setSelectDisplayValue] = useState<string>('');
+
+  const applyTemplate = (key: string) => {
+    const tpl = COURSE_TEMPLATES.find(t => t.key === key);
+    if (!tpl) return;
+    setCourseId('__new__');
+    setSelectDisplayValue(`__tpl__${key}`);
+    setNewCourseName(tpl.label);
+    setNewCourseDescription('');
+    const ids = new Set(
+      subjects.filter(s => tpl.subjects.includes(s.name)).map(s => s.id)
+    );
+    setNewCourseSubjectIds(ids);
+  };
+
   // About this class
   const [yearGroupId, setYearGroupId] = useState<string>('');
   // Multi-subject: a class can teach multiple subjects (e.g. WEMT bundles Writing + English + Maths + Thinking).
@@ -248,7 +272,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   const [level, setLevel] = useState<string>('');
 
   // When
-  const [pickedTermIds, setPickedTermIds] = useState<Set<number>>(new Set());
+  const [pickedTermIds, setPickedTermIds] = useState<Set<string>>(new Set());
 
   // Who
   const [tutorId, setTutorId] = useState<string>('');
@@ -311,6 +335,13 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
     setPickedSubjectIds(prev => prev.filter(id => courseScopedSubjectIds.includes(id)));
   }, [courseScopedSubjectIds]);
 
+  // Auto-select year group when an existing course with a year_group_code is chosen.
+  useEffect(() => {
+    if (!selectedExistingCourse?.year_group_code) return;
+    const match = yearGroups.find(yg => yg.code === selectedExistingCourse.year_group_code);
+    if (match) setYearGroupId(String(match.id));
+  }, [selectedExistingCourse, yearGroups]);
+
   // Auto-suggest class name from its parts unless the owner has typed one.
   const suggestedName = useMemo(() => {
     const courseLabel = courseId && courseId !== '__new__'
@@ -329,7 +360,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
   }, [courseId, newCourseName, yearGroupId, pickedSubjectIds, level, courses, yearGroups, subjects]);
   const effectiveName = nameTouched ? name : suggestedName;
 
-  const toggleTerm = (id: number) => {
+  const toggleTerm = (id: string) => {
     setPickedTermIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -395,11 +426,11 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
 
   const isCreatingNewCourse = courseId === '__new__';
   const valid =
-    yearGroupId && pickedSubjectIds.length > 0 && pickedTermIds.size > 0 && currentYear &&
+    yearGroupId && pickedSubjectIds.length > 0 &&
+    (terms.length === 0 || pickedTermIds.size > 0) &&
     (!isCreatingNewCourse || newCourseName.trim().length >= 2) &&
     effectiveName.trim().length > 0;
   const blockers: string[] = [];
-  if (!currentYear) blockers.push('No academic year set up yet — apply your state pack at /company/academic first.');
 
   // List of what's still missing — surfaces under the disabled Save button.
   const missing: string[] = [];
@@ -421,19 +452,26 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
           </button>
         </div>
         <div className="p-5 space-y-5 overflow-y-auto">
-          {blockers.length > 0 && (
-            <div className="rounded-xl bg-amber-50 border border-amber-200 p-3 text-xs text-amber-900 space-y-1">
-              {blockers.map((b, i) => <p key={i}>• {b}</p>)}
-            </div>
-          )}
-
           {/* Course (catalogue parent) */}
           <section>
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Course</h4>
             <Field label="Catalogue parent" hint="Pick an existing course or create a new one. Leave blank for a standalone class.">
               <select
-                value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
+                value={selectDisplayValue || courseId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.startsWith('__tpl__')) {
+                    applyTemplate(v.replace('__tpl__', ''));
+                  } else {
+                    setSelectDisplayValue('');
+                    setCourseId(v);
+                    if (v !== '__new__') {
+                      setNewCourseName('');
+                      setNewCourseDescription('');
+                      setNewCourseSubjectIds(new Set());
+                    }
+                  }
+                }}
                 className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 autoFocus
               >
@@ -443,12 +481,22 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
                     {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </optgroup>
                 )}
-                <option value="__new__">+ Create new course…</option>
+                <optgroup label="Start from a template">
+                  {COURSE_TEMPLATES.map(t => (
+                    <option key={t.key} value={`__tpl__${t.key}`}>{t.label}</option>
+                  ))}
+                </optgroup>
+                <option value="__new__">+ Create custom course…</option>
               </select>
             </Field>
             {isCreatingNewCourse && (
               <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-3">
-                <Field label="New course name" hint="e.g. WEMT, Foundation, OC Test Prep.">
+                {selectDisplayValue.startsWith('__tpl__') && (
+                  <p className="text-xs font-semibold text-amber-800">
+                    Template pre-filled — adjust the name or subjects if needed.
+                  </p>
+                )}
+                <Field label="Course name" hint="e.g. WEMT, Foundation, OC Test Prep.">
                   <input
                     value={newCourseName}
                     onChange={(e) => setNewCourseName(e.target.value)}
@@ -571,9 +619,10 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
             <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">When</h4>
             <Field label="Terms" required hint="Pick which term(s) this class runs in. Dates come from the term boundaries.">
               {terms.length === 0 ? (
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
-                  No terms available — apply your state pack on /company/academic first.
-                </p>
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 flex items-center justify-between gap-3">
+                  <p className="text-xs text-amber-800 font-semibold">No terms set up yet — classes require a term.</p>
+                  <a href="/company/terms" className="text-xs font-bold text-amber-900 underline whitespace-nowrap hover:text-amber-700">Set up terms →</a>
+                </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {terms.map(t => {
@@ -596,7 +645,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
                           <span className="font-bold text-sm">{t.name}</span>
                         </div>
                         <p className="text-[10px] text-gray-500 mt-1">
-                          {dateOnly(t.start_date)} → {dateOnly(t.end_date)}
+                          {dateOnly(t.startDate ?? '')} → {dateOnly(t.endDate ?? '')}
                         </p>
                       </button>
                     );
@@ -715,7 +764,7 @@ function CreateClassModal({ businessId, onClose }: { businessId: string; onClose
 
           {currentYear && (
             <p className="text-xs text-gray-500">
-              Class will live under academic year <span className="font-semibold text-gray-700">{currentYear.year}</span>.
+              Class will live under academic year <span className="font-semibold text-gray-700">{currentYear.name}</span>.
             </p>
           )}
         </div>

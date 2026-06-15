@@ -28,6 +28,8 @@ import ClassDetail from "@/pages/company/ClassDetail";
 import Timetable from "@/pages/company/Timetable";
 import Courses from "@/pages/company/Courses";
 import CourseOfferingDetail from "@/pages/company/CourseOfferingDetail";
+import Subjects from "@/pages/company/Subjects";
+import Terms from "@/pages/company/Terms";
 import CompanySettings from "@/pages/company/Settings";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
@@ -171,6 +173,8 @@ function Router() {
           <Route path="/company/timetable" component={Timetable} />
           <Route path="/company/courses" component={Courses} />
           <Route path="/company/courses/:id" component={CourseOfferingDetail} />
+          <Route path="/company/subjects" component={Subjects} />
+          <Route path="/company/terms" component={Terms} />
           <Route path="/company/settings" component={CompanySettings} />
           <Route path="/company/academic" component={() => <CompanyAcademicManagement />} />
           <Route path="/company/assignments" component={AssignmentManagement} />

@@ -124,6 +124,7 @@ export const courses = pgTable("courses", {
   companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 150 }).notNull(),
   description: text("description"),
+  yearGroupCode: varchar("year_group_code", { length: 10 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -140,6 +141,16 @@ export const classSubjects = pgTable("class_subjects", {
   classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
   subjectId: integer("subject_id").notNull(),
   isPrimary: boolean("is_primary").notNull().default(false),
+});
+
+// Custom subjects created by a tutoring company (supplements the 6 built-in subjects)
+export const companySubjects = pgTable("company_subjects", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  code: varchar("code", { length: 20 }).notNull(),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
 });
 
 export const companySupportContacts = pgTable("company_support_contacts", {

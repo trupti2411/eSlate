@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useRoute } from 'wouter';
+import { Link, useRoute, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, withBase, authHeaders } from '@/lib/queryClient';
@@ -231,7 +231,7 @@ export default function ClassDetailPage() {
                 />
               </div>
               <div>
-                <LifecycleSection classId={cls.id} status={cls.status} />
+                <LifecycleSection classId={cls.id} businessId={cls.business_id} status={cls.status} />
               </div>
             </div>
           </>
@@ -492,9 +492,10 @@ function AField({ label, hint, required, children }: { label: string; hint?: str
 
 /* ---------- Lifecycle ---------- */
 
-function LifecycleSection({ classId, status }: { classId: number; status: string }) {
+function LifecycleSection({ classId, businessId, status }: { classId: number; businessId: number; status: string }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [, navigate] = useLocation();
 
   const transition = useMutation({
     mutationFn: (next: string) => apiRequest(`/api/classes/${classId}`, 'PATCH', { status: next }),
@@ -504,6 +505,16 @@ function LifecycleSection({ classId, status }: { classId: number; status: string
       qc.invalidateQueries({ queryKey: ['/api/classes'] });
     },
     onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/companies/${businessId}/classes/${classId}`, 'DELETE'),
+    onSuccess: () => {
+      toast({ title: 'Class deleted' });
+      qc.invalidateQueries({ queryKey: ['/api/classes'] });
+      navigate('/company/classes');
+    },
+    onError: (e: any) => toast({ title: 'Could not delete', description: e.message, variant: 'destructive' }),
   });
 
   type Btn = { to: string; label: string; icon: React.ReactNode; tone: string };
@@ -551,6 +562,17 @@ function LifecycleSection({ classId, status }: { classId: number; status: string
         {status === 'archived' && (
           <p className="text-xs text-gray-500">Archived classes are read-only.</p>
         )}
+        <button
+          onClick={() => {
+            if (confirm('Permanently delete this class? This cannot be undone — all enrolments and assignments will be removed.')) {
+              deleteMutation.mutate();
+            }
+          }}
+          disabled={deleteMutation.isPending}
+          className="w-full bg-white hover:bg-red-50 text-red-600 border border-red-200 hover:border-red-300 text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60 mt-3"
+        >
+          <Trash2 size={12} /> Delete class permanently
+        </button>
       </div>
       <p className="text-xs text-gray-400 mt-4">
         Draft → Active makes the class visible to students. Completed locks the roster but keeps history.
@@ -574,7 +596,7 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
   const [capacity, setCapacity] = useState(cls.capacity != null ? String(cls.capacity) : '');
   const [courseId, setCourseId] = useState<string>(cls.course_id ? String(cls.course_id) : '');
   const [tutorId, setTutorId] = useState<string>(cls.tutor_id ? String(cls.tutor_id) : '');
-  const [pickedTermIds, setPickedTermIds] = useState<Set<number>>(new Set((cls.terms ?? []).map(t => t.id)));
+  const [pickedTermIds, setPickedTermIds] = useState<Set<string>>(new Set((cls.terms ?? []).map(t => String(t.id))));
   const [scheduleDay, setScheduleDay] = useState<string>(cls.schedule_day_of_week ? String(cls.schedule_day_of_week) : '');
   const [startTime, setStartTime] = useState<string>(cls.schedule_start_time?.slice(0, 5) ?? '');
   const [endTime, setEndTime] = useState<string>(cls.schedule_end_time?.slice(0, 5) ?? '');
@@ -593,10 +615,10 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
   }, [hierarchy]);
   const thisYearTerms = useMemo(() => {
     const y = allYears.find((y: any) => y.id === cls.academic_year_id);
-    return (y?.terms ?? []) as { id: number; name: string; start_date: string; end_date: string }[];
+    return (y?.terms ?? []) as { id: string; name: string; startDate?: string; endDate?: string }[];
   }, [allYears, cls.academic_year_id]);
 
-  const toggleTerm = (id: number) => {
+  const toggleTerm = (id: string) => {
     setPickedTermIds(prev => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
@@ -611,8 +633,8 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
         description: description.trim() || null,
         level: level.trim() || null,
         capacity: capacity ? Number(capacity) : null,
-        course_id: courseId ? Number(courseId) : null,
-        tutor_id: tutorId ? Number(tutorId) : null,
+        course_id: courseId || null,
+        tutor_id: tutorId || null,
         term_ids: Array.from(pickedTermIds),
         schedule_day_of_week: scheduleDay ? Number(scheduleDay) : null,
         schedule_start_time: startTime || null,
@@ -945,7 +967,7 @@ function EnrolModal({
     mutationFn: async () => {
       const ids = Array.from(selected);
       for (const studentId of ids) {
-        await apiRequest(`/api/classes/${classId}/enrol`, 'POST', { student_id: studentId });
+        await apiRequest(`/api/classes/${classId}/students`, 'POST', { studentId });
       }
       return ids.length;
     },

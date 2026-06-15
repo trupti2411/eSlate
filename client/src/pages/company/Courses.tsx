@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
@@ -6,8 +6,75 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
   Trophy, Bell, LogOut, ArrowLeft, Plus, X, Save, Search, User,
-  Target, Calendar, GraduationCap, ChevronRight, Filter,
+  Target, Calendar, GraduationCap, ChevronRight, Filter, Sparkles,
 } from 'lucide-react';
+
+interface CourseTemplateOption {
+  key: string;
+  label: string;
+  name: string;
+  description: string;
+  tone: 'indigo' | 'amber' | 'emerald' | 'rose' | 'violet' | 'sky';
+  badge: string;
+  subjectNames: string[];
+}
+
+const COURSE_TEMPLATES: CourseTemplateOption[] = [
+  {
+    key: 'oc',
+    label: 'OC Prep',
+    name: 'OC Test Preparation',
+    description: 'Opportunity Class placement test preparation covering English, Mathematics, and Thinking Skills for Year 3–4 students.',
+    tone: 'indigo',
+    badge: 'OC',
+    subjectNames: ['English', 'Mathematics', 'Thinking Skills'],
+  },
+  {
+    key: 'selective',
+    label: 'Selective',
+    name: 'Selective School Preparation',
+    description: 'Selective Entry High School test preparation covering Reading, Mathematics, Thinking Skills, and Writing for Year 5–6 students.',
+    tone: 'violet',
+    badge: 'SEL',
+    subjectNames: ['Mathematics', 'Reading', 'Thinking Skills', 'Writing'],
+  },
+  {
+    key: 'naplan',
+    label: 'NAPLAN',
+    name: 'NAPLAN Preparation',
+    description: 'National Assessment Program preparation covering Literacy (Reading, Writing, Language Conventions) and Numeracy.',
+    tone: 'sky',
+    badge: 'NAP',
+    subjectNames: ['English', 'Mathematics', 'Reading', 'Writing'],
+  },
+  {
+    key: 'foundation',
+    label: 'Foundation',
+    name: 'Foundation Program',
+    description: 'Core foundations in literacy and numeracy for primary school students. Builds confidence and closes learning gaps.',
+    tone: 'emerald',
+    badge: 'FDN',
+    subjectNames: ['English', 'Mathematics', 'Reading', 'Writing'],
+  },
+  {
+    key: 'wemt',
+    label: 'WEMT',
+    name: 'WEMT Program',
+    description: 'Writing, English, Mathematics, and Thinking Skills comprehensive program for students preparing for competitive entry exams.',
+    tone: 'amber',
+    badge: 'WEMT',
+    subjectNames: ['English', 'Mathematics', 'Thinking Skills', 'Writing'],
+  },
+  {
+    key: 'mock',
+    label: 'Mock Tests',
+    name: 'Mock Test Series',
+    description: 'Simulated exam-condition practice tests with timed assessments, performance tracking, and exam technique coaching.',
+    tone: 'rose',
+    badge: 'MOCK',
+    subjectNames: ['English', 'Mathematics', 'Reading', 'Science', 'Thinking Skills', 'Writing'],
+  },
+];
 
 interface AdminProfile { userId: string; companyId: string; companyName: string; }
 interface TutorRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; }
@@ -85,6 +152,7 @@ export default function CoursesPage() {
   const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'active' | 'completed' | 'archived'>('all');
   const [createOpen, setCreateOpen] = useState(false);
   const [createCourseOpen, setCreateCourseOpen] = useState(false);
+  const [editCourse, setEditCourse] = useState<Course | null>(null);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -98,7 +166,7 @@ export default function CoursesPage() {
     enabled: !!user,
   });
 
-  const { data: courses = [] } = useQuery<Course[]>({
+  const { data: courses = [], isError: coursesError } = useQuery<Course[]>({
     queryKey: ['/api/courses'],
     enabled: !!user,
   });
@@ -172,23 +240,34 @@ export default function CoursesPage() {
               <Plus size={12} /> New course
             </button>
           </div>
-          {courses.length === 0 ? (
+          {coursesError ? (
+            <p className="text-sm text-rose-600">
+              Could not load courses. Refresh the page or contact support if the problem persists.
+            </p>
+          ) : courses.length === 0 ? (
             <p className="text-sm text-gray-500">
-              No courses yet. A course (e.g. "Foundation", "OC Test Preparation") groups offerings together so you can manage your catalogue.
+              No courses yet. Click <span className="font-semibold">+ New course</span> above to add your first course (e.g. "OC Test Preparation", "NAPLAN Prep").
             </p>
           ) : (
             <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {courses.map(c => (
-                <li key={c.id} className="rounded-xl border border-gray-100 p-3 flex items-start gap-3">
+                <li key={c.id} className="rounded-xl border border-gray-100 p-3 flex items-start gap-3 hover:border-indigo-200 transition-colors">
                   <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black flex-shrink-0">
                     {c.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-black text-gray-900 truncate">{c.name}</p>
+                    {c.description && <p className="text-xs text-gray-400 truncate">{c.description}</p>}
                     <p className="text-xs text-gray-500">
                       {c.offerings?.length ?? 0} offering{(c.offerings?.length ?? 0) === 1 ? '' : 's'}
                     </p>
                   </div>
+                  <button
+                    onClick={() => setEditCourse(c)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 px-2 py-1 rounded-lg hover:bg-indigo-50 flex-shrink-0 border border-indigo-200 hover:border-indigo-300"
+                  >
+                    Edit
+                  </button>
                 </li>
               ))}
             </ul>
@@ -253,6 +332,126 @@ export default function CoursesPage() {
       {createCourseOpen && (
         <CreateCourseModal onClose={() => setCreateCourseOpen(false)} />
       )}
+      {editCourse && (
+        <EditCourseModal course={editCourse} onClose={() => setEditCourse(null)} />
+      )}
+    </div>
+  );
+}
+
+const TEMPLATE_TONE_MAP: Record<CourseTemplateOption['tone'], { ring: string; bg: string; text: string; badge: string; selected: string }> = {
+  indigo: { ring: 'ring-indigo-400', bg: 'bg-indigo-50', text: 'text-indigo-700', badge: 'bg-indigo-100 text-indigo-700', selected: 'border-indigo-400 bg-indigo-50' },
+  violet: { ring: 'ring-violet-400', bg: 'bg-violet-50', text: 'text-violet-700', badge: 'bg-violet-100 text-violet-700', selected: 'border-violet-400 bg-violet-50' },
+  sky:    { ring: 'ring-sky-400',    bg: 'bg-sky-50',    text: 'text-sky-700',    badge: 'bg-sky-100 text-sky-700',    selected: 'border-sky-400 bg-sky-50' },
+  emerald:{ ring: 'ring-emerald-400',bg: 'bg-emerald-50',text: 'text-emerald-700',badge: 'bg-emerald-100 text-emerald-700', selected: 'border-emerald-400 bg-emerald-50' },
+  amber:  { ring: 'ring-amber-400',  bg: 'bg-amber-50',  text: 'text-amber-700',  badge: 'bg-amber-100 text-amber-700',  selected: 'border-amber-400 bg-amber-50' },
+  rose:   { ring: 'ring-rose-400',   bg: 'bg-rose-50',   text: 'text-rose-700',   badge: 'bg-rose-100 text-rose-700',   selected: 'border-rose-400 bg-rose-50' },
+};
+
+function EditCourseModal({ course, onClose }: { course: Course; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [name, setName] = useState(course.name);
+  const [description, setDescription] = useState(course.description ?? '');
+  const [pickedSubjectIds, setPickedSubjectIds] = useState<Set<number>>(new Set());
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+
+  const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
+  const { data: courseDetail } = useQuery<any>({
+    queryKey: [`/api/courses/${course.id}`],
+    enabled: !!course.id,
+  });
+
+  // Pre-select subjects when courseDetail loads
+  useEffect(() => {
+    if (courseDetail?.subject_ids?.length) {
+      setPickedSubjectIds(new Set(courseDetail.subject_ids as number[]));
+    }
+  }, [courseDetail]);
+
+  const toggleSubject = (id: number) => {
+    setPickedSubjectIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/courses/${course.id}`, 'PATCH', {
+      name: name.trim(),
+      description: description.trim() || null,
+      subject_ids: Array.from(pickedSubjectIds),
+    }),
+    onSuccess: () => {
+      toast({ title: 'Course updated' });
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: 'Could not update', description: e.message, variant: 'destructive' }),
+  });
+
+  const valid = name.trim().length > 0 && pickedSubjectIds.size > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="text-base font-black">Edit course</h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center"><X size={16} /></button>
+        </div>
+        <div className="p-5 space-y-4 overflow-y-auto">
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Course name <span className="text-rose-500">*</span></label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              maxLength={150}
+              className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {submitAttempted && !name.trim() && <p className="text-xs text-rose-600 mt-1">Course name is required.</p>}
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Description <span className="text-gray-400">(optional)</span></label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              maxLength={500}
+              rows={3}
+              className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Subjects <span className="text-rose-500">*</span></label>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              {subjects.map(s => {
+                const isOn = pickedSubjectIds.has(s.id);
+                return (
+                  <button key={s.id} type="button" onClick={() => toggleSubject(s.id)}
+                    className={`text-left rounded-xl border px-3 py-2 text-sm transition-colors ${isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <span className={`inline-flex w-4 h-4 rounded mr-2 items-center justify-center flex-shrink-0 ${isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300'}`}>
+                      {isOn && <span className="text-[10px]">✓</span>}
+                    </span>
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+            {submitAttempted && pickedSubjectIds.size === 0 && <p className="text-xs text-rose-600 mt-1">Select at least one subject.</p>}
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">Cancel</button>
+          <button
+            onClick={() => { setSubmitAttempted(true); if (valid) saveMutation.mutate(); }}
+            disabled={saveMutation.isPending}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            <Save size={14} /> {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -260,14 +459,49 @@ export default function CoursesPage() {
 function CreateCourseModal({ onClose }: { onClose: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+  const [selectedTemplateKey, setSelectedTemplateKey] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [yearGroupCode, setYearGroupCode] = useState('');
+  const [selectedSubjectIds, setSelectedSubjectIds] = useState<Set<number>>(new Set());
+
+  const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
+  const { data: yearGroups = [] } = useQuery<YearGroupRow[]>({ queryKey: ['/api/year-groups?state=NSW'] });
+
+  const applyTemplate = (tpl: CourseTemplateOption) => {
+    if (selectedTemplateKey === tpl.key) {
+      setSelectedTemplateKey(null);
+      setName('');
+      setDescription('');
+      setSelectedSubjectIds(new Set());
+    } else {
+      setSelectedTemplateKey(tpl.key);
+      setName(tpl.name);
+      setDescription(tpl.description);
+      const ids = new Set(
+        subjects
+          .filter(s => tpl.subjectNames.includes(s.name))
+          .map(s => s.id)
+      );
+      setSelectedSubjectIds(ids);
+    }
+  };
+
+  const toggleSubject = (id: number) => {
+    setSelectedSubjectIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
 
   const m = useMutation({
     mutationFn: () =>
       apiRequest('/api/courses', 'POST', {
         name: name.trim(),
         description: description.trim() || null,
+        year_group_code: yearGroupCode || null,
+        subject_ids: Array.from(selectedSubjectIds),
       }),
     onSuccess: () => {
       toast({ title: 'Course created' });
@@ -278,12 +512,16 @@ function CreateCourseModal({ onClose }: { onClose: () => void }) {
       toast({ title: 'Could not create course', description: e.message ?? 'Try again.', variant: 'destructive' }),
   });
 
-  const valid = name.trim().length >= 2;
+  const valid = name.trim().length >= 2 && selectedSubjectIds.size > 0;
+
+  const missingItems: string[] = [];
+  if (name.trim().length < 2) missingItems.push('course name');
+  if (selectedSubjectIds.size === 0) missingItems.push('at least one subject');
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
           <h3 className="text-base font-black flex items-center gap-2">
             <Plus size={16} className="text-indigo-600" /> New course
           </h3>
@@ -291,39 +529,125 @@ function CreateCourseModal({ onClose }: { onClose: () => void }) {
             <X size={16} />
           </button>
         </div>
-        <div className="p-5 space-y-4">
-          <Field label="Name" required>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Foundation, OC Test Preparation"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              autoFocus
-            />
-          </Field>
-          <Field label="Description (optional)" hint="What this course covers — students and parents will see this.">
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            />
-          </Field>
-          <p className="text-xs text-gray-500">
-            Add offerings under this course next — each offering is a specific year/subject combo (e.g. Foundation Y4 Maths).
-          </p>
+
+        <div className="overflow-y-auto flex-1">
+          {/* Template picker */}
+          <div className="px-5 pt-4 pb-3 border-b border-gray-100">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-500 flex items-center gap-1.5 mb-3">
+              <Sparkles size={12} className="text-indigo-500" /> Start from a template
+            </p>
+            <div className="grid grid-cols-3 gap-2">
+              {COURSE_TEMPLATES.map(tpl => {
+                const tone = TEMPLATE_TONE_MAP[tpl.tone];
+                const isSelected = selectedTemplateKey === tpl.key;
+                return (
+                  <button
+                    key={tpl.key}
+                    type="button"
+                    onClick={() => applyTemplate(tpl)}
+                    title={tpl.description}
+                    className={`rounded-xl border-2 p-2.5 text-left transition-all ${
+                      isSelected
+                        ? `${tone.selected} border-2`
+                        : 'border-gray-100 hover:border-gray-200 bg-white'
+                    }`}
+                  >
+                    <span className={`inline-block text-[10px] font-black px-1.5 py-0.5 rounded-md mb-1.5 ${tone.badge}`}>
+                      {tpl.badge}
+                    </span>
+                    <p className={`text-xs font-bold leading-tight ${isSelected ? tone.text : 'text-gray-700'}`}>
+                      {tpl.label}
+                    </p>
+                    <p className="text-[10px] text-gray-400 mt-0.5 leading-tight">
+                      {tpl.subjectNames.slice(0, 2).join(', ')}{tpl.subjectNames.length > 2 ? ` +${tpl.subjectNames.length - 2}` : ''}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-2">
+              Pick a template to pre-fill name, description, and subjects — edit freely before saving.
+            </p>
+          </div>
+
+          <div className="p-5 space-y-4">
+            <Field label="Course name" required>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. OC Test Preparation, Foundation Program"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                autoFocus
+              />
+            </Field>
+
+            <Field label="Year group" hint="When selected in Create Class, this year will be auto-filled.">
+              <select
+                value={yearGroupCode}
+                onChange={(e) => setYearGroupCode(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Any year (not year-specific)</option>
+                {yearGroups.map(yg => (
+                  <option key={yg.code} value={yg.code}>{yg.label}</option>
+                ))}
+              </select>
+            </Field>
+
+            <Field label="Description" hint="What this course covers — students and parents will see this.">
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                placeholder="Describe what students will learn and who this course is for…"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </Field>
+
+            <Field label="Subjects this course covers" required hint="Classes in this course can only pick from this set.">
+              <div className="flex flex-wrap gap-2 mt-1">
+                {subjects.map(s => {
+                  const checked = selectedSubjectIds.has(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => toggleSubject(s.id)}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border-2 transition-colors ${
+                        checked
+                          ? 'bg-indigo-600 border-indigo-600 text-white'
+                          : 'bg-white border-gray-200 text-gray-600 hover:border-indigo-300'
+                      }`}
+                    >
+                      {s.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </Field>
+          </div>
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
-            Cancel
-          </button>
-          <button
-            onClick={() => m.mutate()}
-            disabled={!valid || m.isPending}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
-          >
-            <Save size={14} /> {m.isPending ? 'Creating…' : 'Create course'}
-          </button>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <p className="text-xs text-gray-400">
+            {missingItems.length > 0
+              ? `Still need: ${missingItems.join(', ')}`
+              : <span className="text-emerald-600 font-semibold">Ready to create</span>
+            }
+          </p>
+          <div className="flex items-center gap-2">
+            <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+              Cancel
+            </button>
+            <button
+              onClick={() => m.mutate()}
+              disabled={!valid || m.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Save size={14} /> {m.isPending ? 'Creating…' : 'Create course'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -437,7 +761,7 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [tutorId, setTutorId] = useState<string>('');
-  const [pickedTermIds, setPickedTermIds] = useState<Set<number>>(new Set());
+  const [pickedTermIds, setPickedTermIds] = useState<Set<string>>(new Set());
   const [testDate, setTestDate] = useState('');
   const [capacity, setCapacity] = useState('');
   // Catalogue fields (Step 1 schema; optional in UI)
@@ -457,12 +781,12 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
 
   // Academic hierarchy — pull current year's terms so the form picks terms not dates.
-  interface TermRow { id: number; name: string; start_date: string; end_date: string; }
-  interface YearRow { id: number; year: number; terms: TermRow[] }
-  const { data: hierarchy } = useQuery<{ years?: YearRow[] } | YearRow[]>({
+  interface AcademicTermRow { id: string; name: string; startDate: string; endDate: string; }
+  interface AcademicYearRow { id: string; yearNumber: number; name: string; terms: AcademicTermRow[] }
+  const { data: hierarchy } = useQuery<{ years?: AcademicYearRow[] } | AcademicYearRow[]>({
     queryKey: [`/api/companies/${businessId}/academic-hierarchy`],
   });
-  const academicYears: YearRow[] = useMemo(() => {
+  const academicYears: AcademicYearRow[] = useMemo(() => {
     if (!hierarchy) return [];
     return Array.isArray(hierarchy) ? hierarchy : (hierarchy.years ?? []);
   }, [hierarchy]);
@@ -470,18 +794,18 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
   const terms = currentAcademicYear?.terms ?? [];
 
   // Derive starts_on / ends_on from picked terms (min start, max end).
-  const dateOnly = (s: string) => s.match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? s;
+  const dateOnly = (s: string | undefined) => (s ?? '').match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? (s ?? '');
   const derived = useMemo(() => {
     const picked = terms.filter(t => pickedTermIds.has(t.id));
     if (picked.length === 0) return { startsOn: '', endsOn: '' };
-    const starts = picked.map(t => dateOnly(t.start_date)).sort();
-    const ends = picked.map(t => dateOnly(t.end_date)).sort();
+    const starts = picked.map(t => dateOnly(t.startDate)).sort();
+    const ends = picked.map(t => dateOnly(t.endDate)).sort();
     return { startsOn: starts[0], endsOn: ends[ends.length - 1] };
   }, [terms, pickedTermIds]);
   const startsOn = derived.startsOn;
   const endsOn = derived.endsOn;
 
-  const toggleTerm = (termId: number) => {
+  const toggleTerm = (termId: string) => {
     setPickedTermIds(prev => {
       const next = new Set(prev);
       next.has(termId) ? next.delete(termId) : next.add(termId);
@@ -796,7 +1120,7 @@ function CreateOfferingModal({ businessId, onClose }: { businessId: string; onCl
                           <span className="font-bold text-sm">{t.name}</span>
                         </div>
                         <p className="text-[10px] text-gray-500 mt-1">
-                          {dateOnly(t.start_date)} → {dateOnly(t.end_date)}
+                          {dateOnly(t.startDate)} → {dateOnly(t.endDate)}
                         </p>
                       </button>
                     );

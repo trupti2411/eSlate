@@ -464,13 +464,18 @@ function QuickActionsCard({
     { href: '/company/students', label: 'Add student', icon: <Plus size={16} />, tone: 'emerald' as const, primary: hasTutors && !hasStudents },
     { href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
     { href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'rose' as const, primary: false },
+    { href: '/company/courses', label: 'Create course', icon: <Trophy size={16} />, tone: 'violet' as const, primary: false },
+    { href: '/company/subjects', label: 'Subjects', icon: <GraduationCap size={16} />, tone: 'teal' as const, primary: false },
+    { href: '/company/terms', label: 'Terms', icon: <CalendarDays size={16} />, tone: 'indigo' as const, primary: false },
   ];
-  const toneClass = (k: 'indigo' | 'emerald' | 'amber' | 'rose', primary: boolean) => {
+  const toneClass = (k: 'indigo' | 'emerald' | 'amber' | 'rose' | 'violet' | 'teal', primary: boolean) => {
     const map: Record<string, { primary: string; ghost: string }> = {
-      indigo: { primary: 'bg-indigo-600 hover:bg-indigo-700 text-white', ghost: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' },
+      indigo:  { primary: 'bg-indigo-600 hover:bg-indigo-700 text-white',  ghost: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' },
       emerald: { primary: 'bg-emerald-600 hover:bg-emerald-700 text-white', ghost: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700' },
-      amber: { primary: 'bg-amber-600 hover:bg-amber-700 text-white', ghost: 'bg-amber-50 hover:bg-amber-100 text-amber-700' },
-      rose: { primary: 'bg-rose-600 hover:bg-rose-700 text-white', ghost: 'bg-rose-50 hover:bg-rose-100 text-rose-700' },
+      amber:   { primary: 'bg-amber-600 hover:bg-amber-700 text-white',   ghost: 'bg-amber-50 hover:bg-amber-100 text-amber-700' },
+      rose:    { primary: 'bg-rose-600 hover:bg-rose-700 text-white',    ghost: 'bg-rose-50 hover:bg-rose-100 text-rose-700' },
+      violet:  { primary: 'bg-violet-600 hover:bg-violet-700 text-white',  ghost: 'bg-violet-50 hover:bg-violet-100 text-violet-700' },
+      teal:    { primary: 'bg-teal-600 hover:bg-teal-700 text-white',    ghost: 'bg-teal-50 hover:bg-teal-100 text-teal-700' },
     };
     return primary ? map[k].primary : map[k].ghost;
   };

@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CheckCircle, ShieldCheck, CalendarDays, ArrowRight, Loader2, GraduationCap } from "lucide-react";
+import { CheckCircle, ShieldCheck, CalendarDays, ArrowRight, Loader2, GraduationCap, FileText } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -37,24 +37,36 @@ const wwccSchema = z.object({
 });
 type WwccData = z.infer<typeof wwccSchema>;
 
-type Step = 1 | 2 | 3;
+type Step = 1 | 2 | 3 | 4;
 
 export default function OnboardingPage() {
   const { toast } = useToast();
   const { user } = useAuth();
   // Multi-tutor business owners (role=company_admin on the wire) aren't tutors themselves —
-  // skip the WWCC step. Solo tutors (role=tutor) start at step 1.
+  // skip the WWCC step. Everyone starts at step 1 (policy acceptance).
   const isCompanyAdmin = (user as any)?.role === "company_admin";
-  const [step, setStep] = useState<Step>(isCompanyAdmin ? 2 : 1);
+  const [step, setStep] = useState<Step>(1);
+  const [tosChecked, setTosChecked] = useState(false);
+  const [privacyChecked, setPrivacyChecked] = useState(false);
+  const [agreementChecked, setAgreementChecked] = useState(false);
 
-  // If user data loads after the page mounts, advance past WWCC for company owners.
-  useEffect(() => {
-    if (isCompanyAdmin && step === 1) setStep(2);
-  }, [isCompanyAdmin, step]);
+  // Not needed after adding step 1 for everyone — remove old skip logic guard.
+  useEffect(() => {}, []);
 
   const wwccForm = useForm<WwccData>({
     resolver: zodResolver(wwccSchema),
     defaultValues: { wwccNumber: "", wwccExpiry: "", wwccState: "NSW" },
+  });
+
+  const policiesMutation = useMutation({
+    mutationFn: () => apiRequest("/api/me/accept-policies", "POST"),
+    onSuccess: () => {
+      toast({ title: "Policies accepted", description: "Thanks! Let's continue your setup." });
+      setStep(isCompanyAdmin ? 3 : 2);
+    },
+    onError: (err: any) => {
+      toast({ title: "Couldn't save", description: err.message ?? "Try again.", variant: "destructive" });
+    },
   });
 
   const wwccMutation = useMutation({
@@ -66,7 +78,7 @@ export default function OnboardingPage() {
       }),
     onSuccess: () => {
       toast({ title: "WWCC captured", description: "Compliance set. Next: your academic calendar." });
-      setStep(2);
+      setStep(3);
     },
     onError: (err: any) => {
       toast({ title: "Couldn't save WWCC", description: err.message ?? "Try again.", variant: "destructive" });
@@ -76,7 +88,7 @@ export default function OnboardingPage() {
   const packQuery = useQuery<any>({
     queryKey: ["/api/state-packs/NSW/2026"],
     queryFn: () => apiRequest("/api/state-packs/NSW/2026", "GET"),
-    enabled: step === 2,
+    enabled: step === 3,
   });
 
   const applyMutation = useMutation({
@@ -84,7 +96,7 @@ export default function OnboardingPage() {
       apiRequest("/api/state-packs/apply", "POST", { state_code: "NSW", year: 2026 }),
     onSuccess: () => {
       toast({ title: "Calendar applied", description: "NSW 2026 terms and weeks are ready." });
-      setStep(3);
+      setStep(4);
     },
     onError: (err: any) => {
       toast({ title: "Couldn't apply calendar", description: err.message ?? "Try again.", variant: "destructive" });
@@ -97,12 +109,56 @@ export default function OnboardingPage() {
         <div className="text-center">
           <GraduationCap className="h-10 w-10 text-blue-600 mx-auto mb-2" />
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Welcome to eSlate</h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-1">Three quick steps to get your tutoring profile ready.</p>
+          <p className="text-gray-600 dark:text-gray-300 mt-1">A few quick steps to get your tutoring profile ready.</p>
         </div>
 
         <Stepper current={step} />
 
         {step === 1 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5 text-blue-600" /> Terms &amp; Policies</CardTitle>
+              <CardDescription>
+                Please read and accept our policies before continuing. All three are required.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="space-y-3">
+                <PolicyCheck
+                  id="tos"
+                  checked={tosChecked}
+                  onChange={setTosChecked}
+                  href="/legal/terms"
+                  label="Terms of Service"
+                />
+                <PolicyCheck
+                  id="privacy"
+                  checked={privacyChecked}
+                  onChange={setPrivacyChecked}
+                  href="/legal/privacy"
+                  label="Privacy Policy"
+                />
+                <PolicyCheck
+                  id="agreement"
+                  checked={agreementChecked}
+                  onChange={setAgreementChecked}
+                  href="/legal/agreement"
+                  label="User Agreement"
+                />
+              </div>
+              <Button
+                onClick={() => policiesMutation.mutate()}
+                disabled={!tosChecked || !privacyChecked || !agreementChecked || policiesMutation.isPending}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                {policiesMutation.isPending ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <ArrowRight className="h-4 w-4 mr-2" />}
+                Accept &amp; continue
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {step === 2 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><ShieldCheck className="h-5 w-5 text-blue-600" /> Working With Children Check</CardTitle>
@@ -158,7 +214,7 @@ export default function OnboardingPage() {
           </Card>
         )}
 
-        {step === 2 && (
+        {step === 3 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><CalendarDays className="h-5 w-5 text-blue-600" /> Academic calendar</CardTitle>
@@ -198,7 +254,7 @@ export default function OnboardingPage() {
           </Card>
         )}
 
-        {step === 3 && (
+        {step === 4 && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2"><CheckCircle className="h-5 w-5 text-green-600" /> You're set up</CardTitle>
@@ -230,17 +286,17 @@ export default function OnboardingPage() {
 function Stepper({ current }: { current: Step }) {
   const { user } = useAuth();
   const isCompanyAdmin = (user as any)?.role === "company_admin";
-  const labels = isCompanyAdmin
-    ? ["Calendar", "Done"]
-    : ["WWCC", "Calendar", "Done"];
-  // For company admin (no WWCC), shift indices so current=2 maps to first label, current=3 to second.
-  const displayed = isCompanyAdmin ? current - 1 : current;
+
+  // steps: [label, actualStep]
+  const steps: [string, number][] = isCompanyAdmin
+    ? [["Policies", 1], ["Calendar", 3], ["Done", 4]]
+    : [["Policies", 1], ["WWCC", 2], ["Calendar", 3], ["Done", 4]];
+
   return (
-    <div className="flex items-center justify-center gap-3 text-sm">
-      {labels.map((label, i) => {
-        const idx = i + 1;
-        const active = idx === displayed;
-        const done = idx < displayed;
+    <div className="flex items-center justify-center gap-3 text-sm flex-wrap">
+      {steps.map(([label, stepNum], i) => {
+        const active = current === stepNum;
+        const done = current > stepNum;
         return (
           <div key={label} className="flex items-center gap-2">
             <span className={
@@ -249,13 +305,45 @@ function Stepper({ current }: { current: Step }) {
                 : active ? "bg-blue-600 text-white"
                 : "bg-gray-200 dark:bg-gray-700 text-gray-500")
             }>
-              {done ? "✓" : idx}
+              {done ? "✓" : i + 1}
             </span>
             <span className={active ? "font-medium" : "text-gray-500"}>{label}</span>
-            {idx < labels.length && <span className="text-gray-300 dark:text-gray-600">→</span>}
+            {i < steps.length - 1 && <span className="text-gray-300 dark:text-gray-600">→</span>}
           </div>
         );
       })}
     </div>
+  );
+}
+
+function PolicyCheck({ id, checked, onChange, href, label }: {
+  id: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  href: string;
+  label: string;
+}) {
+  return (
+    <label htmlFor={id} className="flex items-start gap-3 cursor-pointer">
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        onChange={e => onChange(e.target.checked)}
+        className="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+      />
+      <span className="text-sm text-gray-700 dark:text-gray-300">
+        I have read and agree to the{" "}
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 hover:underline font-medium"
+          onClick={e => e.stopPropagation()}
+        >
+          {label}
+        </a>
+      </span>
+    </label>
   );
 }

@@ -31,7 +31,7 @@ export default function Layout({ children }: LayoutProps) {
       // Clear localStorage first
       localStorage.removeItem('authToken');
       
-      const response = await fetch('/api/logout', {
+      const response = await fetch('/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });

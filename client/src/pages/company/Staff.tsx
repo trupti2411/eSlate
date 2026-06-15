@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
   Users, Building2, Bell, LogOut, ArrowLeft, UserPlus, ShieldCheck, ShieldAlert,
-  Mail, X, Save, Search,
+  Mail, X, Save, Search, Eye, Edit2,
 } from 'lucide-react';
 
 interface AdminProfile {
@@ -29,6 +29,11 @@ interface Tutor {
   status?: 'invited' | 'pending_compliance' | 'active' | string;
   complianceStatus?: 'compliant' | 'pending_compliance' | 'compliance_hold' | string;
   wwccExpiry?: string | null;
+  specialization?: string | null;
+  qualifications?: string | null;
+  availability?: string | null;
+  branch?: string | null;
+  isVerified?: boolean;
 }
 
 function formatDate(s: string | null | undefined): string {
@@ -53,6 +58,7 @@ export default function Staff() {
   const { user, logoutMutation } = useAuth();
   const [search, setSearch] = useState('');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [profileTutor, setProfileTutor] = useState<Tutor | null>(null);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -165,7 +171,7 @@ export default function Staff() {
           </div>
         ) : (
           <ul className="space-y-3">
-            {filtered.map((t) => <TutorRow key={t.id} t={t} />)}
+            {filtered.map((t) => <TutorRow key={t.id} t={t} onView={() => setProfileTutor(t)} />)}
           </ul>
         )}
       </main>
@@ -174,6 +180,13 @@ export default function Staff() {
         <InviteModal
           businessId={companyId}
           onClose={() => setInviteOpen(false)}
+        />
+      )}
+      {profileTutor && companyId && (
+        <TutorProfileModal
+          tutor={profileTutor}
+          companyId={companyId}
+          onClose={() => setProfileTutor(null)}
         />
       )}
     </div>
@@ -199,7 +212,7 @@ function KpiTile({ value, label, tone }: { value: number; label: string; tone: k
   );
 }
 
-function TutorRow({ t }: { t: Tutor }) {
+function TutorRow({ t, onView }: { t: Tutor; onView: () => void }) {
   const fullName = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || t.email;
   const initials = fullName.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'T';
   const wwccDays = daysUntil(t.wwccExpiry);
@@ -219,13 +232,14 @@ function TutorRow({ t }: { t: Tutor }) {
   const Icon = badge.tone === 'green' ? ShieldCheck : ShieldAlert;
 
   return (
-    <li className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
+    <li className="group bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4">
       <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black flex-shrink-0">
         {initials}
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-black text-gray-900 truncate">{fullName}</p>
         <p className="text-xs text-gray-500 truncate">{t.email}</p>
+        {t.branch && <p className="text-xs text-gray-400 truncate">{t.branch}</p>}
       </div>
       <div className="hidden sm:flex flex-col items-end gap-1 flex-shrink-0">
         <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full inline-flex items-center gap-1 ${palette}`}>
@@ -235,6 +249,13 @@ function TutorRow({ t }: { t: Tutor }) {
           <span className="text-[10px] text-gray-500">WWCC {formatDate(t.wwccExpiry)}</span>
         )}
       </div>
+      <button
+        onClick={onView}
+        className="opacity-0 group-hover:opacity-100 transition-opacity w-8 h-8 rounded-xl hover:bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0"
+        title="View profile"
+      >
+        <Eye size={15} />
+      </button>
     </li>
   );
 }
@@ -346,6 +367,176 @@ function InviteModal({ businessId, onClose }: { businessId: string; onClose: () 
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function TutorProfileModal({ tutor, companyId, onClose }: { tutor: Tutor; companyId: string; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState(false);
+  const [firstName, setFirstName] = useState(tutor.firstName ?? '');
+  const [lastName, setLastName] = useState(tutor.lastName ?? '');
+  const [specialization, setSpecialization] = useState(tutor.specialization ?? '');
+  const [qualifications, setQualifications] = useState(tutor.qualifications ?? '');
+  const [availability, setAvailability] = useState(tutor.availability ?? '');
+  const [branch, setBranch] = useState(tutor.branch ?? '');
+
+  const saveMutation = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/companies/${companyId}/tutors/${tutor.id}`, 'PATCH', {
+        firstName: firstName.trim() || undefined,
+        lastName: lastName.trim() || undefined,
+        specialization: specialization.trim() || null,
+        qualifications: qualifications.trim() || null,
+        availability: availability.trim() || null,
+        branch: branch.trim() || null,
+      }),
+    onSuccess: () => {
+      toast({ title: 'Profile updated' });
+      qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
+      setEditing(false);
+      onClose();
+    },
+    onError: (e: any) => {
+      toast({ title: 'Save failed', description: e.message ?? 'Try again.', variant: 'destructive' });
+    },
+  });
+
+  const fullName = `${tutor.firstName ?? ''} ${tutor.lastName ?? ''}`.trim() || tutor.email;
+  const initials = fullName.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'T';
+
+  let badgeLabel = 'Active';
+  let badgeCls = 'bg-emerald-100 text-emerald-800';
+  if (tutor.complianceStatus === 'compliance_hold') { badgeLabel = 'On hold'; badgeCls = 'bg-rose-100 text-rose-800'; }
+  else if (tutor.complianceStatus === 'pending_compliance' || tutor.status === 'invited') { badgeLabel = 'Pending'; badgeCls = 'bg-amber-100 text-amber-800'; }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-black flex-shrink-0">
+              {initials}
+            </div>
+            <div>
+              <h3 className="text-base font-black text-gray-900">{fullName}</h3>
+              <p className="text-xs text-gray-500">{tutor.email}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${badgeCls}`}>{badgeLabel}</span>
+            {!editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="w-8 h-8 rounded-xl hover:bg-indigo-50 text-indigo-600 flex items-center justify-center"
+                title="Edit profile"
+              >
+                <Edit2 size={14} />
+              </button>
+            )}
+            <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto flex-1 p-5 space-y-4">
+          {editing ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <Field label="First name">
+                  <input
+                    value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </Field>
+                <Field label="Last name">
+                  <input
+                    value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
+                </Field>
+              </div>
+              <Field label="Branch / location">
+                <input
+                  value={branch}
+                  onChange={e => setBranch(e.target.value)}
+                  placeholder="e.g. Sydney CBD"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+              <Field label="Specialization">
+                <input
+                  value={specialization}
+                  onChange={e => setSpecialization(e.target.value)}
+                  placeholder="e.g. HSC Maths, OC Prep"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+              <Field label="Qualifications">
+                <textarea
+                  value={qualifications}
+                  onChange={e => setQualifications(e.target.value)}
+                  rows={3}
+                  placeholder="e.g. B.Ed, B.Sc Mathematics"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none"
+                />
+              </Field>
+              <Field label="Availability">
+                <input
+                  value={availability}
+                  onChange={e => setAvailability(e.target.value)}
+                  placeholder="e.g. Mon–Fri 4pm–8pm, Weekends"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </>
+          ) : (
+            <dl className="space-y-3 text-sm">
+              <ProfileRow label="Email" value={tutor.email} />
+              <ProfileRow label="Branch" value={tutor.branch} />
+              <ProfileRow label="Specialization" value={tutor.specialization} />
+              <ProfileRow label="Qualifications" value={tutor.qualifications} />
+              <ProfileRow label="Availability" value={tutor.availability} />
+              <ProfileRow label="Verified" value={tutor.isVerified ? 'Yes' : 'No'} />
+            </dl>
+          )}
+        </div>
+
+        {/* Footer */}
+        {editing && (
+          <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+            <button
+              onClick={() => setEditing(false)}
+              className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => saveMutation.mutate()}
+              disabled={saveMutation.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Save size={14} /> {saveMutation.isPending ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ProfileRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="flex gap-3">
+      <dt className="w-32 flex-shrink-0 text-xs font-bold uppercase tracking-wider text-gray-400">{label}</dt>
+      <dd className="text-gray-800 whitespace-pre-wrap">{value}</dd>
     </div>
   );
 }

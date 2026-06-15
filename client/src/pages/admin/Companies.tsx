@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
@@ -28,32 +27,42 @@ interface BusinessSummary {
 }
 
 interface InviteResponse {
-  invitation_id: number;
-  business_id: number;
-  business_type: "individual" | "multi_tutor";
+  invitation_id: string;
+  business_id: string;
+  business_type: "multi_tutor";
   business_name: string;
   token: string;
   expires_at: string;
 }
 
-type ProfileType = "individual" | "multi_tutor";
+type ProfileType = "multi_tutor";
 
 export default function Companies() {
   const { toast } = useToast();
   const { user: me, logoutMutation } = useAuth();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | ProfileType>("all");
+  const [filterType, setFilterType] = useState<"all" | "individual" | "multi_tutor">("all");
   const [inviteResult, setInviteResult] = useState<InviteResponse | null>(null);
+
+  // Close dialog on unmount to prevent the Radix UI overlay from being left in the DOM
+  // when navigating away with the dialog open (animation-duration:1ms still fires animationend).
+  useEffect(() => {
+    return () => setIsCreateDialogOpen(false);
+  }, []);
 
   const [form, setForm] = useState({
     type: "multi_tutor" as ProfileType,
     name: "",
+    abn: "",
+    address: "",
+    contactPhone: "",
+    contactEmail: "",
     ownerFirstName: "",
     ownerLastName: "",
     ownerEmail: "",
-    stateCode: "NSW",
   });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   const { data: businesses, isLoading } = useQuery<BusinessSummary[]>({
     queryKey: ["/api/companies"],
@@ -61,16 +70,17 @@ export default function Companies() {
 
   const inviteMutation = useMutation({
     mutationFn: async (data: typeof form): Promise<InviteResponse> => {
-      const payload: Record<string, unknown> = {
-        type: data.type,
+      return await apiRequest("/api/admin/businesses/invite", "POST", {
+        type: "multi_tutor",
+        name: data.name,
+        abn: data.abn || undefined,
+        address: data.address || undefined,
+        contact_phone: data.contactPhone || undefined,
+        contact_email: data.contactEmail || undefined,
         owner_email: data.ownerEmail,
         owner_first_name: data.ownerFirstName,
         owner_last_name: data.ownerLastName,
-        state_code: data.stateCode,
-      };
-      if (data.type === "multi_tutor") payload.name = data.name;
-      else if (data.name.trim()) payload.name = data.name;
-      return await apiRequest("/api/admin/businesses/invite", "POST", payload);
+      });
     },
     onSuccess: (res) => {
       toast({
@@ -93,11 +103,15 @@ export default function Companies() {
     setForm({
       type: "multi_tutor",
       name: "",
+      abn: "",
+      address: "",
+      contactPhone: "",
+      contactEmail: "",
       ownerFirstName: "",
       ownerLastName: "",
       ownerEmail: "",
-      stateCode: "NSW",
     });
+    setFormErrors({});
     setInviteResult(null);
   };
 
@@ -106,9 +120,26 @@ export default function Companies() {
     resetForm();
   };
 
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {};
+    if (form.abn) {
+      const digits = form.abn.replace(/\s/g, "");
+      if (!/^\d{11}$/.test(digits)) errors.abn = "ABN must be 11 digits";
+    }
+    if (form.contactEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.contactEmail)) {
+      errors.contactEmail = "Enter a valid email address";
+    }
+    if (form.contactPhone) {
+      const digits = form.contactPhone.replace(/[\s\-().+]/g, "");
+      if (!/^\d{8,15}$/.test(digits)) errors.contactPhone = "Enter a valid phone number";
+    }
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    inviteMutation.mutate(form);
+    if (validateForm()) inviteMutation.mutate(form);
   };
 
   const inviteLink = inviteResult
@@ -229,8 +260,7 @@ export default function Companies() {
                     </div>
 
                     <div className="text-xs text-gray-500">
-                      Business <strong>{inviteResult.business_name}</strong> (id #{inviteResult.business_id}) has been created
-                      as <strong>{inviteResult.business_type === "individual" ? "Solo Tutor" : "Tutoring Company"}</strong>.
+                      Business <strong>{inviteResult.business_name}</strong> has been created as a <strong>Tutoring Company</strong>.
                       It will activate once the owner accepts the invite.
                     </div>
 
@@ -242,88 +272,121 @@ export default function Companies() {
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                      <Label>Profile type <span className="text-red-500">*</span></Label>
-                      <Select
-                        value={form.type}
-                        onValueChange={(v) => setForm({ ...form, type: v as ProfileType })}
-                      >
-                        <SelectTrigger className="mt-1.5">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="individual">Solo tutor (just one person)</SelectItem>
-                          <SelectItem value="multi_tutor">Tutoring company (multiple tutors)</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label>Profile type</Label>
+                      <Input
+                        readOnly
+                        value="Tutoring company (multiple tutors)"
+                        className="mt-1.5 bg-gray-50 text-gray-500"
+                      />
                       <p className="text-xs text-gray-500 mt-1">
-                        {form.type === "individual"
-                          ? "We'll create a hidden Individual business so the tutor has somewhere to own classes and students."
-                          : "We'll create a Multi-Tutor business at Starter tier. The owner can invite tutors after setup."}
+                        We'll create a Multi-Tutor business at Starter tier. The owner can invite tutors after setup.
                       </p>
                     </div>
 
-                    {form.type === "multi_tutor" && (
-                      <div>
-                        <Label htmlFor="biz-name">Business name <span className="text-red-500">*</span></Label>
-                        <Input
-                          id="biz-name"
-                          className="mt-1.5"
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          placeholder="e.g. Acme Tutoring"
-                          required
-                        />
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="first-name">Owner first name <span className="text-red-500">*</span></Label>
-                        <Input
-                          id="first-name"
-                          className="mt-1.5"
-                          value={form.ownerFirstName}
-                          onChange={(e) => setForm({ ...form, ownerFirstName: e.target.value })}
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="last-name">Owner last name <span className="text-red-500">*</span></Label>
-                        <Input
-                          id="last-name"
-                          className="mt-1.5"
-                          value={form.ownerLastName}
-                          onChange={(e) => setForm({ ...form, ownerLastName: e.target.value })}
-                          required
-                        />
-                      </div>
-                    </div>
-
+                    {/* Company details */}
                     <div>
-                      <Label htmlFor="owner-email">Owner email <span className="text-red-500">*</span></Label>
+                      <Label htmlFor="biz-name">Business name <span className="text-red-500">*</span></Label>
                       <Input
-                        id="owner-email"
-                        type="email"
+                        id="biz-name"
                         className="mt-1.5"
-                        value={form.ownerEmail}
-                        onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
-                        placeholder="owner@example.com"
+                        value={form.name}
+                        onChange={(e) => setForm({ ...form, name: e.target.value })}
+                        placeholder="e.g. Acme Tutoring"
                         required
                       />
                     </div>
 
-                    {form.type === "individual" && (
+                    <div>
+                      <Label htmlFor="abn">ABN <span className="text-gray-400 font-normal">(optional)</span></Label>
+                      <Input
+                        id="abn"
+                        className={`mt-1.5 ${formErrors.abn ? "border-red-400" : ""}`}
+                        value={form.abn}
+                        onChange={(e) => setForm({ ...form, abn: e.target.value })}
+                        placeholder="e.g. 12 345 678 901"
+                      />
+                      {formErrors.abn && <p className="text-xs text-red-500 mt-1">{formErrors.abn}</p>}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="address">Address <span className="text-gray-400 font-normal">(optional)</span></Label>
+                      <Input
+                        id="address"
+                        className="mt-1.5"
+                        value={form.address}
+                        onChange={(e) => setForm({ ...form, address: e.target.value })}
+                        placeholder="e.g. 123 Main St, Sydney NSW 2000"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <Label htmlFor="solo-biz-name">Business name (optional)</Label>
+                        <Label htmlFor="contact-phone">Contact phone <span className="text-gray-400 font-normal">(optional)</span></Label>
                         <Input
-                          id="solo-biz-name"
-                          className="mt-1.5"
-                          value={form.name}
-                          onChange={(e) => setForm({ ...form, name: e.target.value })}
-                          placeholder={`Default: "${(form.ownerFirstName + ' ' + form.ownerLastName).trim() || 'Their name'} Tutoring"`}
+                          id="contact-phone"
+                          type="tel"
+                          className={`mt-1.5 ${formErrors.contactPhone ? "border-red-400" : ""}`}
+                          value={form.contactPhone}
+                          onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
+                          placeholder="e.g. 02 9000 0000"
                         />
+                        {formErrors.contactPhone && <p className="text-xs text-red-500 mt-1">{formErrors.contactPhone}</p>}
                       </div>
-                    )}
+                      <div>
+                        <Label htmlFor="contact-email">Contact email <span className="text-gray-400 font-normal">(optional)</span></Label>
+                        <Input
+                          id="contact-email"
+                          type="email"
+                          className={`mt-1.5 ${formErrors.contactEmail ? "border-red-400" : ""}`}
+                          value={form.contactEmail}
+                          onChange={(e) => setForm({ ...form, contactEmail: e.target.value })}
+                          placeholder="info@company.com"
+                        />
+                        {formErrors.contactEmail && <p className="text-xs text-red-500 mt-1">{formErrors.contactEmail}</p>}
+                      </div>
+                    </div>
+
+                    {/* Owner details */}
+                    <div className="border-t pt-4">
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Owner details</p>
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="first-name">First name <span className="text-red-500">*</span></Label>
+                            <Input
+                              id="first-name"
+                              className="mt-1.5"
+                              value={form.ownerFirstName}
+                              onChange={(e) => setForm({ ...form, ownerFirstName: e.target.value })}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="last-name">Last name <span className="text-red-500">*</span></Label>
+                            <Input
+                              id="last-name"
+                              className="mt-1.5"
+                              value={form.ownerLastName}
+                              onChange={(e) => setForm({ ...form, ownerLastName: e.target.value })}
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <Label htmlFor="owner-email">Owner email <span className="text-red-500">*</span></Label>
+                          <Input
+                            id="owner-email"
+                            type="email"
+                            className="mt-1.5"
+                            value={form.ownerEmail}
+                            onChange={(e) => setForm({ ...form, ownerEmail: e.target.value })}
+                            placeholder="owner@example.com"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
 
                     <div>
                       <Label>State</Label>
