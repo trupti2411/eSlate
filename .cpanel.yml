@@ -4,3 +4,5 @@ deployment:
     - export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
     - npm install --production 2>&1
     - npm run build 2>&1
+    - npm run db:push 2>&1
+    - npm run db:seed 2>&1
