@@ -2,361 +2,647 @@ import { sql } from 'drizzle-orm';
 import { relations } from 'drizzle-orm';
 import {
   index,
-  jsonb,
-  pgTable,
+  mysqlTable,
+  mysqlEnum,
   timestamp,
   varchar,
   text,
-  integer,
+  int,
   boolean,
-  pgEnum,
-} from "drizzle-orm/pg-core";
+  json,
+} from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-// Session storage table (required for Replit Auth)
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
-// Enums for user roles and status
-export const userRoleEnum = pgEnum('user_role', ['student', 'parent', 'tutor', 'admin', 'company_admin']);
-export const assignmentStatusEnum = pgEnum('assignment_status', ['assigned', 'submitted', 'reviewed', 'completed', 'late', 'needs_revision']);
-export const submissionStatusEnum = pgEnum('submission_status', ['draft', 'submitted', 'late', 'graded', 'parent_verified', 'needs_revision']);
-export const messageTypeEnum = pgEnum('message_type', ['text', 'file', 'system']);
-export const questionTypeEnum = pgEnum('question_type', ['short_text', 'long_text', 'multiple_choice', 'fill_blank', 'text_image', 'information']);
-export const assignmentKindEnum = pgEnum('assignment_kind', ['file_upload', 'worksheet']);
-
 // User storage table with custom authentication
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").unique().notNull(),
-  password: varchar("password"), // For email/password auth
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  role: userRoleEnum("role").notNull().default('student'),
+export const users = mysqlTable("users", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  email: varchar("email", { length: 255 }).unique().notNull(),
+  password: varchar("password", { length: 255 }),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  profileImageUrl: varchar("profile_image_url", { length: 500 }),
+  role: mysqlEnum("role", ['student', 'parent', 'tutor', 'admin', 'company_admin']).notNull().default('student'),
   isActive: boolean("is_active").notNull().default(true),
   isEmailVerified: boolean("is_email_verified").notNull().default(false),
-  emailVerificationToken: varchar("email_verification_token"),
-  passwordResetToken: varchar("password_reset_token"),
+  emailVerificationToken: varchar("email_verification_token", { length: 255 }),
+  passwordResetToken: varchar("password_reset_token", { length: 255 }),
   passwordResetExpires: timestamp("password_reset_expires"),
   lastLogin: timestamp("last_login"),
-  authProvider: varchar("auth_provider").default('email'), // 'email' or 'replit'
-  replitId: varchar("replit_id"), // Keep for existing users
-  termsAcceptedAt: timestamp("terms_accepted_at"), // When user accepted terms & privacy policy
-  termsVersion: varchar("terms_version"), // Version of terms accepted (e.g., "1.0")
+  authProvider: varchar("auth_provider", { length: 50 }).default('email'),
+  replitId: varchar("replit_id", { length: 255 }),
+  termsAcceptedAt: timestamp("terms_accepted_at"),
+  termsVersion: varchar("terms_version", { length: 20 }),
   isDeleted: boolean("is_deleted").notNull().default(false),
   deletedAt: timestamp("deleted_at"),
-  deletedBy: varchar("deleted_by"),
+  deletedBy: varchar("deleted_by", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Students table for additional student-specific data
-export const students = pgTable("students", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  gradeLevel: varchar("grade_level"),
-  schoolName: varchar("school_name"),
-  yearGroupCode: varchar("year_group_code"),
+// Students table
+export const students = mysqlTable("students", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  gradeLevel: varchar("grade_level", { length: 50 }),
+  schoolName: varchar("school_name", { length: 255 }),
+  yearGroupCode: varchar("year_group_code", { length: 20 }),
   dateOfBirth: timestamp("date_of_birth"),
   address: text("address"),
   learningGoals: text("learning_goals"),
   notes: text("notes"),
-  parentId: varchar("parent_id").references(() => parents.id),
-  tutorId: varchar("tutor_id").references(() => tutors.id),
-  companyId: varchar("company_id").references(() => tutoringCompanies.id), // Direct company assignment
-  yearId: varchar("year_id").references(() => academicYears.id), // Academic year assignment
-  termId: varchar("term_id").references(() => academicTerms.id), // Academic term assignment
-  classId: varchar("class_id").references(() => classes.id), // Class assignment
+  parentId: varchar("parent_id", { length: 36 }).references(() => parents.id),
+  tutorId: varchar("tutor_id", { length: 36 }).references(() => tutors.id),
+  companyId: varchar("company_id", { length: 36 }).references(() => tutoringCompanies.id),
+  yearId: varchar("year_id", { length: 36 }).references(() => academicYears.id),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
-  updatedByName: varchar("updated_by_name"),
+  updatedByName: varchar("updated_by_name", { length: 255 }),
 });
 
-// Student contacts (parents/guardians) — standalone, no user account required
-export const studentContacts = pgTable("student_contacts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
-  name: varchar("name").notNull(),
-  relationship: varchar("relationship"),
-  email: varchar("email"),
-  phone: varchar("phone"),
+// Student contacts
+export const studentContacts = mysqlTable("student_contacts", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  relationship: varchar("relationship", { length: 100 }),
+  email: varchar("email", { length: 255 }),
+  phone: varchar("phone", { length: 50 }),
   isPrimary: boolean("is_primary").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Parents table
-export const parents = pgTable("parents", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  phoneNumber: varchar("phone_number"),
+export const parents = mysqlTable("parents", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  phoneNumber: varchar("phone_number", { length: 50 }),
   aiHintsEnabled: boolean("ai_hints_enabled").notNull().default(true),
-  maxHintsPerQuestion: integer("max_hints_per_question").default(3),
+  maxHintsPerQuestion: int("max_hints_per_question").default(3),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
 // Tutoring Companies table
-export const tutoringCompanies = pgTable("tutoring_companies", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  name: varchar("name").notNull(),
+export const tutoringCompanies = mysqlTable("tutoring_companies", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
-  abn: varchar("abn"),
-  contactEmail: varchar("contact_email"),
-  contactPhone: varchar("contact_phone"),
+  abn: varchar("abn", { length: 20 }),
+  contactEmail: varchar("contact_email", { length: 255 }),
+  contactPhone: varchar("contact_phone", { length: 50 }),
   address: text("address"),
-  state: varchar("state", { length: 10 }), // Australian state/territory: NSW, VIC, QLD, SA, WA, TAS, NT, ACT
+  state: varchar("state", { length: 10 }),
   tutorChatEnabled: boolean("tutor_chat_enabled").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Courses — catalogue parents for classes (scoped per tutoring company)
-export const courses = pgTable("courses", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+// Courses
+export const courses = mysqlTable("courses", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 150 }).notNull(),
   description: text("description"),
   yearGroupCode: varchar("year_group_code", { length: 10 }),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Subjects a course covers — drives the subject filter in the class form
-export const courseSubjects = pgTable("course_subjects", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  courseId: varchar("course_id").notNull().references(() => courses.id, { onDelete: "cascade" }),
-  subjectId: integer("subject_id").notNull(),
+// Course subjects
+export const courseSubjects = mysqlTable("course_subjects", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  courseId: varchar("course_id", { length: 36 }).notNull().references(() => courses.id, { onDelete: "cascade" }),
+  subjectId: int("subject_id").notNull(),
 });
 
-// Multi-subject pivot for classes — first row with isPrimary=true mirrors classes.subject
-export const classSubjects = pgTable("class_subjects", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
-  subjectId: integer("subject_id").notNull(),
+// Class subjects
+export const classSubjects = mysqlTable("class_subjects", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id, { onDelete: "cascade" }),
+  subjectId: int("subject_id").notNull(),
   isPrimary: boolean("is_primary").notNull().default(false),
 });
 
-// Custom subjects created by a tutoring company (supplements the 6 built-in subjects)
-export const companySubjects = pgTable("company_subjects", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+// Company subjects
+export const companySubjects = mysqlTable("company_subjects", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 100 }).notNull(),
   code: varchar("code", { length: 20 }).notNull(),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-export const companySupportContacts = pgTable("company_support_contacts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  roleLabel: varchar("role_label").notNull().default('Support'),
+export const companySupportContacts = mysqlTable("company_support_contacts", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  roleLabel: varchar("role_label", { length: 100 }).notNull().default('Support'),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Audit Log table - tracks security-relevant user actions
-export const auditLogs = pgTable("audit_logs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id"),
-  action: varchar("action").notNull(),
-  resource: varchar("resource"),
-  resourceId: varchar("resource_id"),
-  ipAddress: varchar("ip_address"),
+// Audit Log
+export const auditLogs = mysqlTable("audit_logs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }),
+  action: varchar("action", { length: 100 }).notNull(),
+  resource: varchar("resource", { length: 100 }),
+  resourceId: varchar("resource_id", { length: 36 }),
+  ipAddress: varchar("ip_address", { length: 50 }),
   userAgent: text("user_agent"),
-  details: jsonb("details"),
-  status: varchar("status").notNull().default('success'),
+  details: json("details"),
+  status: varchar("status", { length: 20 }).notNull().default('success'),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Login Attempts table - tracks failed login attempts for rate limiting
-export const loginAttempts = pgTable("login_attempts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  email: varchar("email").notNull(),
-  ipAddress: varchar("ip_address"),
+// Login Attempts
+export const loginAttempts = mysqlTable("login_attempts", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  email: varchar("email", { length: 255 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 50 }),
   success: boolean("success").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Company Admins table
-export const companyAdmins = pgTable("company_admins", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
-  permissions: text("permissions").array(), // Array of permission strings
+// Company Admins
+export const companyAdmins = mysqlTable("company_admins", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  permissions: json("permissions").$type<string[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Tutors table
-export const tutors = pgTable("tutors", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  companyId: varchar("company_id").references(() => tutoringCompanies.id), // Associate tutor with company
+// Tutors
+export const tutors = mysqlTable("tutors", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  companyId: varchar("company_id", { length: 36 }).references(() => tutoringCompanies.id),
   specialization: text("specialization"),
   qualifications: text("qualifications"),
-  availability: text("availability"), // e.g., "Mon-Fri 9am-5pm", "Weekends only"
-  subjectsTeaching: text("subjects_teaching").array().default([]), // Array of subjects
-  branch: varchar("branch", { length: 255 }), // Branch/location of the tutor
+  availability: text("availability"),
+  subjectsTeaching: json("subjects_teaching").$type<string[]>().default([]),
+  branch: varchar("branch", { length: 255 }),
   isVerified: boolean("is_verified").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Assignments table
-export const assignments = pgTable("assignments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: varchar("title").notNull(),
-  description: text("description"),
-  instructions: text("instructions"),
-  correctAnswer: text("correct_answer"), // Correct answer for tutor reference
-  helpText: text("help_text"), // Help/hints that students can view
-  submissionDate: timestamp("submission_date").notNull(), // Required deadline field
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
-  createdBy: varchar("created_by").notNull().references(() => users.id),
-  classId: varchar("class_id").references(() => classes.id), // Assign to entire class
-  
-  // Assignment type: 'file_upload' for traditional file submissions, 'worksheet' for interactive worksheets
-  assignmentKind: assignmentKindEnum("assignment_kind").notNull().default('file_upload'),
-  worksheetId: varchar("worksheet_id"), // Reference to worksheet (when assignmentKind is 'worksheet')
-  
-  // Academic organization fields
-  academicYearId: varchar("academic_year_id").references(() => academicYears.id),
-  termId: varchar("term_id").references(() => academicTerms.id),
-  subject: varchar("subject").notNull(), // Required subject field
-  week: integer("week"), // Week number (1-52 or term-specific)
-  
-  solutionText: text("solution_text"), // Tutor-provided solution text/explanation
-  solutionFileUrls: text("solution_file_urls").array().default([]), // Tutor-uploaded solution files (PDF, doc, images)
-  solutionNotes: text("solution_notes"), // Additional notes about solution files (e.g., descriptions, instructions)
-  
-  attachmentUrls: text("attachment_urls").array().default([]), // Files uploaded by admin/tutor
-  allowedFileTypes: text("allowed_file_types").array().default(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg']), // Specified file types
-  maxFileSize: integer("max_file_size").default(31457280), // 30MB in bytes
-  pageRotations: jsonb("page_rotations").$type<Record<string, number>>().default({}), // Per-page rotation corrections (e.g. {"1": 90})
-  status: assignmentStatusEnum("status").notNull().default('assigned'),
+// Academic Years
+export const academicYears = mysqlTable("academic_years", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  yearNumber: int("year_number").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  description: varchar("description", { length: 255 }),
   isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Submissions table - optimized for e-ink devices
-export const submissions = pgTable("submissions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  assignmentId: varchar("assignment_id").notNull().references(() => assignments.id),
-  studentId: varchar("student_id").notNull().references(() => students.id),
-  documentUrl: varchar("document_url"), // Which specific document this submission is for (for multi-document assignments)
-  content: text("content"), // Text response for pen/touchscreen input
-  digitalContent: text("digital_content"), // Digitized handwriting content
-  fileUrls: text("file_urls").array().default([]), // Multiple uploaded files
-  status: submissionStatusEnum("status").notNull().default('draft'),
-  isDraft: boolean("is_draft").notNull().default(true),
-  submittedAt: timestamp("submitted_at"),
-  isLate: boolean("is_late").notNull().default(false),
-  // Grading fields
-  score: integer("score"), // Grade score (0-100)
-  feedback: text("feedback"), // Tutor feedback on the submission
-  reviewerAnnotations: text("reviewer_annotations"), // JSON string of tick/cross/comment annotations from tutor/admin/parent
-  annotations: text("annotations"), // JSON string of student annotations (pen strokes, text, highlights)
-  gradedBy: varchar("graded_by").references(() => users.id), // Who graded this submission
-  gradedAt: timestamp("graded_at"), // When it was graded
-  // AI check result (stored after first check to prevent re-runs)
-  aiCheckResult: text("ai_check_result"), // JSON string of AI assessment result
-  // Parent feedback on the submission
-  parentComment: text("parent_comment"), // Parent's comment/feedback visible to tutor
-  parentCommentAt: timestamp("parent_comment_at"), // When parent left the comment
-  // E-ink device specific fields
-  deviceType: varchar("device_type"), // 'e-ink', 'tablet', 'desktop'
-  inputMethod: varchar("input_method"), // 'pen', 'touch', 'keyboard'
-
+// Academic Terms
+export const academicTerms = mysqlTable("academic_terms", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  academicYearId: varchar("academic_year_id", { length: 36 }).notNull().references(() => academicYears.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 100 }).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isActive: boolean("is_active").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Messages table for real-time communication
-export const messages = pgTable("messages", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  senderId: varchar("sender_id").notNull().references(() => users.id),
-  receiverId: varchar("receiver_id").notNull().references(() => users.id),
+// Academic Weeks
+export const academicWeeks = mysqlTable("academic_weeks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  termId: varchar("term_id", { length: 36 }).notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  weekNumber: int("week_number").notNull(),
+  name: varchar("name", { length: 50 }).notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Classes
+export const classes = mysqlTable("classes", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  termId: varchar("term_id", { length: 36 }).notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  subject: varchar("subject", { length: 100 }).notNull().default('TBD'),
+  description: text("description"),
+  location: varchar("location", { length: 255 }),
+  tutorId: varchar("tutor_id", { length: 36 }).references(() => tutors.id, { onDelete: "set null" }),
+  dayOfWeek: int("day_of_week"),
+  daysOfWeek: json("days_of_week").$type<number[]>().default([]),
+  startTime: varchar("start_time", { length: 10 }).notNull().default(''),
+  endTime: varchar("end_time", { length: 10 }).notNull().default(''),
+  maxStudents: int("max_students").default(20),
+  isActive: boolean("is_active").default(true),
+  courseId: varchar("course_id", { length: 36 }).references(() => courses.id, { onDelete: "set null" }),
+  yearGroupCode: varchar("year_group_code", { length: 20 }),
+  level: varchar("level", { length: 50 }),
+  status: varchar("status", { length: 20 }).default('draft'),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Assignments
+export const assignments = mysqlTable("assignments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  instructions: text("instructions"),
+  correctAnswer: text("correct_answer"),
+  helpText: text("help_text"),
+  submissionDate: timestamp("submission_date").notNull(),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  createdBy: varchar("created_by", { length: 36 }).notNull().references(() => users.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  assignmentKind: mysqlEnum("assignment_kind", ['file_upload', 'worksheet']).notNull().default('file_upload'),
+  worksheetId: varchar("worksheet_id", { length: 36 }),
+  academicYearId: varchar("academic_year_id", { length: 36 }).references(() => academicYears.id),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id),
+  subject: varchar("subject", { length: 100 }).notNull(),
+  week: int("week"),
+  solutionText: text("solution_text"),
+  solutionFileUrls: json("solution_file_urls").$type<string[]>().default([]),
+  solutionNotes: text("solution_notes"),
+  attachmentUrls: json("attachment_urls").$type<string[]>().default([]),
+  allowedFileTypes: json("allowed_file_types").$type<string[]>().default(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'png', 'jpeg']),
+  maxFileSize: int("max_file_size").default(31457280),
+  pageRotations: json("page_rotations").$type<Record<string, number>>().default({}),
+  status: mysqlEnum("status", ['assigned', 'submitted', 'reviewed', 'completed', 'late', 'needs_revision']).notNull().default('assigned'),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Submissions
+export const submissions = mysqlTable("submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  assignmentId: varchar("assignment_id", { length: 36 }).notNull().references(() => assignments.id),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id),
+  documentUrl: varchar("document_url", { length: 500 }),
+  content: text("content"),
+  digitalContent: text("digital_content"),
+  fileUrls: json("file_urls").$type<string[]>().default([]),
+  status: mysqlEnum("status", ['draft', 'submitted', 'late', 'graded', 'parent_verified', 'needs_revision']).notNull().default('draft'),
+  isDraft: boolean("is_draft").notNull().default(true),
+  submittedAt: timestamp("submitted_at"),
+  isLate: boolean("is_late").notNull().default(false),
+  score: int("score"),
+  feedback: text("feedback"),
+  reviewerAnnotations: text("reviewer_annotations"),
+  annotations: text("annotations"),
+  gradedBy: varchar("graded_by", { length: 36 }).references(() => users.id),
+  gradedAt: timestamp("graded_at"),
+  aiCheckResult: text("ai_check_result"),
+  parentComment: text("parent_comment"),
+  parentCommentAt: timestamp("parent_comment_at"),
+  deviceType: varchar("device_type", { length: 50 }),
+  inputMethod: varchar("input_method", { length: 50 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Messages
+export const messages = mysqlTable("messages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  senderId: varchar("sender_id", { length: 36 }).notNull().references(() => users.id),
+  receiverId: varchar("receiver_id", { length: 36 }).notNull().references(() => users.id),
   content: text("content").notNull(),
-  messageType: messageTypeEnum("message_type").notNull().default('text'),
+  messageType: mysqlEnum("message_type", ['text', 'file', 'system']).notNull().default('text'),
   isRead: boolean("is_read").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Progress tracking table
-export const progress = pgTable("progress", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  studentId: varchar("student_id").notNull().references(() => students.id),
-  assignmentId: varchar("assignment_id").notNull().references(() => assignments.id),
-  completionPercentage: integer("completion_percentage").notNull().default(0),
-  timeSpent: integer("time_spent_minutes").default(0),
+// Progress
+export const progress = mysqlTable("progress", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id),
+  assignmentId: varchar("assignment_id", { length: 36 }).notNull().references(() => assignments.id),
+  completionPercentage: int("completion_percentage").notNull().default(0),
+  timeSpent: int("time_spent_minutes").default(0),
   lastAccessedAt: timestamp("last_accessed_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
-// Calendar events table
-export const calendarEvents = pgTable("calendar_events", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: varchar("title").notNull(),
+// Calendar Events
+export const calendarEvents = mysqlTable("calendar_events", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   startTime: timestamp("start_time").notNull(),
   endTime: timestamp("end_time").notNull(),
-  tutorId: varchar("tutor_id").references(() => tutors.id),
-  studentId: varchar("student_id").references(() => students.id),
-  eventType: varchar("event_type").notNull(), // 'class', 'makeup', 'meeting'
+  tutorId: varchar("tutor_id", { length: 36 }).references(() => tutors.id),
+  studentId: varchar("student_id", { length: 36 }).references(() => students.id),
+  eventType: varchar("event_type", { length: 50 }).notNull(),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
-// Relations
+// Student Class Assignments
+export const studentClassAssignments = mysqlTable("student_class_assignments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id, { onDelete: "cascade" }),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id, { onDelete: "cascade" }),
+  assignedDate: timestamp("assigned_date").defaultNow(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ==========================================
+// WORKSHEET SYSTEM
+// ==========================================
+
+export const worksheets = mysqlTable("worksheets", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  subject: varchar("subject", { length: 100 }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  createdBy: varchar("created_by", { length: 36 }).notNull().references(() => users.id),
+  isPublished: boolean("is_published").notNull().default(false),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const worksheetPages = mysqlTable("worksheet_pages", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  worksheetId: varchar("worksheet_id", { length: 36 }).notNull().references(() => worksheets.id, { onDelete: 'cascade' }),
+  pageNumber: int("page_number").notNull(),
+  title: varchar("title", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const worksheetQuestions = mysqlTable("worksheet_questions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  pageId: varchar("page_id", { length: 36 }).notNull().references(() => worksheetPages.id, { onDelete: 'cascade' }),
+  questionType: mysqlEnum("question_type", ['short_text', 'long_text', 'multiple_choice', 'fill_blank', 'text_image', 'information']).notNull(),
+  questionText: text("question_text").notNull(),
+  questionNumber: int("question_number").notNull(),
+  options: json("options"),
+  imageUrl: varchar("image_url", { length: 500 }),
+  correctAnswer: text("correct_answer"),
+  points: int("points").default(1),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const worksheetAssignments = mysqlTable("worksheet_assignments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  worksheetId: varchar("worksheet_id", { length: 36 }).notNull().references(() => worksheets.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id", { length: 36 }).references(() => students.id, { onDelete: 'cascade' }),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id, { onDelete: 'cascade' }),
+  assignedBy: varchar("assigned_by", { length: 36 }).notNull().references(() => users.id),
+  dueDate: timestamp("due_date"),
+  status: mysqlEnum("status", ['assigned', 'in_progress', 'submitted', 'graded']).notNull().default("assigned"),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const worksheetAnswers = mysqlTable("worksheet_answers", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  questionId: varchar("question_id", { length: 36 }).notNull().references(() => worksheetQuestions.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id),
+  worksheetId: varchar("worksheet_id", { length: 36 }).notNull().references(() => worksheets.id),
+  textAnswer: text("text_answer"),
+  handwritingData: text("handwriting_data"),
+  selectedOption: varchar("selected_option", { length: 100 }),
+  isSubmitted: boolean("is_submitted").notNull().default(false),
+  submittedAt: timestamp("submitted_at"),
+  grade: int("grade"),
+  feedback: text("feedback"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ==========================================
+// TEST SYSTEM
+// ==========================================
+
+export const tests = mysqlTable("tests", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  subject: varchar("subject", { length: 100 }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  createdBy: varchar("created_by", { length: 36 }).notNull().references(() => users.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  status: mysqlEnum("status", ['draft', 'published', 'archived']).notNull().default("draft"),
+  duration: int("duration"),
+  totalPoints: int("total_points").default(0),
+  passingScore: int("passing_score"),
+  dueDate: timestamp("due_date"),
+  allowRetakes: boolean("allow_retakes").default(false),
+  showResultsImmediately: boolean("show_results_immediately").default(true),
+  shuffleQuestions: boolean("shuffle_questions").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const testQuestions = mysqlTable("test_questions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  testId: varchar("test_id", { length: 36 }).notNull().references(() => tests.id, { onDelete: 'cascade' }),
+  questionType: mysqlEnum("question_type", ['multiple_choice', 'true_false', 'short_answer', 'essay', 'fill_blank']).notNull(),
+  questionText: text("question_text").notNull(),
+  questionNumber: int("question_number").notNull(),
+  options: json("options"),
+  correctAnswer: text("correct_answer"),
+  points: int("points").default(1),
+  explanation: text("explanation"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const testAssignments = mysqlTable("test_assignments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  testId: varchar("test_id", { length: 36 }).notNull().references(() => tests.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id", { length: 36 }).references(() => students.id, { onDelete: 'cascade' }),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id, { onDelete: 'cascade' }),
+  assignedBy: varchar("assigned_by", { length: 36 }).notNull().references(() => users.id),
+  dueDate: timestamp("due_date"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const testAttempts = mysqlTable("test_attempts", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  testId: varchar("test_id", { length: 36 }).notNull().references(() => tests.id, { onDelete: 'cascade' }),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id),
+  status: mysqlEnum("status", ['in_progress', 'submitted', 'graded']).notNull().default("in_progress"),
+  startedAt: timestamp("started_at").defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+  totalScore: int("total_score"),
+  percentageScore: int("percentage_score"),
+  isPassed: boolean("is_passed"),
+  gradedBy: varchar("graded_by", { length: 36 }).references(() => users.id),
+  gradedAt: timestamp("graded_at"),
+  feedback: text("feedback"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const testAnswers = mysqlTable("test_answers", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  attemptId: varchar("attempt_id", { length: 36 }).notNull().references(() => testAttempts.id, { onDelete: 'cascade' }),
+  questionId: varchar("question_id", { length: 36 }).notNull().references(() => testQuestions.id, { onDelete: 'cascade' }),
+  studentAnswer: text("student_answer"),
+  selectedOption: varchar("selected_option", { length: 100 }),
+  isCorrect: boolean("is_correct"),
+  pointsAwarded: int("points_awarded"),
+  feedback: text("feedback"),
+  gradedAt: timestamp("graded_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// ==========================================
+// CALENDAR & ATTENDANCE
+// ==========================================
+
+export const classSessions = mysqlTable("class_sessions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id, { onDelete: "cascade" }),
+  tutorId: varchar("tutor_id", { length: 36 }).references(() => tutors.id, { onDelete: "set null" }),
+  sessionDate: timestamp("session_date").notNull(),
+  startTime: varchar("start_time", { length: 10 }).notNull(),
+  endTime: varchar("end_time", { length: 10 }).notNull(),
+  durationMinutes: int("duration_minutes").notNull(),
+  status: mysqlEnum("status", ['scheduled', 'in_progress', 'completed', 'cancelled']).notNull().default("scheduled"),
+  deliveryMode: varchar("delivery_mode", { length: 20 }).default("in_person"),
+  locationUrl: varchar("location_url", { length: 500 }),
+  notes: text("notes"),
+  enrolledCount: int("enrolled_count").default(0),
+  attendedCount: int("attended_count").default(0),
+  attendanceLocked: boolean("attendance_locked").default(false),
+  attendanceLockedAt: timestamp("attendance_locked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const sessionAttendance = mysqlTable("session_attendance", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  sessionId: varchar("session_id", { length: 36 }).notNull().references(() => classSessions.id, { onDelete: "cascade" }),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id, { onDelete: "cascade" }),
+  status: mysqlEnum("status", ['present', 'absent', 'late', 'excused']).notNull().default("absent"),
+  markedBy: varchar("marked_by", { length: 36 }).references(() => users.id),
+  markedAt: timestamp("marked_at"),
+  notes: text("notes"),
+  isOverride: boolean("is_override").default(false),
+  overrideBy: varchar("override_by", { length: 36 }).references(() => users.id),
+  overrideAt: timestamp("override_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const academicHolidays = mysqlTable("academic_holidays", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  isPublic: boolean("is_public").default(true),
+  isRecurring: boolean("is_recurring").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Notification Preferences
+export const notificationPreferences = mysqlTable("notification_preferences", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id),
+  emailEnabled: boolean("email_enabled").notNull().default(true),
+  emailNewAssignment: boolean("email_new_assignment").notNull().default(true),
+  emailSubmissionGraded: boolean("email_submission_graded").notNull().default(true),
+  emailNewMessage: boolean("email_new_message").notNull().default(true),
+  emailAttendanceMarked: boolean("email_attendance_marked").notNull().default(true),
+  emailScheduleChanges: boolean("email_schedule_changes").notNull().default(true),
+  emailWeeklyDigest: boolean("email_weekly_digest").notNull().default(false),
+  inAppEnabled: boolean("in_app_enabled").notNull().default(true),
+  inAppNewAssignment: boolean("in_app_new_assignment").notNull().default(true),
+  inAppSubmissionGraded: boolean("in_app_submission_graded").notNull().default(true),
+  inAppNewMessage: boolean("in_app_new_message").notNull().default(true),
+  inAppAttendanceMarked: boolean("in_app_attendance_marked").notNull().default(true),
+  inAppScheduleChanges: boolean("in_app_schedule_changes").notNull().default(true),
+  staffNewStudentEnrollment: boolean("staff_new_student_enrollment").notNull().default(true),
+  staffSubmissionReceived: boolean("staff_submission_received").notNull().default(true),
+  staffLowAttendanceAlert: boolean("staff_low_attendance_alert").notNull().default(true),
+  adminSystemAlerts: boolean("admin_system_alerts").notNull().default(true),
+  adminNewStaffRegistration: boolean("admin_new_staff_registration").notNull().default(true),
+  quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(false),
+  quietHoursStart: varchar("quiet_hours_start", { length: 10 }).default("22:00"),
+  quietHoursEnd: varchar("quiet_hours_end", { length: 10 }).default("07:00"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Reports
+export const reportDefinitions = mysqlTable("report_definitions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  reportType: mysqlEnum("report_type", ['student_performance', 'attendance_summary', 'class_utilization', 'assignment_completion', 'tutor_workload', 'enrollment_trends']).notNull(),
+  defaultFilters: json("default_filters").default({}),
+  isScheduled: boolean("is_scheduled").notNull().default(false),
+  scheduleCron: varchar("schedule_cron", { length: 100 }),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const reportRuns = mysqlTable("report_runs", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  reportType: mysqlEnum("report_type", ['student_performance', 'attendance_summary', 'class_utilization', 'assignment_completion', 'tutor_workload', 'enrollment_trends']).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  parameters: json("parameters").default({}),
+  status: mysqlEnum("status", ['pending', 'processing', 'completed', 'failed']).notNull().default('pending'),
+  resultData: json("result_data"),
+  rowCount: int("row_count"),
+  errorMessage: text("error_message"),
+  requestedBy: varchar("requested_by", { length: 36 }).references(() => users.id),
+  startedAt: timestamp("started_at"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const reportExports = mysqlTable("report_exports", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  reportRunId: varchar("report_run_id", { length: 36 }).notNull().references(() => reportRuns.id),
+  exportType: varchar("export_type", { length: 20 }).notNull(),
+  fileName: varchar("file_name", { length: 255 }).notNull(),
+  filePath: varchar("file_path", { length: 500 }),
+  fileSize: int("file_size"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ==========================================
+// RELATIONS
+// ==========================================
+
 export const usersRelations = relations(users, ({ one }) => ({
-  student: one(students, {
-    fields: [users.id],
-    references: [students.userId],
-  }),
-  parent: one(parents, {
-    fields: [users.id],
-    references: [parents.userId],
-  }),
-  tutor: one(tutors, {
-    fields: [users.id],
-    references: [tutors.userId],
-  }),
+  student: one(students, { fields: [users.id], references: [students.userId] }),
+  parent: one(parents, { fields: [users.id], references: [parents.userId] }),
+  tutor: one(tutors, { fields: [users.id], references: [tutors.userId] }),
 }));
 
 export const studentsRelations = relations(students, ({ one, many }) => ({
-  user: one(users, {
-    fields: [students.userId],
-    references: [users.id],
-  }),
-  parent: one(parents, {
-    fields: [students.parentId],
-    references: [parents.id],
-  }),
-  tutor: one(tutors, {
-    fields: [students.tutorId],
-    references: [tutors.id],
-  }),
-  company: one(tutoringCompanies, {
-    fields: [students.companyId],
-    references: [tutoringCompanies.id],
-  }),
+  user: one(users, { fields: [students.userId], references: [users.id] }),
+  parent: one(parents, { fields: [students.parentId], references: [parents.id] }),
+  tutor: one(tutors, { fields: [students.tutorId], references: [tutors.id] }),
+  company: one(tutoringCompanies, { fields: [students.companyId], references: [tutoringCompanies.id] }),
   submissions: many(submissions),
   progress: many(progress),
   calendarEvents: many(calendarEvents),
 }));
 
 export const parentsRelations = relations(parents, ({ one, many }) => ({
-  user: one(users, {
-    fields: [parents.userId],
-    references: [users.id],
-  }),
+  user: one(users, { fields: [parents.userId], references: [users.id] }),
   students: many(students),
 }));
 
@@ -367,161 +653,154 @@ export const tutoringCompaniesRelations = relations(tutoringCompanies, ({ many }
 }));
 
 export const companySupportContactsRelations = relations(companySupportContacts, ({ one }) => ({
-  company: one(tutoringCompanies, {
-    fields: [companySupportContacts.companyId],
-    references: [tutoringCompanies.id],
-  }),
-  user: one(users, {
-    fields: [companySupportContacts.userId],
-    references: [users.id],
-  }),
+  company: one(tutoringCompanies, { fields: [companySupportContacts.companyId], references: [tutoringCompanies.id] }),
+  user: one(users, { fields: [companySupportContacts.userId], references: [users.id] }),
 }));
 
 export const companyAdminsRelations = relations(companyAdmins, ({ one }) => ({
-  user: one(users, {
-    fields: [companyAdmins.userId],
-    references: [users.id],
-  }),
-  company: one(tutoringCompanies, {
-    fields: [companyAdmins.companyId],
-    references: [tutoringCompanies.id],
-  }),
+  user: one(users, { fields: [companyAdmins.userId], references: [users.id] }),
+  company: one(tutoringCompanies, { fields: [companyAdmins.companyId], references: [tutoringCompanies.id] }),
 }));
 
 export const tutorsRelations = relations(tutors, ({ one, many }) => ({
-  user: one(users, {
-    fields: [tutors.userId],
-    references: [users.id],
-  }),
-  company: one(tutoringCompanies, {
-    fields: [tutors.companyId],
-    references: [tutoringCompanies.id],
-  }),
+  user: one(users, { fields: [tutors.userId], references: [users.id] }),
+  company: one(tutoringCompanies, { fields: [tutors.companyId], references: [tutoringCompanies.id] }),
   students: many(students),
   assignments: many(assignments),
   calendarEvents: many(calendarEvents),
 }));
 
 export const assignmentsRelations = relations(assignments, ({ one, many }) => ({
-  company: one(tutoringCompanies, {
-    fields: [assignments.companyId],
-    references: [tutoringCompanies.id],
-  }),
-  creator: one(users, {
-    fields: [assignments.createdBy],
-    references: [users.id],
-  }),
-  class: one(classes, {
-    fields: [assignments.classId],
-    references: [classes.id],
-  }),
-  academicYear: one(academicYears, {
-    fields: [assignments.academicYearId],
-    references: [academicYears.id],
-  }),
-  term: one(academicTerms, {
-    fields: [assignments.termId],
-    references: [academicTerms.id],
-  }),
+  company: one(tutoringCompanies, { fields: [assignments.companyId], references: [tutoringCompanies.id] }),
+  creator: one(users, { fields: [assignments.createdBy], references: [users.id] }),
+  class: one(classes, { fields: [assignments.classId], references: [classes.id] }),
+  academicYear: one(academicYears, { fields: [assignments.academicYearId], references: [academicYears.id] }),
+  term: one(academicTerms, { fields: [assignments.termId], references: [academicTerms.id] }),
   submissions: many(submissions),
   progress: many(progress),
 }));
 
 export const submissionsRelations = relations(submissions, ({ one }) => ({
-  assignment: one(assignments, {
-    fields: [submissions.assignmentId],
-    references: [assignments.id],
-  }),
-  student: one(students, {
-    fields: [submissions.studentId],
-    references: [students.id],
-  }),
+  assignment: one(assignments, { fields: [submissions.assignmentId], references: [assignments.id] }),
+  student: one(students, { fields: [submissions.studentId], references: [students.id] }),
 }));
 
 export const messagesRelations = relations(messages, ({ one }) => ({
-  sender: one(users, {
-    fields: [messages.senderId],
-    references: [users.id],
-  }),
-  receiver: one(users, {
-    fields: [messages.receiverId],
-    references: [users.id],
-  }),
+  sender: one(users, { fields: [messages.senderId], references: [users.id] }),
+  receiver: one(users, { fields: [messages.receiverId], references: [users.id] }),
 }));
 
 export const progressRelations = relations(progress, ({ one }) => ({
-  student: one(students, {
-    fields: [progress.studentId],
-    references: [students.id],
-  }),
-  assignment: one(assignments, {
-    fields: [progress.assignmentId],
-    references: [assignments.id],
-  }),
+  student: one(students, { fields: [progress.studentId], references: [students.id] }),
+  assignment: one(assignments, { fields: [progress.assignmentId], references: [assignments.id] }),
 }));
 
 export const calendarEventsRelations = relations(calendarEvents, ({ one }) => ({
-  tutor: one(tutors, {
-    fields: [calendarEvents.tutorId],
-    references: [tutors.id],
-  }),
-  student: one(students, {
-    fields: [calendarEvents.studentId],
-    references: [students.id],
-  }),
+  tutor: one(tutors, { fields: [calendarEvents.tutorId], references: [tutors.id] }),
+  student: one(students, { fields: [calendarEvents.studentId], references: [students.id] }),
 }));
 
-// Insert schemas
-export const insertUserSchema = createInsertSchema(users).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const academicYearsRelations = relations(academicYears, ({ one, many }) => ({
+  company: one(tutoringCompanies, { fields: [academicYears.companyId], references: [tutoringCompanies.id] }),
+  terms: many(academicTerms),
+  assignments: many(assignments),
+}));
 
-export const insertStudentSchema = createInsertSchema(students).omit({
-  id: true,
-  createdAt: true,
-});
+export const academicTermsRelations = relations(academicTerms, ({ one, many }) => ({
+  academicYear: one(academicYears, { fields: [academicTerms.academicYearId], references: [academicYears.id] }),
+  company: one(tutoringCompanies, { fields: [academicTerms.companyId], references: [tutoringCompanies.id] }),
+  weeks: many(academicWeeks),
+  classes: many(classes),
+  assignments: many(assignments),
+}));
 
-export const insertParentSchema = createInsertSchema(parents).omit({
-  id: true,
-  createdAt: true,
-});
+export const academicWeeksRelations = relations(academicWeeks, ({ one }) => ({
+  term: one(academicTerms, { fields: [academicWeeks.termId], references: [academicTerms.id] }),
+  company: one(tutoringCompanies, { fields: [academicWeeks.companyId], references: [tutoringCompanies.id] }),
+}));
 
-export const insertTutorSchema = createInsertSchema(tutors).omit({
-  id: true,
-  createdAt: true,
-});
+export const classesRelations = relations(classes, ({ one, many }) => ({
+  term: one(academicTerms, { fields: [classes.termId], references: [academicTerms.id] }),
+  company: one(tutoringCompanies, { fields: [classes.companyId], references: [tutoringCompanies.id] }),
+  tutor: one(tutors, { fields: [classes.tutorId], references: [tutors.id] }),
+  studentAssignments: many(studentClassAssignments),
+  assignments: many(assignments),
+}));
 
-export const insertAssignmentSchema = createInsertSchema(assignments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const studentClassAssignmentsRelations = relations(studentClassAssignments, ({ one }) => ({
+  student: one(students, { fields: [studentClassAssignments.studentId], references: [students.id] }),
+  class: one(classes, { fields: [studentClassAssignments.classId], references: [classes.id] }),
+}));
 
-export const insertSubmissionSchema = createInsertSchema(submissions).omit({
-  id: true,
-  submittedAt: true,
-  gradedAt: true,
-  createdAt: true,
-  updatedAt: true,
-});
+export const classSessionsRelations = relations(classSessions, ({ one, many }) => ({
+  class: one(classes, { fields: [classSessions.classId], references: [classes.id] }),
+  tutor: one(tutors, { fields: [classSessions.tutorId], references: [tutors.id] }),
+  attendance: many(sessionAttendance),
+}));
 
-export const insertMessageSchema = createInsertSchema(messages).omit({
-  id: true,
-  createdAt: true,
-});
+export const sessionAttendanceRelations = relations(sessionAttendance, ({ one }) => ({
+  session: one(classSessions, { fields: [sessionAttendance.sessionId], references: [classSessions.id] }),
+  student: one(students, { fields: [sessionAttendance.studentId], references: [students.id] }),
+  markedByUser: one(users, { fields: [sessionAttendance.markedBy], references: [users.id] }),
+}));
 
-export const insertProgressSchema = createInsertSchema(progress).omit({
-  id: true,
-  lastAccessedAt: true,
-  updatedAt: true,
-});
+export const academicHolidaysRelations = relations(academicHolidays, ({ one }) => ({
+  company: one(tutoringCompanies, { fields: [academicHolidays.companyId], references: [tutoringCompanies.id] }),
+}));
 
-export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({
-  id: true,
-  createdAt: true,
-});
+export const reportDefinitionsRelations = relations(reportDefinitions, ({ one }) => ({
+  company: one(tutoringCompanies, { fields: [reportDefinitions.companyId], references: [tutoringCompanies.id] }),
+  createdByUser: one(users, { fields: [reportDefinitions.createdBy], references: [users.id] }),
+}));
+
+export const reportRunsRelations = relations(reportRuns, ({ one, many }) => ({
+  company: one(tutoringCompanies, { fields: [reportRuns.companyId], references: [tutoringCompanies.id] }),
+  requestedByUser: one(users, { fields: [reportRuns.requestedBy], references: [users.id] }),
+  exports: many(reportExports),
+}));
+
+export const reportExportsRelations = relations(reportExports, ({ one }) => ({
+  reportRun: one(reportRuns, { fields: [reportExports.reportRunId], references: [reportRuns.id] }),
+}));
+
+// ==========================================
+// INSERT SCHEMAS & TYPES
+// ==========================================
+
+export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStudentSchema = createInsertSchema(students).omit({ id: true, createdAt: true });
+export const insertParentSchema = createInsertSchema(parents).omit({ id: true, createdAt: true });
+export const insertTutorSchema = createInsertSchema(tutors).omit({ id: true, createdAt: true });
+export const insertAssignmentSchema = createInsertSchema(assignments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSubmissionSchema = createInsertSchema(submissions).omit({ id: true, submittedAt: true, gradedAt: true, createdAt: true, updatedAt: true });
+export const insertMessageSchema = createInsertSchema(messages).omit({ id: true, createdAt: true });
+export const insertProgressSchema = createInsertSchema(progress).omit({ id: true, lastAccessedAt: true, updatedAt: true });
+export const insertCalendarEventSchema = createInsertSchema(calendarEvents).omit({ id: true, createdAt: true });
+export const insertTutoringCompanySchema = createInsertSchema(tutoringCompanies).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertCompanyAdminSchema = createInsertSchema(companyAdmins).omit({ id: true, createdAt: true });
+export const insertCompanySupportContactSchema = createInsertSchema(companySupportContacts).omit({ id: true, createdAt: true });
+export const insertAcademicYearSchema = createInsertSchema(academicYears).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAcademicTermSchema = createInsertSchema(academicTerms).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAcademicWeekSchema = createInsertSchema(academicWeeks).omit({ id: true, createdAt: true });
+export const insertClassSchema = createInsertSchema(classes).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertStudentClassAssignmentSchema = createInsertSchema(studentClassAssignments).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertWorksheetSchema = createInsertSchema(worksheets).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertWorksheetPageSchema = createInsertSchema(worksheetPages).omit({ id: true, createdAt: true });
+export const insertWorksheetQuestionSchema = createInsertSchema(worksheetQuestions).omit({ id: true, createdAt: true });
+export const insertWorksheetAssignmentSchema = createInsertSchema(worksheetAssignments).omit({ id: true, createdAt: true });
+export const insertWorksheetAnswerSchema = createInsertSchema(worksheetAnswers).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTestSchema = createInsertSchema(tests).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertTestQuestionSchema = createInsertSchema(testQuestions).omit({ id: true, createdAt: true });
+export const insertTestAssignmentSchema = createInsertSchema(testAssignments).omit({ id: true, createdAt: true });
+export const insertTestAttemptSchema = createInsertSchema(testAttempts).omit({ id: true, createdAt: true });
+export const insertTestAnswerSchema = createInsertSchema(testAnswers).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertClassSessionSchema = createInsertSchema(classSessions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSessionAttendanceSchema = createInsertSchema(sessionAttendance).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAcademicHolidaySchema = createInsertSchema(academicHolidays).omit({ id: true, createdAt: true });
+export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertReportDefinitionSchema = createInsertSchema(reportDefinitions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertReportRunSchema = createInsertSchema(reportRuns).omit({ id: true, createdAt: true });
+export const insertReportExportSchema = createInsertSchema(reportExports).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -533,6 +812,10 @@ export type InsertParent = z.infer<typeof insertParentSchema>;
 export type Tutor = typeof tutors.$inferSelect;
 export type InsertTutor = z.infer<typeof insertTutorSchema>;
 export type TutoringCompany = typeof tutoringCompanies.$inferSelect;
+export type InsertTutoringCompany = z.infer<typeof insertTutoringCompanySchema>;
+export type CompanyAdmin = typeof companyAdmins.$inferSelect;
+export type InsertCompanyAdmin = z.infer<typeof insertCompanyAdminSchema>;
+export type CompanySupportContact = typeof companySupportContacts.$inferSelect;
 export type Assignment = typeof assignments.$inferSelect;
 export type InsertAssignment = z.infer<typeof insertAssignmentSchema>;
 export type Submission = typeof submissions.$inferSelect;
@@ -542,470 +825,56 @@ export type InsertMessage = z.infer<typeof insertMessageSchema>;
 export type Progress = typeof progress.$inferSelect;
 export type InsertProgress = z.infer<typeof insertProgressSchema>;
 export type CalendarEvent = typeof calendarEvents.$inferSelect;
-
-// Academic management insert schemas will be added after table definitions
-
-export const insertTutoringCompanySchema = createInsertSchema(tutoringCompanies).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertCompanyAdminSchema = createInsertSchema(companyAdmins).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type CompanySupportContact = typeof companySupportContacts.$inferSelect;
-export const insertCompanySupportContactSchema = createInsertSchema(companySupportContacts).omit({
-  id: true,
-  createdAt: true,
-});
-
-
-
-// Academic Years table
-export const academicYears = pgTable("academic_years", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
-  yearNumber: integer("year_number").notNull(), // 1-12
-  name: varchar("name").notNull(), // e.g., "Year 7", "Grade 10"
-  description: varchar("description"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Academic Terms table
-export const academicTerms = pgTable("academic_terms", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  academicYearId: varchar("academic_year_id").notNull().references(() => academicYears.id, { onDelete: "cascade" }),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
-  name: varchar("name").notNull(), // e.g., "Term 1", "Fall Semester"
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Academic Weeks table
-export const academicWeeks = pgTable("academic_weeks", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  termId: varchar("term_id").notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
-  weekNumber: integer("week_number").notNull(),
-  name: varchar("name").notNull(), // e.g. "Week 1"
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Classes table
-export const classes = pgTable("classes", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  termId: varchar("term_id").notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
-  name: varchar("name").notNull(), // e.g., "Mathematics A", "English Literature"
-  subject: varchar("subject").notNull().default('TBD'),
-  description: text("description"),
-  location: varchar("location"),
-  tutorId: varchar("tutor_id").references(() => tutors.id, { onDelete: "set null" }),
-  dayOfWeek: integer("day_of_week"),
-  daysOfWeek: integer("days_of_week").array().notNull().default([]),
-  startTime: varchar("start_time").notNull().default(''),
-  endTime: varchar("end_time").notNull().default(''),
-  maxStudents: integer("max_students").default(20),
-  isActive: boolean("is_active").default(true),
-  // ESLATE-8 additions
-  courseId: varchar("course_id").references(() => courses.id, { onDelete: "set null" }),
-  yearGroupCode: varchar("year_group_code"),
-  level: varchar("level"),
-  status: varchar("status").default('draft'),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Student Class Assignments table
-export const studentClassAssignments = pgTable("student_class_assignments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
-  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
-  assignedDate: timestamp("assigned_date").defaultNow(),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Define relations
-export const academicYearsRelations = relations(academicYears, ({ one, many }) => ({
-  company: one(tutoringCompanies, {
-    fields: [academicYears.companyId],
-    references: [tutoringCompanies.id],
-  }),
-  terms: many(academicTerms),
-  assignments: many(assignments),
-}));
-
-export const academicTermsRelations = relations(academicTerms, ({ one, many }) => ({
-  academicYear: one(academicYears, {
-    fields: [academicTerms.academicYearId],
-    references: [academicYears.id],
-  }),
-  company: one(tutoringCompanies, {
-    fields: [academicTerms.companyId],
-    references: [tutoringCompanies.id],
-  }),
-  weeks: many(academicWeeks),
-  classes: many(classes),
-  assignments: many(assignments),
-}));
-
-export const academicWeeksRelations = relations(academicWeeks, ({ one }) => ({
-  term: one(academicTerms, {
-    fields: [academicWeeks.termId],
-    references: [academicTerms.id],
-  }),
-  company: one(tutoringCompanies, {
-    fields: [academicWeeks.companyId],
-    references: [tutoringCompanies.id],
-  }),
-}));
-
-export const classesRelations = relations(classes, ({ one, many }) => ({
-  term: one(academicTerms, {
-    fields: [classes.termId],
-    references: [academicTerms.id],
-  }),
-  company: one(tutoringCompanies, {
-    fields: [classes.companyId],
-    references: [tutoringCompanies.id],
-  }),
-  tutor: one(tutors, {
-    fields: [classes.tutorId],
-    references: [tutors.id],
-  }),
-  studentAssignments: many(studentClassAssignments),
-  assignments: many(assignments),
-}));
-
-export const studentClassAssignmentsRelations = relations(studentClassAssignments, ({ one }) => ({
-  student: one(students, {
-    fields: [studentClassAssignments.studentId],
-    references: [students.id],
-  }),
-  class: one(classes, {
-    fields: [studentClassAssignments.classId],
-    references: [classes.id],
-  }),
-}));
-
-// Type exports for academic entities
 export type AcademicYear = typeof academicYears.$inferSelect;
-export type AcademicTerm = typeof academicTerms.$inferSelect;
-export type AcademicWeek = typeof academicWeeks.$inferSelect;
-export type Class = typeof classes.$inferSelect;
-export type StudentClassAssignment = typeof studentClassAssignments.$inferSelect;
-export type InsertStudentClassAssignment = typeof studentClassAssignments.$inferInsert;
-
-// Academic management insert schemas
-export const insertAcademicYearSchema = createInsertSchema(academicYears).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAcademicTermSchema = createInsertSchema(academicTerms).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAcademicWeekSchema = createInsertSchema(academicWeeks).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertClassSchema = createInsertSchema(classes).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertStudentClassAssignmentSchema = createInsertSchema(studentClassAssignments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-// Insert types for academic management
 export type InsertAcademicYear = z.infer<typeof insertAcademicYearSchema>;
+export type AcademicTerm = typeof academicTerms.$inferSelect;
 export type InsertAcademicTerm = z.infer<typeof insertAcademicTermSchema>;
+export type AcademicWeek = typeof academicWeeks.$inferSelect;
 export type InsertAcademicWeek = z.infer<typeof insertAcademicWeekSchema>;
+export type Class = typeof classes.$inferSelect;
 export type InsertClass = z.infer<typeof insertClassSchema>;
+export type StudentClassAssignment = typeof studentClassAssignments.$inferSelect;
 export type InsertStudentAssignment = z.infer<typeof insertStudentClassAssignmentSchema>;
-
-
-export type InsertCompanyAdmin = z.infer<typeof insertCompanyAdminSchema>;
-export type CompanyAdmin = typeof companyAdmins.$inferSelect;
-
-// ==========================================
-// WORKSHEET SYSTEM TABLES
-// ==========================================
-
-// Worksheets table - main worksheet document
-export const worksheets = pgTable("worksheets", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: varchar("title").notNull(),
-  description: text("description"),
-  subject: varchar("subject"),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
-  createdBy: varchar("created_by").notNull().references(() => users.id),
-  isPublished: boolean("is_published").notNull().default(false),
-  dueDate: timestamp("due_date"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Worksheet pages - each page in a worksheet
-export const worksheetPages = pgTable("worksheet_pages", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  worksheetId: varchar("worksheet_id").notNull().references(() => worksheets.id, { onDelete: 'cascade' }),
-  pageNumber: integer("page_number").notNull(),
-  title: varchar("title"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Worksheet questions - questions on each page
-export const worksheetQuestions = pgTable("worksheet_questions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  pageId: varchar("page_id").notNull().references(() => worksheetPages.id, { onDelete: 'cascade' }),
-  questionType: questionTypeEnum("question_type").notNull(),
-  questionText: text("question_text").notNull(),
-  questionNumber: integer("question_number").notNull(),
-  options: jsonb("options"), // For multiple choice: [{id, text, isCorrect}]
-  imageUrl: varchar("image_url"), // For text+image questions
-  correctAnswer: text("correct_answer"), // For fill-blank
-  points: integer("points").default(1),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Worksheet assignment status enum
-export const worksheetAssignmentStatusEnum = pgEnum("worksheet_assignment_status", [
-  "assigned",
-  "in_progress",
-  "submitted",
-  "graded",
-]);
-
-// Worksheet assignments - assign worksheets to students/classes
-export const worksheetAssignments = pgTable("worksheet_assignments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  worksheetId: varchar("worksheet_id").notNull().references(() => worksheets.id, { onDelete: 'cascade' }),
-  studentId: varchar("student_id").references(() => students.id, { onDelete: 'cascade' }),
-  classId: varchar("class_id").references(() => classes.id, { onDelete: 'cascade' }),
-  assignedBy: varchar("assigned_by").notNull().references(() => users.id),
-  dueDate: timestamp("due_date"),
-  status: worksheetAssignmentStatusEnum("status").notNull().default("assigned"),
-  submittedAt: timestamp("submitted_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Student worksheet answers - student responses to questions
-export const worksheetAnswers = pgTable("worksheet_answers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  questionId: varchar("question_id").notNull().references(() => worksheetQuestions.id, { onDelete: 'cascade' }),
-  studentId: varchar("student_id").notNull().references(() => students.id),
-  worksheetId: varchar("worksheet_id").notNull().references(() => worksheets.id),
-  textAnswer: text("text_answer"), // For typed answers
-  handwritingData: text("handwriting_data"), // For pen/stylus input (SVG or canvas data)
-  selectedOption: varchar("selected_option"), // For multiple choice
-  isSubmitted: boolean("is_submitted").notNull().default(false),
-  submittedAt: timestamp("submitted_at"),
-  grade: integer("grade"),
-  feedback: text("feedback"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Worksheet type exports
+export type InsertStudentClassAssignment = typeof studentClassAssignments.$inferInsert;
 export type Worksheet = typeof worksheets.$inferSelect;
 export type WorksheetPage = typeof worksheetPages.$inferSelect;
 export type WorksheetQuestion = typeof worksheetQuestions.$inferSelect;
 export type WorksheetAssignment = typeof worksheetAssignments.$inferSelect;
 export type WorksheetAnswer = typeof worksheetAnswers.$inferSelect;
-
-// Worksheet insert schemas
-export const insertWorksheetSchema = createInsertSchema(worksheets).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertWorksheetPageSchema = createInsertSchema(worksheetPages).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertWorksheetQuestionSchema = createInsertSchema(worksheetQuestions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertWorksheetAssignmentSchema = createInsertSchema(worksheetAssignments).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertWorksheetAnswerSchema = createInsertSchema(worksheetAnswers).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 export type InsertWorksheet = z.infer<typeof insertWorksheetSchema>;
 export type InsertWorksheetPage = z.infer<typeof insertWorksheetPageSchema>;
 export type InsertWorksheetQuestion = z.infer<typeof insertWorksheetQuestionSchema>;
 export type InsertWorksheetAssignment = z.infer<typeof insertWorksheetAssignmentSchema>;
 export type InsertWorksheetAnswer = z.infer<typeof insertWorksheetAnswerSchema>;
-
-// Test/Exam status enum
-export const testStatusEnum = pgEnum("test_status", ["draft", "published", "archived"]);
-
-// Test question type enum
-export const testQuestionTypeEnum = pgEnum("test_question_type", [
-  "multiple_choice",
-  "true_false", 
-  "short_answer",
-  "essay",
-  "fill_blank"
-]);
-
-// Test attempt status enum
-export const testAttemptStatusEnum = pgEnum("test_attempt_status", ["in_progress", "submitted", "graded"]);
-
-// Tests table - main test/exam record
-export const tests = pgTable("tests", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  title: varchar("title").notNull(),
-  description: text("description"),
-  subject: varchar("subject"),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
-  createdBy: varchar("created_by").notNull().references(() => users.id),
-  classId: varchar("class_id").references(() => classes.id),
-  status: testStatusEnum("status").notNull().default("draft"),
-  duration: integer("duration"), // Duration in minutes
-  totalPoints: integer("total_points").default(0),
-  passingScore: integer("passing_score"), // Minimum score to pass
-  dueDate: timestamp("due_date"),
-  allowRetakes: boolean("allow_retakes").default(false),
-  showResultsImmediately: boolean("show_results_immediately").default(true),
-  shuffleQuestions: boolean("shuffle_questions").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Test questions table
-export const testQuestions = pgTable("test_questions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: 'cascade' }),
-  questionType: testQuestionTypeEnum("question_type").notNull(),
-  questionText: text("question_text").notNull(),
-  questionNumber: integer("question_number").notNull(),
-  options: jsonb("options"), // For multiple choice: [{id, text, isCorrect}]
-  correctAnswer: text("correct_answer"), // For short answer, fill blank
-  points: integer("points").default(1),
-  explanation: text("explanation"), // Explanation shown after grading
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Test assignments - assign tests to students/classes
-export const testAssignments = pgTable("test_assignments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: 'cascade' }),
-  studentId: varchar("student_id").references(() => students.id, { onDelete: 'cascade' }),
-  classId: varchar("class_id").references(() => classes.id, { onDelete: 'cascade' }),
-  assignedBy: varchar("assigned_by").notNull().references(() => users.id),
-  dueDate: timestamp("due_date"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Test attempts - track student test sessions
-export const testAttempts = pgTable("test_attempts", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  testId: varchar("test_id").notNull().references(() => tests.id, { onDelete: 'cascade' }),
-  studentId: varchar("student_id").notNull().references(() => students.id),
-  status: testAttemptStatusEnum("status").notNull().default("in_progress"),
-  startedAt: timestamp("started_at").defaultNow(),
-  submittedAt: timestamp("submitted_at"),
-  totalScore: integer("total_score"),
-  percentageScore: integer("percentage_score"),
-  isPassed: boolean("is_passed"),
-  gradedBy: varchar("graded_by").references(() => users.id),
-  gradedAt: timestamp("graded_at"),
-  feedback: text("feedback"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Test answers - student responses to questions
-export const testAnswers = pgTable("test_answers", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  attemptId: varchar("attempt_id").notNull().references(() => testAttempts.id, { onDelete: 'cascade' }),
-  questionId: varchar("question_id").notNull().references(() => testQuestions.id, { onDelete: 'cascade' }),
-  studentAnswer: text("student_answer"),
-  selectedOption: varchar("selected_option"), // For multiple choice
-  isCorrect: boolean("is_correct"),
-  pointsAwarded: integer("points_awarded"),
-  feedback: text("feedback"),
-  gradedAt: timestamp("graded_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Test type exports
 export type Test = typeof tests.$inferSelect;
 export type TestQuestion = typeof testQuestions.$inferSelect;
 export type TestAssignment = typeof testAssignments.$inferSelect;
 export type TestAttempt = typeof testAttempts.$inferSelect;
 export type TestAnswer = typeof testAnswers.$inferSelect;
-
-// Test insert schemas
-export const insertTestSchema = createInsertSchema(tests).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertTestQuestionSchema = createInsertSchema(testQuestions).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertTestAssignmentSchema = createInsertSchema(testAssignments).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertTestAttemptSchema = createInsertSchema(testAttempts).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertTestAnswerSchema = createInsertSchema(testAnswers).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
 export type InsertTest = z.infer<typeof insertTestSchema>;
 export type InsertTestQuestion = z.infer<typeof insertTestQuestionSchema>;
 export type InsertTestAssignment = z.infer<typeof insertTestAssignmentSchema>;
 export type InsertTestAttempt = z.infer<typeof insertTestAttemptSchema>;
 export type InsertTestAnswer = z.infer<typeof insertTestAnswerSchema>;
+export type ClassSession = typeof classSessions.$inferSelect;
+export type SessionAttendance = typeof sessionAttendance.$inferSelect;
+export type AcademicHoliday = typeof academicHolidays.$inferSelect;
+export type InsertClassSession = z.infer<typeof insertClassSessionSchema>;
+export type InsertSessionAttendance = z.infer<typeof insertSessionAttendanceSchema>;
+export type InsertAcademicHoliday = z.infer<typeof insertAcademicHolidaySchema>;
+export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
+export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
+export type ReportDefinition = typeof reportDefinitions.$inferSelect;
+export type ReportRun = typeof reportRuns.$inferSelect;
+export type ReportExport = typeof reportExports.$inferSelect;
+export type InsertReportDefinition = z.infer<typeof insertReportDefinitionSchema>;
+export type InsertReportRun = z.infer<typeof insertReportRunSchema>;
+export type InsertReportExport = z.infer<typeof insertReportExportSchema>;
 
-// Authentication schemas
-// v3: self-registration is open only for solo tutors in NSW. Country=AU, state=NSW are
-// gated at the form; non-NSW AU users hit waitlistSchema instead; international is blocked.
+// ==========================================
+// AUTH SCHEMAS
+// ==========================================
+
 export const AU_STATES = ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT'] as const;
 export type AuState = typeof AU_STATES[number];
 
@@ -1015,7 +884,7 @@ export const registerSchema = z.object({
   firstName: z.string().min(1, "First name is required"),
   lastName: z.string().min(1, "Last name is required"),
   country: z.literal('AU').default('AU'),
-  state: z.literal('NSW'),                // non-NSW routes to waitlist form, not this schema
+  state: z.literal('NSW'),
   suburb: z.string().max(120).optional(),
   postcode: z.string().max(10).optional(),
   accountType: z.enum(['individual', 'multi_tutor']).default('individual'),
@@ -1052,288 +921,3 @@ export type WaitlistData = z.infer<typeof waitlistSchema>;
 export type LoginData = z.infer<typeof loginSchema>;
 export type ForgotPasswordData = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordData = z.infer<typeof resetPasswordSchema>;
-
-// =====================
-// CALENDAR & ATTENDANCE SYSTEM
-// =====================
-
-// Session status enum
-export const sessionStatusEnum = pgEnum("session_status", ["scheduled", "in_progress", "completed", "cancelled"]);
-
-// Attendance status enum
-export const attendanceStatusEnum = pgEnum("attendance_status", ["present", "absent", "late", "excused"]);
-
-// Class Sessions table - individual instances of a class
-export const classSessions = pgTable("class_sessions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  classId: varchar("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
-  tutorId: varchar("tutor_id").references(() => tutors.id, { onDelete: "set null" }),
-  sessionDate: timestamp("session_date").notNull(),
-  startTime: varchar("start_time").notNull(), // e.g., "09:00"
-  endTime: varchar("end_time").notNull(), // e.g., "10:30"
-  durationMinutes: integer("duration_minutes").notNull(),
-  status: sessionStatusEnum("status").notNull().default("scheduled"),
-  deliveryMode: varchar("delivery_mode").default("in_person"), // in_person, online, hybrid
-  locationUrl: varchar("location_url"), // Online meeting link if applicable
-  notes: text("notes"), // Lesson summary/notes
-  enrolledCount: integer("enrolled_count").default(0),
-  attendedCount: integer("attended_count").default(0),
-  attendanceLocked: boolean("attendance_locked").default(false),
-  attendanceLockedAt: timestamp("attendance_locked_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Session Attendance table - individual attendance records
-export const sessionAttendance = pgTable("session_attendance", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  sessionId: varchar("session_id").notNull().references(() => classSessions.id, { onDelete: "cascade" }),
-  studentId: varchar("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
-  status: attendanceStatusEnum("status").notNull().default("absent"),
-  markedBy: varchar("marked_by").references(() => users.id),
-  markedAt: timestamp("marked_at"),
-  notes: text("notes"), // Tutor remarks
-  isOverride: boolean("is_override").default(false), // Admin override flag
-  overrideBy: varchar("override_by").references(() => users.id),
-  overrideAt: timestamp("override_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Academic Holidays table
-export const academicHolidays = pgTable("academic_holidays", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").references(() => tutoringCompanies.id, { onDelete: "cascade" }),
-  name: varchar("name").notNull(),
-  description: text("description"),
-  startDate: timestamp("start_date").notNull(),
-  endDate: timestamp("end_date").notNull(),
-  isPublic: boolean("is_public").default(true), // Public holiday vs company-specific
-  isRecurring: boolean("is_recurring").default(false),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Relations
-export const classSessionsRelations = relations(classSessions, ({ one, many }) => ({
-  class: one(classes, {
-    fields: [classSessions.classId],
-    references: [classes.id],
-  }),
-  tutor: one(tutors, {
-    fields: [classSessions.tutorId],
-    references: [tutors.id],
-  }),
-  attendance: many(sessionAttendance),
-}));
-
-export const sessionAttendanceRelations = relations(sessionAttendance, ({ one }) => ({
-  session: one(classSessions, {
-    fields: [sessionAttendance.sessionId],
-    references: [classSessions.id],
-  }),
-  student: one(students, {
-    fields: [sessionAttendance.studentId],
-    references: [students.id],
-  }),
-  markedByUser: one(users, {
-    fields: [sessionAttendance.markedBy],
-    references: [users.id],
-  }),
-}));
-
-export const academicHolidaysRelations = relations(academicHolidays, ({ one }) => ({
-  company: one(tutoringCompanies, {
-    fields: [academicHolidays.companyId],
-    references: [tutoringCompanies.id],
-  }),
-}));
-
-// Type exports
-export type ClassSession = typeof classSessions.$inferSelect;
-export type SessionAttendance = typeof sessionAttendance.$inferSelect;
-export type AcademicHoliday = typeof academicHolidays.$inferSelect;
-
-// Insert schemas
-export const insertClassSessionSchema = createInsertSchema(classSessions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertSessionAttendanceSchema = createInsertSchema(sessionAttendance).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertAcademicHolidaySchema = createInsertSchema(academicHolidays).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertClassSession = z.infer<typeof insertClassSessionSchema>;
-export type InsertSessionAttendance = z.infer<typeof insertSessionAttendanceSchema>;
-export type InsertAcademicHoliday = z.infer<typeof insertAcademicHolidaySchema>;
-
-// Notification Preferences table
-export const notificationPreferences = pgTable("notification_preferences", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id),
-  
-  // Email notification preferences
-  emailEnabled: boolean("email_enabled").notNull().default(true),
-  emailNewAssignment: boolean("email_new_assignment").notNull().default(true),
-  emailSubmissionGraded: boolean("email_submission_graded").notNull().default(true),
-  emailNewMessage: boolean("email_new_message").notNull().default(true),
-  emailAttendanceMarked: boolean("email_attendance_marked").notNull().default(true),
-  emailScheduleChanges: boolean("email_schedule_changes").notNull().default(true),
-  emailWeeklyDigest: boolean("email_weekly_digest").notNull().default(false),
-  
-  // In-app notification preferences
-  inAppEnabled: boolean("in_app_enabled").notNull().default(true),
-  inAppNewAssignment: boolean("in_app_new_assignment").notNull().default(true),
-  inAppSubmissionGraded: boolean("in_app_submission_graded").notNull().default(true),
-  inAppNewMessage: boolean("in_app_new_message").notNull().default(true),
-  inAppAttendanceMarked: boolean("in_app_attendance_marked").notNull().default(true),
-  inAppScheduleChanges: boolean("in_app_schedule_changes").notNull().default(true),
-  
-  // Staff/Admin specific preferences
-  staffNewStudentEnrollment: boolean("staff_new_student_enrollment").notNull().default(true),
-  staffSubmissionReceived: boolean("staff_submission_received").notNull().default(true),
-  staffLowAttendanceAlert: boolean("staff_low_attendance_alert").notNull().default(true),
-  adminSystemAlerts: boolean("admin_system_alerts").notNull().default(true),
-  adminNewStaffRegistration: boolean("admin_new_staff_registration").notNull().default(true),
-  
-  // Quiet hours
-  quietHoursEnabled: boolean("quiet_hours_enabled").notNull().default(false),
-  quietHoursStart: varchar("quiet_hours_start").default("22:00"),
-  quietHoursEnd: varchar("quiet_hours_end").default("07:00"),
-  
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Type exports for notification preferences
-export type NotificationPreferences = typeof notificationPreferences.$inferSelect;
-
-// Insert schema for notification preferences
-export const insertNotificationPreferencesSchema = createInsertSchema(notificationPreferences).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export type InsertNotificationPreferences = z.infer<typeof insertNotificationPreferencesSchema>;
-
-// Report type and status enums
-export const reportTypeEnum = pgEnum('report_type', [
-  'student_performance',
-  'attendance_summary',
-  'class_utilization',
-  'assignment_completion',
-  'tutor_workload',
-  'enrollment_trends'
-]);
-
-export const reportStatusEnum = pgEnum('report_status', ['pending', 'processing', 'completed', 'failed']);
-
-// Report Definitions table - templates for reports
-export const reportDefinitions = pgTable("report_definitions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
-  name: varchar("name").notNull(),
-  description: text("description"),
-  reportType: reportTypeEnum("report_type").notNull(),
-  defaultFilters: jsonb("default_filters").default({}),
-  isScheduled: boolean("is_scheduled").notNull().default(false),
-  scheduleCron: varchar("schedule_cron"),
-  createdBy: varchar("created_by").references(() => users.id),
-  isActive: boolean("is_active").notNull().default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
-
-// Report Runs table - individual report executions
-export const reportRuns = pgTable("report_runs", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  companyId: varchar("company_id").notNull().references(() => tutoringCompanies.id),
-  reportType: reportTypeEnum("report_type").notNull(),
-  name: varchar("name").notNull(),
-  parameters: jsonb("parameters").default({}),
-  status: reportStatusEnum("status").notNull().default('pending'),
-  resultData: jsonb("result_data"),
-  rowCount: integer("row_count"),
-  errorMessage: text("error_message"),
-  requestedBy: varchar("requested_by").references(() => users.id),
-  startedAt: timestamp("started_at"),
-  completedAt: timestamp("completed_at"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Report Exports table - exported files
-export const reportExports = pgTable("report_exports", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  reportRunId: varchar("report_run_id").notNull().references(() => reportRuns.id),
-  exportType: varchar("export_type").notNull(), // 'csv', 'pdf', 'xlsx'
-  fileName: varchar("file_name").notNull(),
-  filePath: varchar("file_path"),
-  fileSize: integer("file_size"),
-  createdAt: timestamp("created_at").defaultNow(),
-});
-
-// Relations for reports
-export const reportDefinitionsRelations = relations(reportDefinitions, ({ one }) => ({
-  company: one(tutoringCompanies, {
-    fields: [reportDefinitions.companyId],
-    references: [tutoringCompanies.id],
-  }),
-  createdByUser: one(users, {
-    fields: [reportDefinitions.createdBy],
-    references: [users.id],
-  }),
-}));
-
-export const reportRunsRelations = relations(reportRuns, ({ one, many }) => ({
-  company: one(tutoringCompanies, {
-    fields: [reportRuns.companyId],
-    references: [tutoringCompanies.id],
-  }),
-  requestedByUser: one(users, {
-    fields: [reportRuns.requestedBy],
-    references: [users.id],
-  }),
-  exports: many(reportExports),
-}));
-
-export const reportExportsRelations = relations(reportExports, ({ one }) => ({
-  reportRun: one(reportRuns, {
-    fields: [reportExports.reportRunId],
-    references: [reportRuns.id],
-  }),
-}));
-
-// Type exports for reports
-export type ReportDefinition = typeof reportDefinitions.$inferSelect;
-export type ReportRun = typeof reportRuns.$inferSelect;
-export type ReportExport = typeof reportExports.$inferSelect;
-
-// Insert schemas for reports
-export const insertReportDefinitionSchema = createInsertSchema(reportDefinitions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertReportRunSchema = createInsertSchema(reportRuns).omit({
-  id: true,
-  createdAt: true,
-});
-
-export const insertReportExportSchema = createInsertSchema(reportExports).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertReportDefinition = z.infer<typeof insertReportDefinitionSchema>;
-export type InsertReportRun = z.infer<typeof insertReportRunSchema>;
-export type InsertReportExport = z.infer<typeof insertReportExportSchema>;

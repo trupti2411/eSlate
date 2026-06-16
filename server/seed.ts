@@ -2,6 +2,7 @@ import { db } from './db';
 import { users, tutoringCompanies, companyAdmins } from '../shared/schema';
 import { eq } from 'drizzle-orm';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
 
 async function upsertUser(email: string, fields: Parameters<typeof db.insert>[0] extends { values: (v: infer V) => any } ? V : any) {
   const existing = await db.select().from(users).where(eq(users.email, email)).limit(1);
@@ -9,8 +10,9 @@ async function upsertUser(email: string, fields: Parameters<typeof db.insert>[0]
     console.log(`  User already exists: ${email} — skipping`);
     return existing[0].id;
   }
-  const [created] = await db.insert(users).values(fields).returning({ id: users.id });
-  return created.id;
+  const id = crypto.randomUUID();
+  await db.insert(users).values({ ...fields, id });
+  return id;
 }
 
 async function seed() {

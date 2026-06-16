@@ -5,7 +5,7 @@ import * as nodemailer from 'nodemailer';
 import { storage } from './storage';
 import type { Express, Request, Response, NextFunction } from 'express';
 import session from 'express-session';
-import connectPg from 'connect-pg-simple';
+import MemoryStore from 'memorystore';
 import type { RegisterData, LoginData } from '@shared/schema';
 import type { User } from '@shared/schema';
 import { checkLoginRateLimit, recordLoginAttempt, logAudit, getCsrfTokenEndpoint, csrfProtection } from './security';
@@ -13,16 +13,10 @@ import { checkLoginRateLimit, recordLoginAttempt, logAudit, getCsrfTokenEndpoint
 // Session configuration
 export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
-  const pgStore = connectPg(session);
-  const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
-    createTableIfMissing: false,
-    ttl: sessionTtl,
-    tableName: "sessions",
-  });
+  const Store = MemoryStore(session);
   return session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
-    store: sessionStore,
+    store: new Store({ checkPeriod: 86400000 }),
     resave: false,
     saveUninitialized: false,
     cookie: {
