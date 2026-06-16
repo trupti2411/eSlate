@@ -48,6 +48,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/admin/users', [AdminController::class, 'listUsers']);
     Route::get('/admin/stats', [AdminController::class, 'stats']);
     Route::patch('/admin/users/{user}/status', [AdminController::class, 'toggleUserStatus']);
+    Route::post('/admin/create-user', [AdminController::class, 'createUser']);
+    Route::patch('/admin/users/{user}', [AdminController::class, 'updateUser']);
+    Route::delete('/admin/users/{user}', [AdminController::class, 'deleteUser']);
     Route::get('/businesses/{id}', [BusinessController::class, 'show']);
     Route::patch('/businesses/{id}', [BusinessController::class, 'update']);
     Route::patch('/businesses/{id}/subjects', [BusinessController::class, 'updateSubjects']);
@@ -120,6 +123,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/companies', [LegacyCompanyController::class, 'listCompanies']);
     Route::get('/companies/{companyId}', [LegacyCompanyController::class, 'showCompany']);
     Route::get('/companies/{companyId}/tutors', [LegacyCompanyController::class, 'companyTutors']);
+    Route::get('/companies/{companyId}/users', [LegacyCompanyController::class, 'companyUsers']);
+    Route::patch('/companies/{companyId}', [LegacyCompanyController::class, 'updateCompany']);
+    Route::patch('/companies/{companyId}/status', [LegacyCompanyController::class, 'updateCompanyStatus']);
+    Route::patch('/companies/{companyId}/assign-tutor/{tutorId}', [LegacyCompanyController::class, 'assignTutor']);
+    Route::get('/admin/unassigned-tutors', [LegacyCompanyController::class, 'unassignedTutors']);
     Route::get('/companies/{companyId}/academic-hierarchy', [LegacyCompanyController::class, 'companyAcademicHierarchy']);
     Route::get('/admin/company-settings', [LegacyCompanyController::class, 'companySettings']);
     Route::patch('/admin/company-settings', [LegacyCompanyController::class, 'updateCompanySettings']);
