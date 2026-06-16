@@ -1,4 +1,5 @@
-import { Switch, Route } from "wouter";
+import { Switch, Route, useLocation } from "wouter";
+import { lazy, Suspense, useEffect } from "react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -37,7 +38,6 @@ import Users from "@/pages/admin/Users";
 import TestUserCreation from "@/pages/admin/TestUserCreation";
 import Companies from "@/pages/admin/Companies";
 import CompanyManagement from "@/pages/admin/CompanyManagement";
-import CompanyDashboard from "@/pages/admin/CompanyDashboard";
 import CompanyStudents from "@/pages/admin/CompanyStudents";
 import CompanyAcademicManagement from "@/pages/admin/CompanyAcademicManagement";
 import AdminSettings from "@/pages/admin/Settings";
@@ -70,9 +70,22 @@ import PitchPage from "@/pages/PitchPage";
 
 import NotFound from "@/pages/not-found";
 
+const CompanyDashboard = lazy(() => import("@/pages/admin/CompanyDashboard"));
+
+function RedirectToCompany() {
+  const [, navigate] = useLocation();
+  useEffect(() => { navigate('/company'); }, [navigate]);
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin"></div>
+    </div>
+  );
+}
+
 function Router() {
   const { user, isAuthenticated, isLoading } = useAuth();
   const { design, setDesign, bannerSeen, dismissBanner } = useDesignPreference();
+  const [location, navigate] = useLocation();
 
   if (isLoading) {
     return (
@@ -97,10 +110,10 @@ function Router() {
       <Route path="/legal/privacy" component={PrivacyPolicy} />
       <Route path="/legal/terms" component={TermsOfService} />
       <Route path="/legal/agreement" component={UserAgreement} />
-      
+
       {/* Video storyboard - always accessible */}
       <Route path="/storyboard" component={VideoStoryboard} />
-      
+
       {/* Contact page - always accessible */}
       <Route path="/contact" component={ContactUs} />
 

@@ -1,0 +1,211 @@
+uploads = []
+
+[[generated]]
+id = "x3UykJ1Luu11ezRUaN-Vf"
+uri = "file://attached_assets/eslate_logo_concept1.png"
+type = "image"
+title = "eSlate logo concept 1 teal lettermark"
+
+[[generated]]
+id = "CcW9jNUXdLyszdjCxMlGM"
+uri = "file://attached_assets/eslate_logo_concept2.png"
+type = "image"
+title = "eSlate logo concept 2 book pen indigo"
+
+[[generated]]
+id = "JpZWurxm-FVnr1yoBbt0D"
+uri = "file://attached_assets/eslate_logo_concept3.png"
+type = "image"
+title = "eSlate logo concept 3 monogram app icon"
+
+[[generated]]
+id = "d5GG7yTulj5yWWbTLkoxQ"
+uri = "file://attached_assets/eslate_v2_green_gold.png"
+type = "image"
+title = "eSlate logo green gold variation"
+
+[[generated]]
+id = "4mfjdbx8gS2zYMrFzzYKD"
+uri = "file://attached_assets/eslate_v2_slate_coral.png"
+type = "image"
+title = "eSlate logo slate coral variation"
+
+[[generated]]
+id = "vOG0I0lY5ZqiSJPgFRUJo"
+uri = "file://attached_assets/eslate_v2_monochrome.png"
+type = "image"
+title = "eSlate logo monochrome black minimal"
+
+[[generated]]
+id = "YAxtQEd1b8gaD2hC187LT"
+uri = "file://attached_assets/eslate_v2_stacked.png"
+type = "image"
+title = "eSlate logo stacked square layout"
+
+[[generated]]
+id = "NtnoyVKZDbweFQGBfelta"
+uri = "file://attached_assets/eslate_v3_purple_gold.png"
+type = "image"
+title = "eSlate logo purple gold app icon"
+
+[[generated]]
+id = "7nCObWxZB8_ZQ_1ls5t5n"
+uri = "file://attached_assets/eslate_v3_navy_blue.png"
+type = "image"
+title = "eSlate logo midnight blue variation"
+
+[[generated]]
+id = "6qvDV3yzkcwFA_wZ6YwRE"
+uri = "file://attached_assets/eslate_v3_dark_mode.png"
+type = "image"
+title = "eSlate logo dark mode app icon"
+
+[[generated]]
+id = "XHbp487UTgIgCfbyKPgiR"
+uri = "file://attached_assets/eslate_v3_coral_accent.png"
+type = "image"
+title = "eSlate logo coral accent variation"
+
+[[generated]]
+id = "ARTfdQsaEv_QcB8hmMevM"
+uri = "file://attached_assets/eslate_compact_v1.png"
+type = "image"
+title = "eSlate compact teal navy icon"
+
+[[generated]]
+id = "KxCJgUQUISlwp8EN4T76x"
+uri = "file://attached_assets/eslate_compact_dark.png"
+type = "image"
+title = "eSlate compact dark background unified"
+
+[[generated]]
+id = "8nDFcYzK5SUKsxtgkuWFf"
+uri = "file://attached_assets/eslate_compact_horizontal.png"
+type = "image"
+title = "eSlate compact horizontal navbar style"
+
+[[generated]]
+id = "0o_fSghJIIOCCa04rEOd3"
+uri = "file://attached_assets/eslate_compact_stylus1.png"
+type = "image"
+title = "eSlate compact clear stylus horizontal"
+
+[[generated]]
+id = "S8kurILsPQDsTc8eRnqJu"
+uri = "file://attached_assets/eslate_compact_stylus2.png"
+type = "image"
+title = "eSlate compact prominent stylus outside tablet"
+
+[[generated]]
+id = "t48pz48-TOOHAreApMnD7"
+uri = "file://attached_assets/eslate_compact_stylus3.png"
+type = "image"
+title = "eSlate compact bold stylus tight spacing"
+
+[[outputs]]
+id = "d_d0mcHLpp2TCe12z2cJl"
+uri = "file://eSlate_Device_Requirements.pdf"
+type = "pdf"
+title = "eSlate — eInk Device Technical Requirements"
+
+[[outputs]]
+id = "mvvWQC0f39LIJmEs-Mko9"
+uri = "file://attached_assets/eslate_logo_concept1.png"
+type = "image"
+title = "Concept 1 — Teal lettermark with slate shape"
+
+[[outputs]]
+id = "VEmj0_fDFJhNw4AJUI-BW"
+uri = "file://attached_assets/eslate_logo_concept2.png"
+type = "image"
+title = "Concept 2 — Book & stylus, indigo"
+
+[[outputs]]
+id = "YEDvsewB2WPKpmHhiUmEV"
+uri = "file://attached_assets/eslate_logo_concept3.png"
+type = "image"
+title = "Concept 3 — eS monogram app icon style"
+
+[[outputs]]
+id = "Hmj_ckQ-dHR6lzM-1lnXw"
+uri = "file://attached_assets/eslate_v2_green_gold.png"
+type = "image"
+title = "Variation A — Forest green + gold stylus"
+
+[[outputs]]
+id = "hKUrLQHYJh3NDI5GxfOFc"
+uri = "file://attached_assets/eslate_v2_slate_coral.png"
+type = "image"
+title = "Variation B — Charcoal + coral"
+
+[[outputs]]
+id = "fwbjbED73JEi_1Mh9pr15"
+uri = "file://attached_assets/eslate_v2_monochrome.png"
+type = "image"
+title = "Variation C — All black, premium minimal"
+
+[[outputs]]
+id = "9Rofq6S3VqOACiq-TvIrP"
+uri = "file://attached_assets/eslate_v2_stacked.png"
+type = "image"
+title = "Variation D — Stacked layout (good for app icon)"
+
+[[outputs]]
+id = "vsMBwDdGNJdlZTv5EwmFF"
+uri = "file://attached_assets/eslate_v3_purple_gold.png"
+type = "image"
+title = "Variation E — Purple + gold stylus"
+
+[[outputs]]
+id = "r-naW2DZ4adooNO47w2nc"
+uri = "file://attached_assets/eslate_v3_navy_blue.png"
+type = "image"
+title = "Variation F — Midnight blue + sky blue"
+
+[[outputs]]
+id = "iJR_Q4KHC-SvTllBI4-EX"
+uri = "file://attached_assets/eslate_v3_dark_mode.png"
+type = "image"
+title = "Variation G — Dark mode (dark background)"
+
+[[outputs]]
+id = "KgVHTE9fI8oRXBnGXyvPG"
+uri = "file://attached_assets/eslate_v3_coral_accent.png"
+type = "image"
+title = "Variation H — Teal + coral accent"
+
+[[outputs]]
+id = "DRmr_8m1md-4FEVG6N62m"
+uri = "file://attached_assets/eslate_compact_v1.png"
+type = "image"
+title = "Compact A — Tight stacked, white background"
+
+[[outputs]]
+id = "UsK0o1JJmihfkbt-olx8Q"
+uri = "file://attached_assets/eslate_compact_dark.png"
+type = "image"
+title = "Compact B — Dark fill, all elements close together"
+
+[[outputs]]
+id = "aDvVnEbrrYzQ5Cks00Kp7"
+uri = "file://attached_assets/eslate_compact_horizontal.png"
+type = "image"
+title = "Compact C — Horizontal, icon + text side by side (navbar style)"
+
+[[outputs]]
+id = "iilWDNG7XMjjBmDSvyzzB"
+uri = "file://attached_assets/eslate_compact_stylus1.png"
+type = "image"
+title = "Option 1 — Compact, stylus extends from tablet corner"
+
+[[outputs]]
+id = "SAQi1oCuWpplUrUcFhTAt"
+uri = "file://attached_assets/eslate_compact_stylus2.png"
+type = "image"
+title = "Option 2 — Compact, large stylus overlapping outside tablet"
+
+[[outputs]]
+id = "Q3Vl-vfoT-I_mHpj1mIRl"
+uri = "file://attached_assets/eslate_compact_stylus3.png"
+type = "image"
+title = "Option 3 — Compact, bold stylus resting diagonally"

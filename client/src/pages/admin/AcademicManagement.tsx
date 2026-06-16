@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { useForm } from 'react-hook-form';
@@ -30,7 +30,12 @@ import {
   Search,
   Filter,
   ArrowUpDown,
-  Archive
+  Archive,
+  Zap,
+  ChevronDown,
+  ChevronRight,
+  MapPin,
+  AlertCircle,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -142,6 +147,23 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     message: string;
     conflicts: string[];
   } | null>(null);
+
+  // Auto-setup state
+  const [isAutoSetupOpen, setIsAutoSetupOpen] = useState(false);
+  const [autoSetupYearId, setAutoSetupYearId] = useState('');
+  const [autoSetupState, setAutoSetupState] = useState('NSW');
+  const [autoSetupDivision, setAutoSetupDivision] = useState<'Eastern' | 'Western'>('Eastern');
+  const [autoSetupClearExisting, setAutoSetupClearExisting] = useState(false);
+
+  // Edit term state
+  const [editingTerm, setEditingTerm] = useState<any | null>(null);
+  const [editTermName, setEditTermName] = useState('');
+  const [editTermStart, setEditTermStart] = useState('');
+  const [editTermEnd, setEditTermEnd] = useState('');
+  const [editTermErrors, setEditTermErrors] = useState<string[]>([]);
+  const [termWeeks, setTermWeeks] = useState<Record<string, any[]>>({});
+  const [expandedTerms, setExpandedTerms] = useState<Record<string, boolean>>({});
+  const [loadingWeeks, setLoadingWeeks] = useState<Record<string, boolean>>({});
 
   // Search, filter, and sort states for Academic Years
   const [yearSearch, setYearSearch] = useState('');
@@ -262,6 +284,187 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
     if (confirm(`Are you sure you want to delete "${yearName}"? This will also delete all terms and classes under this year.`)) {
       deleteYearMutation.mutate(yearId);
     }
+  };
+
+  // Auto-setup mutation
+  const autoSetupMutation = useMutation({
+    mutationFn: async (data: { yearId: string; state: string; division: string; clearExisting: boolean }) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-auto-setup`, 'POST', data);
+    },
+    onSuccess: (data: any) => {
+      toast({
+        title: "Calendar Created",
+        description: data.message || "2026 academic calendar set up successfully",
+      });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setIsAutoSetupOpen(false);
+      setAutoSetupYearId('');
+      setAutoSetupClearExisting(false);
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Setup Failed",
+        description: error.message || "Failed to auto-setup academic calendar",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Edit term mutation
+  const editTermMutation = useMutation({
+    mutationFn: async (data: { termId: string; name: string; startDate: string; endDate: string }) => {
+      return await apiRequest(`/api/companies/${companyId}/academic-terms/${data.termId}`, 'PATCH', {
+        name: data.name,
+        startDate: data.startDate,
+        endDate: data.endDate,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Term Updated", description: "Term dates and name saved successfully." });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-terms`] });
+      queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/academic-hierarchy`] });
+      setEditingTerm(null);
+      setEditTermErrors([]);
+    },
+    onError: (error: any) => {
+      const msg = error?.message || "Failed to update term";
+      // If overlap error, extract conflict names from message
+      if (msg.includes("overlaps")) {
+        setEditTermErrors([msg]);
+      } else {
+        toast({ title: "Update Failed", description: msg, variant: "destructive" });
+      }
+    },
+  });
+
+  // Sync company state into auto-setup dialog when company settings load
+  useEffect(() => {
+    if (companySettings?.state) {
+      setAutoSetupState(companySettings.state.toUpperCase());
+    }
+  }, [companySettings?.state]);
+
+  // Fetch weeks for a term (lazy load on expand)
+  const fetchTermWeeks = async (termId: string) => {
+    if (termWeeks[termId]) {
+      setExpandedTerms(prev => ({ ...prev, [termId]: !prev[termId] }));
+      return;
+    }
+    setLoadingWeeks(prev => ({ ...prev, [termId]: true }));
+    try {
+      const res = await fetch(`/api/companies/${companyId}/academic-weeks?termId=${termId}`, { credentials: 'include' });
+      const data = await res.json();
+      setTermWeeks(prev => ({ ...prev, [termId]: data }));
+      setExpandedTerms(prev => ({ ...prev, [termId]: true }));
+    } catch {
+      // silently fail
+    } finally {
+      setLoadingWeeks(prev => ({ ...prev, [termId]: false }));
+    }
+  };
+
+  // 2026 preview data for all Australian states (for dialog preview)
+  const AUS_2026_PREVIEW: Record<string, Record<string, { name: string; start: string; end: string; weeks: number }[]>> = {
+    NSW: {
+      Eastern: [
+        { name: "Term 1", start: "27 Jan", end: "1 Apr", weeks: 10 },
+        { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
+        { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
+        { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
+      ],
+      Western: [
+        { name: "Term 1", start: "3 Feb", end: "1 Apr", weeks: 9 },
+        { name: "Term 2", start: "28 Apr", end: "4 Jul", weeks: 10 },
+        { name: "Term 3", start: "21 Jul", end: "26 Sep", weeks: 10 },
+        { name: "Term 4", start: "13 Oct", end: "19 Dec", weeks: 10 },
+      ],
+    },
+    VIC: {
+      default: [
+        { name: "Term 1", start: "28 Jan", end: "2 Apr", weeks: 9 },
+        { name: "Term 2", start: "20 Apr", end: "26 Jun", weeks: 10 },
+        { name: "Term 3", start: "13 Jul", end: "18 Sep", weeks: 10 },
+        { name: "Term 4", start: "5 Oct", end: "18 Dec", weeks: 11 },
+      ],
+    },
+    QLD: {
+      default: [
+        { name: "Term 1", start: "27 Jan", end: "25 Mar", weeks: 9 },
+        { name: "Term 2", start: "12 Apr", end: "25 Jun", weeks: 11 },
+        { name: "Term 3", start: "12 Jul", end: "17 Sep", weeks: 10 },
+        { name: "Term 4", start: "5 Oct", end: "10 Dec", weeks: 10 },
+      ],
+    },
+    SA: {
+      default: [
+        { name: "Term 1", start: "27 Jan", end: "10 Apr", weeks: 11 },
+        { name: "Term 2", start: "27 Apr", end: "3 Jul", weeks: 10 },
+        { name: "Term 3", start: "20 Jul", end: "25 Sep", weeks: 10 },
+        { name: "Term 4", start: "12 Oct", end: "11 Dec", weeks: 9 },
+      ],
+    },
+    WA: {
+      default: [
+        { name: "Term 1", start: "2 Feb", end: "2 Apr", weeks: 9 },
+        { name: "Term 2", start: "20 Apr", end: "3 Jul", weeks: 11 },
+        { name: "Term 3", start: "20 Jul", end: "25 Sep", weeks: 10 },
+        { name: "Term 4", start: "12 Oct", end: "17 Dec", weeks: 10 },
+      ],
+    },
+    TAS: {
+      default: [
+        { name: "Term 1", start: "5 Feb", end: "17 Apr", weeks: 10 },
+        { name: "Term 2", start: "4 May", end: "10 Jul", weeks: 10 },
+        { name: "Term 3", start: "27 Jul", end: "2 Oct", weeks: 10 },
+        { name: "Term 4", start: "19 Oct", end: "18 Dec", weeks: 9 },
+      ],
+    },
+    ACT: {
+      default: [
+        { name: "Term 1", start: "2 Feb", end: "2 Apr", weeks: 9 },
+        { name: "Term 2", start: "21 Apr", end: "3 Jul", weeks: 11 },
+        { name: "Term 3", start: "20 Jul", end: "25 Sep", weeks: 10 },
+        { name: "Term 4", start: "13 Oct", end: "18 Dec", weeks: 10 },
+      ],
+    },
+    NT: {
+      default: [
+        { name: "Term 1", start: "27 Jan", end: "27 Mar", weeks: 9 },
+        { name: "Term 2", start: "14 Apr", end: "26 Jun", weeks: 11 },
+        { name: "Term 3", start: "14 Jul", end: "18 Sep", weeks: 10 },
+        { name: "Term 4", start: "6 Oct", end: "11 Dec", weeks: 10 },
+      ],
+    },
+  };
+
+  const AUS_STATES = [
+    { code: 'NSW', label: 'New South Wales (NSW)' },
+    { code: 'VIC', label: 'Victoria (VIC)' },
+    { code: 'QLD', label: 'Queensland (QLD)' },
+    { code: 'SA', label: 'South Australia (SA)' },
+    { code: 'WA', label: 'Western Australia (WA)' },
+    { code: 'TAS', label: 'Tasmania (TAS)' },
+    { code: 'ACT', label: 'Australian Capital Territory (ACT)' },
+    { code: 'NT', label: 'Northern Territory (NT)' },
+  ];
+
+  const STATE_SOURCES: Record<string, string> = {
+    NSW: 'education.nsw.gov.au',
+    VIC: 'schools.vic.gov.au',
+    QLD: 'education.qld.gov.au',
+    SA: 'education.sa.gov.au',
+    WA: 'education.wa.edu.au',
+    TAS: 'decyp.tas.gov.au',
+    ACT: 'education.act.gov.au',
+    NT: 'education.nt.gov.au',
+  };
+
+  // Get the preview for the currently selected state + division
+  const getPreviewTerms = () => {
+    const stateData = AUS_2026_PREVIEW[autoSetupState] || AUS_2026_PREVIEW['NSW'];
+    if (autoSetupState === 'NSW') return stateData[autoSetupDivision] || stateData['Eastern'];
+    return stateData['default'] || Object.values(stateData)[0];
   };
 
   const createTermMutation = useMutation({
@@ -544,6 +747,13 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
   const { data: academicYears = [], isLoading: yearsLoading, error: yearsError } = useQuery({
     queryKey: [`/api/companies/${companyId}/academic-years`],
     enabled: !!companyId,
+  });
+
+  // Fetch company settings to auto-detect state for calendar setup
+  const { data: companySettings } = useQuery<{ state?: string; tutorChatEnabled?: boolean; name?: string }>({
+    queryKey: ['/api/admin/company-settings'],
+    enabled: !!companyId,
+    staleTime: 60000,
   });
 
   // Fetch academic terms (with optional year filter)
@@ -1014,14 +1224,24 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 </p>
               )}
             </div>
-            <Dialog open={isAddTermOpen} onOpenChange={setIsAddTermOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Term
-                </Button>
-              </DialogTrigger>
-            </Dialog>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="border-green-600 text-green-700 hover:bg-green-50"
+                onClick={() => setIsAutoSetupOpen(true)}
+              >
+                <Zap className="w-4 h-4 mr-2" />
+                Auto-Setup Australia 2026
+              </Button>
+              <Dialog open={isAddTermOpen} onOpenChange={setIsAddTermOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Term
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
+            </div>
           </div>
 
           {/* Search, Filter, Sort Controls */}
@@ -1114,9 +1334,17 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => {
+                              setEditingTerm(term);
+                              setEditTermName(term.name);
+                              setEditTermStart(term.startDate ? format(new Date(term.startDate), 'yyyy-MM-dd') : '');
+                              setEditTermEnd(term.endDate ? format(new Date(term.endDate), 'yyyy-MM-dd') : '');
+                              setEditTermErrors([]);
+                            }}
+                          >
                             <Edit className="w-4 h-4 mr-2" />
-                            Edit
+                            Edit Dates
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onClick={() => setTermToArchive(term)}
@@ -1147,6 +1375,33 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                       <Badge variant={term.isActive ? "default" : "secondary"} className="text-[10px] px-1.5 py-0">
                         {term.isActive ? "Active" : "Archived"}
                       </Badge>
+                      {/* Weeks toggle */}
+                      <button
+                        onClick={() => fetchTermWeeks(term.id)}
+                        className="flex items-center text-[10px] text-blue-600 hover:text-blue-700 mt-1 gap-0.5"
+                      >
+                        {loadingWeeks[term.id] ? (
+                          <span className="animate-pulse">Loading weeks…</span>
+                        ) : expandedTerms[term.id] ? (
+                          <><ChevronDown className="w-3 h-3" />Hide weeks</>
+                        ) : (
+                          <><ChevronRight className="w-3 h-3" />Show weeks</>
+                        )}
+                      </button>
+                      {expandedTerms[term.id] && termWeeks[term.id] && (
+                        <div className="mt-1.5 border rounded-md divide-y text-[10px] max-h-36 overflow-y-auto">
+                          {termWeeks[term.id].length === 0 ? (
+                            <p className="px-2 py-1 text-gray-400 italic">No weeks set up</p>
+                          ) : termWeeks[term.id].map((w: any) => (
+                            <div key={w.id} className="flex justify-between px-2 py-0.5">
+                              <span className="font-medium text-gray-700">{w.name}</span>
+                              <span className="text-gray-500">
+                                {format(new Date(w.startDate), 'MMM d')} – {format(new Date(w.endDate), 'MMM d')}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -2741,6 +2996,280 @@ export default function AcademicManagement({ companyId, companyName }: AcademicM
                 Close
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Term Dialog */}
+      {editingTerm && (() => {
+        // Client-side overlap check
+        const siblingTerms = (academicTerms as AcademicTerm[]).filter(
+          t => t.academicYearId === editingTerm.academicYearId && t.id !== editingTerm.id
+        );
+        const overlapWarnings: string[] = [];
+        if (editTermStart && editTermEnd) {
+          const s = new Date(editTermStart);
+          const e = new Date(editTermEnd);
+          for (const t of siblingTerms) {
+            const ts = new Date(t.startDate);
+            const te = new Date(t.endDate);
+            if (s <= te && e >= ts) overlapWarnings.push(t.name);
+          }
+        }
+        const startBeforeEnd = editTermStart && editTermEnd && new Date(editTermStart) < new Date(editTermEnd);
+        const hasServerErrors = editTermErrors.length > 0;
+        const canSave = editTermName.trim() && editTermStart && editTermEnd && startBeforeEnd && overlapWarnings.length === 0;
+
+        return (
+          <Dialog open={!!editingTerm} onOpenChange={(open) => { if (!open) { setEditingTerm(null); setEditTermErrors([]); } }}>
+            <DialogContent className="sm:max-w-[440px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Edit className="w-4 h-4" />
+                  Edit Term
+                </DialogTitle>
+                <DialogDescription>Update the name and date range for this term.</DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-2">
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <Label className="text-sm font-medium">Term Name</Label>
+                  <Input
+                    value={editTermName}
+                    onChange={e => setEditTermName(e.target.value)}
+                    placeholder="e.g. Term 1"
+                    className="border-black"
+                  />
+                </div>
+
+                {/* Start Date */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">Start Date</Label>
+                    <Input
+                      type="date"
+                      value={editTermStart}
+                      onChange={e => { setEditTermStart(e.target.value); setEditTermErrors([]); }}
+                      className="border-black"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium">End Date</Label>
+                    <Input
+                      type="date"
+                      value={editTermEnd}
+                      onChange={e => { setEditTermEnd(e.target.value); setEditTermErrors([]); }}
+                      className="border-black"
+                    />
+                  </div>
+                </div>
+
+                {/* Start/end order error */}
+                {editTermStart && editTermEnd && !startBeforeEnd && (
+                  <div className="flex items-start gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>Start date must be before end date.</span>
+                  </div>
+                )}
+
+                {/* Overlap warning */}
+                {overlapWarnings.length > 0 && (
+                  <div className="flex items-start gap-2 p-2.5 bg-amber-50 border border-amber-300 rounded-lg text-xs text-amber-800">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>Date range overlaps with: <strong>{overlapWarnings.join(', ')}</strong>. Adjust the dates to avoid conflicts.</span>
+                  </div>
+                )}
+
+                {/* Server-side error */}
+                {hasServerErrors && (
+                  <div className="flex items-start gap-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">
+                    <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{editTermErrors[0]}</span>
+                  </div>
+                )}
+
+                {/* Summary of other terms for reference */}
+                {siblingTerms.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-[11px] text-gray-500 font-medium">Other terms in this year:</p>
+                    <div className="border rounded-md divide-y text-[11px]">
+                      {siblingTerms.map(t => (
+                        <div key={t.id} className="flex justify-between px-2.5 py-1 text-gray-600">
+                          <span className="font-medium">{t.name}</span>
+                          <span>{t.startDate && t.endDate ? `${format(new Date(t.startDate), 'MMM d')} – ${format(new Date(t.endDate), 'MMM d, yyyy')}` : '–'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t">
+                <Button variant="outline" onClick={() => { setEditingTerm(null); setEditTermErrors([]); }}>Cancel</Button>
+                <Button
+                  className="bg-black hover:bg-gray-800 text-white"
+                  disabled={!canSave || editTermMutation.isPending}
+                  onClick={() => editTermMutation.mutate({
+                    termId: editingTerm.id,
+                    name: editTermName.trim(),
+                    startDate: editTermStart,
+                    endDate: editTermEnd,
+                  })}
+                >
+                  {editTermMutation.isPending ? 'Saving…' : 'Save Changes'}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
+
+      {/* Auto-Setup Australian 2026 Academic Calendar Dialog */}
+      <Dialog open={isAutoSetupOpen} onOpenChange={setIsAutoSetupOpen}>
+        <DialogContent className="sm:max-w-[580px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-green-600" />
+              Auto-Setup 2026 Academic Calendar
+            </DialogTitle>
+            <DialogDescription>
+              {companySettings?.state
+                ? `Your business is set to ${autoSetupState}. Dates are pre-filled from official government sources.`
+                : 'Select your state to load official 2026 school term dates automatically.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Year Level Selector */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">Apply to Year Level</Label>
+              <Select value={autoSetupYearId} onValueChange={setAutoSetupYearId}>
+                <SelectTrigger className="border-black">
+                  <SelectValue placeholder="Select a year level…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {(academicYears as AcademicYear[]).map((year) => (
+                    <SelectItem key={year.id} value={year.id}>{year.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-gray-500">Terms will be created under this year level.</p>
+            </div>
+
+            {/* State Selector */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5" />
+                State / Territory
+                {companySettings?.state && (
+                  <span className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-normal ml-1">
+                    Auto-detected from your profile
+                  </span>
+                )}
+              </Label>
+              <Select value={autoSetupState} onValueChange={setAutoSetupState}>
+                <SelectTrigger className="border-black">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {AUS_STATES.map((s) => (
+                    <SelectItem key={s.code} value={s.code}>{s.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* NSW Division Selector — only shown for NSW */}
+            {autoSetupState === 'NSW' && (
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium">NSW Division</Label>
+                <div className="flex gap-2">
+                  {(['Eastern', 'Western'] as const).map((div) => (
+                    <button
+                      key={div}
+                      onClick={() => setAutoSetupDivision(div)}
+                      className={`flex-1 py-1.5 text-sm rounded-md border font-medium transition-colors ${
+                        autoSetupDivision === div
+                          ? 'bg-green-600 text-white border-green-600'
+                          : 'bg-white text-gray-700 border-gray-300 hover:border-green-500'
+                      }`}
+                    >
+                      {div} Division
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[11px] text-gray-500">
+                  {autoSetupDivision === 'Western'
+                    ? 'Western Division: Term 1 starts 3 Feb (one week later than Eastern).'
+                    : 'Eastern Division: Term 1 starts 27 Jan. Most Sydney/coastal schools.'}
+                </p>
+              </div>
+            )}
+
+            {/* Preview Table */}
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium">What will be created</Label>
+              <div className="border rounded-lg overflow-hidden text-sm">
+                <div className="grid grid-cols-3 bg-gray-50 font-medium text-gray-600 text-xs px-3 py-1.5 border-b">
+                  <span>Term</span>
+                  <span>Dates (2026)</span>
+                  <span>Weeks</span>
+                </div>
+                {getPreviewTerms().map((t) => (
+                  <div key={t.name} className="grid grid-cols-3 px-3 py-1.5 border-b last:border-0 text-xs">
+                    <span className="font-semibold text-gray-800">{t.name}</span>
+                    <span className="text-gray-600">{t.start} – {t.end}</span>
+                    <span className="text-green-700 font-medium">{t.weeks} wks</span>
+                  </div>
+                ))}
+                <div className="px-3 py-1.5 bg-green-50 text-xs text-green-800 font-medium">
+                  Total: 4 terms · ~{getPreviewTerms().reduce((s, t) => s + t.weeks, 0)} weeks created
+                </div>
+              </div>
+              <p className="text-[11px] text-gray-400">
+                Source: {STATE_SOURCES[autoSetupState] || 'Official state education department'}
+              </p>
+            </div>
+
+            {/* Override existing terms */}
+            <div
+              className={`flex items-start gap-2.5 p-3 rounded-lg border cursor-pointer select-none transition-colors ${
+                autoSetupClearExisting ? 'bg-red-50 border-red-300' : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+              }`}
+              onClick={() => setAutoSetupClearExisting(v => !v)}
+            >
+              <div className={`mt-0.5 w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                autoSetupClearExisting ? 'bg-red-600 border-red-600' : 'border-gray-400 bg-white'
+              }`}>
+                {autoSetupClearExisting && <span className="text-white text-[10px] leading-none font-bold">✓</span>}
+              </div>
+              <div>
+                <p className="text-sm font-medium text-gray-800">Override existing terms</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  Deletes all current terms (and their weeks) for this year before creating new ones.
+                </p>
+              </div>
+            </div>
+
+            {!autoSetupYearId && (
+              <p className="text-xs text-amber-600 font-medium">⚠ Select a year level to continue.</p>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t">
+            <Button variant="outline" onClick={() => setIsAutoSetupOpen(false)}>Cancel</Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              disabled={!autoSetupYearId || autoSetupMutation.isPending}
+              onClick={() => autoSetupMutation.mutate({ yearId: autoSetupYearId, state: autoSetupState, division: autoSetupDivision, clearExisting: autoSetupClearExisting })}
+            >
+              {autoSetupMutation.isPending ? (
+                <span className="flex items-center gap-1.5"><span className="animate-spin">⏳</span> Creating…</span>
+              ) : (
+                <span className="flex items-center gap-1.5"><Zap className="w-4 h-4" /> Create {autoSetupState} 2026 Calendar</span>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
