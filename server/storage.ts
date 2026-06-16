@@ -1,6 +1,7 @@
 import {
   users,
   students,
+  studentContacts,
   parents,
   tutors,
   tutoringCompanies,
@@ -11,6 +12,10 @@ import {
   academicYears,
   academicTerms,
   academicWeeks,
+  courses,
+  courseSubjects,
+  classSubjects,
+  companySubjects,
   classes,
   studentClassAssignments,
   assignments,
@@ -159,6 +164,7 @@ export interface IStorage {
   getAllTutoringCompanies(): Promise<TutoringCompany[]>;
   updateTutoringCompany(id: string, updates: any): Promise<TutoringCompany>;
   getCompanyStudentsByCompanyId(companyId: string): Promise<any[]>;
+  createStudentWithContacts(data: any): Promise<any>;
   getCompanyUsersByCompanyId(companyId: string): Promise<User[]>;
   updateCompanyStatus(companyId: string, isActive: boolean): Promise<void>;
 
@@ -169,6 +175,15 @@ export interface IStorage {
   createCompanyAdmin(adminData: InsertCompanyAdmin): Promise<CompanyAdmin>;
   updateCompanyAdmin(id: string, updates: Partial<InsertCompanyAdmin>): Promise<CompanyAdmin>;
   getTutorsByCompany(companyId: string): Promise<any[]>;
+  getTutorById(tutorId: string, companyId: string): Promise<any | null>;
+  updateTutorProfile(tutorId: string, companyId: string, data: {
+    firstName?: string;
+    lastName?: string;
+    specialization?: string | null;
+    qualifications?: string | null;
+    availability?: string | null;
+    branch?: string | null;
+  }): Promise<any | null>;
 
   // Admin user management methods
   getAllUsers(): Promise<User[]>;
@@ -213,6 +228,7 @@ export interface IStorage {
   getClassesByCompany(companyId: string): Promise<Class[]>;
   getClassesByTutor(tutorId: string): Promise<Class[]>;
   getClass(id: string): Promise<Class | undefined>;
+  getClassDetailById(classId: string, companyId: string): Promise<any | null>;
   updateClass(id: string, updates: Partial<InsertClass>): Promise<Class>;
   deleteClass(id: string): Promise<void>;
   permanentlyDeleteClass(id: string): Promise<void>;
@@ -450,6 +466,11 @@ export class DatabaseStorage implements IStorage {
         userId: students.userId,
         gradeLevel: students.gradeLevel,
         schoolName: students.schoolName,
+        yearGroupCode: students.yearGroupCode,
+        dateOfBirth: students.dateOfBirth,
+        address: students.address,
+        learningGoals: students.learningGoals,
+        notes: students.notes,
         parentId: students.parentId,
         tutorId: students.tutorId,
         companyId: students.companyId,
@@ -457,6 +478,8 @@ export class DatabaseStorage implements IStorage {
         termId: students.termId,
         classId: students.classId,
         createdAt: students.createdAt,
+        updatedAt: students.updatedAt,
+        updatedByName: students.updatedByName,
         user: {
           id: users.id,
           email: users.email,
@@ -471,7 +494,29 @@ export class DatabaseStorage implements IStorage {
       .where(eq(students.id, id))
       .limit(1);
 
-    return result[0] || undefined;
+    const row = result[0];
+    if (!row) return undefined;
+
+    const contacts = await db.select().from(studentContacts).where(eq(studentContacts.studentId, id));
+    return {
+      ...row,
+      // snake_case aliases for frontend compat
+      year_group_code: row.yearGroupCode,
+      date_of_birth: row.dateOfBirth,
+      school: row.schoolName,
+      first_name: row.user?.firstName ?? null,
+      last_name: row.user?.lastName ?? null,
+      updated_at: row.updatedAt,
+      updated_by_name: row.updatedByName,
+      parents: contacts.map(c => ({
+        id: c.id,
+        name: c.name,
+        relationship: c.relationship,
+        email: c.email,
+        phone: c.phone,
+        is_primary: c.isPrimary,
+      })),
+    };
   }
 
   async getStudentByUserId(userId: string): Promise<Student | undefined> {
@@ -1066,17 +1111,27 @@ export class DatabaseStorage implements IStorage {
       }
 
       // Transform the result to match expected structure
+      // Fetch contacts for all students
+      const allStudentIds = companyStudents.map((row: any) => row.students.id);
+      const contactRows = allStudentIds.length > 0
+        ? await db.select().from(studentContacts).where(inArray(studentContacts.studentId, allStudentIds))
+        : [];
+      const contactsByStudentId = new Map<string, any[]>();
+      for (const c of contactRows) {
+        const existing = contactsByStudentId.get(c.studentId) ?? [];
+        existing.push(c);
+        contactsByStudentId.set(c.studentId, existing);
+      }
+
       return companyStudents.map((row: any) => {
         const tutorUser = row.tutors?.userId ? tutorUserMap.get(row.tutors.userId) : null;
-        
-        // Use direct classId if available, otherwise check enrollments
+
         let classInfo = row.classes ? {
           id: row.classes.id,
           name: row.classes.name,
           academicYearId: row.classes.academicYearId
         } : null;
-        
-        // If no direct class, check class enrollments
+
         if (!classInfo && enrollmentMap.has(row.students.id)) {
           const enrolledClass = enrollmentMap.get(row.students.id);
           classInfo = {
@@ -1085,17 +1140,35 @@ export class DatabaseStorage implements IStorage {
             academicYearId: enrolledClass.academicYearId
           };
         }
-        
+
+        const contacts = contactsByStudentId.get(row.students.id) ?? [];
+
         return {
           id: row.students.id,
           userId: row.students.userId,
           gradeLevel: row.students.gradeLevel,
+          yearGroupCode: row.students.yearGroupCode,
+          schoolName: row.students.schoolName,
+          dateOfBirth: row.students.dateOfBirth,
+          address: row.students.address,
+          learningGoals: row.students.learningGoals,
+          notes: row.students.notes,
           parentId: row.students.parentId,
           tutorId: row.students.tutorId,
           companyId: row.students.companyId,
           classId: row.students.classId,
-          schoolName: row.students.schoolName,
-          dateOfBirth: row.students.dateOfBirth,
+          // Expose as year_group_code, school, date_of_birth for company/Students.tsx
+          year_group_code: row.students.yearGroupCode,
+          school: row.students.schoolName,
+          date_of_birth: row.students.dateOfBirth,
+          parents: contacts.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            relationship: c.relationship,
+            email: c.email,
+            phone: c.phone,
+            is_primary: c.isPrimary,
+          })),
           user: {
             id: row.users.id,
             email: row.users.email,
@@ -1104,6 +1177,11 @@ export class DatabaseStorage implements IStorage {
             isActive: row.users.isActive,
             createdAt: row.users.createdAt
           },
+          // Legacy compat fields
+          first_name: row.users.firstName,
+          last_name: row.users.lastName,
+          updated_at: row.students.updatedAt,
+          updated_by_name: row.students.updatedByName,
           class: classInfo,
           tutor: row.tutors ? {
             id: row.tutors.id,
@@ -1121,6 +1199,333 @@ export class DatabaseStorage implements IStorage {
   }
 
 
+
+  async createStudentWithContacts(data: {
+    userId: string;
+    companyId: string;
+    gradeLevel?: string | null;
+    schoolName?: string | null;
+    yearGroupCode?: string | null;
+    dateOfBirth?: Date | null;
+    address?: string | null;
+    learningGoals?: string | null;
+    notes?: string | null;
+    contacts?: Array<{ name: string; relationship?: string | null; email?: string | null; phone?: string | null; isPrimary: boolean }>;
+  }): Promise<any> {
+    const { contacts, ...studentData } = data;
+    const [student] = await db.insert(students).values(studentData).returning();
+    if (contacts && contacts.length > 0) {
+      await db.insert(studentContacts).values(
+        contacts.map(c => ({ ...c, studentId: student.id }))
+      );
+    }
+    return student;
+  }
+
+  async updateStudentWithContacts(
+    studentId: string,
+    data: {
+      firstName?: string;
+      lastName?: string;
+      schoolName?: string | null;
+      yearGroupCode?: string | null;
+      dateOfBirth?: Date | null;
+      address?: string | null;
+      learningGoals?: string | null;
+      notes?: string | null;
+      updatedAt?: Date;
+      updatedByName?: string | null;
+    },
+    contacts?: Array<{ name: string; relationship?: string | null; email?: string | null; phone?: string | null; isPrimary: boolean }>,
+    userId?: string,
+  ): Promise<any> {
+    const { firstName, lastName, ...studentFields } = data;
+
+    if (firstName !== undefined || lastName !== undefined) {
+      const student = await db.select({ userId: students.userId }).from(students).where(eq(students.id, studentId)).limit(1);
+      if (student[0]?.userId) {
+        await db.update(users)
+          .set({
+            ...(firstName !== undefined ? { firstName } : {}),
+            ...(lastName !== undefined ? { lastName } : {}),
+          })
+          .where(eq(users.id, student[0].userId));
+      }
+    }
+
+    await db.update(students).set(studentFields).where(eq(students.id, studentId));
+
+    if (contacts !== undefined) {
+      await db.delete(studentContacts).where(eq(studentContacts.studentId, studentId));
+      if (contacts.length > 0) {
+        await db.insert(studentContacts).values(contacts.map(c => ({ ...c, studentId })));
+      }
+    }
+
+    return this.getStudent(studentId);
+  }
+
+  async getCoursesByCompany(companyId: string): Promise<any[]> {
+    const rows = await db.select().from(courses).where(eq(courses.companyId, companyId)).orderBy(courses.name);
+    const ids = rows.map(r => r.id);
+    const subjectRows = ids.length > 0
+      ? await db.select().from(courseSubjects).where(inArray(courseSubjects.courseId, ids))
+      : [];
+    const byId = new Map<string, number[]>();
+    for (const s of subjectRows) {
+      const arr = byId.get(s.courseId) ?? [];
+      arr.push(s.subjectId);
+      byId.set(s.courseId, arr);
+    }
+    return rows.map(r => ({ ...r, subjectIds: byId.get(r.id) ?? [] }));
+  }
+
+  async getCourseById(id: string, companyId: string): Promise<any | null> {
+    const [row] = await db.select().from(courses).where(and(eq(courses.id, id), eq(courses.companyId, companyId)));
+    if (!row) return null;
+    const subjectRows = await db.select().from(courseSubjects).where(eq(courseSubjects.courseId, id));
+    return { ...row, subjectIds: subjectRows.map(s => s.subjectId) };
+  }
+
+  async updateCourse(id: string, companyId: string, data: { name?: string; description?: string | null; subjectIds?: number[] }): Promise<any | null> {
+    const { subjectIds, ...fields } = data;
+    if (Object.keys(fields).length > 0) {
+      await db.update(courses).set(fields).where(and(eq(courses.id, id), eq(courses.companyId, companyId)));
+    }
+    if (subjectIds !== undefined) {
+      await db.delete(courseSubjects).where(eq(courseSubjects.courseId, id));
+      if (subjectIds.length > 0) {
+        await db.insert(courseSubjects).values(subjectIds.map(sid => ({ courseId: id, subjectId: sid })));
+      }
+    }
+    return this.getCourseById(id, companyId);
+  }
+
+  async createCourse(data: { companyId: string; name: string; description?: string | null; yearGroupCode?: string | null; subjectIds?: number[] }): Promise<any> {
+    const { subjectIds, ...courseData } = data;
+    const [course] = await db.insert(courses).values(courseData).returning();
+    if (subjectIds && subjectIds.length > 0) {
+      await db.insert(courseSubjects).values(subjectIds.map(sid => ({ courseId: course.id, subjectId: sid })));
+    }
+    return { ...course, subjectIds: subjectIds ?? [] };
+  }
+
+  async createClassWithSubjects(classData: any, subjectIds: number[]): Promise<any> {
+    const [newClass] = await db.insert(classes).values(classData).returning();
+    if (subjectIds.length > 0) {
+      await db.insert(classSubjects).values(
+        subjectIds.map((sid, i) => ({ classId: newClass.id, subjectId: sid, isPrimary: i === 0 }))
+      );
+    }
+    return newClass;
+  }
+
+  async getClassesWithDetailsForCompany(companyId: string): Promise<any[]> {
+    const classList = await db
+      .select({
+        id: classes.id,
+        name: classes.name,
+        companyId: classes.companyId,
+        termId: classes.termId,
+        tutorId: classes.tutorId,
+        courseId: classes.courseId,
+        yearGroupCode: classes.yearGroupCode,
+        level: classes.level,
+        status: classes.status,
+        location: classes.location,
+        startTime: classes.startTime,
+        endTime: classes.endTime,
+        dayOfWeek: classes.dayOfWeek,
+        description: classes.description,
+        maxStudents: classes.maxStudents,
+        createdAt: classes.createdAt,
+      })
+      .from(classes)
+      .where(and(eq(classes.companyId, companyId), eq(classes.isActive, true)))
+      .orderBy(classes.name);
+
+    if (classList.length === 0) return [];
+
+    const classIds = classList.map(c => c.id);
+    const tutorIds = Array.from(new Set(classList.map(c => c.tutorId).filter(Boolean) as string[]));
+    const termIds = Array.from(new Set(classList.map(c => c.termId)));
+
+    const [subjectRows, tutorRows, termRows] = await Promise.all([
+      db.select().from(classSubjects).where(inArray(classSubjects.classId, classIds)),
+      tutorIds.length > 0
+        ? db.select({ id: tutors.id, userId: tutors.userId }).from(tutors).where(inArray(tutors.id, tutorIds))
+        : Promise.resolve([] as { id: string; userId: string }[]),
+      db.select({ id: academicTerms.id, academicYearId: academicTerms.academicYearId }).from(academicTerms).where(inArray(academicTerms.id, termIds)),
+    ]);
+
+    const tutorUserIds = tutorRows.map(t => t.userId);
+    const tutorUsers = tutorUserIds.length > 0
+      ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, tutorUserIds))
+      : [];
+    const tutorUserMap = new Map(tutorUsers.map(u => [u.id, u]));
+    const tutorMap = new Map(tutorRows.map(t => ({ ...t, user: tutorUserMap.get(t.userId) })).map(t => [t.id, t]));
+
+    const yearIds = Array.from(new Set(termRows.map((t: any) => t.academicYearId)));
+    const yearRows = yearIds.length > 0
+      ? await db.select({ id: academicYears.id, year: academicYears.yearNumber, name: academicYears.name }).from(academicYears).where(inArray(academicYears.id, yearIds))
+      : [];
+    const yearMap = new Map(yearRows.map(y => [y.id, y]));
+    const termYearMap = new Map(termRows.map((t: any) => [t.id, yearMap.get(t.academicYearId)]));
+
+    const subjectsByClass = new Map<string, { id: number; isPrimary: boolean }[]>();
+    for (const s of subjectRows) {
+      const arr = subjectsByClass.get(s.classId) ?? [];
+      arr.push({ id: s.subjectId, isPrimary: s.isPrimary });
+      subjectsByClass.set(s.classId, arr);
+    }
+
+    const SUBJECTS = [
+      { id: 1, code: 'ENG', name: 'English' },
+      { id: 2, code: 'MATH', name: 'Mathematics' },
+      { id: 3, code: 'READ', name: 'Reading' },
+      { id: 4, code: 'SCI', name: 'Science' },
+      { id: 5, code: 'THINK', name: 'Thinking Skills' },
+      { id: 6, code: 'WRITE', name: 'Writing' },
+    ];
+    const subjectById = new Map(SUBJECTS.map(s => [s.id, s]));
+
+    return classList.map(c => {
+      const tutor = c.tutorId ? tutorMap.get(c.tutorId) : null;
+      const academicYear = termYearMap.get(c.termId);
+      const subs = subjectsByClass.get(c.id) ?? [];
+      const subjects = subs.map(s => ({ ...subjectById.get(s.id), pivot: { is_primary: s.isPrimary } })).filter(s => s.id);
+      const primarySub = subs.find(s => s.isPrimary);
+
+      return {
+        id: c.id,
+        name: c.name,
+        business_id: c.companyId,
+        tutor_id: c.tutorId,
+        course_id: c.courseId,
+        year_group_code: c.yearGroupCode,
+        level: c.level,
+        status: c.status,
+        location: c.location,
+        description: c.description,
+        yearGroup: c.yearGroupCode
+          ? { id: 0, label: c.yearGroupCode, code: c.yearGroupCode }
+          : undefined,
+        subjects,
+        subject: primarySub ? subjectById.get(primarySub.id) : undefined,
+        tutor: tutor ? { id: tutor.id, user: tutor.user } : undefined,
+        academicYear: academicYear ?? undefined,
+      };
+    });
+  }
+
+  async getClassDetailById(classId: string, companyId: string): Promise<any | null> {
+    const SUBJECTS = [
+      { id: 1, code: 'ENG', name: 'English' },
+      { id: 2, code: 'MATH', name: 'Mathematics' },
+      { id: 3, code: 'READ', name: 'Reading' },
+      { id: 4, code: 'SCI', name: 'Science' },
+      { id: 5, code: 'THINK', name: 'Thinking Skills' },
+      { id: 6, code: 'WRITE', name: 'Writing' },
+    ];
+    const subjectById = new Map(SUBJECTS.map(s => [s.id, s]));
+
+    const [cls] = await db.select().from(classes)
+      .where(and(eq(classes.id, classId), eq(classes.companyId, companyId), eq(classes.isActive, true)));
+    if (!cls) return null;
+
+    const [term, subjectRows, enrollmentRows] = await Promise.all([
+      db.select().from(academicTerms).where(eq(academicTerms.id, cls.termId)).then(r => r[0] ?? null),
+      db.select().from(classSubjects).where(eq(classSubjects.classId, classId)),
+      db.select().from(studentClassAssignments)
+        .where(and(eq(studentClassAssignments.classId, classId), eq(studentClassAssignments.isActive, true))),
+    ]);
+
+    const academicYear = term
+      ? await db.select().from(academicYears).where(eq(academicYears.id, term.academicYearId)).then(r => r[0] ?? null)
+      : null;
+
+    const course = cls.courseId
+      ? await db.select().from(courses).where(eq(courses.id, cls.courseId)).then(r => r[0] ?? null)
+      : null;
+
+    let tutorDetail: any = null;
+    if (cls.tutorId) {
+      const [tRow] = await db.select({ id: tutors.id, userId: tutors.userId })
+        .from(tutors).where(eq(tutors.id, cls.tutorId));
+      if (tRow) {
+        const [uRow] = await db.select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
+          .from(users).where(eq(users.id, tRow.userId));
+        tutorDetail = { id: tRow.id, user: uRow ?? undefined };
+      }
+    }
+
+    const studentIds = enrollmentRows.map(e => e.studentId);
+    const studentDetails = studentIds.length > 0
+      ? await db.select({
+          id: students.id,
+          userId: students.userId,
+          yearGroupCode: students.yearGroupCode,
+          schoolName: students.schoolName,
+          createdAt: students.createdAt,
+        }).from(students).where(inArray(students.id, studentIds))
+      : [];
+    const studentUserIds = studentDetails.map(s => s.userId);
+    const studentUsers = studentUserIds.length > 0
+      ? await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName })
+          .from(users).where(inArray(users.id, studentUserIds))
+      : [];
+    const studentUserMap = new Map(studentUsers.map(u => [u.id, u]));
+    const enrollmentMap = new Map(enrollmentRows.map(e => [e.studentId, e]));
+
+    const studentList = studentDetails.map(s => {
+      const u = studentUserMap.get(s.userId);
+      const enrl = enrollmentMap.get(s.id);
+      return {
+        id: s.id,
+        first_name: u?.firstName ?? null,
+        last_name: u?.lastName ?? null,
+        year_group_code: s.yearGroupCode ?? null,
+        school: s.schoolName ?? null,
+        user: u ?? null,
+        pivot: enrl?.assignedDate ? { enrolled_at: enrl.assignedDate.toISOString() } : undefined,
+      };
+    });
+
+    const subjects = subjectRows.map(s => ({
+      ...subjectById.get(s.subjectId),
+      pivot: { is_primary: s.isPrimary },
+    })).filter(s => s.id);
+    const primarySub = subjectRows.find(s => s.isPrimary);
+
+    return {
+      id: cls.id,
+      business_id: cls.companyId,
+      course_id: cls.courseId ?? null,
+      tutor_id: cls.tutorId ?? null,
+      academic_year_id: academicYear?.id ?? null,
+      year_group_id: cls.yearGroupCode ?? null,
+      subject_id: primarySub?.subjectId ?? null,
+      name: cls.name,
+      starts_on: term?.startDate ? term.startDate.toISOString().slice(0, 10) : null,
+      ends_on: term?.endDate ? term.endDate.toISOString().slice(0, 10) : null,
+      capacity: cls.maxStudents ?? null,
+      status: cls.status ?? 'draft',
+      description: cls.description ?? null,
+      level: cls.level ?? null,
+      schedule_day_of_week: cls.dayOfWeek ?? null,
+      schedule_start_time: cls.startTime || null,
+      schedule_end_time: cls.endTime || null,
+      location: cls.location ?? null,
+      course: course ? { id: course.id, name: course.name, description: course.description } : null,
+      subject: primarySub ? subjectById.get(primarySub.subjectId) ?? null : null,
+      subjects,
+      yearGroup: cls.yearGroupCode ? { id: 0, label: cls.yearGroupCode, code: cls.yearGroupCode } : null,
+      tutor: tutorDetail,
+      academicYear: academicYear ? { id: academicYear.id, year: academicYear.yearNumber } : null,
+      terms: term ? [{ id: term.id, name: term.name, start_date: term.startDate?.toISOString().slice(0, 10) ?? '', end_date: term.endDate?.toISOString().slice(0, 10) ?? '' }] : [],
+      students: studentList,
+    };
+  }
 
   async createTutoringCompany(companyData: any): Promise<TutoringCompany> {
     const [company] = await db.insert(tutoringCompanies).values(companyData).returning();
@@ -1246,26 +1651,98 @@ export class DatabaseStorage implements IStorage {
         tutorSchedulesMap.get(session.tutorId)!.add(scheduleKey);
       }
 
-      // Add schedules and student count to tutors
+      // Add schedules and student count to tutors — flatten user sub-object
       return companyTutors.map(tutor => {
         const scheduleSet = tutorSchedulesMap.get(tutor.id);
-        const schedules = scheduleSet 
+        const schedules = scheduleSet
           ? Array.from(scheduleSet).map(key => {
               const [className, dayOfWeek, startTime, endTime] = key.split('|');
               return { className, dayOfWeek, startTime, endTime };
             })
           : [];
-        
+
         return {
-          ...tutor,
+          id: tutor.id,
+          userId: tutor.userId,
+          companyId: tutor.companyId,
+          firstName: tutor.user.firstName,
+          lastName: tutor.user.lastName,
+          email: tutor.user.email,
+          specialization: tutor.specialization,
+          qualifications: tutor.qualifications,
+          isVerified: tutor.isVerified,
+          status: tutor.user.isActive ? 'active' : 'invited',
+          complianceStatus: tutor.isVerified ? 'compliant' : 'pending_compliance',
           schedules,
-          studentCount: studentCountMap.get(tutor.id) || 0
+          studentCount: studentCountMap.get(tutor.id) || 0,
         };
       });
     } catch (error) {
       console.error("Error fetching company tutors:", error);
       return [];
     }
+  }
+
+  async getTutorById(tutorId: string, companyId: string): Promise<any | null> {
+    const [row] = await db.select({
+      id: tutors.id,
+      userId: tutors.userId,
+      specialization: tutors.specialization,
+      qualifications: tutors.qualifications,
+      availability: tutors.availability,
+      branch: tutors.branch,
+      isVerified: tutors.isVerified,
+      companyId: tutors.companyId,
+      firstName: users.firstName,
+      lastName: users.lastName,
+      email: users.email,
+      isActive: users.isActive,
+    })
+    .from(tutors)
+    .innerJoin(users, eq(tutors.userId, users.id))
+    .where(and(eq(tutors.id, tutorId), eq(tutors.companyId, companyId)));
+
+    if (!row) return null;
+    return {
+      ...row,
+      status: row.isActive ? 'active' : 'invited',
+      complianceStatus: row.isVerified ? 'compliant' : 'pending_compliance',
+    };
+  }
+
+  async updateTutorProfile(tutorId: string, companyId: string, data: {
+    firstName?: string;
+    lastName?: string;
+    specialization?: string | null;
+    qualifications?: string | null;
+    availability?: string | null;
+    branch?: string | null;
+  }): Promise<any | null> {
+    const [tutor] = await db.select().from(tutors)
+      .where(and(eq(tutors.id, tutorId), eq(tutors.companyId, companyId)));
+    if (!tutor) return null;
+
+    const { firstName, lastName, ...tutorFields } = data;
+
+    if (firstName !== undefined || lastName !== undefined) {
+      const userUpdates: Record<string, any> = { updatedAt: new Date() };
+      if (firstName !== undefined) userUpdates.firstName = firstName;
+      if (lastName !== undefined) userUpdates.lastName = lastName;
+      await db.update(users).set(userUpdates).where(eq(users.id, tutor.userId));
+    }
+
+    const tutorUpdates: Record<string, any> = {};
+    if (tutorFields.specialization !== undefined) tutorUpdates.specialization = tutorFields.specialization;
+    if (tutorFields.qualifications !== undefined) tutorUpdates.qualifications = tutorFields.qualifications;
+    if (tutorFields.availability !== undefined) tutorUpdates.availability = tutorFields.availability;
+    if (tutorFields.branch !== undefined) tutorUpdates.branch = tutorFields.branch;
+
+    if (Object.keys(tutorUpdates).length > 0) {
+      await db.update(tutors).set(tutorUpdates)
+        .where(and(eq(tutors.id, tutorId), eq(tutors.companyId, companyId)));
+    }
+
+    return this.getTutorById(tutorId, companyId);
   }
 
   // Admin user management methods
@@ -3406,10 +3883,33 @@ export class DatabaseStorage implements IStorage {
       .where(eq(academicYears.companyId, companyId));
     
     if (years.length === 0) return [];
-    
+
     const yearIds = years.map(y => y.id);
     return db.select().from(academicTerms)
       .where(inArray(academicTerms.academicYearId, yearIds));
+  }
+
+  async getCompanySubjects(companyId: string) {
+    return db.select().from(companySubjects)
+      .where(eq(companySubjects.companyId, companyId))
+      .orderBy(companySubjects.createdAt);
+  }
+
+  async createCompanySubject(companyId: string, name: string, code: string, description?: string | null) {
+    const [row] = await db.insert(companySubjects).values({
+      companyId,
+      name: name.trim(),
+      code: code.trim().toUpperCase(),
+      description: description?.trim() || null,
+    }).returning();
+    return row;
+  }
+
+  async deleteCompanySubject(id: string, companyId: string) {
+    const [row] = await db.delete(companySubjects)
+      .where(eq(companySubjects.id, id) && eq(companySubjects.companyId, companyId))
+      .returning();
+    return row;
   }
 }
 

@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<title>eSlate – Data Flow Diagrams</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',Arial,sans-serif;background:#fff;color:#1a1a2e;font-size:13px}
+
+  /* ── Cover page ───────────────────────────────────────────── */
+  .cover{width:100%;min-height:100vh;display:flex;flex-direction:column;justify-content:center;align-items:center;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:#fff;page-break-after:always}
+  .cover-logo{font-size:64px;font-weight:700;letter-spacing:-2px;color:#e94560;margin-bottom:8px}
+  .cover-sub{font-size:20px;font-weight:300;color:#a8b2d8;margin-bottom:48px}
+  .cover-title{font-size:36px;font-weight:700;text-align:center;margin-bottom:12px;color:#fff}
+  .cover-desc{font-size:14px;font-weight:300;color:#a8b2d8;text-align:center;max-width:480px;line-height:1.8}
+  .cover-meta{margin-top:60px;display:flex;gap:48px}
+  .cover-meta-item{text-align:center}
+  .cover-meta-item .val{font-size:28px;font-weight:700;color:#e94560}
+  .cover-meta-item .lbl{font-size:11px;color:#a8b2d8;margin-top:4px;text-transform:uppercase;letter-spacing:1px}
+  .cover-date{margin-top:48px;font-size:12px;color:#a8b2d8}
+
+  /* ── TOC ──────────────────────────────────────────────────── */
+  .toc{padding:60px 80px;page-break-after:always}
+  .toc h2{font-size:26px;font-weight:700;margin-bottom:32px;color:#1a1a2e;border-bottom:3px solid #e94560;padding-bottom:12px}
+  .toc-item{display:flex;align-items:center;padding:10px 0;border-bottom:1px dashed #e2e8f0}
+  .toc-num{font-size:13px;font-weight:700;color:#e94560;width:32px;flex-shrink:0}
+  .toc-name{font-size:13px;flex:1}
+  .toc-dots{flex:1;border-bottom:1px dotted #cbd5e0;margin:0 12px;align-self:flex-end;margin-bottom:3px}
+  .toc-page{font-size:12px;color:#718096}
+
+  /* ── Section page ─────────────────────────────────────────── */
+  .section-cover{width:100%;min-height:50vh;display:flex;flex-direction:column;justify-content:center;padding:60px 80px;background:linear-gradient(135deg,#f7f8fc 0%,#eef2ff 100%);page-break-before:always;page-break-after:always}
+  .section-num{font-size:48px;font-weight:700;color:#e94560;opacity:.2;line-height:1}
+  .section-title{font-size:32px;font-weight:700;color:#1a1a2e;margin-top:-16px}
+  .section-desc{font-size:14px;color:#718096;margin-top:12px;max-width:560px;line-height:1.8}
+
+  /* ── Diagram page ─────────────────────────────────────────── */
+  .page{padding:48px 60px;page-break-after:always;page-break-inside:avoid}
+  .page-title{font-size:20px;font-weight:700;margin-bottom:6px;color:#1a1a2e}
+  .page-subtitle{font-size:12px;color:#718096;margin-bottom:28px}
+  .diagram-wrap{background:#fafbff;border:1.5px solid #e2e8f0;border-radius:12px;padding:32px;overflow:hidden}
+
+  /* ── Legend ───────────────────────────────────────────────── */
+  .legend{display:flex;gap:24px;flex-wrap:wrap;margin-top:20px;padding:16px 20px;background:#f7f8fc;border-radius:8px;border:1px solid #e2e8f0}
+  .legend-item{display:flex;align-items:center;gap:8px;font-size:11px;color:#4a5568}
+  .lg-box{width:20px;height:14px;border-radius:2px;flex-shrink:0}
+  .lg-circle{width:18px;height:18px;border-radius:50%;flex-shrink:0}
+  .lg-line{width:24px;height:2px;flex-shrink:0}
+
+  /* ── SVG shared colors ────────────────────────────────────── */
+  :root{
+    --ext:#1a73e8;   /* external entity – blue */
+    --proc:#e94560;  /* process – red */
+    --store:#00897b; /* data store – teal */
+    --flow:#64748b;  /* arrow – slate */
+    --bg-ext:#dbeafe;
+    --bg-proc:#fee2e6;
+    --bg-store:#ccfbf1;
+  }
+
+  /* ── Data dictionary table ────────────────────────────────── */
+  .dd-table{width:100%;border-collapse:collapse;margin-top:8px;font-size:12px}
+  .dd-table th{background:#1a1a2e;color:#fff;padding:8px 12px;text-align:left;font-weight:600}
+  .dd-table td{padding:7px 12px;border-bottom:1px solid #e2e8f0;vertical-align:top}
+  .dd-table tr:nth-child(even) td{background:#f7f8fc}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+  .badge-ext{background:#dbeafe;color:#1e40af}
+  .badge-proc{background:#fee2e6;color:#9b1c1c}
+  .badge-store{background:#ccfbf1;color:#065f46}
+  .badge-flow{background:#f3f4f6;color:#374151}
+
+  /* Print */
+  @media print{
+    body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    .page{page-break-after:always}
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════ COVER -->
+<div class="cover">
+  <div class="cover-logo">eSlate</div>
+  <div class="cover-sub">Educational Platform for Education Providers</div>
+  <div class="cover-title">Data Flow Diagrams (DFD)</div>
+  <div class="cover-desc">System architecture, data flows, processes, and data stores across the eSlate platform — including the React frontend, Express.js backend (PostgreSQL), and Laravel API backend (SQLite).</div>
+  <div class="cover-meta">
+    <div class="cover-meta-item"><div class="val">6</div><div class="lbl">Actors</div></div>
+    <div class="cover-meta-item"><div class="val">15</div><div class="lbl">Processes</div></div>
+    <div class="cover-meta-item"><div class="val">2</div><div class="lbl">Databases</div></div>
+    <div class="cover-meta-item"><div class="val">37+</div><div class="lbl">Tables</div></div>
+  </div>
+  <div class="cover-date">Generated June 2026 · Branch: trupti-dev</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ TOC -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <div class="toc-item"><span class="toc-num">1</span><span class="toc-name">Level 0 — Context Diagram</span><span class="toc-dots"></span><span class="toc-page">3</span></div>
+  <div class="toc-item"><span class="toc-num">2</span><span class="toc-name">Level 1 — System Overview (Main Processes)</span><span class="toc-dots"></span><span class="toc-page">4</span></div>
+  <div class="toc-item"><span class="toc-num">3</span><span class="toc-name">Level 2A — Authentication &amp; Session Flow</span><span class="toc-dots"></span><span class="toc-page">5</span></div>
+  <div class="toc-item"><span class="toc-num">4</span><span class="toc-name">Level 2B — Assignment &amp; Submission Flow</span><span class="toc-dots"></span><span class="toc-page">6</span></div>
+  <div class="toc-item"><span class="toc-num">5</span><span class="toc-name">Level 2C — Academic Structure &amp; Class Management</span><span class="toc-dots"></span><span class="toc-page">7</span></div>
+  <div class="toc-item"><span class="toc-num">6</span><span class="toc-name">Level 2D — Reporting &amp; AI Features</span><span class="toc-dots"></span><span class="toc-page">8</span></div>
+  <div class="toc-item"><span class="toc-num">7</span><span class="toc-name">Data Dictionary — Entities &amp; Stores</span><span class="toc-dots"></span><span class="toc-page">9</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ LEVEL 0 -->
+<div class="page">
+  <div class="page-title">1 · Level 0 — Context Diagram</div>
+  <div class="page-subtitle">The entire eSlate system as a single process showing all external entities and top-level data flows</div>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 860 520" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
+      <defs>
+        <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#64748b"/></marker>
+        <marker id="ah-b" markerWidth="8" markerHeight="6" refX="0" refY="3" orient="auto"><polygon points="8 0,0 3,8 6" fill="#64748b"/></marker>
+        <filter id="sh"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity=".12"/></filter>
+      </defs>
+
+      <!-- Central system bubble -->
+      <ellipse cx="430" cy="260" rx="130" ry="80" fill="#fee2e6" stroke="#e94560" stroke-width="2.5" filter="url(#sh)"/>
+      <text x="430" y="252" text-anchor="middle" font-size="15" font-weight="700" fill="#9b1c1c">eSlate Platform</text>
+      <text x="430" y="270" text-anchor="middle" font-size="10" fill="#9b1c1c">React + Express + Laravel</text>
+      <text x="430" y="285" text-anchor="middle" font-size="10" fill="#9b1c1c">PostgreSQL + SQLite</text>
+
+      <!-- External entities -->
+      <!-- Admin -->
+      <rect x="20" y="30" width="110" height="44" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8" filter="url(#sh)"/>
+      <text x="75" y="50" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Admin</text>
+      <text x="75" y="65" text-anchor="middle" font-size="9" fill="#1e40af">Platform Admin</text>
+
+      <!-- Company Admin -->
+      <rect x="20" y="160" width="120" height="44" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8" filter="url(#sh)"/>
+      <text x="80" y="180" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Company Admin</text>
+      <text x="80" y="195" text-anchor="middle" font-size="9" fill="#1e40af">Tutoring Org Manager</text>
+
+      <!-- Tutor -->
+      <rect x="20" y="290" width="110" height="44" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8" filter="url(#sh)"/>
+      <text x="75" y="310" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Tutor</text>
+      <text x="75" y="325" text-anchor="middle" font-size="9" fill="#1e40af">Teaching Staff</text>
+
+      <!-- Student -->
+      <rect x="20" y="420" width="110" height="44" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8" filter="url(#sh)"/>
+      <text x="75" y="440" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Student</text>
+      <text x="75" y="455" text-anchor="middle" font-size="9" fill="#1e40af">Learner</text>
+
+      <!-- Parent -->
+      <rect x="730" y="160" width="110" height="44" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8" filter="url(#sh)"/>
+      <text x="785" y="180" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Parent</text>
+      <text x="785" y="195" text-anchor="middle" font-size="9" fill="#1e40af">Guardian</text>
+
+      <!-- Email/Notification -->
+      <rect x="730" y="380" width="110" height="44" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8" filter="url(#sh)"/>
+      <text x="785" y="399" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">Email</text>
+      <text x="785" y="414" text-anchor="middle" font-size="9" fill="#1e40af">Notification Service</text>
+
+      <!-- File Storage -->
+      <rect x="730" y="30" width="110" height="44" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8" filter="url(#sh)"/>
+      <text x="785" y="50" text-anchor="middle" font-size="12" font-weight="600" fill="#1e40af">File Storage</text>
+      <text x="785" y="65" text-anchor="middle" font-size="9" fill="#1e40af">S3 / MinIO</text>
+
+      <!-- Arrows: Admin -->
+      <line x1="130" y1="52" x2="296" y2="210" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="175" y="118" font-size="9" fill="#475569" transform="rotate(-30,175,118)">Manage users/companies</text>
+      <line x1="296" y1="220" x2="135" y2="64" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="152" y="150" font-size="9" fill="#475569" transform="rotate(-30,152,150)">Audit logs / stats</text>
+
+      <!-- Arrows: Company Admin -->
+      <line x1="140" y1="182" x2="300" y2="240" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="186" y="202" font-size="9" fill="#475569">Manage classes/tutors</text>
+      <line x1="300" y1="255" x2="140" y2="195" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="168" y="230" font-size="9" fill="#475569">Reports/analytics</text>
+
+      <!-- Arrows: Tutor -->
+      <line x1="130" y1="308" x2="300" y2="272" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="176" y="278" font-size="9" fill="#475569">Create assignments</text>
+      <line x1="300" y1="282" x2="130" y2="318" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="170" y="306" font-size="9" fill="#475569">Grades/feedback</text>
+
+      <!-- Arrows: Student -->
+      <line x1="130" y1="430" x2="300" y2="310" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="160" y="385" font-size="9" fill="#475569">Submit work</text>
+      <line x1="300" y1="318" x2="130" y2="440" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="168" y="408" font-size="9" fill="#475569">Assignments/grades</text>
+
+      <!-- Arrows: Parent -->
+      <line x1="730" y1="180" x2="560" y2="240" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="615" y="198" font-size="9" fill="#475569">View progress</text>
+      <line x1="560" y1="255" x2="730" y2="192" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="610" y="236" font-size="9" fill="#475569">Child reports</text>
+
+      <!-- Arrows: Email -->
+      <line x1="560" y1="295" x2="730" y2="390" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="628" y="328" font-size="9" fill="#475569">Notifications</text>
+
+      <!-- Arrows: File Storage -->
+      <line x1="730" y1="52" x2="560" y2="218" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="628" y="118" font-size="9" fill="#475569">Files/PDFs</text>
+      <line x1="560" y1="210" x2="730" y2="60" stroke="#64748b" stroke-width="1.4" marker-end="url(#ah)"/>
+      <text x="650" y="148" font-size="9" fill="#475569">Upload/fetch</text>
+    </svg>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="lg-box" style="background:#dbeafe;border:1.5px solid #1a73e8"></div>External Entity (Actor)</div>
+    <div class="legend-item"><div class="lg-circle" style="background:#fee2e6;border:1.5px solid #e94560"></div>Process / System</div>
+    <div class="legend-item"><div class="lg-line" style="background:#64748b"></div>Data Flow (arrow = direction)</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ LEVEL 1 -->
+<div class="page">
+  <div class="page-title">2 · Level 1 — System Overview</div>
+  <div class="page-subtitle">eSlate decomposed into its primary process groups showing flows between actors, processes, and data stores</div>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 900 580" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
+      <defs>
+        <marker id="ah2" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#64748b"/></marker>
+        <filter id="sh2"><feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity=".1"/></filter>
+      </defs>
+
+      <!-- Data Stores (bottom bar) -->
+      <!-- DS1: PostgreSQL -->
+      <rect x="30" y="500" width="180" height="36" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="30" y1="500" x2="30" y2="536" stroke="#00897b" stroke-width="1.8"/>
+      <text x="48" y="514" font-size="10" font-weight="700" fill="#065f46">D1</text>
+      <text x="48" y="528" font-size="10" fill="#065f46">PostgreSQL (Express)</text>
+
+      <!-- DS2: SQLite -->
+      <rect x="240" y="500" width="160" height="36" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="240" y1="500" x2="240" y2="536" stroke="#00897b" stroke-width="1.8"/>
+      <text x="258" y="514" font-size="10" font-weight="700" fill="#065f46">D2</text>
+      <text x="258" y="528" font-size="10" fill="#065f46">SQLite (Laravel)</text>
+
+      <!-- DS3: File Storage -->
+      <rect x="430" y="500" width="150" height="36" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="430" y1="500" x2="430" y2="536" stroke="#00897b" stroke-width="1.8"/>
+      <text x="448" y="514" font-size="10" font-weight="700" fill="#065f46">D3</text>
+      <text x="448" y="528" font-size="10" fill="#065f46">File Storage (S3)</text>
+
+      <!-- DS4: Session Store -->
+      <rect x="610" y="500" width="160" height="36" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="610" y1="500" x2="610" y2="536" stroke="#00897b" stroke-width="1.8"/>
+      <text x="628" y="514" font-size="10" font-weight="700" fill="#065f46">D4</text>
+      <text x="628" y="528" font-size="10" fill="#065f46">Sessions (PG)</text>
+
+      <!-- Process bubbles: row 1 -->
+      <!-- P1: Auth -->
+      <ellipse cx="130" cy="120" rx="80" ry="42" fill="#fee2e6" stroke="#e94560" stroke-width="2" filter="url(#sh2)"/>
+      <text x="130" y="115" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">P1</text>
+      <text x="130" y="130" text-anchor="middle" font-size="10" fill="#9b1c1c">Authentication</text>
+
+      <!-- P2: User Mgmt -->
+      <ellipse cx="330" cy="120" rx="80" ry="42" fill="#fee2e6" stroke="#e94560" stroke-width="2" filter="url(#sh2)"/>
+      <text x="330" y="115" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">P2</text>
+      <text x="330" y="130" text-anchor="middle" font-size="10" fill="#9b1c1c">User Management</text>
+
+      <!-- P3: Academic -->
+      <ellipse cx="540" cy="120" rx="88" ry="42" fill="#fee2e6" stroke="#e94560" stroke-width="2" filter="url(#sh2)"/>
+      <text x="540" y="115" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">P3</text>
+      <text x="540" y="130" text-anchor="middle" font-size="10" fill="#9b1c1c">Academic Structure</text>
+
+      <!-- P4: Onboarding (Laravel) -->
+      <ellipse cx="760" cy="120" rx="88" ry="42" fill="#fef3c7" stroke="#d97706" stroke-width="2" filter="url(#sh2)"/>
+      <text x="760" y="112" text-anchor="middle" font-size="11" font-weight="700" fill="#92400e">P4</text>
+      <text x="760" y="126" text-anchor="middle" font-size="10" fill="#92400e">Onboarding</text>
+      <text x="760" y="140" text-anchor="middle" font-size="9" fill="#92400e">(Laravel API)</text>
+
+      <!-- row 2 -->
+      <!-- P5: Assignments -->
+      <ellipse cx="130" cy="300" rx="82" ry="42" fill="#fee2e6" stroke="#e94560" stroke-width="2" filter="url(#sh2)"/>
+      <text x="130" y="295" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">P5</text>
+      <text x="130" y="310" text-anchor="middle" font-size="10" fill="#9b1c1c">Assignments</text>
+
+      <!-- P6: Submissions -->
+      <ellipse cx="330" cy="300" rx="82" ry="42" fill="#fee2e6" stroke="#e94560" stroke-width="2" filter="url(#sh2)"/>
+      <text x="330" y="295" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">P6</text>
+      <text x="330" y="310" text-anchor="middle" font-size="10" fill="#9b1c1c">Submissions &amp; Grading</text>
+
+      <!-- P7: Messaging -->
+      <ellipse cx="530" cy="300" rx="76" ry="42" fill="#fee2e6" stroke="#e94560" stroke-width="2" filter="url(#sh2)"/>
+      <text x="530" y="295" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">P7</text>
+      <text x="530" y="310" text-anchor="middle" font-size="10" fill="#9b1c1c">Messaging</text>
+
+      <!-- P8: Reporting / AI -->
+      <ellipse cx="730" cy="300" rx="84" ry="42" fill="#fee2e6" stroke="#e94560" stroke-width="2" filter="url(#sh2)"/>
+      <text x="730" y="295" text-anchor="middle" font-size="11" font-weight="700" fill="#9b1c1c">P8</text>
+      <text x="730" y="310" text-anchor="middle" font-size="10" fill="#9b1c1c">Reporting &amp; AI</text>
+
+      <!-- External entities (right side) -->
+      <rect x="820" y="50" width="68" height="32" rx="5" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="854" y="70" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Admin</text>
+
+      <rect x="820" y="230" width="68" height="32" rx="5" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="854" y="250" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Tutor</text>
+
+      <rect x="820" y="280" width="68" height="32" rx="5" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="854" y="300" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Student</text>
+
+      <rect x="820" y="330" width="68" height="32" rx="5" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="854" y="350" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Parent</text>
+
+      <!-- External: left -->
+      <rect x="10" y="50" width="82" height="32" rx="5" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="51" y="70" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Co. Admin</text>
+
+      <rect x="10" y="230" width="72" height="32" rx="5" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="46" y="250" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Tutor</text>
+
+      <rect x="10" y="280" width="72" height="32" rx="5" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="46" y="300" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Student</text>
+
+      <!-- Flow lines (selected key flows) -->
+      <!-- Login → P1 -->
+      <line x1="92" y1="66" x2="100" y2="100" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)" stroke-dasharray="4,2"/>
+      <!-- Admin → P2 -->
+      <line x1="820" y1="62" x2="730" y2="100" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="760" y="76" font-size="9" fill="#475569">Manage users</text>
+      <!-- Admin → P8 -->
+      <line x1="820" y1="74" x2="814" y2="272" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="826" y="186" font-size="9" fill="#475569">View reports</text>
+      <!-- P1 → D1 (auth tokens) -->
+      <line x1="130" y1="162" x2="80" y2="500" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)" stroke-dasharray="3,2"/>
+      <text x="46" y="340" font-size="9" fill="#475569">Sessions/tokens</text>
+      <!-- P5 → D1 -->
+      <line x1="130" y1="342" x2="120" y2="500" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <!-- P5 → D3 -->
+      <line x1="175" y1="330" x2="430" y2="505" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="270" y="440" font-size="9" fill="#475569">PDFs/files</text>
+      <!-- P6 → D1 -->
+      <line x1="330" y1="342" x2="250" y2="500" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <!-- Tutor → P5 -->
+      <line x1="82" y1="246" x2="100" y2="275" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="52" y="265" font-size="9" fill="#475569">Create</text>
+      <!-- Student → P6 -->
+      <line x1="82" y1="293" x2="250" y2="298" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="118" y="288" font-size="9" fill="#475569">Submit work</text>
+      <!-- Tutor → P6 -->
+      <line x1="820" y1="243" x2="412" y2="283" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="600" y="257" font-size="9" fill="#475569">Grade submissions</text>
+      <!-- Parent → P7 -->
+      <line x1="820" y1="347" x2="606" y2="316" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="700" y="342" font-size="9" fill="#475569">Messages</text>
+      <!-- P8 → D1 -->
+      <line x1="730" y1="342" x2="700" y2="500" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <!-- P3 → D2 (Laravel) -->
+      <line x1="540" y1="162" x2="350" y2="500" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)" stroke-dasharray="4,2"/>
+      <text x="414" y="348" font-size="9" fill="#475569">Academic data</text>
+      <!-- P4 → D2 -->
+      <line x1="720" y1="160" x2="380" y2="500" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)" stroke-dasharray="4,2"/>
+
+      <!-- P1→P2 process link -->
+      <line x1="210" y1="120" x2="250" y2="120" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <text x="218" y="114" font-size="9" fill="#475569">JWT</text>
+      <line x1="410" y1="120" x2="452" y2="120" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+      <line x1="628" y1="120" x2="672" y2="120" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah2)"/>
+    </svg>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="lg-circle" style="background:#fee2e6;border:2px solid #e94560"></div>Express Process</div>
+    <div class="legend-item"><div class="lg-circle" style="background:#fef3c7;border:2px solid #d97706"></div>Laravel Process</div>
+    <div class="legend-item"><div class="lg-box" style="background:#ccfbf1;border:1.5px solid #00897b;border-radius:0"></div>Data Store</div>
+    <div class="legend-item"><div class="lg-box" style="background:#dbeafe;border:1.5px solid #1a73e8"></div>External Entity</div>
+    <div class="legend-item"><div class="lg-line" style="background:#64748b"></div>Data Flow</div>
+    <div class="legend-item"><div class="lg-line" style="background:#64748b;border-top:2px dashed #64748b;background:transparent"></div>Token/Session Flow</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ L2A AUTH -->
+<div class="page">
+  <div class="page-title">3 · Level 2A — Authentication &amp; Session Flow</div>
+  <div class="page-subtitle">Detailed data flows within P1: Authentication — login, JWT, session, rate-limiting, password reset</div>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 860 460" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
+      <defs>
+        <marker id="ah3" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#64748b"/></marker>
+      </defs>
+      <!-- steps flow left→right then down -->
+
+      <!-- Step boxes -->
+      <!-- 1. Login form -->
+      <rect x="20" y="60" width="110" height="50" rx="8" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8"/>
+      <text x="75" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">User</text>
+      <text x="75" y="97" text-anchor="middle" font-size="10" fill="#1e40af">Login Form</text>
+
+      <!-- 2. Rate limit check -->
+      <rect x="180" y="60" width="130" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="245" y="80" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P1.1</text>
+      <text x="245" y="95" text-anchor="middle" font-size="10" fill="#9b1c1c">Rate Limit Check</text>
+      <text x="245" y="108" text-anchor="middle" font-size="9" fill="#9b1c1c">login_attempts table</text>
+
+      <!-- 3. Validate credentials -->
+      <rect x="360" y="60" width="130" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="425" y="80" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P1.2</text>
+      <text x="425" y="95" text-anchor="middle" font-size="10" fill="#9b1c1c">Validate Credentials</text>
+      <text x="425" y="108" text-anchor="middle" font-size="9" fill="#9b1c1c">bcrypt.compare()</text>
+
+      <!-- 4. Create session + JWT -->
+      <rect x="540" y="60" width="130" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="605" y="80" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P1.3</text>
+      <text x="605" y="95" text-anchor="middle" font-size="10" fill="#9b1c1c">Create Session+JWT</text>
+      <text x="605" y="108" text-anchor="middle" font-size="9" fill="#9b1c1c">express-session</text>
+
+      <!-- 5. isAuthenticated middleware -->
+      <rect x="540" y="200" width="130" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="605" y="220" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P1.4</text>
+      <text x="605" y="235" text-anchor="middle" font-size="10" fill="#9b1c1c">isAuthenticated</text>
+      <text x="605" y="248" text-anchor="middle" font-size="9" fill="#9b1c1c">JWT verify / session</text>
+
+      <!-- 6. Password reset flow -->
+      <rect x="20" y="200" width="120" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="80" y="220" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P1.5</text>
+      <text x="80" y="235" text-anchor="middle" font-size="10" fill="#9b1c1c">Password Reset</text>
+      <text x="80" y="248" text-anchor="middle" font-size="9" fill="#9b1c1c">token + email</text>
+
+      <!-- Data stores -->
+      <rect x="180" y="370" width="160" height="34" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="180" y1="370" x2="180" y2="404" stroke="#00897b" stroke-width="1.8"/>
+      <text x="200" y="384" font-size="10" font-weight="700" fill="#065f46">D1</text>
+      <text x="200" y="398" font-size="10" fill="#065f46">users table (PostgreSQL)</text>
+
+      <rect x="540" y="370" width="160" height="34" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="540" y1="370" x2="540" y2="404" stroke="#00897b" stroke-width="1.8"/>
+      <text x="560" y="384" font-size="10" font-weight="700" fill="#065f46">D4</text>
+      <text x="560" y="398" font-size="10" fill="#065f46">sessions (PostgreSQL)</text>
+
+      <!-- email -->
+      <rect x="720" y="200" width="110" height="50" rx="8" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8"/>
+      <text x="775" y="222" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Email</text>
+      <text x="775" y="237" text-anchor="middle" font-size="9" fill="#1e40af">Notification Service</text>
+      <text x="775" y="250" text-anchor="middle" font-size="9" fill="#1e40af">(Nodemailer)</text>
+
+      <!-- localStorage -->
+      <rect x="720" y="60" width="110" height="50" rx="8" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.8"/>
+      <text x="775" y="80" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">localStorage</text>
+      <text x="775" y="97" text-anchor="middle" font-size="9" fill="#1e40af">authToken (JWT)</text>
+
+      <!-- Arrows -->
+      <line x1="130" y1="85" x2="180" y2="85" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)"/>
+      <text x="138" y="80" font-size="9" fill="#475569">email+pw</text>
+
+      <line x1="310" y1="85" x2="360" y2="85" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)"/>
+      <text x="316" y="80" font-size="9" fill="#475569">allowed</text>
+
+      <line x1="490" y1="85" x2="540" y2="85" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)"/>
+      <text x="496" y="80" font-size="9" fill="#475569">valid user</text>
+
+      <line x1="670" y1="85" x2="720" y2="85" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)"/>
+      <text x="674" y="80" font-size="9" fill="#475569">store token</text>
+
+      <!-- P1.3 down to P1.4 -->
+      <line x1="605" y1="110" x2="605" y2="200" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)"/>
+      <text x="610" y="160" font-size="9" fill="#475569">JWT for API calls</text>
+
+      <!-- P1.4 to email -->
+      <line x1="670" y1="225" x2="720" y2="225" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)"/>
+      <text x="675" y="218" font-size="9" fill="#475569">401 → redirect</text>
+
+      <!-- rate limit → D1 -->
+      <line x1="245" y1="110" x2="260" y2="370" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)" stroke-dasharray="3,2"/>
+      <text x="266" y="245" font-size="9" fill="#475569">log attempt</text>
+
+      <!-- P1.2 → D1 -->
+      <line x1="425" y1="110" x2="320" y2="370" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)" stroke-dasharray="3,2"/>
+      <text x="350" y="260" font-size="9" fill="#475569">lookup user</text>
+
+      <!-- P1.3 → D4 -->
+      <line x1="605" y1="110" x2="640" y2="370" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)" stroke-dasharray="3,2"/>
+
+      <!-- P1.5 → email -->
+      <line x1="140" y1="225" x2="720" y2="225" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah3)" stroke-dasharray="5,3"/>
+      <text x="380" y="218" font-size="9" fill="#475569">reset link email</text>
+
+      <!-- blocked →  -->
+      <line x1="245" y1="110" x2="140" y2="200" stroke="#e94560" stroke-width="1.3" marker-end="url(#ah3)"/>
+      <text x="150" y="165" font-size="9" fill="#e94560">too many → 429</text>
+
+      <!-- CSRF label -->
+      <rect x="340" y="170" width="100" height="22" rx="4" fill="#fef3c7" stroke="#d97706"/>
+      <text x="390" y="185" text-anchor="middle" font-size="9" font-weight="600" fill="#92400e">CSRF Protection</text>
+      <text x="390" y="155" text-anchor="middle" font-size="8" fill="#92400e">x-csrf-token header</text>
+    </svg>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ L2B ASSIGNMENT -->
+<div class="page">
+  <div class="page-title">4 · Level 2B — Assignment &amp; Submission Flow</div>
+  <div class="page-subtitle">Detailed flows within P5 (Assignments) and P6 (Submissions &amp; Grading) including file handling and notifications</div>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 860 460" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
+      <defs><marker id="ah4" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#64748b"/></marker></defs>
+
+      <!-- Actors left -->
+      <rect x="10" y="60" width="80" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="50" y="82" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Tutor</text>
+
+      <rect x="10" y="200" width="80" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="50" y="222" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Student</text>
+
+      <rect x="10" y="330" width="80" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="50" y="352" text-anchor="middle" font-size="11" font-weight="600" fill="#1e40af">Parent</text>
+
+      <!-- Processes -->
+      <rect x="130" y="50" width="120" height="54" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="190" y="72" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P5.1</text>
+      <text x="190" y="86" text-anchor="middle" font-size="10" fill="#9b1c1c">Create Assignment</text>
+      <text x="190" y="99" text-anchor="middle" font-size="9" fill="#9b1c1c">POST /api/assignments</text>
+
+      <rect x="300" y="50" width="120" height="54" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="360" y="72" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P5.2</text>
+      <text x="360" y="86" text-anchor="middle" font-size="10" fill="#9b1c1c">Upload PDF</text>
+      <text x="360" y="99" text-anchor="middle" font-size="9" fill="#9b1c1c">multer → S3/MinIO</text>
+
+      <rect x="300" y="190" width="120" height="54" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="360" y="212" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P6.1</text>
+      <text x="360" y="226" text-anchor="middle" font-size="10" fill="#9b1c1c">Submit Work</text>
+      <text x="360" y="239" text-anchor="middle" font-size="9" fill="#9b1c1c">POST /submissions</text>
+
+      <rect x="480" y="190" width="120" height="54" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="540" y="212" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P6.2</text>
+      <text x="540" y="226" text-anchor="middle" font-size="10" fill="#9b1c1c">Grade Submission</text>
+      <text x="540" y="239" text-anchor="middle" font-size="9" fill="#9b1c1c">PATCH /grade</text>
+
+      <rect x="480" y="310" width="120" height="54" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="540" y="330" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P6.3</text>
+      <text x="540" y="344" text-anchor="middle" font-size="10" fill="#9b1c1c">Notify Parent</text>
+      <text x="540" y="357" text-anchor="middle" font-size="9" fill="#9b1c1c">sendHomeworkEmail()</text>
+
+      <rect x="300" y="310" width="120" height="54" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="360" y="330" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P6.4</text>
+      <text x="360" y="344" text-anchor="middle" font-size="10" fill="#9b1c1c">AI Check</text>
+      <text x="360" y="357" text-anchor="middle" font-size="9" fill="#9b1c1c">Gemini AI API</text>
+
+      <!-- Data stores -->
+      <rect x="660" y="50" width="160" height="34" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="660" y1="50" x2="660" y2="84" stroke="#00897b" stroke-width="1.8"/>
+      <text x="678" y="64" font-size="10" font-weight="700" fill="#065f46">D3</text>
+      <text x="678" y="78" font-size="10" fill="#065f46">File Storage (S3)</text>
+
+      <rect x="660" y="190" width="160" height="34" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="660" y1="190" x2="660" y2="224" stroke="#00897b" stroke-width="1.8"/>
+      <text x="678" y="204" font-size="10" font-weight="700" fill="#065f46">D1a</text>
+      <text x="678" y="218" font-size="10" fill="#065f46">assignments table</text>
+
+      <rect x="660" y="260" width="160" height="34" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.8"/>
+      <line x1="660" y1="260" x2="660" y2="294" stroke="#00897b" stroke-width="1.8"/>
+      <text x="678" y="274" font-size="10" font-weight="700" fill="#065f46">D1b</text>
+      <text x="678" y="288" font-size="10" fill="#065f46">submissions table</text>
+
+      <!-- Email actor -->
+      <rect x="680" y="330" width="100" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="730" y="352" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Email Service</text>
+
+      <!-- Arrows -->
+      <line x1="90" y1="77" x2="130" y2="77" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="94" y="72" font-size="9" fill="#475569">title, due date</text>
+      <line x1="250" y1="77" x2="300" y2="77" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="258" y="72" font-size="9" fill="#475569">PDF file</text>
+      <line x1="420" y1="67" x2="660" y2="62" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="510" y="57" font-size="9" fill="#475569">store file</text>
+      <line x1="660" y1="70" x2="420" y2="77" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="510" y="82" font-size="9" fill="#475569">file URL</text>
+      <!-- P5.1 → D1a -->
+      <line x1="250" y1="90" x2="660" y2="200" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)" stroke-dasharray="3,2"/>
+      <text x="430" y="160" font-size="9" fill="#475569">save record</text>
+
+      <!-- Student → P6.1 -->
+      <line x1="90" y1="217" x2="300" y2="217" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="136" y="210" font-size="9" fill="#475569">upload answer</text>
+      <!-- P6.1 → D1b -->
+      <line x1="420" y1="220" x2="660" y2="270" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)" stroke-dasharray="3,2"/>
+      <text x="520" y="256" font-size="9" fill="#475569">save submission</text>
+      <!-- P6.1 → P6.2 (tutor grades) -->
+      <line x1="420" y1="217" x2="480" y2="217" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="432" y="210" font-size="9" fill="#475569">submission</text>
+      <!-- Tutor → P6.2 -->
+      <line x1="90" y1="207" x2="480" y2="214" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)" stroke-dasharray="5,3"/>
+      <!-- P6.2 → D1b -->
+      <line x1="600" y1="244" x2="690" y2="260" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="618" y="256" font-size="9" fill="#475569">grade/feedback</text>
+      <!-- P6.2 → P6.3 -->
+      <line x1="540" y1="244" x2="540" y2="310" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <text x="545" y="282" font-size="9" fill="#475569">trigger</text>
+      <!-- P6.3 → Email -->
+      <line x1="600" y1="345" x2="680" y2="345" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+      <!-- Email → Parent -->
+      <line x1="680" y1="348" x2="90" y2="345" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)" stroke-dasharray="5,3"/>
+      <text x="340" y="362" font-size="9" fill="#475569">notification email</text>
+      <!-- P6.1 → P6.4 -->
+      <line x1="360" y1="244" x2="360" y2="310" stroke="#64748b" stroke-width="1.3" marker-end="url(#ah4)"/>
+    </svg>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ L2C ACADEMIC -->
+<div class="page">
+  <div class="page-title">5 · Level 2C — Academic Structure &amp; Class Management</div>
+  <div class="page-subtitle">Data flows for academic years, terms, classes, enrolments and the Laravel course/offering system</div>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 860 440" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
+      <defs><marker id="ah5" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#64748b"/></marker></defs>
+
+      <!-- Two lanes: Express (top) and Laravel (bottom) -->
+      <rect x="0" y="10" width="860" height="200" rx="0" fill="#fef9f9" stroke="#f8d7da" stroke-width="1"/>
+      <text x="12" y="28" font-size="10" font-weight="700" fill="#9b1c1c">EXPRESS / PostgreSQL LANE</text>
+      <rect x="0" y="220" width="860" height="200" rx="0" fill="#fffdf0" stroke="#fde68a" stroke-width="1"/>
+      <text x="12" y="238" font-size="10" font-weight="700" fill="#92400e">LARAVEL / SQLite LANE</text>
+
+      <!-- Actors -->
+      <rect x="10" y="55" width="90" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="55" y="77" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Co. Admin</text>
+
+      <!-- Express processes -->
+      <rect x="140" y="50" width="115" height="44" rx="7" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="197" y="68" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P3.1</text>
+      <text x="197" y="82" text-anchor="middle" font-size="10" fill="#9b1c1c">Academic Years</text>
+      <text x="197" y="92" text-anchor="middle" font-size="9" fill="#9b1c1c">&amp; Terms</text>
+
+      <rect x="300" y="50" width="115" height="44" rx="7" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="357" y="68" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P3.2</text>
+      <text x="357" y="82" text-anchor="middle" font-size="10" fill="#9b1c1c">Class Creation</text>
+      <text x="357" y="92" text-anchor="middle" font-size="9" fill="#9b1c1c">POST /classes</text>
+
+      <rect x="460" y="50" width="115" height="44" rx="7" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="517" y="68" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P3.3</text>
+      <text x="517" y="82" text-anchor="middle" font-size="10" fill="#9b1c1c">Enrol Students</text>
+      <text x="517" y="92" text-anchor="middle" font-size="9" fill="#9b1c1c">POST /enrol</text>
+
+      <rect x="620" y="50" width="115" height="44" rx="7" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="677" y="68" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P3.4</text>
+      <text x="677" y="82" text-anchor="middle" font-size="10" fill="#9b1c1c">Attendance</text>
+      <text x="677" y="92" text-anchor="middle" font-size="9" fill="#9b1c1c">Sessions &amp; Mark</text>
+
+      <!-- Express data stores -->
+      <rect x="140" y="155" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="140" y1="155" x2="140" y2="185" stroke="#00897b" stroke-width="1.5"/>
+      <text x="160" y="167" font-size="9" font-weight="700" fill="#065f46">D1c</text>
+      <text x="160" y="179" font-size="9" fill="#065f46">academic_years/terms</text>
+
+      <rect x="300" y="155" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="300" y1="155" x2="300" y2="185" stroke="#00897b" stroke-width="1.5"/>
+      <text x="320" y="167" font-size="9" font-weight="700" fill="#065f46">D1d</text>
+      <text x="320" y="179" font-size="9" fill="#065f46">classes table</text>
+
+      <rect x="460" y="155" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="460" y1="155" x2="460" y2="185" stroke="#00897b" stroke-width="1.5"/>
+      <text x="480" y="167" font-size="9" font-weight="700" fill="#065f46">D1e</text>
+      <text x="480" y="179" font-size="9" fill="#065f46">student_class_asgn</text>
+
+      <rect x="620" y="155" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="620" y1="155" x2="620" y2="185" stroke="#00897b" stroke-width="1.5"/>
+      <text x="640" y="167" font-size="9" font-weight="700" fill="#065f46">D1f</text>
+      <text x="640" y="179" font-size="9" fill="#065f46">class_sessions/atten.</text>
+
+      <!-- Laravel processes -->
+      <rect x="10" y="260" width="90" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="55" y="282" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Co. Admin</text>
+
+      <rect x="140" y="255" width="115" height="44" rx="7" fill="#fef3c7" stroke="#d97706" stroke-width="1.8"/>
+      <text x="197" y="273" text-anchor="middle" font-size="10" font-weight="700" fill="#92400e">P4.1</text>
+      <text x="197" y="287" text-anchor="middle" font-size="10" fill="#92400e">Course Templates</text>
+      <text x="197" y="297" text-anchor="middle" font-size="9" fill="#92400e">OC, HSC packs</text>
+
+      <rect x="300" y="255" width="115" height="44" rx="7" fill="#fef3c7" stroke="#d97706" stroke-width="1.8"/>
+      <text x="357" y="273" text-anchor="middle" font-size="10" font-weight="700" fill="#92400e">P4.2</text>
+      <text x="357" y="287" text-anchor="middle" font-size="10" fill="#92400e">Course Offerings</text>
+      <text x="357" y="297" text-anchor="middle" font-size="9" fill="#92400e">POST /course-offerings</text>
+
+      <rect x="460" y="255" width="115" height="44" rx="7" fill="#fef3c7" stroke="#d97706" stroke-width="1.8"/>
+      <text x="517" y="273" text-anchor="middle" font-size="10" font-weight="700" fill="#92400e">P4.3</text>
+      <text x="517" y="287" text-anchor="middle" font-size="10" fill="#92400e">Enrol in Offering</text>
+      <text x="517" y="297" text-anchor="middle" font-size="9" fill="#92400e">POST /enrolments</text>
+
+      <rect x="620" y="255" width="115" height="44" rx="7" fill="#fef3c7" stroke="#d97706" stroke-width="1.8"/>
+      <text x="677" y="273" text-anchor="middle" font-size="10" font-weight="700" fill="#92400e">P4.4</text>
+      <text x="677" y="287" text-anchor="middle" font-size="10" fill="#92400e">Business Onboarding</text>
+      <text x="677" y="297" text-anchor="middle" font-size="9" fill="#92400e">invite + accept flow</text>
+
+      <!-- Laravel data stores -->
+      <rect x="140" y="360" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="140" y1="360" x2="140" y2="390" stroke="#00897b" stroke-width="1.5"/>
+      <text x="160" y="372" font-size="9" font-weight="700" fill="#065f46">D2a</text>
+      <text x="160" y="384" font-size="9" fill="#065f46">course_templates</text>
+
+      <rect x="300" y="360" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="300" y1="360" x2="300" y2="390" stroke="#00897b" stroke-width="1.5"/>
+      <text x="320" y="372" font-size="9" font-weight="700" fill="#065f46">D2b</text>
+      <text x="320" y="384" font-size="9" fill="#065f46">course_offerings</text>
+
+      <rect x="460" y="360" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="460" y1="360" x2="460" y2="390" stroke="#00897b" stroke-width="1.5"/>
+      <text x="480" y="372" font-size="9" font-weight="700" fill="#065f46">D2c</text>
+      <text x="480" y="384" font-size="9" fill="#065f46">offering_enrolments</text>
+
+      <rect x="620" y="360" width="115" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="620" y1="360" x2="620" y2="390" stroke="#00897b" stroke-width="1.5"/>
+      <text x="640" y="372" font-size="9" font-weight="700" fill="#065f46">D2d</text>
+      <text x="640" y="384" font-size="9" fill="#065f46">businesses/invitations</text>
+
+      <!-- Arrows Express lane -->
+      <line x1="100" y1="72" x2="140" y2="72" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="255" y1="72" x2="300" y2="72" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="415" y1="72" x2="460" y2="72" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="575" y1="72" x2="620" y2="72" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="197" y1="94" x2="197" y2="155" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+      <line x1="357" y1="94" x2="357" y2="155" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+      <line x1="517" y1="94" x2="517" y2="155" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+      <line x1="677" y1="94" x2="677" y2="155" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+
+      <!-- Arrows Laravel lane -->
+      <line x1="100" y1="277" x2="140" y2="277" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="255" y1="277" x2="300" y2="277" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="415" y1="277" x2="460" y2="277" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="575" y1="277" x2="620" y2="277" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)"/>
+      <line x1="197" y1="299" x2="197" y2="360" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+      <line x1="357" y1="299" x2="357" y2="360" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+      <line x1="517" y1="299" x2="517" y2="360" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+      <line x1="677" y1="299" x2="677" y2="360" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah5)" stroke-dasharray="3,2"/>
+    </svg>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ L2D REPORTING -->
+<div class="page">
+  <div class="page-title">6 · Level 2D — Reporting &amp; AI Features</div>
+  <div class="page-subtitle">Data flows within P8: report generation pipeline and AI-assisted features (question generation, grading suggestions, hints)</div>
+  <div class="diagram-wrap">
+    <svg viewBox="0 0 860 420" width="100%" xmlns="http://www.w3.org/2000/svg" font-family="Inter,Arial,sans-serif">
+      <defs><marker id="ah6" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#64748b"/></marker></defs>
+
+      <!-- Actors -->
+      <rect x="10" y="50" width="90" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="55" y="72" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Admin /</text>
+      <text x="55" y="82" text-anchor="middle" font-size="9" fill="#1e40af">Co. Admin</text>
+
+      <rect x="10" y="240" width="90" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="55" y="262" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Tutor</text>
+
+      <rect x="10" y="310" width="90" height="34" rx="6" fill="#dbeafe" stroke="#1a73e8" stroke-width="1.5"/>
+      <text x="55" y="332" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Student</text>
+
+      <!-- Reporting processes -->
+      <rect x="140" y="42" width="120" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="200" y="62" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P8.1</text>
+      <text x="200" y="76" text-anchor="middle" font-size="10" fill="#9b1c1c">Select Report Type</text>
+      <text x="200" y="88" text-anchor="middle" font-size="9" fill="#9b1c1c">GET /reports/types</text>
+
+      <rect x="310" y="42" width="120" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="370" y="62" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P8.2</text>
+      <text x="370" y="76" text-anchor="middle" font-size="10" fill="#9b1c1c">Run Report</text>
+      <text x="370" y="88" text-anchor="middle" font-size="9" fill="#9b1c1c">POST /reports/run</text>
+
+      <rect x="480" y="42" width="120" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="540" y="62" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P8.3</text>
+      <text x="540" y="76" text-anchor="middle" font-size="10" fill="#9b1c1c">Aggregate Data</text>
+      <text x="540" y="88" text-anchor="middle" font-size="9" fill="#9b1c1c">submissions/attendance</text>
+
+      <rect x="650" y="42" width="120" height="50" rx="8" fill="#fee2e6" stroke="#e94560" stroke-width="1.8"/>
+      <text x="710" y="62" text-anchor="middle" font-size="10" font-weight="700" fill="#9b1c1c">P8.4</text>
+      <text x="710" y="76" text-anchor="middle" font-size="10" fill="#9b1c1c">Export Report</text>
+      <text x="710" y="88" text-anchor="middle" font-size="9" fill="#9b1c1c">CSV / PDF download</text>
+
+      <!-- AI processes -->
+      <rect x="140" y="230" width="120" height="50" rx="8" fill="#f3e8ff" stroke="#7c3aed" stroke-width="1.8"/>
+      <text x="200" y="250" text-anchor="middle" font-size="10" font-weight="700" fill="#5b21b6">P8.5</text>
+      <text x="200" y="264" text-anchor="middle" font-size="10" fill="#5b21b6">Generate Questions</text>
+      <text x="200" y="276" text-anchor="middle" font-size="9" fill="#5b21b6">POST /ai/generate-q</text>
+
+      <rect x="310" y="230" width="120" height="50" rx="8" fill="#f3e8ff" stroke="#7c3aed" stroke-width="1.8"/>
+      <text x="370" y="250" text-anchor="middle" font-size="10" font-weight="700" fill="#5b21b6">P8.6</text>
+      <text x="370" y="264" text-anchor="middle" font-size="10" fill="#5b21b6">Grading Suggestion</text>
+      <text x="370" y="276" text-anchor="middle" font-size="9" fill="#5b21b6">POST /ai/grading</text>
+
+      <rect x="480" y="230" width="120" height="50" rx="8" fill="#f3e8ff" stroke="#7c3aed" stroke-width="1.8"/>
+      <text x="540" y="250" text-anchor="middle" font-size="10" font-weight="700" fill="#5b21b6">P8.7</text>
+      <text x="540" y="264" text-anchor="middle" font-size="10" fill="#5b21b6">Student Hints</text>
+      <text x="540" y="276" text-anchor="middle" font-size="9" fill="#5b21b6">POST /ai/student-hint</text>
+
+      <rect x="650" y="230" width="120" height="50" rx="8" fill="#f3e8ff" stroke="#7c3aed" stroke-width="1.8"/>
+      <text x="710" y="250" text-anchor="middle" font-size="10" font-weight="700" fill="#5b21b6">P8.8</text>
+      <text x="710" y="264" text-anchor="middle" font-size="10" fill="#5b21b6">Progress Insights</text>
+      <text x="710" y="276" text-anchor="middle" font-size="9" fill="#5b21b6">POST /ai/insights</text>
+
+      <!-- Gemini API -->
+      <rect x="350" y="340" width="170" height="40" rx="8" fill="#ede9fe" stroke="#7c3aed" stroke-width="2"/>
+      <text x="435" y="356" text-anchor="middle" font-size="11" font-weight="700" fill="#5b21b6">Google Gemini AI API</text>
+      <text x="435" y="372" text-anchor="middle" font-size="9" fill="#5b21b6">@google/generative-ai</text>
+
+      <!-- Data stores -->
+      <rect x="140" y="155" width="120" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="140" y1="155" x2="140" y2="185" stroke="#00897b" stroke-width="1.5"/>
+      <text x="158" y="168" font-size="9" font-weight="700" fill="#065f46">D1g</text>
+      <text x="158" y="180" font-size="9" fill="#065f46">report_definitions</text>
+
+      <rect x="310" y="155" width="120" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="310" y1="155" x2="310" y2="185" stroke="#00897b" stroke-width="1.5"/>
+      <text x="328" y="168" font-size="9" font-weight="700" fill="#065f46">D1h</text>
+      <text x="328" y="180" font-size="9" fill="#065f46">report_runs</text>
+
+      <rect x="480" y="155" width="120" height="30" rx="0" fill="#ccfbf1" stroke="#00897b" stroke-width="1.5"/>
+      <line x1="480" y1="155" x2="480" y2="185" stroke="#00897b" stroke-width="1.5"/>
+      <text x="498" y="168" font-size="9" font-weight="700" fill="#065f46">D1i</text>
+      <text x="498" y="180" font-size="9" fill="#065f46">submissions/attendance</text>
+
+      <!-- Arrows reporting -->
+      <line x1="100" y1="67" x2="140" y2="67" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="260" y1="67" x2="310" y2="67" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="430" y1="67" x2="480" y2="67" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="600" y1="67" x2="650" y2="67" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="200" y1="92" x2="200" y2="155" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)" stroke-dasharray="3,2"/>
+      <line x1="370" y1="92" x2="370" y2="155" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)" stroke-dasharray="3,2"/>
+      <line x1="540" y1="92" x2="540" y2="155" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)" stroke-dasharray="3,2"/>
+
+      <!-- Arrows AI -->
+      <line x1="100" y1="257" x2="140" y2="257" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="100" y1="325" x2="500" y2="265" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)" stroke-dasharray="4,2"/>
+      <line x1="200" y1="280" x2="390" y2="340" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="370" y1="280" x2="410" y2="340" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="540" y1="280" x2="480" y2="340" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <line x1="710" y1="280" x2="530" y2="340" stroke="#64748b" stroke-width="1.2" marker-end="url(#ah6)"/>
+      <!-- Gemini response back -->
+      <line x1="435" y1="340" x2="370" y2="292" stroke="#7c3aed" stroke-width="1.2" marker-end="url(#ah6)" stroke-dasharray="4,2"/>
+      <text x="360" y="322" font-size="9" fill="#7c3aed">AI response</text>
+    </svg>
+  </div>
+  <div class="legend">
+    <div class="legend-item"><div class="lg-circle" style="background:#fee2e6;border:2px solid #e94560"></div>Express Process</div>
+    <div class="legend-item"><div class="lg-circle" style="background:#f3e8ff;border:2px solid #7c3aed"></div>AI Process (Gemini)</div>
+    <div class="legend-item"><div class="lg-box" style="background:#ccfbf1;border:1.5px solid #00897b;border-radius:0"></div>Data Store</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ DATA DICTIONARY -->
+<div class="page" style="page-break-after:avoid">
+  <div class="page-title">7 · Data Dictionary</div>
+  <div class="page-subtitle">Key entities, processes, and data stores referenced in the DFDs above</div>
+
+  <p style="font-size:12px;font-weight:700;margin:16px 0 8px;color:#1a1a2e">External Entities</p>
+  <table class="dd-table">
+    <tr><th>Entity</th><th>Role</th><th>Interacts With</th></tr>
+    <tr><td><span class="badge badge-ext">Admin</span></td><td>Platform-level administrator (admin@eslate.com)</td><td>P1, P2, P8 — user/company management, audit logs, stats</td></tr>
+    <tr><td><span class="badge badge-ext">Company Admin</span></td><td>Manages a single tutoring organisation</td><td>P2, P3, P4, P8 — staff, classes, reports</td></tr>
+    <tr><td><span class="badge badge-ext">Tutor</span></td><td>Teaching staff; creates assignments, grades work</td><td>P5, P6, P7, P8.5/P8.6 — assignments, grading, AI</td></tr>
+    <tr><td><span class="badge badge-ext">Student</span></td><td>Learner; submits work, takes tests</td><td>P5, P6, P8.7 — submissions, hints</td></tr>
+    <tr><td><span class="badge badge-ext">Parent</span></td><td>Guardian; monitors progress, receives notifications</td><td>P6.3, P7 — grades, messaging</td></tr>
+    <tr><td><span class="badge badge-ext">Email Service</span></td><td>Nodemailer; sends notifications, reset links</td><td>P1.5, P6.3 — password reset, submission alerts</td></tr>
+  </table>
+
+  <p style="font-size:12px;font-weight:700;margin:16px 0 8px;color:#1a1a2e">Key Data Stores</p>
+  <table class="dd-table">
+    <tr><th>ID</th><th>Store</th><th>Technology</th><th>Key Tables</th></tr>
+    <tr><td><span class="badge badge-store">D1</span></td><td>Express PostgreSQL</td><td>PostgreSQL + Drizzle ORM</td><td>users, assignments, submissions, classes, messages, reports</td></tr>
+    <tr><td><span class="badge badge-store">D2</span></td><td>Laravel SQLite</td><td>SQLite + Eloquent ORM</td><td>businesses, academic_years, course_templates, offering_enrolments</td></tr>
+    <tr><td><span class="badge badge-store">D3</span></td><td>File Storage</td><td>S3 / MinIO</td><td>PDFs, annotated submissions, exported reports</td></tr>
+    <tr><td><span class="badge badge-store">D4</span></td><td>Session Store</td><td>PostgreSQL (connect-pg-simple)</td><td>sessions (sid, sess JSON, expire)</td></tr>
+  </table>
+
+  <p style="font-size:12px;font-weight:700;margin:16px 0 8px;color:#1a1a2e">Primary Data Flows</p>
+  <table class="dd-table">
+    <tr><th>Flow</th><th>From → To</th><th>Data Carried</th><th>Protocol</th></tr>
+    <tr><td>Login</td><td>User → P1.2 → D1</td><td>email, password (bcrypt), JWT token</td><td>HTTPS JSON</td></tr>
+    <tr><td>Session Auth</td><td>Browser → P1.4 → D4</td><td>session cookie / Bearer JWT</td><td>HTTP Cookie / Header</td></tr>
+    <tr><td>Assignment Create</td><td>Tutor → P5.1 → D1 + D3</td><td>title, due date, PDF file (multipart)</td><td>HTTPS multipart</td></tr>
+    <tr><td>Submission</td><td>Student → P6.1 → D1 + D3</td><td>answer file, annotations (JSON)</td><td>HTTPS JSON/multipart</td></tr>
+    <tr><td>Grading</td><td>Tutor → P6.2 → D1 → P6.3 → Email</td><td>score, feedback text, notif. trigger</td><td>HTTPS JSON + SMTP</td></tr>
+    <tr><td>Report Run</td><td>Admin → P8.2 → D1 → P8.4 → Browser</td><td>report params, aggregated CSV/JSON</td><td>HTTPS JSON + file download</td></tr>
+    <tr><td>AI Request</td><td>Tutor/Student → P8.5-8 → Gemini</td><td>prompt, submission text, rubric</td><td>HTTPS (Google API)</td></tr>
+    <tr><td>Laravel Auth</td><td>User → POST /api/login → D2</td><td>email, password → Sanctum token</td><td>HTTPS JSON</td></tr>
+  </table>
+</div>
+
+</body>
+</html>

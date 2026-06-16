@@ -101,7 +101,7 @@ function freePort(port: number) {
   // Other ports are firewalled. Default to 80 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "3000", 10);
 
   server.on("error", (err: NodeJS.ErrnoException) => {
     if (err.code === "EADDRINUSE") {
@@ -109,7 +109,7 @@ function freePort(port: number) {
       freePort(port);
       setTimeout(() => {
         server.close();
-        server.listen({ port, host: "0.0.0.0", reusePort: true }, () => {
+        server.listen({ port, host: "localhost" }, () => {
           log(`serving on port ${port}`);
         });
       }, 1000);
@@ -121,8 +121,7 @@ function freePort(port: number) {
 
   server.listen({
     port,
-    host: "0.0.0.0",
-    reusePort: true,
+    host: "localhost",
   }, () => {
     log(`serving on port ${port}`);
   });

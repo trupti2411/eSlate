@@ -1,0 +1,805 @@
+import { useMemo, useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link } from 'wouter';
+import { useAuth } from '@/hooks/useAuth';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest } from '@/lib/queryClient';
+import {
+  BookOpen, Bell, LogOut, ArrowLeft, Plus, X, Save, Search,
+  User, GraduationCap, CalendarDays,
+} from 'lucide-react';
+
+interface AdminProfile { userId: string; companyId: string; companyName?: string; company?: { id: string; name: string } }
+interface SubjectRow { id: number; code: string; name: string; state_code?: string; }
+interface YearGroupRow { id: number; code: string; label: string; state_code: string; order: number; }
+interface TutorRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; }
+interface AcademicYearRow {
+  id: string;
+  yearNumber: number;
+  name: string;
+  isActive?: boolean;
+}
+interface ClassRow {
+  id: number;
+  name: string;
+  business_id: number;
+  tutor_id: number | null;
+  academic_year_id: number;
+  year_group_id: number;
+  subject_id: number;
+  subject?: { id: number; name: string; code?: string };
+  subjects?: { id: number; name: string; code?: string; pivot?: { is_primary?: boolean } }[];
+  yearGroup?: { id: number; label: string; code: string };
+  tutor?: { id: number; user?: { name?: string; firstName?: string; lastName?: string } };
+  academicYear?: { id: number; year: number };
+}
+
+export default function ClassesPage() {
+  const { user, logoutMutation } = useAuth();
+  const [search, setSearch] = useState('');
+  const [createOpen, setCreateOpen] = useState(false);
+
+  const { data: adminProfile } = useQuery<AdminProfile>({
+    queryKey: ['/api/company-admin/profile'],
+    enabled: !!user?.id,
+  });
+  const companyId = adminProfile?.companyId;
+  const companyName = adminProfile?.company?.name ?? adminProfile?.companyName;
+
+  const { data: classes = [], isLoading } = useQuery<ClassRow[]>({
+    queryKey: ['/api/classes'],
+    enabled: !!user,
+  });
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return classes;
+    return classes.filter(c =>
+      `${c.name} ${c.subject?.name ?? ''} ${c.yearGroup?.label ?? ''} ${c.tutor?.user?.name ?? ''}`
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [classes, search]);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-indigo-700 text-white shadow-lg">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
+                <BookOpen size={20} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">Classes</p>
+                <h1 className="text-xl sm:text-2xl font-black truncate">{companyName ?? 'Loading…'}</h1>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
+                <ArrowLeft size={12} /> Dashboard
+              </Link>
+              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
+                <Bell size={16} />
+              </button>
+              <button
+                onClick={() => logoutMutation.mutate()}
+                className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
+                aria-label="Sign out"
+              >
+                <LogOut size={15} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, subject, year, or tutor"
+              className="w-full bg-white rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            />
+          </div>
+          <button
+            onClick={() => setCreateOpen(true)}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            <Plus size={14} /> Create class
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-sm text-gray-500">
+            Loading…
+          </div>
+        ) : classes.length === 0 ? (
+          <EmptyState onCreate={() => setCreateOpen(true)} />
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-sm text-gray-500">
+            No classes match "{search}".
+          </div>
+        ) : (
+          <ul className="space-y-3">
+            {filtered.map(c => <ClassRowItem key={c.id} c={c} />)}
+          </ul>
+        )}
+      </main>
+
+      {createOpen && companyId && (
+        <CreateClassModal
+          businessId={companyId}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ---------- subcomponents ---------- */
+
+function ClassRowItem({ c }: { c: ClassRow }) {
+  const tutorName = c.tutor?.user?.name
+    || `${c.tutor?.user?.firstName ?? ''} ${c.tutor?.user?.lastName ?? ''}`.trim()
+    || (c.tutor_id ? 'Tutor' : '—');
+  const initials = c.name.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'C';
+  const subjectLabel = (() => {
+    if (c.subjects && c.subjects.length > 0) {
+      if (c.subjects.length === 1) return c.subjects[0].name;
+      if (c.subjects.length <= 2) return c.subjects.map(s => s.name).join(' + ');
+      return `${c.subjects.length} subjects`;
+    }
+    return c.subject?.name ?? null;
+  })();
+  return (
+    <li>
+      <Link
+        href={`/company/classes/${c.id}`}
+        className="block bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-4 hover:border-indigo-200 transition-colors"
+      >
+      <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black flex-shrink-0">
+        {initials}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-black text-gray-900 truncate">{c.name}</p>
+        <div className="text-xs text-gray-500 truncate flex items-center gap-2 flex-wrap mt-0.5">
+          {subjectLabel && (
+            <span className="font-semibold text-gray-700">{subjectLabel}</span>
+          )}
+          {c.yearGroup?.label && (
+            <span className="flex items-center gap-1">
+              <GraduationCap size={11} /> {c.yearGroup.label}
+            </span>
+          )}
+          <span className="flex items-center gap-1">
+            <User size={11} /> {tutorName}
+          </span>
+          {c.academicYear?.year && (
+            <span className="flex items-center gap-1">
+              <CalendarDays size={11} /> {c.academicYear.year}
+            </span>
+          )}
+        </div>
+      </div>
+      </Link>
+    </li>
+  );
+}
+
+function EmptyState({ onCreate }: { onCreate: () => void }) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center">
+      <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center mx-auto mb-3">
+        <BookOpen size={22} />
+      </div>
+      <h2 className="text-lg font-black text-gray-900">No classes yet</h2>
+      <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+        Create a class to group students by subject and year level. You'll assign a tutor and enrol students.
+      </p>
+      <button
+        onClick={onCreate}
+        className="mt-4 inline-flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-xl"
+      >
+        <Plus size={14} /> Create your first class
+      </button>
+    </div>
+  );
+}
+
+interface CourseSummary {
+  id: string;
+  name: string;
+  year_group_code?: string | null;
+  subjects?: SubjectRow[];   // course's allowed subject set (from course_subjects pivot)
+}
+interface TermRow {
+  id: string;
+  name: string;
+  startDate: string;
+  endDate: string;
+  academicYearId: string;
+}
+interface YearWithTerms extends AcademicYearRow {
+  terms?: TermRow[];
+}
+
+const dateOnly = (s: string) => (s ?? '').match(/^(\d{4}-\d{2}-\d{2})/)?.[1] ?? s ?? '';
+
+function CreateClassModal({ businessId, onClose }: { businessId: string; onClose: () => void }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+
+  // Course parent
+  const [courseId, setCourseId] = useState<string>('');           // '' | numeric id | '__new__'
+  const [newCourseName, setNewCourseName] = useState('');
+  const [newCourseDescription, setNewCourseDescription] = useState('');
+  // For a new course, owner picks its allowed subject set (e.g. WEMT → Reading/Maths/Thinking/Writing).
+  const [newCourseSubjectIds, setNewCourseSubjectIds] = useState<Set<number>>(new Set());
+
+  const COURSE_TEMPLATES = [
+    { key: 'OC',        label: 'OC Test Prep',      subjects: ['English', 'Mathematics', 'Thinking Skills'] },
+    { key: 'SELECTIVE', label: 'Selective Prep',     subjects: ['Mathematics', 'Reading', 'Thinking Skills', 'Writing'] },
+    { key: 'NAPLAN',    label: 'NAPLAN Prep',        subjects: ['English', 'Mathematics', 'Reading', 'Writing'] },
+    { key: 'WEMT',      label: 'WEMT',               subjects: ['English', 'Mathematics', 'Thinking Skills', 'Writing'] },
+    { key: 'FOUNDATION',label: 'Foundation Skills',  subjects: ['English', 'Mathematics', 'Reading', 'Writing'] },
+    { key: 'MOCK',      label: 'Mock Tests',         subjects: ['English', 'Mathematics', 'Reading', 'Science', 'Thinking Skills', 'Writing'] },
+  ];
+
+  const [selectDisplayValue, setSelectDisplayValue] = useState<string>('');
+
+  const applyTemplate = (key: string) => {
+    const tpl = COURSE_TEMPLATES.find(t => t.key === key);
+    if (!tpl) return;
+    setCourseId('__new__');
+    setSelectDisplayValue(`__tpl__${key}`);
+    setNewCourseName(tpl.label);
+    setNewCourseDescription('');
+    const ids = new Set(
+      subjects.filter(s => tpl.subjects.includes(s.name)).map(s => s.id)
+    );
+    setNewCourseSubjectIds(ids);
+  };
+
+  // About this class
+  const [yearGroupId, setYearGroupId] = useState<string>('');
+  // Multi-subject: a class can teach multiple subjects (e.g. WEMT bundles Writing + English + Maths + Thinking).
+  // First-picked subject becomes the primary (mirrored to classes.subject_id by the API).
+  const [pickedSubjectIds, setPickedSubjectIds] = useState<number[]>([]);
+  const [level, setLevel] = useState<string>('');
+
+  // When
+  const [pickedTermIds, setPickedTermIds] = useState<Set<string>>(new Set());
+
+  // Who
+  const [tutorId, setTutorId] = useState<string>('');
+
+  // Schedule
+  const [scheduleDay, setScheduleDay] = useState<string>(''); // '1'..'7'
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [location, setLocation] = useState('');
+
+  // Optional details
+  const [capacity, setCapacity] = useState<string>('');
+  const [description, setDescription] = useState('');
+  const [name, setName] = useState('');
+  const [nameTouched, setNameTouched] = useState(false);
+
+  const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
+  const { data: yearGroups = [] } = useQuery<YearGroupRow[]>({ queryKey: ['/api/year-groups?state=NSW'] });
+  const { data: tutors = [] } = useQuery<TutorRow[]>({
+    queryKey: [`/api/companies/${businessId}/tutors`],
+  });
+  const { data: courses = [] } = useQuery<CourseSummary[]>({ queryKey: ['/api/courses'] });
+
+  const { data: hierarchy } = useQuery<{ years?: YearWithTerms[] } | YearWithTerms[]>({
+    queryKey: [`/api/companies/${businessId}/academic-hierarchy`],
+  });
+  const academicYears = useMemo<YearWithTerms[]>(() => {
+    if (!hierarchy) return [];
+    if (Array.isArray(hierarchy)) return hierarchy;
+    return hierarchy.years ?? [];
+  }, [hierarchy]);
+  const currentYear = academicYears[0];
+  const terms = currentYear?.terms ?? [];
+
+  // When a course is picked AND it has a declared subject set, only those subjects are pickable
+  // for the class. Otherwise (no course or course w/ no declared subjects) all subjects show.
+  const selectedExistingCourse = useMemo(
+    () => courseId && courseId !== '__new__' ? courses.find(c => String(c.id) === courseId) : undefined,
+    [courseId, courses]
+  );
+  const courseScopedSubjectIds = useMemo<number[] | null>(() => {
+    if (selectedExistingCourse?.subjects && selectedExistingCourse.subjects.length > 0) {
+      return selectedExistingCourse.subjects.map(s => s.id);
+    }
+    if (courseId === '__new__' && newCourseSubjectIds.size > 0) {
+      return Array.from(newCourseSubjectIds);
+    }
+    return null;   // unconstrained
+  }, [selectedExistingCourse, courseId, newCourseSubjectIds]);
+  const availableSubjects = useMemo(
+    () => courseScopedSubjectIds === null
+      ? subjects
+      : subjects.filter(s => courseScopedSubjectIds.includes(s.id)),
+    [subjects, courseScopedSubjectIds]
+  );
+
+  // Drop any picked subjects that are no longer valid for the current course scope.
+  useMemo(() => {
+    if (courseScopedSubjectIds === null) return;
+    setPickedSubjectIds(prev => prev.filter(id => courseScopedSubjectIds.includes(id)));
+  }, [courseScopedSubjectIds]);
+
+  // Auto-select year group when an existing course with a year_group_code is chosen.
+  useEffect(() => {
+    if (!selectedExistingCourse?.year_group_code) return;
+    const match = yearGroups.find(yg => yg.code === selectedExistingCourse.year_group_code);
+    if (match) setYearGroupId(String(match.id));
+  }, [selectedExistingCourse, yearGroups]);
+
+  // Auto-suggest class name from its parts unless the owner has typed one.
+  const suggestedName = useMemo(() => {
+    const courseLabel = courseId && courseId !== '__new__'
+      ? courses.find(c => String(c.id) === courseId)?.name
+      : courseId === '__new__' ? newCourseName.trim() : '';
+    const yg = yearGroups.find(y => String(y.id) === yearGroupId)?.label;
+    const subjectLabels = pickedSubjectIds
+      .map(id => subjects.find(s => s.id === id)?.name)
+      .filter(Boolean);
+    const sjLabel = subjectLabels.length === 0
+      ? ''
+      : subjectLabels.length <= 2
+        ? subjectLabels.join(' + ')
+        : `${subjectLabels.length} subjects`;
+    return [courseLabel, yg, sjLabel, level].filter(Boolean).join(' · ');
+  }, [courseId, newCourseName, yearGroupId, pickedSubjectIds, level, courses, yearGroups, subjects]);
+  const effectiveName = nameTouched ? name : suggestedName;
+
+  const toggleTerm = (id: string) => {
+    setPickedTermIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSubject = (id: number) => {
+    setPickedSubjectIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const toggleNewCourseSubject = (id: number) => {
+    setNewCourseSubjectIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const m = useMutation({
+    mutationFn: async () => {
+      let parentCourseId: number | null = null;
+      if (courseId === '__new__') {
+        const c = await apiRequest('/api/courses', 'POST', {
+          name: newCourseName.trim(),
+          description: newCourseDescription.trim() || null,
+          subject_ids: Array.from(newCourseSubjectIds),
+        });
+        parentCourseId = c.id;
+      } else if (courseId) {
+        parentCourseId = Number(courseId);
+      }
+
+      return apiRequest('/api/classes', 'POST', {
+        name: effectiveName.trim(),
+        course_id: parentCourseId,
+        subject_ids: pickedSubjectIds,
+        year_group_id: Number(yearGroupId),
+        tutor_id: tutorId ? Number(tutorId) : null,
+        academic_year_id: currentYear?.id,
+        business_id: Number(businessId),
+        term_ids: Array.from(pickedTermIds),
+        capacity: capacity ? Number(capacity) : null,
+        description: description.trim() || null,
+        level: level.trim() || null,
+        status: 'draft',
+        schedule_day_of_week: scheduleDay ? Number(scheduleDay) : null,
+        schedule_start_time: startTime || null,
+        schedule_end_time: endTime || null,
+        location: location.trim() || null,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: 'Class created' });
+      qc.invalidateQueries({ queryKey: ['/api/classes'] });
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
+      onClose();
+    },
+    onError: (e: any) => {
+      toast({ title: 'Could not create class', description: e.message ?? 'Try again.', variant: 'destructive' });
+    },
+  });
+
+  const isCreatingNewCourse = courseId === '__new__';
+  const valid =
+    yearGroupId && pickedSubjectIds.length > 0 &&
+    (terms.length === 0 || pickedTermIds.size > 0) &&
+    (!isCreatingNewCourse || newCourseName.trim().length >= 2) &&
+    effectiveName.trim().length > 0;
+  const blockers: string[] = [];
+
+  // List of what's still missing — surfaces under the disabled Save button.
+  const missing: string[] = [];
+  if (!yearGroupId) missing.push('Year group');
+  if (pickedSubjectIds.length === 0) missing.push('at least one Subject');
+  if (pickedTermIds.size === 0) missing.push('at least one Term');
+  if (isCreatingNewCourse && newCourseName.trim().length < 2) missing.push('new course name');
+  if (!effectiveName.trim()) missing.push('Class name');
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="text-base font-black flex items-center gap-2">
+            <Plus size={16} className="text-indigo-600" /> Create a class
+          </h3>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-5 overflow-y-auto">
+          {/* Course (catalogue parent) */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Course</h4>
+            <Field label="Catalogue parent" hint="Pick an existing course or create a new one. Leave blank for a standalone class.">
+              <select
+                value={selectDisplayValue || courseId}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v.startsWith('__tpl__')) {
+                    applyTemplate(v.replace('__tpl__', ''));
+                  } else {
+                    setSelectDisplayValue('');
+                    setCourseId(v);
+                    if (v !== '__new__') {
+                      setNewCourseName('');
+                      setNewCourseDescription('');
+                      setNewCourseSubjectIds(new Set());
+                    }
+                  }
+                }}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                autoFocus
+              >
+                <option value="">Standalone class (no course)</option>
+                {courses.length > 0 && (
+                  <optgroup label="Existing courses">
+                    {courses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </optgroup>
+                )}
+                <optgroup label="Start from a template">
+                  {COURSE_TEMPLATES.map(t => (
+                    <option key={t.key} value={`__tpl__${t.key}`}>{t.label}</option>
+                  ))}
+                </optgroup>
+                <option value="__new__">+ Create custom course…</option>
+              </select>
+            </Field>
+            {isCreatingNewCourse && (
+              <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 p-3 space-y-3">
+                {selectDisplayValue.startsWith('__tpl__') && (
+                  <p className="text-xs font-semibold text-amber-800">
+                    Template pre-filled — adjust the name or subjects if needed.
+                  </p>
+                )}
+                <Field label="Course name" hint="e.g. WEMT, Foundation, OC Test Prep.">
+                  <input
+                    value={newCourseName}
+                    onChange={(e) => setNewCourseName(e.target.value)}
+                    placeholder="What's this course called?"
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                  />
+                </Field>
+                <Field label="Description (optional)">
+                  <textarea
+                    value={newCourseDescription}
+                    onChange={(e) => setNewCourseDescription(e.target.value)}
+                    rows={2}
+                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
+                  />
+                </Field>
+                <Field label="Subjects this course covers" hint="Classes in this course can only pick from this set. WEMT typically: Reading, Maths, Thinking Skills, Writing.">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {subjects.map(s => {
+                      const isOn = newCourseSubjectIds.has(s.id);
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleNewCourseSubject(s.id)}
+                          className={`text-left rounded-xl border px-3 py-2 transition-colors text-sm ${
+                            isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                              isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                            }`}>
+                              {isOn && <span className="text-[10px]">✓</span>}
+                            </span>
+                            {s.name}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </Field>
+              </div>
+            )}
+          </section>
+
+          {/* About this class */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">About this class</h4>
+            <Field label="Year group" required>
+              <select
+                value={yearGroupId}
+                onChange={(e) => setYearGroupId(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              >
+                <option value="">Select…</option>
+                {yearGroups.map(y => <option key={y.id} value={y.id}>{y.label}</option>)}
+              </select>
+            </Field>
+            <div className="mt-3">
+              <Field
+                label="Subjects"
+                required
+                hint={courseScopedSubjectIds === null
+                  ? 'Pick one or more subjects this class teaches. First-picked is the primary.'
+                  : `Limited to this course's subject set (${courseScopedSubjectIds.length} ${courseScopedSubjectIds.length === 1 ? 'option' : 'options'}).`}
+              >
+                {availableSubjects.length === 0 ? (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2">
+                    {courseId === '__new__'
+                      ? 'Pick at least one subject in the new course above first.'
+                      : 'The selected course has no subjects assigned yet.'}
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {availableSubjects.map(s => {
+                      const idx = pickedSubjectIds.indexOf(s.id);
+                      const isOn = idx >= 0;
+                      const isPrimary = idx === 0;
+                      return (
+                        <button
+                          key={s.id}
+                          type="button"
+                          onClick={() => toggleSubject(s.id)}
+                          className={`text-left rounded-xl border px-3 py-2 transition-colors text-sm relative ${
+                            isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                              isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                            }`}>
+                              {isOn && <span className="text-[10px]">✓</span>}
+                            </span>
+                            {s.name}
+                          </div>
+                          {isPrimary && (
+                            <span className="absolute top-1 right-2 text-[9px] font-bold uppercase tracking-wider text-indigo-700">Primary</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Difficulty (optional)" hint="Beginner / Intermediate / Advanced — or your own label.">
+                <input
+                  value={level}
+                  onChange={(e) => setLevel(e.target.value)}
+                  placeholder="Beginner, Intermediate, Advanced, …"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+          </section>
+
+          {/* When */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">When</h4>
+            <Field label="Terms" required hint="Pick which term(s) this class runs in. Dates come from the term boundaries.">
+              {terms.length === 0 ? (
+                <div className="rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5 flex items-center justify-between gap-3">
+                  <p className="text-xs text-amber-800 font-semibold">No terms set up yet — classes require a term.</p>
+                  <a href="/company/terms" className="text-xs font-bold text-amber-900 underline whitespace-nowrap hover:text-amber-700">Set up terms →</a>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {terms.map(t => {
+                    const isOn = pickedTermIds.has(t.id);
+                    return (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => toggleTerm(t.id)}
+                        className={`text-left rounded-xl border px-3 py-2 transition-colors ${
+                          isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
+                            isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
+                          }`}>
+                            {isOn && <span className="text-[10px]">✓</span>}
+                          </span>
+                          <span className="font-bold text-sm">{t.name}</span>
+                        </div>
+                        <p className="text-[10px] text-gray-500 mt-1">
+                          {dateOnly(t.startDate ?? '')} → {dateOnly(t.endDate ?? '')}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </Field>
+          </section>
+
+          {/* Who */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Who</h4>
+            <Field label="Tutor (optional)" hint="Leave blank if you haven't decided yet — you can assign one later from the class detail page.">
+              <select
+                value={tutorId}
+                onChange={(e) => setTutorId(e.target.value)}
+                disabled={tutors.length === 0}
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">Not assigned yet</option>
+                {tutors.map(t => {
+                  const nm = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || t.email || `Tutor #${t.id}`;
+                  return <option key={t.id} value={t.id}>{nm}</option>;
+                })}
+              </select>
+            </Field>
+          </section>
+
+          {/* Schedule */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Schedule (optional)</h4>
+            <div className="grid grid-cols-3 gap-3">
+              <Field label="Day of week">
+                <select
+                  value={scheduleDay}
+                  onChange={(e) => setScheduleDay(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                >
+                  <option value="">Pick a day…</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                  <option value="7">Sunday</option>
+                </select>
+              </Field>
+              <Field label="Start time">
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+              <Field label="End time">
+                <input
+                  type="time"
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Location" hint="Room name, address, or 'Online'.">
+                <input
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Room A, Online, Bondi Campus, …"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+            <p className="text-xs text-gray-500 mt-2">
+              If the tutor's already running another class at this day/time during overlapping terms, save will fail with a conflict message.
+            </p>
+          </section>
+
+          {/* Optional */}
+          <section>
+            <h4 className="text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-2">Optional details</h4>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Capacity">
+                <input
+                  type="number"
+                  value={capacity}
+                  onChange={(e) => setCapacity(e.target.value)}
+                  min={1}
+                  placeholder="No cap"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+              <Field label="Class name" hint="Auto-suggested. Override if you want a different label.">
+                <input
+                  value={effectiveName}
+                  onChange={(e) => { setNameTouched(true); setName(e.target.value); }}
+                  placeholder={suggestedName || 'Class name'}
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+            <div className="mt-3">
+              <Field label="Description">
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={2}
+                  placeholder="Anything students or parents should know"
+                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </Field>
+            </div>
+          </section>
+
+          {currentYear && (
+            <p className="text-xs text-gray-500">
+              Class will live under academic year <span className="font-semibold text-gray-700">{currentYear.name}</span>.
+            </p>
+          )}
+        </div>
+        <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <p className="text-xs text-gray-500 min-w-0 truncate">
+            {missing.length > 0
+              ? <>Still need: <span className="font-semibold text-amber-700">{missing.join(', ')}</span></>
+              : <span className="text-emerald-700 font-semibold">Ready to save</span>}
+          </p>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+              Cancel
+            </button>
+            <button
+              onClick={() => m.mutate()}
+              disabled={!valid || m.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Save size={14} /> {m.isPending ? 'Creating…' : 'Create class'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, hint, required, children }: { label: string; hint?: string; required?: boolean; children: React.ReactNode }) {
+  return (
+    <div>
+      <label className="text-xs font-bold uppercase tracking-wider text-gray-500">
+        {label}{required && <span className="text-rose-500"> *</span>}
+      </label>
+      <div className="mt-1.5">{children}</div>
+      {hint && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+    </div>
+  );
+}

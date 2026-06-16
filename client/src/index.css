@@ -134,9 +134,11 @@
     color: var(--eink-light);
   }
   
-  /* Remove animations for e-ink displays */
+  /* Remove animations for e-ink displays.
+     1ms (not 0s) so animationend fires reliably — Radix UI Dialog needs it
+     to remove overlays from the DOM when a dialog closes or navigates away. */
   * {
-    animation-duration: 0s !important;
+    animation-duration: 1ms !important;
     animation-delay: 0s !important;
     transition-duration: 0.1s !important;
   }

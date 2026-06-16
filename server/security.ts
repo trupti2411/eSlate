@@ -64,6 +64,12 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     return next();
   }
 
+  // JWT in Authorization header is inherently CSRF-safe — localStorage cannot be
+  // read by cross-site requests, so no CSRF validation needed for Bearer-token calls.
+  if (req.headers.authorization?.startsWith('Bearer ')) {
+    return next();
+  }
+
   const exemptPaths = [
     '/api/auth/login',
     '/api/auth/register',

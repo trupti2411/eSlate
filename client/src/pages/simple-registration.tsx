@@ -65,7 +65,7 @@ export default function SimpleRegistration() {
 
   const registerMutation = useMutation({
     mutationFn: async (data: RegistrationFormData) => {
-      const response = await apiRequest('/api/auth/register', 'POST', data);
+      const response = await apiRequest('/api/register', 'POST', data);
       return response.json();
     },
     onSuccess: (data) => {

@@ -8,15 +8,30 @@ import { useAuth, AuthProvider } from "@/hooks/useAuth.tsx";
 import { useDesignPreference } from "@/hooks/useDesignPreference";
 import { DesignSwitchBanner } from "@/components/DesignSwitchBanner";
 import AuthPage from "@/pages/auth-page";
-import SimpleRegistration from "@/pages/simple-registration";
+import OnboardingPage from "@/pages/onboarding";
+import AcceptInvitePage from "@/pages/accept-invite";
 import StudentDashboard from "@/pages/student/Dashboard";
 import StudentHome from "@/pages/student/StudentHome";
+import NewStudentHome from "@/pages/student/NewStudentHome";
+import StudentAssignmentsNew from "@/pages/student/Assignments";
 import NewStudentDashboard from "@/pages/student/NewStudentDashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import NewParentDashboard from "@/pages/parent/NewParentDashboard";
 import TutorDashboard from "@/pages/tutor/Dashboard";
+import TutorProfile from "@/pages/tutor/Profile";
 import CompanyTutorDashboard from "@/pages/company/TutorDashboard";
 import NewTutorDashboard from "@/pages/company/NewTutorDashboard";
+import NewCompanyDashboard from "@/pages/company/NewCompanyDashboard";
+import Staff from "@/pages/company/Staff";
+import Students from "@/pages/company/Students";
+import Classes from "@/pages/company/Classes";
+import ClassDetail from "@/pages/company/ClassDetail";
+import Timetable from "@/pages/company/Timetable";
+import Courses from "@/pages/company/Courses";
+import CourseOfferingDetail from "@/pages/company/CourseOfferingDetail";
+import Subjects from "@/pages/company/Subjects";
+import Terms from "@/pages/company/Terms";
+import CompanySettings from "@/pages/company/Settings";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
 import Users from "@/pages/admin/Users";
@@ -84,112 +99,115 @@ function Router() {
   }
 
   return (
-    <div>
-      {/* DesignSwitchBanner lives OUTSIDE the Switch so it never gets treated as a wildcard route */}
-      {isAuthenticated && design === 'classic' && (
-        <DesignSwitchBanner
-          bannerSeen={bannerSeen}
-          onDismiss={dismissBanner}
-          onSwitch={() => {
-            setDesign('new');
-            if (location === '/company') navigate('/');
-          }}
-        />
+    <Switch>
+      {/* Always available auth route for registration */}
+      <Route path="/auth" component={AuthPage} />
+      <Route path="/onboarding" component={OnboardingPage} />
+      <Route path="/accept-invite/business">{() => <AcceptInvitePage kind="business_owner" />}</Route>
+      <Route path="/accept-invite/tutor">{() => <AcceptInvitePage kind="tutor" />}</Route>
+
+      {/* Legal pages - always accessible */}
+      <Route path="/legal/privacy" component={PrivacyPolicy} />
+      <Route path="/legal/terms" component={TermsOfService} />
+      <Route path="/legal/agreement" component={UserAgreement} />
+
+      {/* Video storyboard - always accessible */}
+      <Route path="/storyboard" component={VideoStoryboard} />
+
+      {/* Contact page - always accessible */}
+      <Route path="/contact" component={ContactUs} />
+
+      {/* Design preview - always accessible */}
+      <Route path="/design-preview" component={DesignPreview} />
+      <Route path="/eink-preview" component={EinkPreview} />
+      <Route path="/switch-preview" component={SwitchPreview} />
+      <Route path="/assignment-preview" component={AssignmentPreview} />
+      <Route path="/tablet-preview" component={TabletPreview} />
+
+      {/* Marketing pitch page - always accessible */}
+      <Route path="/pitch" component={PitchPage} />
+
+      {!isAuthenticated ? (
+        <>
+          <Route path="/" component={HomePage} />
+          {/* Redirect any protected route to auth page when not logged in */}
+          <Route path="/company" component={AuthPage} />
+          <Route path="/company/:rest*" component={AuthPage} />
+          <Route path="/admin" component={AuthPage} />
+          <Route path="/admin/:rest*" component={AuthPage} />
+          <Route path="/student" component={AuthPage} />
+          <Route path="/student/:rest*" component={AuthPage} />
+          <Route path="/tutor" component={AuthPage} />
+          <Route path="/tutor/:rest*" component={AuthPage} />
+          <Route path="/parent" component={AuthPage} />
+          <Route path="/parent/:rest*" component={AuthPage} />
+        </>
+      ) : (
+        <>
+          {design === 'classic' && (
+            <DesignSwitchBanner
+              bannerSeen={bannerSeen}
+              onDismiss={dismissBanner}
+              onSwitch={() => setDesign('new')}
+            />
+          )}
+          <Route path="/">
+            {user?.role === 'student' && <NewStudentHome />}
+            {user?.role === 'parent' && (
+              design === 'new' ? <NewParentDashboard setDesign={setDesign} /> : <ParentDashboard />
+            )}
+            {user?.role === 'tutor' && <TutorDashboard />}
+            {user?.role === 'admin' && <AdminDashboard />}
+            {user?.role === 'company_admin' && (
+              design === 'new' ? <NewCompanyDashboard setDesign={setDesign} /> : <CompanyDashboard />
+            )}
+          </Route>
+          <Route path="/student" component={NewStudentHome} />
+          <Route path="/student/home" component={NewStudentHome} />
+          <Route path="/student/home-legacy" component={StudentHome} />
+          <Route path="/student/assignments" component={StudentAssignmentsNew} />
+          <Route path="/student/dashboard" component={StudentDashboard} />
+          <Route path="/parent" component={ParentDashboard} />
+          <Route path="/tutor" component={TutorDashboard} />
+          <Route path="/tutor/profile" component={TutorProfile} />
+          <Route path="/tutor/tests" component={TestManagement} />
+          <Route path="/tutor/tests/:testId/grade/:attemptId" component={TestGrading} />
+          <Route path="/admin" component={AdminDashboard} />
+          <Route path="/admin/users" component={Users} />
+          <Route path="/admin/companies" component={Companies} />
+          <Route path="/admin/companies/:id" component={CompanyManagement} />
+          <Route path="/admin/settings" component={AdminSettings} />
+          <Route path="/admin/test" component={TestUserCreation} />
+          <Route path="/company" component={CompanyDashboard} />
+          <Route path="/company/tutors" component={Staff} />
+          <Route path="/company/students" component={Students} />
+          <Route path="/company/classes" component={Classes} />
+          <Route path="/company/classes/:id" component={ClassDetail} />
+          <Route path="/company/timetable" component={Timetable} />
+          <Route path="/company/courses" component={Courses} />
+          <Route path="/company/courses/:id" component={CourseOfferingDetail} />
+          <Route path="/company/subjects" component={Subjects} />
+          <Route path="/company/terms" component={Terms} />
+          <Route path="/company/settings" component={CompanySettings} />
+          <Route path="/company/academic" component={() => <CompanyAcademicManagement />} />
+          <Route path="/company/assignments" component={AssignmentManagement} />
+          <Route path="/company/homework" component={SubmittedHomework} />
+          <Route path="/company/marking" component={MarkingPage} />
+          <Route path="/company/worksheets" component={WorksheetManagementPage} />
+          <Route path="/company/worksheet/edit/:worksheetId" component={WorksheetEditorPage} />
+          <Route path="/company/tests" component={TestManagement} />
+          <Route path="/company/tests/:testId/grade/:attemptId" component={TestGrading} />
+          <Route path="/company/reports" component={Reports} />
+          <Route path="/student/portal">{() => <StudentPortal />}</Route>
+          <Route path="/student/worksheets" component={StudentWorksheets} />
+          <Route path="/student/worksheet/:id" component={WorksheetWorkPage} />
+          <Route path="/student/assignment/:id" component={AssignmentWorkPage} />
+          <Route path="/pdf-annotator" component={PDFAnnotatorPage} />
+          <Route path="/google-docs-viewer" component={GoogleDocsViewer} />
+        </>
       )}
-      <Switch>
-        {/* Always available auth route for registration */}
-        <Route path="/auth" component={AuthPage} />
-        <Route path="/register" component={SimpleRegistration} />
-        
-        {/* Legal pages - always accessible */}
-        <Route path="/legal/privacy" component={PrivacyPolicy} />
-        <Route path="/legal/terms" component={TermsOfService} />
-        <Route path="/legal/agreement" component={UserAgreement} />
-        
-        {/* Video storyboard - always accessible */}
-        <Route path="/storyboard" component={VideoStoryboard} />
-        
-        {/* Contact page - always accessible */}
-        <Route path="/contact" component={ContactUs} />
-
-        {/* Design preview - always accessible */}
-        <Route path="/design-preview" component={DesignPreview} />
-        <Route path="/eink-preview" component={EinkPreview} />
-        <Route path="/switch-preview" component={SwitchPreview} />
-        <Route path="/assignment-preview" component={AssignmentPreview} />
-        <Route path="/tablet-preview" component={TabletPreview} />
-
-        {/* Marketing pitch page - always accessible */}
-        <Route path="/pitch" component={PitchPage} />
-
-        {!isAuthenticated ? (
-          <>
-            <Route path="/" component={HomePage} />
-            {/* Redirect any protected route to auth page when not logged in */}
-            <Route path="/company" component={AuthPage} />
-            <Route path="/company/:rest*" component={AuthPage} />
-            <Route path="/admin" component={AuthPage} />
-            <Route path="/admin/:rest*" component={AuthPage} />
-            <Route path="/student" component={AuthPage} />
-            <Route path="/student/:rest*" component={AuthPage} />
-            <Route path="/tutor" component={AuthPage} />
-            <Route path="/tutor/:rest*" component={AuthPage} />
-            <Route path="/parent" component={AuthPage} />
-            <Route path="/parent/:rest*" component={AuthPage} />
-          </>
-        ) : (
-          <>
-            <Route path="/">
-              {user?.role === 'student' && (
-                design === 'new' ? <NewStudentDashboard setDesign={setDesign} /> : <StudentHome />
-              )}
-              {user?.role === 'parent' && (
-                design === 'new' ? <NewParentDashboard setDesign={setDesign} /> : <ParentDashboard />
-              )}
-              {user?.role === 'tutor' && <TutorDashboard />}
-              {user?.role === 'admin' && <AdminDashboard />}
-              {user?.role === 'company_admin' && (
-                design === 'new'
-                  ? <NewTutorDashboard setDesign={setDesign} />
-                  : <RedirectToCompany />
-              )}
-            </Route>
-            <Route path="/student" component={StudentHome} />
-            <Route path="/student/home" component={StudentHome} />
-            <Route path="/student/dashboard" component={StudentDashboard} />
-            <Route path="/parent" component={ParentDashboard} />
-            <Route path="/tutor" component={TutorDashboard} />
-            <Route path="/tutor/tests" component={TestManagement} />
-            <Route path="/tutor/tests/:testId/grade/:attemptId" component={TestGrading} />
-            <Route path="/admin" component={AdminDashboard} />
-            <Route path="/admin/users" component={Users} />
-            <Route path="/admin/companies" component={Companies} />
-            <Route path="/admin/companies/:id" component={CompanyManagement} />
-            <Route path="/admin/settings" component={AdminSettings} />
-            <Route path="/admin/test" component={TestUserCreation} />
-            <Route path="/company">{() => <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white"><div className="w-8 h-8 border-2 border-black border-t-transparent rounded-full animate-spin mx-auto"></div></div>}><CompanyDashboard /></Suspense>}</Route>
-            <Route path="/company/tutors" component={CompanyTutorDashboard} />
-            <Route path="/company/students" component={CompanyStudents} />
-            <Route path="/company/academic" component={() => <CompanyAcademicManagement />} />
-            <Route path="/company/assignments" component={AssignmentManagement} />
-            <Route path="/company/homework" component={SubmittedHomework} />
-            <Route path="/company/marking" component={MarkingPage} />
-            <Route path="/company/worksheets" component={WorksheetManagementPage} />
-            <Route path="/company/worksheet/edit/:worksheetId" component={WorksheetEditorPage} />
-            <Route path="/company/tests" component={TestManagement} />
-            <Route path="/company/tests/:testId/grade/:attemptId" component={TestGrading} />
-            <Route path="/company/reports" component={Reports} />
-            <Route path="/student/portal">{() => <StudentPortal />}</Route>
-            <Route path="/student/worksheets" component={StudentWorksheets} />
-            <Route path="/student/worksheet/:id" component={WorksheetWorkPage} />
-            <Route path="/student/assignment/:id" component={AssignmentWorkPage} />
-            <Route path="/pdf-annotator" component={PDFAnnotatorPage} />
-            <Route path="/google-docs-viewer" component={GoogleDocsViewer} />
-          </>
-        )}
-        <Route component={NotFound} />
-      </Switch>
-    </div>
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 
