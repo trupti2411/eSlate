@@ -67,6 +67,7 @@ function formatDob(s: string | null | undefined): string {
 export default function StudentsPage() {
   const { user, logoutMutation } = useAuth();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
   const [addOpen, setAddOpen] = useState(false);
   const [editStudent, setEditStudent] = useState<Student | null>(null);
 
@@ -78,7 +79,8 @@ export default function StudentsPage() {
   const companyName = adminProfile?.company?.name ?? adminProfile?.companyName;
 
   const { data: students = [], isLoading } = useQuery<Student[]>({
-    queryKey: [`/api/companies/${companyId}/students`],
+    queryKey: [`/api/companies/${companyId}/students`, statusFilter],
+    queryFn: () => apiRequest(`/api/companies/${companyId}/students?status=${statusFilter}`, 'GET'),
     enabled: !!companyId,
   });
 
@@ -136,6 +138,21 @@ export default function StudentsPage() {
           <KpiTile value={counts.archived} label="Archived" tone="rose" />
         </div>
 
+        {/* Status filter */}
+        <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 w-fit">
+          {(['active', 'archived'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all capitalize ${
+                statusFilter === s ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -146,12 +163,14 @@ export default function StudentsPage() {
               className="w-full bg-white rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <button
-            onClick={() => setAddOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
-          >
-            <Plus size={14} /> Add student
-          </button>
+          {statusFilter === 'active' && (
+            <button
+              onClick={() => setAddOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Plus size={14} /> Add student
+            </button>
+          )}
         </div>
 
         {isLoading ? (
@@ -463,6 +482,7 @@ function AddStudentModal({ businessId, onClose }: { businessId: string; onClose:
   const [postcode, setPostcode] = useState('');
   const [suburbSchools, setSuburbSchools] = useState<SchoolResult[]>([]);
   const [suburbSuggestOpen, setSuburbSuggestOpen] = useState(false);
+  const [rollNumber, setRollNumber] = useState('');
   const [notes, setNotes] = useState('');
   const [learningGoals, setLearningGoals] = useState('');
   const [parents, setParents] = useState<ParentDraft[]>([emptyParent(true)]);
@@ -541,6 +561,7 @@ function AddStudentModal({ businessId, onClose }: { businessId: string; onClose:
         last_name: lastName.trim(),
         year_group_code: yearGroupCode,
         school: school || null,
+        roll_number: rollNumber.trim() || null,
         date_of_birth: dob ? dob.toISOString() : null,
         address: [street.trim(), suburb.trim(), [stateAU, postcode.trim()].filter(Boolean).join(' ')].filter(Boolean).join(', '),
         notes: notes.trim() || null,
@@ -725,6 +746,14 @@ function AddStudentModal({ businessId, onClose }: { businessId: string; onClose:
                 />
               </Field>
             </div>
+            <Field label="Roll number (optional)">
+              <input
+                value={rollNumber}
+                onChange={e => setRollNumber(e.target.value)}
+                placeholder="e.g. 2024-001"
+                className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              />
+            </Field>
           </Section>
 
           <Section

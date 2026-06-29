@@ -7,7 +7,7 @@ import { isPast, format, startOfWeek } from 'date-fns';
 import {
   Users, CheckSquare, MessageCircle, Bell, LogOut, AlertCircle,
   ChevronDown, ChevronUp, MessageSquare, Star, Clock, CheckCircle2,
-  BookOpen, Send, Eye, PenLine
+  BookOpen, Send, Eye, PenLine, FileText, TrendingUp
 } from 'lucide-react';
 import MessageCenter from '@/components/MessageCenter';
 import { apiRequest } from '@/lib/queryClient';
@@ -15,7 +15,21 @@ import { useToast } from '@/hooks/use-toast';
 import MarkedWorkViewer from '@/components/MarkedWorkViewer';
 
 interface Props { setDesign: (d: Design) => void; }
-type Tab = 'children' | 'homework' | 'messages';
+type Tab = 'children' | 'homework' | 'reports' | 'messages';
+
+interface ProgressReport {
+  id: string;
+  subject: string;
+  grade: string | null;
+  overallComment: string | null;
+  strengths: string | null;
+  areasForImprovement: string | null;
+  attendancePercentage: number | null;
+  status: string;
+  sharedWithParentAt: string | null;
+  createdByName: string | null;
+  termName?: string | null;
+}
 
 interface Submission {
   id: string;
@@ -499,6 +513,96 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
   );
 }
 
+function ParentProgressReports({ studentId, childName }: { studentId: string; childName: string }) {
+  const { data: reports = [], isLoading } = useQuery<ProgressReport[]>({
+    queryKey: [`/api/students/${studentId}/progress-reports`, { status: 'shared_with_parent' }],
+    queryFn: () =>
+      apiRequest(`/api/students/${studentId}/progress-reports?status=shared_with_parent`, 'GET'),
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center py-12">
+        <div className="w-8 h-8 border-4 border-rose-200 border-t-rose-600 rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (reports.length === 0) {
+    return (
+      <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <TrendingUp className="h-10 w-10 mx-auto text-gray-300 mb-3" />
+        <p className="font-bold text-gray-800">No progress reports yet</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Progress reports for {childName} will appear here once your tutor shares them.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-xs font-bold text-rose-600 uppercase tracking-widest px-1">
+        {childName}'s Progress Reports
+      </p>
+      {reports.map(report => (
+        <div key={report.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <p className="font-extrabold text-gray-900">{report.subject}</p>
+              {report.termName && (
+                <p className="text-xs text-gray-500 mt-0.5">{report.termName}</p>
+              )}
+            </div>
+            <div className="flex flex-col items-end gap-1 flex-shrink-0">
+              {report.grade && (
+                <span className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 text-xs font-extrabold px-2.5 py-1 rounded-full">
+                  <Star className="h-3 w-3" /> {report.grade}
+                </span>
+              )}
+              {report.attendancePercentage != null && (
+                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  report.attendancePercentage >= 80 ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {report.attendancePercentage}% attendance
+                </span>
+              )}
+            </div>
+          </div>
+          {report.overallComment && (
+            <div className="mb-3">
+              <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-1">Overall</p>
+              <p className="text-sm text-gray-700 leading-relaxed">{report.overallComment}</p>
+            </div>
+          )}
+          {(report.strengths || report.areasForImprovement) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {report.strengths && (
+                <div className="bg-green-50 rounded-xl p-3">
+                  <p className="text-xs font-bold text-green-700 uppercase tracking-widest mb-1">Strengths</p>
+                  <p className="text-sm text-green-900 leading-relaxed">{report.strengths}</p>
+                </div>
+              )}
+              {report.areasForImprovement && (
+                <div className="bg-amber-50 rounded-xl p-3">
+                  <p className="text-xs font-bold text-amber-700 uppercase tracking-widest mb-1">To Improve</p>
+                  <p className="text-sm text-amber-900 leading-relaxed">{report.areasForImprovement}</p>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+            <span>{report.createdByName ? `By ${report.createdByName}` : ''}</span>
+            {report.sharedWithParentAt && (
+              <span>Shared {format(new Date(report.sharedWithParentAt), 'd MMM yyyy')}</span>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function NewParentDashboard({ setDesign }: Props) {
   const { user, logoutMutation } = useAuth();
   const [tab, setTab] = useState<Tab>('children');
@@ -512,6 +616,7 @@ export default function NewParentDashboard({ setDesign }: Props) {
   const tabs: { key: Tab; label: string; icon: typeof Users }[] = [
     { key: 'children', label: 'My Children', icon: Users },
     { key: 'homework', label: 'Homework', icon: CheckSquare },
+    { key: 'reports', label: 'Reports', icon: FileText },
     { key: 'messages', label: 'Messages', icon: MessageCircle },
   ];
 
@@ -713,6 +818,34 @@ export default function NewParentDashboard({ setDesign }: Props) {
                 ) : (
                   <div className="text-center py-12">
                     <p className="text-gray-500">Select a child above to view their homework.</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* REPORTS */}
+            {tab === 'reports' && (
+              <>
+                {children.length > 1 && (
+                  <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+                    {children.map((child, idx) => (
+                      <button
+                        key={child.id}
+                        onClick={() => setSelectedChildIdx(idx)}
+                        className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-bold border-2 transition-all ${
+                          selectedChildIdx === idx ? 'bg-rose-600 text-white border-rose-600' : 'bg-white text-gray-600 border-gray-200'
+                        }`}
+                      >
+                        {child.user.firstName || child.user.email}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {selectedChild ? (
+                  <ParentProgressReports studentId={selectedChild.id} childName={selectedChild.user.firstName || 'your child'} />
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-gray-500">Select a child to view their reports.</p>
                   </div>
                 )}
               </>

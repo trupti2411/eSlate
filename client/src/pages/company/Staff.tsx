@@ -5,8 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
-  Users, Building2, Bell, LogOut, ArrowLeft, UserPlus, ShieldCheck, ShieldAlert,
-  Mail, X, Save, Search, Eye, Edit2,
+  Users, Building2, Bell, LogOut, ArrowLeft, UserPlus, ShieldCheck, ShieldAlert, ShieldX,
+  Mail, X, Save, Search, Eye, Edit2, UserX, UserCheck, AlertTriangle,
 } from 'lucide-react';
 
 interface AdminProfile {
@@ -26,14 +26,18 @@ interface Tutor {
   firstName: string;
   lastName: string;
   email: string;
-  status?: 'invited' | 'pending_compliance' | 'active' | string;
+  status?: 'active' | 'inactive' | 'invited' | 'pending_compliance' | string;
   complianceStatus?: 'compliant' | 'pending_compliance' | 'compliance_hold' | string;
   wwccExpiry?: string | null;
+  wwccNumber?: string | null;
+  wwccState?: string | null;
   specialization?: string | null;
   qualifications?: string | null;
   availability?: string | null;
   branch?: string | null;
   isVerified?: boolean;
+  phoneNumber?: string | null;
+  address?: string | null;
 }
 
 function formatDate(s: string | null | undefined): string {
@@ -54,9 +58,21 @@ function daysUntil(s: string | null | undefined): number | null {
   return Math.round((expiry - today) / 86400000);
 }
 
+interface WwccAlert {
+  tutorId: string;
+  firstName: string;
+  lastName: string;
+  wwccExpiry: string | null;
+  daysUntilExpiry: number | null;
+  status: string;
+}
+
 export default function Staff() {
   const { user, logoutMutation } = useAuth();
+  const qc = useQueryClient();
+  const { toast } = useToast();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'inactive'>('active');
   const [inviteOpen, setInviteOpen] = useState(false);
   const [profileTutor, setProfileTutor] = useState<Tutor | null>(null);
 
@@ -68,8 +84,34 @@ export default function Staff() {
   const companyName = adminProfile?.companyName;
 
   const { data: tutors = [], isLoading } = useQuery<Tutor[]>({
-    queryKey: [`/api/companies/${companyId}/tutors`],
+    queryKey: [`/api/companies/${companyId}/tutors`, statusFilter],
+    queryFn: () => apiRequest(`/api/companies/${companyId}/tutors?status=${statusFilter}`, 'GET'),
     enabled: !!companyId,
+  });
+
+  const { data: wwccAlerts = [] } = useQuery<WwccAlert[]>({
+    queryKey: [`/api/companies/${companyId}/wwcc-alerts`],
+    enabled: !!companyId,
+  });
+
+  const deactivateMutation = useMutation({
+    mutationFn: (tutorId: string) => apiRequest(`/api/tutors/${tutorId}/deactivate`, 'POST'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
+      setProfileTutor(null);
+      toast({ title: 'Tutor deactivated' });
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: (tutorId: string) => apiRequest(`/api/tutors/${tutorId}/reactivate`, 'POST'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
+      setProfileTutor(null);
+      toast({ title: 'Tutor reactivated' });
+    },
+    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
   });
 
   const filtered = useMemo(() => {
@@ -125,6 +167,27 @@ export default function Staff() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* WWCC alerts */}
+        {wwccAlerts.length > 0 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+            <AlertTriangle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-900 text-sm">{wwccAlerts.length} WWCC expiry alert{wwccAlerts.length > 1 ? 's' : ''}</p>
+              <ul className="mt-1 space-y-0.5">
+                {wwccAlerts.slice(0, 5).map(a => (
+                  <li key={a.tutorId} className="text-xs text-amber-800">
+                    {a.firstName} {a.lastName} —{' '}
+                    {a.daysUntilExpiry != null && a.daysUntilExpiry < 0
+                      ? <span className="font-bold text-red-700">EXPIRED</span>
+                      : <span>{a.daysUntilExpiry} days remaining</span>}
+                  </li>
+                ))}
+                {wwccAlerts.length > 5 && <li className="text-xs text-amber-700">+{wwccAlerts.length - 5} more</li>}
+              </ul>
+            </div>
+          </div>
+        )}
+
         {/* KPI strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <KpiTile
@@ -135,6 +198,21 @@ export default function Staff() {
           <KpiTile value={counts.compliant} label="Compliant" tone="emerald" />
           <KpiTile value={counts.pending} label="Pending" tone="amber" />
           <KpiTile value={counts.hold} label="On hold" tone="rose" />
+        </div>
+
+        {/* Status filter */}
+        <div className="flex gap-1 bg-white rounded-xl border border-gray-200 p-1 w-fit">
+          {(['active', 'inactive'] as const).map(s => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all capitalize ${
+                statusFilter === s ? 'bg-indigo-600 text-white shadow-sm' : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
         </div>
 
         {/* Toolbar */}
@@ -187,6 +265,9 @@ export default function Staff() {
           tutor={profileTutor}
           companyId={companyId}
           onClose={() => setProfileTutor(null)}
+          onDeactivate={() => deactivateMutation.mutate(profileTutor.id)}
+          onReactivate={() => reactivateMutation.mutate(profileTutor.id)}
+          actionPending={deactivateMutation.isPending || reactivateMutation.isPending}
         />
       )}
     </div>
@@ -371,7 +452,10 @@ function InviteModal({ businessId, onClose }: { businessId: string; onClose: () 
   );
 }
 
-function TutorProfileModal({ tutor, companyId, onClose }: { tutor: Tutor; companyId: string; onClose: () => void }) {
+function TutorProfileModal({ tutor, companyId, onClose, onDeactivate, onReactivate, actionPending }: {
+  tutor: Tutor; companyId: string; onClose: () => void;
+  onDeactivate?: () => void; onReactivate?: () => void; actionPending?: boolean;
+}) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -497,14 +581,60 @@ function TutorProfileModal({ tutor, companyId, onClose }: { tutor: Tutor; compan
               </Field>
             </>
           ) : (
+            <>
             <dl className="space-y-3 text-sm">
               <ProfileRow label="Email" value={tutor.email} />
+              <ProfileRow label="Phone" value={tutor.phoneNumber} />
+              <ProfileRow label="Address" value={tutor.address} />
               <ProfileRow label="Branch" value={tutor.branch} />
               <ProfileRow label="Specialization" value={tutor.specialization} />
               <ProfileRow label="Qualifications" value={tutor.qualifications} />
               <ProfileRow label="Availability" value={tutor.availability} />
               <ProfileRow label="Verified" value={tutor.isVerified ? 'Yes' : 'No'} />
             </dl>
+            {/* WWCC section */}
+            {(tutor.wwccNumber || tutor.wwccExpiry) && (
+              <div className="mt-2 pt-3 border-t border-gray-100">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">WWCC</p>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {tutor.wwccNumber && <div><p className="text-gray-400">Number</p><p className="font-mono font-semibold text-gray-800">{tutor.wwccNumber}</p></div>}
+                  {tutor.wwccExpiry && (
+                    <div>
+                      <p className="text-gray-400">Expiry</p>
+                      <p className={`font-semibold ${daysUntil(tutor.wwccExpiry) !== null && daysUntil(tutor.wwccExpiry)! < 0 ? 'text-red-700' : daysUntil(tutor.wwccExpiry) !== null && daysUntil(tutor.wwccExpiry)! <= 30 ? 'text-amber-700' : 'text-gray-800'}`}>
+                        {formatDate(tutor.wwccExpiry)}
+                      </p>
+                    </div>
+                  )}
+                  {tutor.wwccState && <div><p className="text-gray-400">State</p><p className="font-semibold text-gray-800">{tutor.wwccState}</p></div>}
+                </div>
+              </div>
+            )}
+            {/* Deactivate / reactivate */}
+            <div className="mt-3 pt-3 border-t border-gray-100">
+              {tutor.status === 'inactive' ? (
+                <button
+                  onClick={onReactivate}
+                  disabled={actionPending}
+                  className="flex items-center gap-1.5 text-sm font-bold text-green-700 hover:bg-green-50 px-3 py-2 rounded-xl w-full disabled:opacity-60"
+                >
+                  <UserCheck size={14} /> Reactivate tutor
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    if (confirm(`Deactivate ${tutor.firstName} ${tutor.lastName}? They will lose portal access.`)) {
+                      onDeactivate?.();
+                    }
+                  }}
+                  disabled={actionPending}
+                  className="flex items-center gap-1.5 text-sm font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl w-full disabled:opacity-60"
+                >
+                  <UserX size={14} /> Deactivate tutor
+                </button>
+              )}
+            </div>
+            </>
           )}
         </div>
 

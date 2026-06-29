@@ -27,6 +27,9 @@ interface TutorProfile {
   wwcc_state: string | null;
   compliance_status: ComplianceStatus;
   status: string;
+  phoneNumber?: string | null;
+  address?: string | null;
+  availability?: string | null;
 }
 
 function formatDate(s: string | null | undefined): string {
@@ -59,11 +62,17 @@ export default function TutorProfilePage() {
 
   const [bio, setBio] = useState('');
   const [hourlyRate, setHourlyRate] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [address, setAddress] = useState('');
+  const [availability, setAvailability] = useState('');
 
   useEffect(() => {
     if (profile) {
       setBio(profile.bio ?? '');
       setHourlyRate(profile.hourly_rate != null ? String(profile.hourly_rate) : '');
+      setPhoneNumber(profile.phoneNumber ?? '');
+      setAddress(profile.address ?? '');
+      setAvailability(profile.availability ?? '');
     }
   }, [profile]);
 
@@ -71,7 +80,9 @@ export default function TutorProfilePage() {
     mutationFn: () =>
       apiRequest('/api/me/tutor-profile', 'PATCH', {
         bio: bio || null,
-        hourly_rate: hourlyRate ? Number(hourlyRate) : null,
+        phoneNumber: phoneNumber || null,
+        address: address || null,
+        availability: availability || null,
       }),
     onSuccess: () => {
       toast({ title: 'Profile saved' });
@@ -177,17 +188,35 @@ export default function TutorProfilePage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Hourly rate (AUD)</label>
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Phone number</label>
                     <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={hourlyRate}
-                      onChange={e => setHourlyRate(e.target.value)}
-                      placeholder="e.g. 60"
+                      type="tel"
+                      value={phoneNumber}
+                      onChange={e => setPhoneNumber(e.target.value)}
+                      placeholder="e.g. 0412 345 678"
                       className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     />
                   </div>
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Availability</label>
+                    <input
+                      type="text"
+                      value={availability}
+                      onChange={e => setAvailability(e.target.value)}
+                      placeholder="e.g. Mon–Fri 4–8pm, Weekends"
+                      className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Address</label>
+                  <input
+                    type="text"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    placeholder="Suburb, State"
+                    className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  />
                 </div>
               </div>
             </section>

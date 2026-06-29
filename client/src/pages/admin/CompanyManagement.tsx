@@ -63,6 +63,7 @@ export default function CompanyManagement() {
     lastName: "",
     role: "",
     roles: [] as string[],
+    rollNumber: "",
   });
   
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -197,7 +198,7 @@ export default function CompanyManagement() {
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/users`] });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/students`] });
       setIsCreateUserDialogOpen(false);
-      setNewUserData({ email: "", firstName: "", lastName: "", role: "", roles: [] });
+      setNewUserData({ email: "", firstName: "", lastName: "", role: "", roles: [], rollNumber: "" });
     },
     onError: (error: Error) => {
       let errorMessage = "Failed to create user";
@@ -935,6 +936,18 @@ export default function CompanyManagement() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {newUserData.role === 'student' && (
+                <div>
+                  <Label htmlFor="rollNumber">Roll Number</Label>
+                  <Input
+                    id="rollNumber"
+                    value={newUserData.rollNumber}
+                    onChange={(e) => setNewUserData(prev => ({ ...prev, rollNumber: e.target.value }))}
+                    placeholder="e.g., 2024-001"
+                  />
+                </div>
+              )}
 
               <div className="flex justify-end gap-2 pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsCreateUserDialogOpen(false)}>

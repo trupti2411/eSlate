@@ -37,6 +37,8 @@ import {
   reportDefinitions,
   reportRuns,
   reportExports,
+  studentProgressReports,
+  inAppNotifications,
   type User,
   type Student,
   type InsertStudent,
@@ -1215,6 +1217,7 @@ export class DatabaseStorage implements IStorage {
     gradeLevel?: string | null;
     schoolName?: string | null;
     yearGroupCode?: string | null;
+    rollNumber?: string | null;
     dateOfBirth?: Date | null;
     address?: string | null;
     learningGoals?: string | null;

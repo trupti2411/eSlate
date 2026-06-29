@@ -58,6 +58,10 @@ export const students = mysqlTable("students", {
   yearId: varchar("year_id", { length: 36 }).references(() => academicYears.id),
   termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id),
   classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  status: mysqlEnum("status", ['active', 'archived']).notNull().default('active'),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by", { length: 36 }),
+  archivedByName: varchar("archived_by_name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at"),
   updatedByName: varchar("updated_by_name", { length: 255 }),
@@ -188,7 +192,17 @@ export const tutors = mysqlTable("tutors", {
   subjectsTeaching: json("subjects_teaching").$type<string[]>().default([]),
   branch: varchar("branch", { length: 255 }),
   isVerified: boolean("is_verified").notNull().default(false),
+  phoneNumber: varchar("phone_number", { length: 50 }),
+  address: text("address"),
+  profilePhotoUrl: varchar("profile_photo_url", { length: 500 }),
+  wwccNumber: varchar("wwcc_number", { length: 100 }),
+  wwccExpiry: timestamp("wwcc_expiry"),
+  wwccState: varchar("wwcc_state", { length: 10 }),
+  status: mysqlEnum("status", ['active', 'inactive']).notNull().default('active'),
+  deactivatedAt: timestamp("deactivated_at"),
+  deactivatedBy: varchar("deactivated_by", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Academic Years
@@ -622,6 +636,40 @@ export const reportExports = mysqlTable("report_exports", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Student Progress Reports (per-student per-term per-subject reports)
+export const studentProgressReports = mysqlTable("student_progress_reports", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id, { onDelete: "set null" }),
+  subject: varchar("subject", { length: 100 }).notNull(),
+  grade: varchar("grade", { length: 20 }),
+  overallComment: text("overall_comment"),
+  strengths: text("strengths"),
+  areasForImprovement: text("areas_for_improvement"),
+  attendancePercentage: int("attendance_percentage"),
+  status: mysqlEnum("status", ['draft', 'published', 'shared_with_parent']).notNull().default('draft'),
+  sharedWithParentAt: timestamp("shared_with_parent_at"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// In-app notifications (used for WWCC reminders and other alerts)
+export const inAppNotifications = mysqlTable("in_app_notifications", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  companyId: varchar("company_id", { length: 36 }).references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  type: varchar("type", { length: 50 }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  data: json("data"),
+  isRead: boolean("is_read").notNull().default(false),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // ==========================================
 // RELATIONS
 // ==========================================
@@ -764,6 +812,18 @@ export const reportExportsRelations = relations(reportExports, ({ one }) => ({
   reportRun: one(reportRuns, { fields: [reportExports.reportRunId], references: [reportRuns.id] }),
 }));
 
+export const studentProgressReportsRelations = relations(studentProgressReports, ({ one }) => ({
+  student: one(students, { fields: [studentProgressReports.studentId], references: [students.id] }),
+  company: one(tutoringCompanies, { fields: [studentProgressReports.companyId], references: [tutoringCompanies.id] }),
+  term: one(academicTerms, { fields: [studentProgressReports.termId], references: [academicTerms.id] }),
+  createdByUser: one(users, { fields: [studentProgressReports.createdBy], references: [users.id] }),
+}));
+
+export const inAppNotificationsRelations = relations(inAppNotifications, ({ one }) => ({
+  user: one(users, { fields: [inAppNotifications.userId], references: [users.id] }),
+  company: one(tutoringCompanies, { fields: [inAppNotifications.companyId], references: [tutoringCompanies.id] }),
+}));
+
 // ==========================================
 // INSERT SCHEMAS & TYPES
 // ==========================================
@@ -802,6 +862,8 @@ export const insertNotificationPreferencesSchema = createInsertSchema(notificati
 export const insertReportDefinitionSchema = createInsertSchema(reportDefinitions).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertReportRunSchema = createInsertSchema(reportRuns).omit({ id: true, createdAt: true });
 export const insertReportExportSchema = createInsertSchema(reportExports).omit({ id: true, createdAt: true });
+export const insertStudentProgressReportSchema = createInsertSchema(studentProgressReports).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInAppNotificationSchema = createInsertSchema(inAppNotifications).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -871,6 +933,10 @@ export type ReportExport = typeof reportExports.$inferSelect;
 export type InsertReportDefinition = z.infer<typeof insertReportDefinitionSchema>;
 export type InsertReportRun = z.infer<typeof insertReportRunSchema>;
 export type InsertReportExport = z.infer<typeof insertReportExportSchema>;
+export type StudentProgressReport = typeof studentProgressReports.$inferSelect;
+export type InsertStudentProgressReport = z.infer<typeof insertStudentProgressReportSchema>;
+export type InAppNotification = typeof inAppNotifications.$inferSelect;
+export type InsertInAppNotification = z.infer<typeof insertInAppNotificationSchema>;
 
 // ==========================================
 // AUTH SCHEMAS

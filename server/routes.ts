@@ -19,8 +19,8 @@ import {
 import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, desc, inArray } from "drizzle-orm";
-import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs } from "@shared/schema";
+import { eq, desc, inArray, and, lte, isNotNull, sql } from "drizzle-orm";
+import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs, studentProgressReports, inAppNotifications, academicTerms } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Report generation helper functions
@@ -3861,8 +3861,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const students = await storage.getCompanyStudentsByCompanyId(companyId);
-      res.json(students);
+      const { status } = req.query;
+      const allStudents = await storage.getCompanyStudentsByCompanyId(companyId);
+      const filterStatus = (status as string) || 'active';
+      const filtered = filterStatus === 'all'
+        ? allStudents
+        : allStudents.filter((s: any) => (s.status || 'active') === filterStatus);
+      res.json(filtered);
     } catch (error) {
       console.error("Error fetching company students:", error);
       res.status(500).json({ message: "Failed to fetch students" });
@@ -4383,7 +4388,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const { first_name, last_name, year_group_code, school, date_of_birth, address, learning_goals, notes, parents } = req.body;
+      const { first_name, last_name, year_group_code, school, roll_number, date_of_birth, address, learning_goals, notes, parents } = req.body;
 
       if (!first_name?.trim() || !last_name?.trim()) {
         return res.status(400).json({ message: "First name and last name are required" });
@@ -4426,6 +4431,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: businessId,
         schoolName: school?.trim() || null,
         yearGroupCode: year_group_code || null,
+        rollNumber: roll_number?.trim() || null,
         dateOfBirth: dob,
         address: address.trim(),
         learningGoals: learning_goals?.trim() || null,
@@ -8237,6 +8243,421 @@ Good luck with your assignment!"
     } catch (error) {
       console.error("Error fetching audit logs:", error);
       res.status(500).json({ message: "Failed to fetch audit logs" });
+    }
+  });
+
+  // ==========================================
+  // STUDENT ARCHIVE (ESLATE-19)
+  // ==========================================
+
+  app.post('/api/students/:studentId/archive', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { studentId } = req.params;
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+      await db.update(students)
+        .set({ status: 'archived', archivedAt: new Date(), archivedBy: user.id, archivedByName: fullName })
+        .where(eq(students.id, studentId));
+      const [updated] = await db.select().from(students).where(eq(students.id, studentId));
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to archive student' });
+    }
+  });
+
+  app.post('/api/students/:studentId/reactivate', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { studentId } = req.params;
+      await db.update(students)
+        .set({ status: 'active', archivedAt: null, archivedBy: null, archivedByName: null })
+        .where(eq(students.id, studentId));
+      const [updated] = await db.select().from(students).where(eq(students.id, studentId));
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to reactivate student' });
+    }
+  });
+
+  // ==========================================
+  // TUTOR DEACTIVATION (ESLATE-26)
+  // ==========================================
+
+  app.post('/api/tutors/:tutorId/deactivate', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { tutorId } = req.params;
+      const [tutor] = await db.select().from(tutors).where(eq(tutors.id, tutorId));
+      if (!tutor) return res.status(404).json({ message: 'Tutor not found' });
+      await db.update(tutors)
+        .set({ status: 'inactive', deactivatedAt: new Date(), deactivatedBy: user.id })
+        .where(eq(tutors.id, tutorId));
+      await db.update(users).set({ isActive: false }).where(eq(users.id, tutor.userId));
+      res.json({ message: 'Tutor deactivated' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to deactivate tutor' });
+    }
+  });
+
+  app.post('/api/tutors/:tutorId/reactivate', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { tutorId } = req.params;
+      const [tutor] = await db.select().from(tutors).where(eq(tutors.id, tutorId));
+      if (!tutor) return res.status(404).json({ message: 'Tutor not found' });
+      await db.update(tutors)
+        .set({ status: 'active', deactivatedAt: null, deactivatedBy: null })
+        .where(eq(tutors.id, tutorId));
+      await db.update(users).set({ isActive: true }).where(eq(users.id, tutor.userId));
+      res.json({ message: 'Tutor reactivated' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to reactivate tutor' });
+    }
+  });
+
+  // WWCC alerts for a company
+  app.get('/api/companies/:companyId/wwcc-alerts', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { companyId } = req.params;
+      const sixtyDaysFromNow = new Date();
+      sixtyDaysFromNow.setDate(sixtyDaysFromNow.getDate() + 60);
+
+      const expiringTutors = await db
+        .select({
+          tutorId: tutors.id,
+          wwccNumber: tutors.wwccNumber,
+          wwccExpiry: tutors.wwccExpiry,
+          wwccState: tutors.wwccState,
+          status: tutors.status,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          email: users.email,
+        })
+        .from(tutors)
+        .innerJoin(users, eq(tutors.userId, users.id))
+        .where(
+          and(
+            eq(tutors.companyId, companyId),
+            isNotNull(tutors.wwccExpiry),
+            lte(tutors.wwccExpiry, sixtyDaysFromNow),
+          )
+        );
+
+      const now = new Date();
+      const result = expiringTutors.map(t => ({
+        ...t,
+        daysUntilExpiry: t.wwccExpiry
+          ? Math.floor((t.wwccExpiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+          : null,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch WWCC alerts' });
+    }
+  });
+
+  // ==========================================
+  // TUTOR SELF-SERVICE PROFILE (ESLATE-22)
+  // ==========================================
+
+  app.get('/api/me/tutor-profile', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const [tutor] = await db.select().from(tutors).where(eq(tutors.userId, user.id));
+      if (!tutor) return res.status(404).json({ message: 'Tutor profile not found' });
+
+      let company = null;
+      if (tutor.companyId) {
+        const [c] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, tutor.companyId));
+        company = c || null;
+      }
+
+      res.json({
+        id: tutor.id,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        email: user.email,
+        bio: tutor.specialization,
+        hourly_rate: null,
+        qualifications: tutor.qualifications ? [tutor.qualifications] : [],
+        delivery_modes: [],
+        year_levels: [],
+        wwcc_number: tutor.wwccNumber,
+        wwcc_expiry: tutor.wwccExpiry,
+        wwcc_state: tutor.wwccState,
+        compliance_status: tutor.isVerified ? 'compliant' : 'pending_compliance',
+        status: tutor.status,
+        phoneNumber: tutor.phoneNumber,
+        address: tutor.address,
+        availability: tutor.availability,
+        business: company ? { id: company.id, name: company.name, type: 'multi_tutor', tier: 'standard', state_code: '' } : null,
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch tutor profile' });
+    }
+  });
+
+  app.patch('/api/me/tutor-profile', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const [tutor] = await db.select().from(tutors).where(eq(tutors.userId, user.id));
+      if (!tutor) return res.status(404).json({ message: 'Tutor profile not found' });
+
+      const { bio, phoneNumber, address, availability } = req.body;
+      await db.update(tutors)
+        .set({
+          specialization: bio ?? tutor.specialization,
+          phoneNumber: phoneNumber ?? tutor.phoneNumber,
+          address: address ?? tutor.address,
+          availability: availability ?? tutor.availability,
+          updatedAt: new Date(),
+        })
+        .where(eq(tutors.id, tutor.id));
+
+      let company = null;
+      if (tutor.companyId) {
+        const [c] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, tutor.companyId));
+        company = c || null;
+      }
+      const [updatedTutor] = await db.select().from(tutors).where(eq(tutors.id, tutor.id));
+
+      res.json({
+        id: updatedTutor.id,
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+        email: user.email,
+        bio: updatedTutor.specialization,
+        hourly_rate: null,
+        qualifications: updatedTutor.qualifications ? [updatedTutor.qualifications] : [],
+        delivery_modes: [],
+        year_levels: [],
+        wwcc_number: updatedTutor.wwccNumber,
+        wwcc_expiry: updatedTutor.wwccExpiry,
+        wwcc_state: updatedTutor.wwccState,
+        compliance_status: updatedTutor.isVerified ? 'compliant' : 'pending_compliance',
+        status: updatedTutor.status,
+        phoneNumber: updatedTutor.phoneNumber,
+        address: updatedTutor.address,
+        availability: updatedTutor.availability,
+        business: company ? { id: company.id, name: company.name, type: 'multi_tutor', tier: 'standard', state_code: '' } : null,
+      });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to update tutor profile' });
+    }
+  });
+
+  // Also update PATCH /api/tutors/:tutorId to handle new fields (admin/company_admin)
+  // (The existing route at line ~3328 handles specialization/qualifications/availability/branch)
+  // We add a separate extended PATCH for WWCC and contact fields accessible to admins:
+  app.patch('/api/tutors/:tutorId/contact', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { tutorId } = req.params;
+      const { phoneNumber, address, wwccNumber, wwccExpiry, wwccState } = req.body;
+      await db.update(tutors)
+        .set({
+          phoneNumber: phoneNumber ?? undefined,
+          address: address ?? undefined,
+          wwccNumber: wwccNumber ?? undefined,
+          wwccExpiry: wwccExpiry ? new Date(wwccExpiry) : undefined,
+          wwccState: wwccState ?? undefined,
+          updatedAt: new Date(),
+        })
+        .where(eq(tutors.id, tutorId));
+      const [updated] = await db.select().from(tutors).where(eq(tutors.id, tutorId));
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to update tutor contact info' });
+    }
+  });
+
+  // ==========================================
+  // PROGRESS REPORTS (ESLATE-20)
+  // ==========================================
+
+  app.get('/api/students/:studentId/progress-reports', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const { status } = req.query;
+
+      const conditions: any[] = [eq(studentProgressReports.studentId, studentId)];
+      if (status) {
+        conditions.push(eq(studentProgressReports.status, status as any));
+      }
+
+      const reports = await db
+        .select({
+          id: studentProgressReports.id,
+          studentId: studentProgressReports.studentId,
+          companyId: studentProgressReports.companyId,
+          termId: studentProgressReports.termId,
+          subject: studentProgressReports.subject,
+          grade: studentProgressReports.grade,
+          overallComment: studentProgressReports.overallComment,
+          strengths: studentProgressReports.strengths,
+          areasForImprovement: studentProgressReports.areasForImprovement,
+          attendancePercentage: studentProgressReports.attendancePercentage,
+          status: studentProgressReports.status,
+          sharedWithParentAt: studentProgressReports.sharedWithParentAt,
+          createdBy: studentProgressReports.createdBy,
+          createdByName: studentProgressReports.createdByName,
+          createdAt: studentProgressReports.createdAt,
+          updatedAt: studentProgressReports.updatedAt,
+          termName: academicTerms.name,
+        })
+        .from(studentProgressReports)
+        .leftJoin(academicTerms, eq(studentProgressReports.termId, academicTerms.id))
+        .where(and(...conditions))
+        .orderBy(desc(studentProgressReports.createdAt));
+
+      res.json(reports);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch progress reports' });
+    }
+  });
+
+  app.post('/api/students/:studentId/progress-reports', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin' && user.role !== 'tutor') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { studentId } = req.params;
+      const { subject, termId, grade, overallComment, strengths, areasForImprovement, status } = req.body;
+      if (!subject) return res.status(400).json({ message: 'Subject is required' });
+
+      const [student] = await db.select().from(students).where(eq(students.id, studentId));
+      if (!student) return res.status(404).json({ message: 'Student not found' });
+
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
+      const newId = crypto.randomUUID();
+      await db.insert(studentProgressReports).values({
+        id: newId,
+        studentId,
+        companyId: student.companyId!,
+        termId: termId || null,
+        subject,
+        grade: grade || null,
+        overallComment: overallComment || null,
+        strengths: strengths || null,
+        areasForImprovement: areasForImprovement || null,
+        status: status || 'draft',
+        createdBy: user.id,
+        createdByName: fullName,
+      });
+
+      const [created] = await db.select().from(studentProgressReports).where(eq(studentProgressReports.id, newId));
+      res.status(201).json(created);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to create progress report' });
+    }
+  });
+
+  app.patch('/api/progress-reports/:reportId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin' && user.role !== 'tutor') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { reportId } = req.params;
+      const { subject, termId, grade, overallComment, strengths, areasForImprovement, attendancePercentage, status } = req.body;
+
+      const updateData: any = { updatedAt: new Date() };
+      if (subject !== undefined) updateData.subject = subject;
+      if (termId !== undefined) updateData.termId = termId;
+      if (grade !== undefined) updateData.grade = grade;
+      if (overallComment !== undefined) updateData.overallComment = overallComment;
+      if (strengths !== undefined) updateData.strengths = strengths;
+      if (areasForImprovement !== undefined) updateData.areasForImprovement = areasForImprovement;
+      if (attendancePercentage !== undefined) updateData.attendancePercentage = attendancePercentage;
+      if (status !== undefined) {
+        updateData.status = status;
+        if (status === 'shared_with_parent') {
+          updateData.sharedWithParentAt = new Date();
+        }
+      }
+
+      await db.update(studentProgressReports).set(updateData).where(eq(studentProgressReports.id, reportId));
+      const [updated] = await db.select().from(studentProgressReports).where(eq(studentProgressReports.id, reportId));
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to update progress report' });
+    }
+  });
+
+  app.delete('/api/progress-reports/:reportId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+      const { reportId } = req.params;
+      await db.delete(studentProgressReports).where(eq(studentProgressReports.id, reportId));
+      res.json({ message: 'Report deleted' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to delete progress report' });
+    }
+  });
+
+  // ==========================================
+  // IN-APP NOTIFICATIONS (ESLATE-25)
+  // ==========================================
+
+  app.get('/api/notifications', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const notifications = await db
+        .select()
+        .from(inAppNotifications)
+        .where(eq(inAppNotifications.userId, user.id))
+        .orderBy(desc(inAppNotifications.createdAt))
+        .limit(50);
+      res.json(notifications);
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to fetch notifications' });
+    }
+  });
+
+  app.patch('/api/notifications/:notificationId/read', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { notificationId } = req.params;
+      await db.update(inAppNotifications)
+        .set({ isRead: true, readAt: new Date() })
+        .where(and(eq(inAppNotifications.id, notificationId), eq(inAppNotifications.userId, user.id)));
+      res.json({ message: 'Marked as read' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to mark notification as read' });
+    }
+  });
+
+  app.post('/api/notifications/read-all', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      await db.update(inAppNotifications)
+        .set({ isRead: true, readAt: new Date() })
+        .where(and(eq(inAppNotifications.userId, user.id), eq(inAppNotifications.isRead, false)));
+      res.json({ message: 'All notifications marked as read' });
+    } catch (error) {
+      res.status(500).json({ message: 'Failed to mark all as read' });
     }
   });
 

@@ -3,6 +3,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { securityHeaders, auditMiddleware } from "./security";
 import { execSync } from "child_process";
+import { startWwccReminderJob } from "./services/wwccReminder";
 
 const app = express();
 
@@ -124,5 +125,6 @@ function freePort(port: number) {
     host: "localhost",
   }, () => {
     log(`serving on port ${port}`);
+    startWwccReminderJob();
   });
 })();

@@ -1132,7 +1132,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Admin access required" });
       }
 
-      const { role, email, firstName, lastName, companyId } = req.body;
+      const { role, email, firstName, lastName, companyId, rollNumber } = req.body;
 
       if (!role || !email) {
         return res.status(400).json({ message: "Role and email are required" });
@@ -1169,6 +1169,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           gradeLevel: null,
           parentId: null,
           tutorId: null,
+          companyId: companyId || null,
+          rollNumber: rollNumber || null,
         });
       } else if (role === 'parent') {
         await storage.createParent({
