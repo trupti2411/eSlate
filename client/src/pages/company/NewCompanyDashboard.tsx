@@ -563,6 +563,8 @@ function QuickActionsCard({
     { href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
     { href: '/company/invoices', label: 'Invoices', icon: <DollarSign size={16} />, tone: 'rose' as const, primary: false },
     { href: '/company/revenue', label: 'Revenue', icon: <BarChart2 size={16} />, tone: 'violet' as const, primary: false },
+    { href: '/company/assignment-library', label: 'Assignment Library', icon: <BookOpen size={16} />, tone: 'teal' as const, primary: false },
+    { href: '/company/library-marking', label: 'Marking Queue', icon: <FileEdit size={16} />, tone: 'indigo' as const, primary: false },
     { href: '/company/courses', label: 'Courses', icon: <Trophy size={16} />, tone: 'teal' as const, primary: false },
     { href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'indigo' as const, primary: false },
     { href: '/company/terms', label: 'Terms', icon: <CalendarDays size={16} />, tone: 'indigo' as const, primary: false },

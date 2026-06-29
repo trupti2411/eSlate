@@ -772,6 +772,160 @@ export const inAppNotifications = mysqlTable("in_app_notifications", {
 });
 
 // ==========================================
+// ASSIGNMENT LIBRARY SYSTEM (ESLATE-42 epic)
+// ==========================================
+
+export const assignmentLibraryItems = mysqlTable("asgn_lib_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  instructions: text("instructions"),
+  subjects: json("subjects").$type<string[]>().default([]),
+  yearGroups: json("year_groups").$type<string[]>().default([]),
+  estimatedDuration: int("estimated_duration"),
+  maxMarks: int("max_marks"),
+  libStatus: mysqlEnum("lib_status", ['draft', 'published', 'archived']).notNull().default('draft'),
+  fileUrl: varchar("file_url", { length: 500 }),
+  fileType: varchar("file_type", { length: 20 }),
+  pageCount: int("page_count"),
+  createdBy: varchar("created_by", { length: 36 }).notNull().references(() => users.id),
+  lastUpdatedBy: varchar("last_updated_by", { length: 36 }).references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const assignmentLibraryQuestions = mysqlTable("asgn_lib_questions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  libraryItemId: varchar("library_item_id", { length: 36 }).notNull().references(() => assignmentLibraryItems.id, { onDelete: "cascade" }),
+  questionNumber: int("question_number").notNull(),
+  questionText: text("question_text").notNull(),
+  questionType: mysqlEnum("lib_question_type", ['objective', 'subjective', 'mcq', 'fill_in']).notNull().default('subjective'),
+  answerKey: text("answer_key"),
+  maxMarks: int("max_marks").default(1),
+  regionCoords: json("region_coords"),
+  options: json("options").$type<string[]>(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const assignmentLibraryRubrics = mysqlTable("asgn_lib_rubrics", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  questionId: varchar("question_id", { length: 36 }).notNull().references(() => assignmentLibraryQuestions.id, { onDelete: "cascade" }),
+  criterion: varchar("criterion", { length: 255 }).notNull(),
+  descriptor: text("descriptor"),
+  maxMarks: int("max_marks").notNull().default(1),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const assignmentAllocations = mysqlTable("asgn_allocations", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  libraryItemId: varchar("library_item_id", { length: 36 }).notNull().references(() => assignmentLibraryItems.id),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  dueAt: timestamp("due_at").notNull(),
+  releaseAt: timestamp("release_at"),
+  allowResubmission: boolean("allow_resubmission").notNull().default(false),
+  allocStatus: mysqlEnum("alloc_status", ['scheduled', 'assigned', 'in_progress', 'submitted', 'auto_marked', 'under_review', 'returned', 'overdue', 'revoked']).notNull().default('assigned'),
+  studentNote: text("student_note"),
+  currentAttempt: int("current_attempt").notNull().default(1),
+  createdBy: varchar("created_by", { length: 36 }).notNull().references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const assignmentSubmissions = mysqlTable("asgn_submissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  allocationId: varchar("allocation_id", { length: 36 }).notNull().references(() => assignmentAllocations.id, { onDelete: "cascade" }),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id),
+  attemptNo: int("attempt_no").notNull().default(1),
+  submittedAt: timestamp("submitted_at"),
+  isLate: boolean("is_late").notNull().default(false),
+  syncStatus: mysqlEnum("asgn_sync_status", ['synced', 'pending']).notNull().default('synced'),
+  inkData: text("ink_data"),
+  enteredAnswers: json("entered_answers"),
+  ocrStatus: mysqlEnum("asgn_ocr_status", ['pending', 'processing', 'complete', 'failed', 'unavailable']).notNull().default('pending'),
+  autoMarkStatus: mysqlEnum("asgn_auto_mark_status", ['pending', 'processing', 'complete', 'failed']).notNull().default('pending'),
+  provisionalScore: int("provisional_score"),
+  finalScore: int("final_score"),
+  tutorFeedback: text("tutor_feedback"),
+  tutorAnnotations: text("tutor_annotations"),
+  finalisedBy: varchar("finalised_by", { length: 36 }).references(() => users.id),
+  finalisedAt: timestamp("finalised_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const submissionTranscriptions = mysqlTable("sub_transcriptions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  submissionId: varchar("submission_id", { length: 36 }).notNull().references(() => assignmentSubmissions.id, { onDelete: "cascade" }),
+  questionId: varchar("question_id", { length: 36 }).notNull().references(() => assignmentLibraryQuestions.id),
+  text: text("text"),
+  confidence: int("confidence"),
+  ocrStatus: varchar("transcription_ocr_status", { length: 20 }).notNull().default('pending'),
+  tutorCorrection: text("tutor_correction"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const submissionMarks = mysqlTable("sub_marks", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  submissionId: varchar("submission_id", { length: 36 }).notNull().references(() => assignmentSubmissions.id, { onDelete: "cascade" }),
+  questionId: varchar("question_id", { length: 36 }).notNull().references(() => assignmentLibraryQuestions.id),
+  markSource: mysqlEnum("mark_source", ['key', 'ai', 'tutor']).notNull(),
+  provisionalScore: int("provisional_score"),
+  finalScore: int("final_score"),
+  provisionalComments: text("provisional_comments"),
+  tutorComments: text("tutor_comments"),
+  confidence: int("confidence"),
+  isProvisional: boolean("is_provisional").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const resubmissions = mysqlTable("resubmissions", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  allocationId: varchar("allocation_id", { length: 36 }).notNull().references(() => assignmentAllocations.id, { onDelete: "cascade" }),
+  grantedBy: varchar("granted_by", { length: 36 }).notNull().references(() => users.id),
+  grantedAt: timestamp("granted_at").defaultNow(),
+  newDueAt: timestamp("new_due_at"),
+  note: text("note"),
+  usedAt: timestamp("used_at"),
+  revokedAt: timestamp("revoked_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const userDevices = mysqlTable("user_devices", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  userId: varchar("user_id", { length: 36 }).notNull().references(() => users.id, { onDelete: "cascade" }),
+  deviceName: varchar("device_name", { length: 100 }),
+  deviceType: varchar("device_type", { length: 50 }),
+  lastActiveAt: timestamp("last_active_at").defaultNow(),
+  lastSyncAt: timestamp("last_sync_at"),
+  sessionTokenRef: varchar("session_token_ref", { length: 100 }),
+  deviceStatus: mysqlEnum("device_status", ['active', 'inactive', 'unlinked']).notNull().default('active'),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const studentAssignmentResults = mysqlTable("stu_asgn_results", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id, { onDelete: "cascade" }),
+  allocationId: varchar("allocation_id", { length: 36 }).notNull().references(() => assignmentAllocations.id),
+  libraryItemId: varchar("library_item_id", { length: 36 }).notNull().references(() => assignmentLibraryItems.id),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id),
+  subjects: json("subjects").$type<string[]>().default([]),
+  score: int("score"),
+  maxMarks: int("sar_max_marks"),
+  isLate: boolean("is_late").notNull().default(false),
+  attemptNo: int("attempt_no").notNull().default(1),
+  finalisedAt: timestamp("finalised_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ==========================================
 // RELATIONS
 // ==========================================
 
@@ -985,6 +1139,16 @@ export const insertInAppNotificationSchema = createInsertSchema(inAppNotificatio
 export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).omit({ id: true, createdAt: true });
 export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
+export const insertAssignmentLibraryItemSchema = createInsertSchema(assignmentLibraryItems).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAssignmentLibraryQuestionSchema = createInsertSchema(assignmentLibraryQuestions).omit({ id: true, createdAt: true });
+export const insertAssignmentLibraryRubricSchema = createInsertSchema(assignmentLibraryRubrics).omit({ id: true, createdAt: true });
+export const insertAssignmentAllocationSchema = createInsertSchema(assignmentAllocations).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertAssignmentSubmissionSchema = createInsertSchema(assignmentSubmissions).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertSubmissionTranscriptionSchema = createInsertSchema(submissionTranscriptions).omit({ id: true, createdAt: true });
+export const insertSubmissionMarkSchema = createInsertSchema(submissionMarks).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertResubmissionSchema = createInsertSchema(resubmissions).omit({ id: true, createdAt: true });
+export const insertUserDeviceSchema = createInsertSchema(userDevices).omit({ id: true, createdAt: true });
+export const insertStudentAssignmentResultSchema = createInsertSchema(studentAssignmentResults).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -1064,6 +1228,16 @@ export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;
 export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
 export type Payment = typeof payments.$inferSelect;
 export type InsertPayment = z.infer<typeof insertPaymentSchema>;
+export type AssignmentLibraryItem = typeof assignmentLibraryItems.$inferSelect;
+export type AssignmentLibraryQuestion = typeof assignmentLibraryQuestions.$inferSelect;
+export type AssignmentLibraryRubric = typeof assignmentLibraryRubrics.$inferSelect;
+export type AssignmentAllocation = typeof assignmentAllocations.$inferSelect;
+export type AssignmentSubmission = typeof assignmentSubmissions.$inferSelect;
+export type SubmissionTranscription = typeof submissionTranscriptions.$inferSelect;
+export type SubmissionMark = typeof submissionMarks.$inferSelect;
+export type Resubmission = typeof resubmissions.$inferSelect;
+export type UserDevice = typeof userDevices.$inferSelect;
+export type StudentAssignmentResult = typeof studentAssignmentResults.$inferSelect;
 
 // ==========================================
 // AUTH SCHEMAS

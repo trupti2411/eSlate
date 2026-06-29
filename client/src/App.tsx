@@ -58,6 +58,13 @@ import Invoices from "@/pages/company/Invoices";
 import InvoiceDetail from "@/pages/company/InvoiceDetail";
 import Revenue from "@/pages/company/Revenue";
 import { MarkingPage } from "@/pages/company/MarkingPage";
+import AssignmentLibrary from "@/pages/company/AssignmentLibrary";
+import AssignmentLibraryEditor from "@/pages/company/AssignmentLibraryEditor";
+import AssignmentOversight from "@/pages/company/AssignmentOversight";
+import LibraryMarkingQueue from "@/pages/company/LibraryMarkingQueue";
+import LibraryMarkingDetail from "@/pages/company/LibraryMarkingDetail";
+import LibraryAssignments from "@/pages/student/LibraryAssignments";
+import LibraryAssignmentWork from "@/pages/student/LibraryAssignmentWork";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
 import UserAgreement from "@/pages/legal/UserAgreement";
@@ -204,6 +211,14 @@ function Router() {
           <Route path="/company/invoices" component={Invoices} />
           <Route path="/company/invoices/:id" component={InvoiceDetail} />
           <Route path="/company/revenue" component={Revenue} />
+          <Route path="/company/assignment-library/new" component={AssignmentLibraryEditor} />
+          <Route path="/company/assignment-library/:id" component={AssignmentLibraryEditor} />
+          <Route path="/company/assignment-library" component={AssignmentLibrary} />
+          <Route path="/company/assignment-oversight" component={AssignmentOversight} />
+          <Route path="/company/library-marking/:submissionId" component={LibraryMarkingDetail} />
+          <Route path="/company/library-marking" component={LibraryMarkingQueue} />
+          <Route path="/student/library-assignments/:allocationId" component={LibraryAssignmentWork} />
+          <Route path="/student/library-assignments" component={LibraryAssignments} />
           <Route path="/student/portal">{() => <StudentPortal />}</Route>
           <Route path="/student/worksheets" component={StudentWorksheets} />
           <Route path="/student/worksheet/:id" component={WorksheetWorkPage} />
