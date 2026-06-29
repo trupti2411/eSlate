@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
   BookOpen, Bell, LogOut, ArrowLeft, Plus, X, Save, Search,
-  User, GraduationCap, CalendarDays,
+  User, GraduationCap, CalendarDays, Download,
 } from 'lucide-react';
 
 interface AdminProfile { userId: string; companyId: string; companyName?: string; company?: { id: string; name: string } }
@@ -131,6 +131,10 @@ export default function ClassesPage() {
               <Plus size={14} /> Create class
             </button>
           )}
+          <a href="/api/export/classes" target="_blank" rel="noopener noreferrer"
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5">
+            <Download size={14} /> Export CSV
+          </a>
         </div>
 
         {isLoading ? (

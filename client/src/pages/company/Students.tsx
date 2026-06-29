@@ -9,7 +9,7 @@ import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
 import {
   GraduationCap, Bell, LogOut, ArrowLeft, Plus, X, Save, Search, School,
-  User, Mail, Phone, Star, Trash2, CalendarIcon, AlertTriangle, Pencil, Clock,
+  User, Mail, Phone, Star, Trash2, CalendarIcon, AlertTriangle, Pencil, Clock, Download,
 } from 'lucide-react';
 
 interface AdminProfile { userId: string; companyId: string; companyName?: string; company?: { id: string; name: string } }
@@ -171,6 +171,10 @@ export default function StudentsPage() {
               <Plus size={14} /> Add student
             </button>
           )}
+          <a href="/api/export/students" target="_blank" rel="noopener noreferrer"
+            className="bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5">
+            <Download size={14} /> Export CSV
+          </a>
         </div>
 
         {isLoading ? (

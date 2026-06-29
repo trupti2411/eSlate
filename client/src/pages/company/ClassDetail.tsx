@@ -983,6 +983,10 @@ function RosterSection({
               <ListOrdered size={12} /> Waitlist
             </button>
           )}
+          <a href={`/api/export/classes/${classId}/students`} target="_blank" rel="noopener noreferrer"
+            className="text-xs font-bold text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-3 py-2 rounded-xl flex items-center gap-1.5">
+            <Download size={12} /> Export
+          </a>
           <button
             onClick={onEnrolClick}
             disabled={atCap}

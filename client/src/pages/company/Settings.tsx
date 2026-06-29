@@ -6,7 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
 import {
   Settings as SettingsIcon, Bell, LogOut, ArrowLeft, Save, Building2,
-  BookOpen, Check, Globe, Hash, Image,
+  BookOpen, Check, Globe, Hash, Image, CreditCard,
 } from 'lucide-react';
 
 interface AdminProfile {
@@ -29,6 +29,10 @@ interface BusinessProfile {
   tier?: string;
   pack_version?: string | null;
   active_subject_ids: number[];
+  paymentBsb?: string | null;
+  paymentAccount?: string | null;
+  paymentReference?: string | null;
+  paymentNotes?: string | null;
 }
 interface SubjectRow { id: number; code: string; name: string; state_code?: string; }
 
@@ -95,6 +99,7 @@ export default function SettingsPage() {
         ) : (
           <>
             <BusinessProfileSection businessId={companyId} profile={profile} />
+            <PaymentInstructionsSection businessId={companyId} profile={profile} />
             <SubjectsSection businessId={companyId} profile={profile} subjects={subjects} />
             <PlanSection profile={profile} />
           </>
@@ -222,6 +227,69 @@ function BusinessProfileSection({
         disabled={!valid || m.isPending}
         saving={m.isPending}
       />
+    </section>
+  );
+}
+
+function PaymentInstructionsSection({
+  businessId, profile,
+}: { businessId: string; profile: BusinessProfile }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [bsb, setBsb] = useState(profile.paymentBsb ?? '');
+  const [account, setAccount] = useState(profile.paymentAccount ?? '');
+  const [reference, setReference] = useState(profile.paymentReference ?? '');
+  const [notes, setNotes] = useState(profile.paymentNotes ?? '');
+
+  useEffect(() => {
+    setBsb(profile.paymentBsb ?? '');
+    setAccount(profile.paymentAccount ?? '');
+    setReference(profile.paymentReference ?? '');
+    setNotes(profile.paymentNotes ?? '');
+  }, [profile]);
+
+  const m = useMutation({
+    mutationFn: () =>
+      apiRequest(`/api/businesses/${businessId}`, 'PATCH', {
+        paymentBsb: bsb.trim() || null,
+        paymentAccount: account.trim() || null,
+        paymentReference: reference.trim() || null,
+        paymentNotes: notes.trim() || null,
+      }),
+    onSuccess: () => {
+      toast({ title: 'Payment instructions saved' });
+      qc.invalidateQueries({ queryKey: [`/api/businesses/${businessId}`] });
+    },
+    onError: (e: any) => {
+      toast({ title: 'Could not save', description: e.message ?? 'Try again.', variant: 'destructive' });
+    },
+  });
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <SectionHeader icon={<CreditCard size={16} className="text-indigo-600" />} title="Payment instructions" />
+      <div className="p-5 space-y-4">
+        <p className="text-xs text-gray-500">These details appear on invoices sent to parents/students.</p>
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="BSB">
+            <input value={bsb} onChange={e => setBsb(e.target.value)} placeholder="123-456"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </Field>
+          <Field label="Account number">
+            <input value={account} onChange={e => setAccount(e.target.value)} placeholder="12345678"
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </Field>
+        </div>
+        <Field label="Payment reference hint (optional)" hint="e.g. 'Student surname + invoice number'">
+          <input value={reference} onChange={e => setReference(e.target.value)} placeholder="Surname + INV-0001"
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        </Field>
+        <Field label="Additional notes (optional)" hint="Shown at the bottom of invoices — e.g. bank name, PayID.">
+          <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} placeholder="e.g. PayID: hello@business.com | Bank: CBA"
+            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none" />
+        </Field>
+      </div>
+      <SectionFooter onSave={() => m.mutate()} disabled={m.isPending} saving={m.isPending} />
     </section>
   );
 }

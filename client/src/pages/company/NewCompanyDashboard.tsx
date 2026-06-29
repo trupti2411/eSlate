@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState, useRef, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { DesignNavToggle } from '@/components/DesignSwitchBanner';
@@ -9,7 +9,9 @@ import {
   CalendarDays, FileBarChart, Bell, LogOut, ArrowRight, UserPlus,
   ClipboardPlus, Plus, AlertTriangle, ChevronRight, Activity, Mail,
   UserCheck, FileEdit, CircleSlash, Settings as SettingsIcon, Trophy,
+  DollarSign, BarChart2, X, Check,
 } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
 
 interface Props { setDesign: (d: Design) => void; }
 
@@ -69,6 +71,18 @@ interface AuditEntry {
   payload: Record<string, unknown> | null;
 }
 
+interface InAppNotif {
+  id: string; type: string; title: string; message: string; isRead: boolean; createdAt: string;
+}
+
+interface EnrolmentSummary {
+  termId: string | null;
+  metrics: { totalStudents: number; totalClasses: number; totalEnrolments: number; availableSpots: number; waitlisted: number; };
+  byClass: { id: string; name: string; courseName?: string; yearGroup?: string; tutorName?: string; enrolled: number; capacity?: number; attendancePct?: number }[];
+  byCourse: { courseId: string; courseName: string; classes: number; students: number }[];
+  byYearGroup: { yearGroup: string; count: number }[];
+}
+
 function formatDate(s: string | null | undefined): string {
   if (!s) return '';
   const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -101,6 +115,18 @@ function dateOnly(s: string | null | undefined): string {
 
 export default function NewCompanyDashboard({ setDesign }: Props) {
   const { user, logoutMutation } = useAuth();
+  const qc = useQueryClient();
+  const [showNotifs, setShowNotifs] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
+
+  // Close notif panel on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotifs(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -129,6 +155,42 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
 
   const { data: auditLog = [] } = useQuery<AuditEntry[]>({
     queryKey: [`/api/companies/${companyId}/audit-log?limit=8`],
+    enabled: !!companyId,
+  });
+
+  const { data: notifications = [] } = useQuery<InAppNotif[]>({
+    queryKey: ['/api/notifications'],
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+  const { data: unreadCountData } = useQuery<{ count: number }>({
+    queryKey: ['/api/notifications/unread-count'],
+    enabled: !!user?.id,
+    refetchInterval: 60000,
+  });
+  const unreadCount = unreadCountData?.count ?? 0;
+
+  const markReadMutation = useMutation({
+    mutationFn: () => apiRequest('POST', '/api/notifications/read-all', {}),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['/api/notifications'] }); qc.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] }); },
+  });
+  const deleteNotifMutation = useMutation({
+    mutationFn: (id: string) => apiRequest('DELETE', `/api/notifications/${id}`, {}),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['/api/notifications'] }); qc.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] }); },
+  });
+
+  const [enrolmentTermId, setEnrolmentTermId] = useState('');
+  const { data: terms = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: [`/api/companies/${companyId}/terms`],
+    enabled: !!companyId,
+  });
+  const { data: enrolmentSummary } = useQuery<EnrolmentSummary>({
+    queryKey: [`/api/companies/${companyId}/enrolment-summary`, enrolmentTermId],
+    queryFn: async () => {
+      const params = enrolmentTermId ? `?term_id=${enrolmentTermId}` : '';
+      const res = await fetch(`/api/companies/${companyId}/enrolment-summary${params}`);
+      return res.json();
+    },
     enabled: !!companyId,
   });
 
@@ -234,9 +296,44 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
               >
                 <SettingsIcon size={16} />
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <div className="relative" ref={notifRef}>
+                <button onClick={() => setShowNotifs(v => !v)} className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center relative" aria-label="Notifications">
+                  <Bell size={16} />
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+                {showNotifs && (
+                  <div className="absolute right-0 top-12 w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 max-h-[480px] flex flex-col">
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                      <h3 className="font-black text-gray-900 text-sm">Notifications {unreadCount > 0 && <span className="ml-1 text-rose-500">({unreadCount})</span>}</h3>
+                      <div className="flex gap-2">
+                        {unreadCount > 0 && <button onClick={() => markReadMutation.mutate()} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">Mark all read</button>}
+                        <button onClick={() => setShowNotifs(false)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+                      </div>
+                    </div>
+                    <div className="overflow-y-auto flex-1">
+                      {notifications.length === 0 ? (
+                        <p className="text-center text-sm text-gray-400 py-8">No notifications</p>
+                      ) : (
+                        notifications.map(n => (
+                          <div key={n.id} className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.isRead ? 'bg-indigo-50/40' : ''}`}>
+                            <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!n.isRead ? 'bg-indigo-500' : 'bg-transparent'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-900 leading-snug">{n.title}</p>
+                              <p className="text-xs text-gray-500 mt-0.5 leading-snug">{n.message}</p>
+                              <p className="text-[10px] text-gray-400 mt-1">{relativeTime(n.createdAt)}</p>
+                            </div>
+                            <button onClick={() => deleteNotifMutation.mutate(n.id)} className="text-gray-300 hover:text-gray-500 flex-shrink-0"><X size={12} /></button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -301,6 +398,7 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-6">
             <QuickActionsCard hasStudents={students.length > 0} hasClasses={classes.length > 0} hasTutors={tutors.length > 0} />
+            <EnrolmentSummaryCard summary={enrolmentSummary} terms={terms} termId={enrolmentTermId} onTermChange={setEnrolmentTermId} />
             <AcademicCard year={currentYear} />
             <ActivityCard entries={auditLog} />
           </div>
@@ -463,12 +561,13 @@ function QuickActionsCard({
     { href: '/company/tutors', label: 'Invite tutor', icon: <UserPlus size={16} />, tone: 'indigo' as const, primary: !hasTutors },
     { href: '/company/students', label: 'Add student', icon: <Plus size={16} />, tone: 'emerald' as const, primary: hasTutors && !hasStudents },
     { href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
-    { href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'rose' as const, primary: false },
-    { href: '/company/courses', label: 'Create course', icon: <Trophy size={16} />, tone: 'violet' as const, primary: false },
-    { href: '/company/subjects', label: 'Subjects', icon: <GraduationCap size={16} />, tone: 'teal' as const, primary: false },
+    { href: '/company/invoices', label: 'Invoices', icon: <DollarSign size={16} />, tone: 'rose' as const, primary: false },
+    { href: '/company/revenue', label: 'Revenue', icon: <BarChart2 size={16} />, tone: 'violet' as const, primary: false },
+    { href: '/company/courses', label: 'Courses', icon: <Trophy size={16} />, tone: 'teal' as const, primary: false },
+    { href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'indigo' as const, primary: false },
     { href: '/company/terms', label: 'Terms', icon: <CalendarDays size={16} />, tone: 'indigo' as const, primary: false },
   ];
-  const toneClass = (k: 'indigo' | 'emerald' | 'amber' | 'rose' | 'violet' | 'teal', primary: boolean) => {
+  const toneClass = (k: 'indigo' | 'emerald' | 'amber' | 'rose' | 'violet' | 'teal' | 'gray', primary: boolean) => {
     const map: Record<string, { primary: string; ghost: string }> = {
       indigo:  { primary: 'bg-indigo-600 hover:bg-indigo-700 text-white',  ghost: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700' },
       emerald: { primary: 'bg-emerald-600 hover:bg-emerald-700 text-white', ghost: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700' },
@@ -476,6 +575,7 @@ function QuickActionsCard({
       rose:    { primary: 'bg-rose-600 hover:bg-rose-700 text-white',    ghost: 'bg-rose-50 hover:bg-rose-100 text-rose-700' },
       violet:  { primary: 'bg-violet-600 hover:bg-violet-700 text-white',  ghost: 'bg-violet-50 hover:bg-violet-100 text-violet-700' },
       teal:    { primary: 'bg-teal-600 hover:bg-teal-700 text-white',    ghost: 'bg-teal-50 hover:bg-teal-100 text-teal-700' },
+      gray:    { primary: 'bg-gray-600 hover:bg-gray-700 text-white',    ghost: 'bg-gray-50 hover:bg-gray-100 text-gray-700' },
     };
     return primary ? map[k].primary : map[k].ghost;
   };
@@ -489,7 +589,7 @@ function QuickActionsCard({
           <Link
             key={a.label}
             href={a.href}
-            className={`${toneClass(a.tone, a.primary)} rounded-xl px-3 py-3 text-sm font-bold flex items-center gap-2 justify-center transition-colors`}
+            className={`${toneClass(a.tone as any, a.primary)} rounded-xl px-3 py-3 text-sm font-bold flex items-center gap-2 justify-center transition-colors`}
           >
             {a.icon}
             <span className="truncate">{a.label}</span>
@@ -686,6 +786,100 @@ function ComplianceCard({ tutors }: { tutors: Tutor[] }) {
             </div>
           )}
         </div>
+      )}
+    </section>
+  );
+}
+
+function EnrolmentSummaryCard({
+  summary, terms, termId, onTermChange,
+}: {
+  summary?: EnrolmentSummary;
+  terms: { id: string; name: string }[];
+  termId: string;
+  onTermChange: (id: string) => void;
+}) {
+  const m = summary?.metrics;
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
+          <BarChart2 size={14} className="text-indigo-600" /> Enrolment Summary
+        </h3>
+        <select value={termId} onChange={e => onTermChange(e.target.value)} className="border border-gray-200 rounded-xl px-2 py-1 text-xs font-semibold text-gray-600">
+          <option value="">Current Term</option>
+          {terms.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      </div>
+
+      {!summary?.termId && !summary?.metrics ? (
+        <p className="text-sm text-gray-400">No active term found. Set up your academic calendar to see enrolment data.</p>
+      ) : (
+        <>
+          {/* Metrics row */}
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 mb-4">
+            {[
+              { label: 'Students', value: m?.totalStudents ?? 0, cls: 'text-indigo-700' },
+              { label: 'Classes',  value: m?.totalClasses ?? 0,  cls: 'text-amber-700' },
+              { label: 'Enrolments', value: m?.totalEnrolments ?? 0, cls: 'text-emerald-700' },
+              { label: 'Spots Left',  value: m?.availableSpots ?? 0, cls: 'text-gray-700' },
+              { label: 'Waitlisted', value: m?.waitlisted ?? 0, cls: 'text-rose-600' },
+            ].map(item => (
+              <div key={item.label} className="text-center">
+                <p className={`text-xl font-black ${item.cls}`}>{item.value}</p>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{item.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* By class */}
+          {summary?.byClass && summary.byClass.length > 0 && (
+            <div className="mb-3">
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">By Class</p>
+              <div className="space-y-1.5">
+                {summary.byClass.slice(0, 5).map(c => {
+                  const pct = c.capacity ? Math.min(100, Math.round((c.enrolled / c.capacity) * 100)) : null;
+                  return (
+                    <div key={c.id} className="flex items-center gap-2 text-xs">
+                      <Link href={`/company/classes/${c.id}`} className="font-semibold text-gray-800 hover:text-indigo-700 truncate flex-1">{c.name}</Link>
+                      <span className="text-gray-500 whitespace-nowrap">{c.enrolled}{c.capacity ? `/${c.capacity}` : ''}</span>
+                      {pct !== null && (
+                        <div className="w-16 h-1.5 rounded-full bg-gray-200 overflow-hidden">
+                          <div className={`h-full rounded-full ${pct >= 100 ? 'bg-rose-500' : pct >= 80 ? 'bg-amber-500' : 'bg-emerald-500'}`} style={{ width: `${pct}%` }} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {summary.byClass.length > 5 && (
+                  <Link href="/company/classes" className="text-xs text-indigo-600 font-semibold hover:underline">+ {summary.byClass.length - 5} more classes</Link>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* By year group */}
+          {summary?.byYearGroup && summary.byYearGroup.length > 0 && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">By Year Group</p>
+              <div className="space-y-1">
+                {summary.byYearGroup.map(yg => {
+                  const maxCount = Math.max(...summary.byYearGroup.map(y => y.count), 1);
+                  const pct = Math.round((yg.count / maxCount) * 100);
+                  return (
+                    <div key={yg.yearGroup} className="flex items-center gap-2 text-xs">
+                      <span className="text-gray-600 w-16 flex-shrink-0">{yg.yearGroup}</span>
+                      <div className="flex-1 h-2 rounded-full bg-gray-100 overflow-hidden">
+                        <div className="h-full rounded-full bg-indigo-400" style={{ width: `${pct}%` }} />
+                      </div>
+                      <span className="text-gray-500 w-8 text-right">{yg.count}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </>
       )}
     </section>
   );

@@ -19,8 +19,8 @@ import {
 import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, desc, inArray, and, lte, isNotNull, sql, ne, gt, max, asc } from "drizzle-orm";
-import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs, studentProgressReports, inAppNotifications, academicTerms, courses, classes, classWaitlist, classSessions, sessionAttendance, studentClassAssignments } from "@shared/schema";
+import { eq, desc, inArray, and, lte, lt, isNotNull, sql, ne, gt, gte, max, asc, count, or, isNull, sum } from "drizzle-orm";
+import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs, studentProgressReports, inAppNotifications, academicTerms, academicYears, courses, classes, classWaitlist, classSessions, sessionAttendance, studentClassAssignments, invoices, invoiceLineItems, payments, termReminders, studentContacts, companySubjects } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Report generation helper functions
@@ -4361,8 +4361,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (status !== undefined) updates.status = status;
       if (Array.isArray(term_ids) && term_ids.length > 0) updates.termId = String(term_ids[0]);
 
+      // ESLATE-39: detect notification-triggering changes
+      const notifyFields = ['tutorId', 'dayOfWeek', 'startTime', 'endTime', 'termId', 'status'];
+      const notifyParents: boolean = req.body.notify_parents !== false;
+      const changedNotifyFields = notifyFields.filter(f => updates[f] !== undefined && (existing as any)[f] !== updates[f]);
+
       await storage.updateClass(classId, updates);
       const updated = await storage.getClassDetailById(classId, ca.companyId);
+
+      // Send parent email notifications if impactful fields changed (ESLATE-39)
+      if (notifyParents && changedNotifyFields.length > 0 && existing.status !== 'archived') {
+        setImmediate(async () => {
+          try {
+            const enrolled = await db
+              .select({ studentId: studentClassAssignments.studentId })
+              .from(studentClassAssignments)
+              .where(and(eq(studentClassAssignments.classId, classId), eq(studentClassAssignments.isActive, true)));
+            if (enrolled.length === 0) return;
+            const studentIds = enrolled.map(e => e.studentId);
+            const contacts = await db
+              .select({ email: studentContacts.email, name: studentContacts.name, studentId: studentContacts.studentId })
+              .from(studentContacts)
+              .where(and(inArray(studentContacts.studentId, studentIds), eq(studentContacts.isPrimary, true)));
+            const uniqueEmails = [...new Map(contacts.map(c => [c.email, c])).values()].filter(c => c.email);
+            if (uniqueEmails.length === 0) return;
+            if (!process.env.EMAIL_HOST || !process.env.EMAIL_USER) return;
+            const transporter = nodemailer.createTransport({
+              host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'), secure: false,
+              auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS },
+            });
+            const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+            const changeLines = changedNotifyFields.map(f => {
+              if (f === 'tutorId') return `<li>Tutor has been updated</li>`;
+              if (f === 'dayOfWeek') return `<li>Day changed to ${dayNames[updates.dayOfWeek] ?? updates.dayOfWeek}</li>`;
+              if (f === 'startTime' || f === 'endTime') return `<li>Time updated: ${updates.startTime || existing.startTime} – ${updates.endTime || existing.endTime}</li>`;
+              if (f === 'termId') return `<li>Term has been updated</li>`;
+              if (f === 'status') return `<li>Class status changed to ${updates.status}</li>`;
+              return '';
+            }).join('');
+            const html = `<p>Dear Parent/Guardian,</p><p>We wanted to let you know that the following changes have been made to <strong>${existing.name}</strong>:</p><ul>${changeLines}</ul><p>If you have any questions, please contact us.</p><p>Regards,<br>The eSlate Team</p>`;
+            for (const c of uniqueEmails) {
+              await transporter.sendMail({ from: process.env.EMAIL_FROM || 'noreply@eslate.com', to: c.email!, subject: `Update: ${existing.name}`, html }).catch(() => {});
+            }
+          } catch (e) { console.error('[ESLATE-39] Parent notification error:', e); }
+        });
+      }
+
       res.json(updated);
     } catch (err: any) {
       console.error("Error updating class:", err);
@@ -4838,6 +4882,78 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err: any) {
       console.error("Error enrolling from waitlist:", err);
       res.status(500).json({ message: err.message ?? "Failed to enrol from waitlist" });
+    }
+  });
+
+  // GET business profile (used by Settings page)
+  app.get('/api/businesses/:businessId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { businessId } = req.params;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca || ca.companyId !== businessId) return res.status(403).json({ message: 'Access denied' });
+      }
+      const [company] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, businessId));
+      if (!company) return res.status(404).json({ message: 'Not found' });
+      // get active subject ids
+      const subjectRows = await db.select({ subjectId: companySubjects.subjectId }).from(companySubjects).where(eq(companySubjects.companyId, businessId));
+      res.json({ ...company, active_subject_ids: subjectRows.map(s => s.subjectId) });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message ?? 'Failed to fetch business' });
+    }
+  });
+
+  // PATCH business profile (name, abn, timezone, currency, payment instructions)
+  app.patch('/api/businesses/:businessId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { businessId } = req.params;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca || ca.companyId !== businessId) return res.status(403).json({ message: 'Access denied' });
+      }
+      const { name, legal_name, abn, logo, timezone, currency, paymentBsb, paymentAccount, paymentReference, paymentNotes } = req.body;
+      const updates: Record<string, any> = {};
+      if (name !== undefined) updates.name = name;
+      if (legal_name !== undefined) updates.legalName = legal_name;
+      if (abn !== undefined) updates.abn = abn;
+      if (logo !== undefined) updates.logo = logo;
+      if (timezone !== undefined) updates.timezone = timezone;
+      if (currency !== undefined) updates.currency = currency;
+      if (paymentBsb !== undefined) updates.paymentBsb = paymentBsb;
+      if (paymentAccount !== undefined) updates.paymentAccount = paymentAccount;
+      if (paymentReference !== undefined) updates.paymentReference = paymentReference;
+      if (paymentNotes !== undefined) updates.paymentNotes = paymentNotes;
+      const company = await storage.updateTutoringCompany(businessId, updates);
+      res.json(company);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message ?? 'Failed to update business' });
+    }
+  });
+
+  // PATCH business subjects
+  app.patch('/api/businesses/:businessId/subjects', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { businessId } = req.params;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca || ca.companyId !== businessId) return res.status(403).json({ message: 'Access denied' });
+      }
+      const { active_subject_ids } = req.body;
+      if (!Array.isArray(active_subject_ids)) return res.status(400).json({ message: 'active_subject_ids must be an array' });
+      // replace all company subjects
+      await db.delete(companySubjects).where(eq(companySubjects.companyId, businessId));
+      if (active_subject_ids.length > 0) {
+        await db.insert(companySubjects).values(active_subject_ids.map((subjectId: number) => ({ companyId: businessId, subjectId })));
+      }
+      res.json({ message: 'Subjects updated', count: active_subject_ids.length });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message ?? 'Failed to update subjects' });
     }
   });
 
@@ -9164,6 +9280,655 @@ Good luck with your assignment!"
     } catch (error) {
       res.status(500).json({ message: 'Failed to mark all as read' });
     }
+  });
+
+  // ── ESLATE-40 — Additional notification endpoints ────────────────────────
+  app.get('/api/notifications/unread-count', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const [row] = await db.select({ c: count() }).from(inAppNotifications)
+        .where(and(eq(inAppNotifications.userId, user.id), eq(inAppNotifications.isRead, false)));
+      res.json({ count: Number(row?.c ?? 0) });
+    } catch { res.status(500).json({ count: 0 }); }
+  });
+
+  app.delete('/api/notifications/:notificationId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { notificationId } = req.params;
+      await db.delete(inAppNotifications)
+        .where(and(eq(inAppNotifications.id, notificationId), eq(inAppNotifications.userId, user.id)));
+      res.json({ message: 'Deleted' });
+    } catch { res.status(500).json({ message: 'Failed to delete notification' }); }
+  });
+
+  app.delete('/api/notifications', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      await db.delete(inAppNotifications).where(eq(inAppNotifications.userId, user.id));
+      res.json({ message: 'Cleared' });
+    } catch { res.status(500).json({ message: 'Failed to clear notifications' }); }
+  });
+
+  // ── ESLATE-32 — Enrolment summary dashboard ─────────────────────────────
+  app.get('/api/companies/:companyId/enrolment-summary', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const { term_id } = req.query;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+
+      // determine term
+      let termId: string | undefined = term_id as string;
+      if (!termId) {
+        const now = new Date();
+        const [currentTerm] = await db.select().from(academicTerms)
+          .where(and(eq(academicTerms.companyId, companyId), lte(academicTerms.startDate, now), gte(academicTerms.endDate, now)))
+          .limit(1);
+        termId = currentTerm?.id;
+      }
+      if (!termId) return res.json({ termId: null, metrics: {}, byClass: [], byCourse: [], byYearGroup: [] });
+
+      // active classes this term
+      const termClasses = await db.select().from(classes)
+        .where(and(eq(classes.companyId, companyId), eq(classes.termId, termId), ne(classes.status, 'archived')));
+      const classIds = termClasses.map(c => c.id);
+
+      // enrolled students per class
+      let enrollments: { classId: string; studentId: string }[] = [];
+      if (classIds.length > 0) {
+        enrollments = await db.select({ classId: studentClassAssignments.classId, studentId: studentClassAssignments.studentId })
+          .from(studentClassAssignments)
+          .where(and(inArray(studentClassAssignments.classId, classIds), eq(studentClassAssignments.isActive, true)));
+      }
+
+      const uniqueStudents = new Set(enrollments.map(e => e.studentId));
+      const totalEnrolments = enrollments.length;
+      const totalAvailableSpots = termClasses.reduce((s, c) => c.maxStudents ? s + Math.max(0, c.maxStudents - enrollments.filter(e => e.classId === c.id).length) : s, 0);
+
+      // waitlisted
+      let waitlistedCount = 0;
+      if (classIds.length > 0) {
+        const [wRow] = await db.select({ c: count() }).from(classWaitlist)
+          .where(and(inArray(classWaitlist.classId, classIds), eq(classWaitlist.status, 'waiting')));
+        waitlistedCount = Number(wRow?.c ?? 0);
+      }
+
+      // attendance % per class
+      const attendanceMap: Record<string, number> = {};
+      if (classIds.length > 0) {
+        const sessRows = await db.select({ classId: classSessions.classId, enrolled: classSessions.enrolledCount, attended: classSessions.attendedCount })
+          .from(classSessions)
+          .where(and(inArray(classSessions.classId, classIds), eq(classSessions.status, 'completed')));
+        for (const c of termClasses) {
+          const rows = sessRows.filter(r => r.classId === c.id);
+          const totalEnrolled = rows.reduce((s, r) => s + (r.enrolled ?? 0), 0);
+          const totalAttended = rows.reduce((s, r) => s + (r.attended ?? 0), 0);
+          attendanceMap[c.id] = totalEnrolled > 0 ? Math.round((totalAttended / totalEnrolled) * 100) : 0;
+        }
+      }
+
+      // get tutor/course names
+      const tutorIds = [...new Set(termClasses.map(c => c.tutorId).filter(Boolean))] as string[];
+      let tutorNames: Record<string, string> = {};
+      if (tutorIds.length > 0) {
+        const tutorRows = await db.select({ id: tutors.id, userId: tutors.userId }).from(tutors).where(inArray(tutors.id, tutorIds));
+        const userIds = tutorRows.map(t => t.userId);
+        const userRows = await db.select({ id: users.id, firstName: users.firstName, lastName: users.lastName }).from(users).where(inArray(users.id, userIds));
+        for (const t of tutorRows) {
+          const u = userRows.find(u => u.id === t.userId);
+          if (u) tutorNames[t.id] = `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim();
+        }
+      }
+      const courseIds = [...new Set(termClasses.map(c => c.courseId).filter(Boolean))] as string[];
+      let courseNames: Record<string, string> = {};
+      if (courseIds.length > 0) {
+        const courseRows = await db.select({ id: courses.id, name: courses.name }).from(courses).where(inArray(courses.id, courseIds));
+        for (const c of courseRows) courseNames[c.id] = c.name;
+      }
+
+      const byClass = termClasses.map(c => {
+        const enrolled = enrollments.filter(e => e.classId === c.id).length;
+        return {
+          id: c.id, name: c.name, courseId: c.courseId, courseName: c.courseId ? courseNames[c.courseId] : null,
+          yearGroup: c.yearGroupCode, tutorName: c.tutorId ? tutorNames[c.tutorId] : null,
+          enrolled, capacity: c.maxStudents, attendancePct: attendanceMap[c.id] ?? null,
+        };
+      }).sort((a, b) => a.name.localeCompare(b.name));
+
+      const byCourse: Record<string, { courseId: string; courseName: string; classes: number; students: number }> = {};
+      for (const c of byClass) {
+        const key = c.courseId ?? '__none__';
+        if (!byCourse[key]) byCourse[key] = { courseId: c.courseId ?? '', courseName: c.courseName ?? 'No course', classes: 0, students: 0 };
+        byCourse[key].classes++;
+        byCourse[key].students += c.enrolled;
+      }
+
+      const byYearGroup: Record<string, number> = {};
+      for (const c of byClass) {
+        const yg = c.yearGroup ?? 'Unknown';
+        byYearGroup[yg] = (byYearGroup[yg] ?? 0) + c.enrolled;
+      }
+
+      res.json({
+        termId,
+        metrics: { totalStudents: uniqueStudents.size, totalClasses: termClasses.length, totalEnrolments, availableSpots: totalAvailableSpots, waitlisted: waitlistedCount },
+        byClass,
+        byCourse: Object.values(byCourse).sort((a, b) => b.students - a.students),
+        byYearGroup: Object.entries(byYearGroup).map(([yg, count]) => ({ yearGroup: yg, count })).sort((a, b) => a.yearGroup.localeCompare(b.yearGroup)),
+      });
+    } catch (err: any) { console.error('[ESLATE-32]', err); res.status(500).json({ message: 'Failed to fetch enrolment summary' }); }
+  });
+
+  // available terms for the company
+  app.get('/api/companies/:companyId/terms', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const terms = await db.select().from(academicTerms).where(eq(academicTerms.companyId, companyId)).orderBy(desc(academicTerms.startDate));
+      res.json(terms);
+    } catch { res.status(500).json({ message: 'Failed to fetch terms' }); }
+  });
+
+  // ── ESLATE-33 — Revenue report ───────────────────────────────────────────
+  app.get('/api/companies/:companyId/reports/revenue', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { term_id } = req.query;
+
+      const whereClause = term_id
+        ? and(eq(invoices.companyId, companyId), eq(invoices.termId, term_id as string))
+        : eq(invoices.companyId, companyId);
+
+      const allInvoices = await db.select().from(invoices).where(whereClause).orderBy(desc(invoices.invoiceDate));
+
+      const allPayments = allInvoices.length > 0
+        ? await db.select().from(payments).where(inArray(payments.invoiceId, allInvoices.map(i => i.id)))
+        : [];
+
+      const paidByInvoice: Record<string, number> = {};
+      for (const p of allPayments) {
+        paidByInvoice[p.invoiceId] = (paidByInvoice[p.invoiceId] ?? 0) + parseFloat(p.amount as string);
+      }
+
+      const now = new Date();
+      let expectedRevenue = 0, invoicedRevenue = 0, collectedRevenue = 0, outstandingRevenue = 0, overdueRevenue = 0;
+      for (const inv of allInvoices) {
+        const total = parseFloat(inv.total as string);
+        const paid = paidByInvoice[inv.id] ?? 0;
+        if (inv.status !== 'void') { expectedRevenue += total; }
+        if (inv.status !== 'draft' && inv.status !== 'void') { invoicedRevenue += total; }
+        collectedRevenue += paid;
+        const outstanding = total - paid;
+        if (['sent', 'partially_paid', 'overdue'].includes(inv.status) && outstanding > 0) { outstandingRevenue += outstanding; }
+        if (inv.status === 'overdue' && outstanding > 0) { overdueRevenue += outstanding; }
+      }
+
+      // by course
+      const lineItems = allInvoices.length > 0
+        ? await db.select({ invoiceId: invoiceLineItems.invoiceId, classId: invoiceLineItems.classId, total: invoiceLineItems.total })
+            .from(invoiceLineItems).where(inArray(invoiceLineItems.invoiceId, allInvoices.map(i => i.id)))
+        : [];
+      const classIds2 = [...new Set(lineItems.map(l => l.classId).filter(Boolean))] as string[];
+      let classToCourseName: Record<string, string> = {};
+      if (classIds2.length > 0) {
+        const classRows = await db.select({ id: classes.id, courseId: classes.courseId }).from(classes).where(inArray(classes.id, classIds2));
+        const cIds = [...new Set(classRows.map(c => c.courseId).filter(Boolean))] as string[];
+        if (cIds.length > 0) {
+          const cRows = await db.select({ id: courses.id, name: courses.name }).from(courses).where(inArray(courses.id, cIds));
+          for (const cl of classRows) {
+            if (cl.courseId) { const c = cRows.find(r => r.id === cl.courseId); if (c) classToCourseName[cl.id] = c.name; }
+          }
+        }
+      }
+      const byCourse: Record<string, { courseName: string; expected: number; collected: number; outstanding: number }> = {};
+      for (const li of lineItems) {
+        const inv = allInvoices.find(i => i.id === li.invoiceId)!;
+        const courseName = li.classId ? (classToCourseName[li.classId] ?? 'No course') : 'No course';
+        if (!byCourse[courseName]) byCourse[courseName] = { courseName, expected: 0, collected: 0, outstanding: 0 };
+        const liTotal = parseFloat(li.total as string);
+        if (inv.status !== 'void') byCourse[courseName].expected += liTotal;
+        const invPaid = paidByInvoice[inv.id] ?? 0;
+        const invTotal = parseFloat(inv.total as string);
+        const payFrac = invTotal > 0 ? Math.min(1, invPaid / invTotal) : 0;
+        byCourse[courseName].collected += liTotal * payFrac;
+        byCourse[courseName].outstanding += liTotal * (1 - payFrac);
+      }
+
+      res.json({
+        metrics: { expectedRevenue, invoicedRevenue, collectedRevenue, outstandingRevenue, overdueRevenue },
+        byCourse: Object.values(byCourse).sort((a, b) => b.expected - a.expected),
+        invoices: allInvoices.map(i => ({
+          ...i, amountPaid: paidByInvoice[i.id] ?? 0,
+          outstanding: parseFloat(i.total as string) - (paidByInvoice[i.id] ?? 0),
+        })),
+      });
+    } catch (err: any) { console.error('[ESLATE-33]', err); res.status(500).json({ message: 'Failed to fetch revenue report' }); }
+  });
+
+  // ── ESLATE-34 — CSV exports ──────────────────────────────────────────────
+  function csvRow(values: (string | number | null | undefined)[]): string {
+    return values.map(v => {
+      if (v == null) return '';
+      const s = String(v);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    }).join(',');
+  }
+  function formatDateAU(d: Date | null | undefined): string {
+    if (!d) return '';
+    const dt = new Date(d);
+    return `${String(dt.getDate()).padStart(2,'0')}/${String(dt.getMonth()+1).padStart(2,'0')}/${dt.getFullYear()}`;
+  }
+
+  app.get('/api/export/students', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: 'Not found' });
+      const allStudents = await storage.getStudentsByCompany(ca.companyId);
+      const lines = ['Student ID,First Name,Last Name,Date of Birth,Year Group,School,Roll Number,Status,Date Added'];
+      for (const s of allStudents) {
+        const u = await storage.getUser(s.userId);
+        lines.push(csvRow([s.id, u?.firstName, u?.lastName, formatDateAU(s.dateOfBirth), s.yearGroupCode, s.schoolName, s.rollNumber, s.status, formatDateAU(s.createdAt)]));
+      }
+      const today = new Date(); const dd = formatDateAU(today).replace(/\//g,'');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="Students_${dd}.csv"`);
+      res.send(lines.join('\n'));
+    } catch (err: any) { res.status(500).json({ message: 'Export failed' }); }
+  });
+
+  app.get('/api/export/classes', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: 'Not found' });
+      const allClasses = await storage.getClassesWithDetailsForCompany(ca.companyId);
+      const lines = ['Class Name,Course,Year Group,Tutor,Capacity,Status'];
+      for (const c of allClasses) {
+        lines.push(csvRow([c.name, (c as any).courseName, c.yearGroupCode, (c as any).tutorName, c.maxStudents, c.status]));
+      }
+      const dd = formatDateAU(new Date()).replace(/\//g,'');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="Classes_${dd}.csv"`);
+      res.send(lines.join('\n'));
+    } catch (err: any) { res.status(500).json({ message: 'Export failed' }); }
+  });
+
+  app.get('/api/export/classes/:classId/students', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const enrolled = await db.select({ studentId: studentClassAssignments.studentId })
+        .from(studentClassAssignments).where(and(eq(studentClassAssignments.classId, classId), eq(studentClassAssignments.isActive, true)));
+      const lines = ['Roll Number,First Name,Last Name,Year Group,School,Status'];
+      for (const e of enrolled) {
+        const s = await db.select().from(students).where(eq(students.id, e.studentId)).limit(1);
+        if (!s[0]) continue;
+        const u = await storage.getUser(s[0].userId);
+        lines.push(csvRow([s[0].rollNumber, u?.firstName, u?.lastName, s[0].yearGroupCode, s[0].schoolName, s[0].status]));
+      }
+      const dd = formatDateAU(new Date()).replace(/\//g,'');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="Class_Students_${dd}.csv"`);
+      res.send(lines.join('\n'));
+    } catch (err: any) { res.status(500).json({ message: 'Export failed' }); }
+  });
+
+  app.get('/api/export/attendance/:classId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const sessions = await db.select().from(classSessions).where(eq(classSessions.classId, classId)).orderBy(asc(classSessions.sessionDate));
+      const lines = ['Student Name,Roll Number,Session Date,Status'];
+      for (const sess of sessions) {
+        const attendanceRows = await db.select({ studentId: sessionAttendance.studentId, status: sessionAttendance.status })
+          .from(sessionAttendance).where(eq(sessionAttendance.sessionId, sess.id));
+        for (const att of attendanceRows) {
+          const s = await db.select().from(students).where(eq(students.id, att.studentId)).limit(1);
+          if (!s[0]) continue;
+          const u = await storage.getUser(s[0].userId);
+          lines.push(csvRow([`${u?.firstName ?? ''} ${u?.lastName ?? ''}`.trim(), s[0].rollNumber, formatDateAU(sess.sessionDate), att.status]));
+        }
+      }
+      const dd = formatDateAU(new Date()).replace(/\//g,'');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="Attendance_${dd}.csv"`);
+      res.send(lines.join('\n'));
+    } catch (err: any) { res.status(500).json({ message: 'Export failed' }); }
+  });
+
+  app.get('/api/export/invoices', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: 'Not found' });
+      const { term_id } = req.query;
+      const whereClause = term_id
+        ? and(eq(invoices.companyId, ca.companyId), eq(invoices.termId, term_id as string))
+        : eq(invoices.companyId, ca.companyId);
+      const allInvoices = await db.select().from(invoices).where(whereClause).orderBy(desc(invoices.invoiceDate));
+      const allPayments = allInvoices.length > 0
+        ? await db.select().from(payments).where(inArray(payments.invoiceId, allInvoices.map(i => i.id)))
+        : [];
+      const paidMap: Record<string, number> = {};
+      for (const p of allPayments) paidMap[p.invoiceId] = (paidMap[p.invoiceId] ?? 0) + parseFloat(p.amount as string);
+      const lines = ['Invoice #,Student,Invoice Date,Due Date,Total,Paid,Outstanding,Status'];
+      for (const inv of allInvoices) {
+        const s = await db.select().from(students).where(eq(students.id, inv.studentId)).limit(1);
+        const u = s[0] ? await storage.getUser(s[0].userId) : null;
+        const paid = paidMap[inv.id] ?? 0;
+        lines.push(csvRow([inv.invoiceNumber, u ? `${u.firstName} ${u.lastName}` : inv.studentId, formatDateAU(inv.invoiceDate), formatDateAU(inv.dueDate), inv.total, paid.toFixed(2), (parseFloat(inv.total as string) - paid).toFixed(2), inv.status]));
+      }
+      const dd = formatDateAU(new Date()).replace(/\//g,'');
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename="Invoices_${dd}.csv"`);
+      res.send(lines.join('\n'));
+    } catch (err: any) { res.status(500).json({ message: 'Export failed' }); }
+  });
+
+  // ── ESLATE-35 — Invoice generation ──────────────────────────────────────
+  async function getNextInvoiceNumber(companyId: string): Promise<string> {
+    const [row] = await db.select({ max: max(invoices.invoiceNumber) }).from(invoices).where(eq(invoices.companyId, companyId));
+    const last = row?.max ? parseInt(String(row.max).replace('INV-', ''), 10) : 0;
+    return `INV-${String((isNaN(last) ? 0 : last) + 1).padStart(4, '0')}`;
+  }
+
+  app.get('/api/companies/:companyId/invoices', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { term_id, student_id, status } = req.query;
+      let whereClause: any = eq(invoices.companyId, companyId);
+      const conditions: any[] = [eq(invoices.companyId, companyId)];
+      if (term_id) conditions.push(eq(invoices.termId, term_id as string));
+      if (student_id) conditions.push(eq(invoices.studentId, student_id as string));
+      if (status) conditions.push(eq(invoices.status, status as any));
+      whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+      const rows = await db.select().from(invoices).where(whereClause).orderBy(desc(invoices.createdAt));
+      const allPayments = rows.length > 0 ? await db.select().from(payments).where(inArray(payments.invoiceId, rows.map(i => i.id))) : [];
+      const paidMap: Record<string, number> = {};
+      for (const p of allPayments) paidMap[p.invoiceId] = (paidMap[p.invoiceId] ?? 0) + parseFloat(p.amount as string);
+      const result = await Promise.all(rows.map(async inv => {
+        const s = await db.select().from(students).where(eq(students.id, inv.studentId)).limit(1);
+        const u = s[0] ? await storage.getUser(s[0].userId) : null;
+        const paid = paidMap[inv.id] ?? 0;
+        return { ...inv, studentName: u ? `${u.firstName} ${u.lastName}` : '', amountPaid: paid, outstanding: parseFloat(inv.total as string) - paid };
+      }));
+      res.json(result);
+    } catch (err: any) { res.status(500).json({ message: 'Failed to fetch invoices' }); }
+  });
+
+  app.get('/api/invoices/:invoiceId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { invoiceId } = req.params;
+      const user = req.user!;
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      if (!inv) return res.status(404).json({ message: 'Invoice not found' });
+      const lineItemRows = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoiceId)).orderBy(asc(invoiceLineItems.sortOrder));
+      const paymentRows = await db.select().from(payments).where(eq(payments.invoiceId, invoiceId)).orderBy(asc(payments.paymentDate));
+      const amountPaid = paymentRows.reduce((s, p) => s + parseFloat(p.amount as string), 0);
+      const s = await db.select().from(students).where(eq(students.id, inv.studentId)).limit(1);
+      const u = s[0] ? await storage.getUser(s[0].userId) : null;
+      const contacts = s[0] ? await db.select().from(studentContacts).where(and(eq(studentContacts.studentId, s[0].id), eq(studentContacts.isPrimary, true))).limit(1) : [];
+      res.json({ ...inv, studentName: u ? `${u.firstName} ${u.lastName}` : '', studentRoll: s[0]?.rollNumber, parentContact: contacts[0] ?? null, lineItems: lineItemRows, payments: paymentRows, amountPaid, outstanding: parseFloat(inv.total as string) - amountPaid });
+    } catch (err: any) { res.status(500).json({ message: 'Failed to fetch invoice' }); }
+  });
+
+  app.post('/api/companies/:companyId/invoices', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { studentId, termId, invoiceDate, dueDate, lineItems: lines, discountAmount, discountType, discountReason, notes } = req.body;
+      if (!studentId) return res.status(400).json({ message: 'studentId required' });
+      const invoiceNumber = await getNextInvoiceNumber(companyId);
+      const subtotal = (lines ?? []).reduce((s: number, l: any) => s + parseFloat(l.total || '0'), 0);
+      const discount = parseFloat(discountAmount || '0');
+      const total = Math.max(0, subtotal - discount);
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      const [newInvoice] = await db.insert(invoices).values({
+        companyId, studentId, termId: termId || null, invoiceNumber, status: 'draft',
+        invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
+        dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 14 * 86400000),
+        subtotal: String(subtotal), discountAmount: String(discount), discountType: discountType || null,
+        discountReason: discountReason || null, total: String(total), notes: notes || null,
+        createdBy: user.id, createdByName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(),
+      });
+      const insertedInvoice = await db.select().from(invoices).where(eq(invoices.invoiceNumber, invoiceNumber)).limit(1);
+      const invId = insertedInvoice[0]?.id;
+      if (invId && lines?.length) {
+        await db.insert(invoiceLineItems).values(lines.map((l: any, i: number) => ({
+          invoiceId: invId, description: l.description, classId: l.classId || null, termId: l.termId || null,
+          sessions: l.sessions ? Number(l.sessions) : null, unitPrice: String(l.unitPrice || '0'),
+          total: String(l.total || '0'), isManual: !!l.isManual, sortOrder: i,
+        })));
+      }
+      res.json(insertedInvoice[0]);
+    } catch (err: any) { console.error('[ESLATE-35]', err); res.status(500).json({ message: 'Failed to create invoice' }); }
+  });
+
+  app.patch('/api/invoices/:invoiceId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { invoiceId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      if (!inv) return res.status(404).json({ message: 'Not found' });
+      if (inv.status !== 'draft') return res.status(400).json({ message: 'Cannot edit a sent invoice' });
+      const { lineItems: lines, discountAmount, discountType, discountReason, notes, invoiceDate, dueDate } = req.body;
+      const updates: Record<string, any> = { updatedAt: new Date() };
+      if (invoiceDate) updates.invoiceDate = new Date(invoiceDate);
+      if (dueDate) updates.dueDate = new Date(dueDate);
+      if (discountAmount !== undefined) updates.discountAmount = String(discountAmount);
+      if (discountType !== undefined) updates.discountType = discountType;
+      if (discountReason !== undefined) updates.discountReason = discountReason;
+      if (notes !== undefined) updates.notes = notes;
+      if (lines !== undefined) {
+        const subtotal = lines.reduce((s: number, l: any) => s + parseFloat(l.total || '0'), 0);
+        const discount = parseFloat(updates.discountAmount ?? inv.discountAmount ?? '0');
+        updates.subtotal = String(subtotal);
+        updates.total = String(Math.max(0, subtotal - discount));
+        await db.delete(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoiceId));
+        if (lines.length) {
+          await db.insert(invoiceLineItems).values(lines.map((l: any, i: number) => ({
+            invoiceId, description: l.description, classId: l.classId || null, termId: l.termId || null,
+            sessions: l.sessions ? Number(l.sessions) : null, unitPrice: String(l.unitPrice || '0'),
+            total: String(l.total || '0'), isManual: !!l.isManual, sortOrder: i,
+          })));
+        }
+      }
+      await db.update(invoices).set(updates).where(eq(invoices.id, invoiceId));
+      const [updated] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      res.json(updated);
+    } catch (err: any) { res.status(500).json({ message: 'Failed to update invoice' }); }
+  });
+
+  // ── ESLATE-36 — Send invoice ─────────────────────────────────────────────
+  app.post('/api/invoices/:invoiceId/send', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { invoiceId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      if (!inv) return res.status(404).json({ message: 'Not found' });
+      const { recipientEmail, ccEmails } = req.body;
+      const s = await db.select().from(students).where(eq(students.id, inv.studentId)).limit(1);
+      const u = s[0] ? await storage.getUser(s[0].userId) : null;
+      const contacts = s[0] ? await db.select().from(studentContacts).where(and(eq(studentContacts.studentId, s[0].id), eq(studentContacts.isPrimary, true))).limit(1) : [];
+      const toEmail = recipientEmail || contacts[0]?.email;
+      if (!toEmail) return res.status(400).json({ message: 'No recipient email available' });
+      const companyRow = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, inv.companyId)).limit(1);
+      const company = companyRow[0];
+      const lineItemRows = await db.select().from(invoiceLineItems).where(eq(invoiceLineItems.invoiceId, invoiceId));
+      const itemsHtml = lineItemRows.map(l => `<tr><td>${l.description}</td><td align="right">$${parseFloat(l.total as string).toFixed(2)}</td></tr>`).join('');
+      const paymentInstructions = company?.paymentNotes ? `<p><strong>Payment Instructions:</strong><br>${company.paymentNotes}</p>` :
+        company?.paymentBsb ? `<p><strong>Bank Transfer:</strong> BSB ${company.paymentBsb} · Account ${company.paymentAccount}<br>Reference: ${inv.invoiceNumber}</p>` : '';
+      const html = `<h2>Invoice ${inv.invoiceNumber}</h2><p>Dear ${contacts[0]?.name || 'Parent/Guardian'},</p><p>Please find your invoice details below for ${u ? `${u.firstName} ${u.lastName}` : 'your child'}.</p><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th>Description</th><th>Amount</th></tr>${itemsHtml}<tr><td><strong>Total Due</strong></td><td align="right"><strong>$${parseFloat(inv.total as string).toFixed(2)}</strong></td></tr></table><p><strong>Due Date:</strong> ${new Date(inv.dueDate).toLocaleDateString('en-AU')}</p>${paymentInstructions}<p>Thank you.</p>`;
+      if (process.env.EMAIL_HOST && process.env.EMAIL_USER) {
+        const transporter = nodemailer.createTransport({ host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'), secure: false, auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
+        await transporter.sendMail({ from: process.env.EMAIL_FROM || 'noreply@eslate.com', to: toEmail, cc: ccEmails?.join(','), subject: `Invoice ${inv.invoiceNumber} — ${company?.name ?? ''}`, html });
+      }
+      await db.update(invoices).set({ status: 'sent', sentAt: new Date(), sentToEmail: toEmail, sendStatus: 'sent', updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
+      res.json({ message: 'Invoice sent', sentTo: toEmail });
+    } catch (err: any) { console.error('[ESLATE-36]', err); res.status(500).json({ message: 'Failed to send invoice' }); }
+  });
+
+  app.post('/api/invoices/:invoiceId/resend', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { invoiceId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      if (!inv) return res.status(404).json({ message: 'Not found' });
+      if (!inv.sentToEmail && !req.body.recipientEmail) return res.status(400).json({ message: 'No recipient email' });
+      const toEmail = req.body.recipientEmail || inv.sentToEmail!;
+      const html = `<p>This is a resend of Invoice ${inv.invoiceNumber}. Total: $${parseFloat(inv.total as string).toFixed(2)}. Due: ${new Date(inv.dueDate).toLocaleDateString('en-AU')}.</p>`;
+      if (process.env.EMAIL_HOST && process.env.EMAIL_USER) {
+        const transporter = nodemailer.createTransport({ host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'), secure: false, auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
+        await transporter.sendMail({ from: process.env.EMAIL_FROM || 'noreply@eslate.com', to: toEmail, subject: `Resend: Invoice ${inv.invoiceNumber}`, html });
+      }
+      res.json({ message: 'Resent', sentTo: toEmail });
+    } catch (err: any) { res.status(500).json({ message: 'Failed to resend invoice' }); }
+  });
+
+  // ── ESLATE-37 — Payment tracking ─────────────────────────────────────────
+  app.post('/api/invoices/:invoiceId/payments', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { invoiceId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const [inv] = await db.select().from(invoices).where(eq(invoices.id, invoiceId)).limit(1);
+      if (!inv) return res.status(404).json({ message: 'Not found' });
+      if (inv.status === 'void') return res.status(400).json({ message: 'Cannot record payment on a voided invoice' });
+      const { amount, paymentDate, method, reference, notes } = req.body;
+      await db.insert(payments).values({ invoiceId, amount: String(amount), paymentDate: paymentDate ? new Date(paymentDate) : new Date(), method: method || 'bank_transfer', reference: reference || null, notes: notes || null, recordedBy: user.id, recordedByName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() });
+      const allPayments = await db.select().from(payments).where(eq(payments.invoiceId, invoiceId));
+      const totalPaid = allPayments.reduce((s, p) => s + parseFloat(p.amount as string), 0);
+      const invoiceTotal = parseFloat(inv.total as string);
+      let newStatus: 'paid' | 'partially_paid' | 'overdue' | 'sent' = totalPaid >= invoiceTotal ? 'paid' : totalPaid > 0 ? 'partially_paid' : 'sent';
+      await db.update(invoices).set({ status: newStatus, updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
+      res.json({ message: 'Payment recorded', status: newStatus, totalPaid });
+    } catch (err: any) { res.status(500).json({ message: 'Failed to record payment' }); }
+  });
+
+  app.patch('/api/invoices/:invoiceId/void', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { invoiceId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { voidReason } = req.body;
+      await db.update(invoices).set({ status: 'void', voidedAt: new Date(), voidReason: voidReason || 'Other', updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
+      res.json({ message: 'Invoice voided' });
+    } catch (err: any) { res.status(500).json({ message: 'Failed to void invoice' }); }
+  });
+
+  // Student invoice history
+  app.get('/api/students/:studentId/invoices', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { studentId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const rows = await db.select().from(invoices).where(eq(invoices.studentId, studentId)).orderBy(desc(invoices.invoiceDate));
+      const allPayments = rows.length > 0 ? await db.select().from(payments).where(inArray(payments.invoiceId, rows.map(i => i.id))) : [];
+      const paidMap: Record<string, number> = {};
+      for (const p of allPayments) paidMap[p.invoiceId] = (paidMap[p.invoiceId] ?? 0) + parseFloat(p.amount as string);
+      res.json(rows.map(inv => ({ ...inv, amountPaid: paidMap[inv.id] ?? 0, outstanding: parseFloat(inv.total as string) - (paidMap[inv.id] ?? 0) })));
+    } catch (err: any) { res.status(500).json({ message: 'Failed to fetch student invoices' }); }
+  });
+
+  // ── ESLATE-38 — Bulk invoice generation ─────────────────────────────────
+  app.post('/api/companies/:companyId/invoices/bulk', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { termId, studentIds, invoiceDate, dueDate, discountAmount, discountType, skipExisting } = req.body;
+      if (!termId || !Array.isArray(studentIds) || studentIds.length === 0) return res.status(400).json({ message: 'termId and studentIds required' });
+      const bulkRunId = randomUUID();
+      const results: { studentId: string; invoiceNumber: string; status: 'created' | 'skipped'; reason?: string }[] = [];
+      for (const sId of studentIds) {
+        // duplicate check
+        const existing2 = await db.select().from(invoices).where(and(eq(invoices.companyId, companyId), eq(invoices.studentId, sId), eq(invoices.termId, termId))).limit(1);
+        if (existing2.length > 0 && skipExisting !== false) { results.push({ studentId: sId, invoiceNumber: '', status: 'skipped', reason: 'already invoiced' }); continue; }
+        // get student's class enrollments for this term
+        const classEnrollments = await db.select({ classId: studentClassAssignments.classId })
+          .from(studentClassAssignments)
+          .innerJoin(classes, eq(classes.id, studentClassAssignments.classId))
+          .where(and(eq(studentClassAssignments.studentId, sId), eq(studentClassAssignments.isActive, true), eq(classes.termId, termId)));
+        const lineItems2: any[] = [];
+        for (const ce of classEnrollments) {
+          const [cl] = await db.select().from(classes).where(eq(classes.id, ce.classId)).limit(1);
+          if (!cl) continue;
+          const fee = parseFloat((cl.feePerSession || cl.feePerTerm || '0') as string);
+          lineItems2.push({ invoiceId: '', description: cl.name, classId: cl.id, termId, sessions: null, unitPrice: String(fee), total: String(fee), isManual: false });
+        }
+        const subtotal = lineItems2.reduce((s: number, l: any) => s + parseFloat(l.total), 0);
+        const discount = parseFloat(discountAmount || '0');
+        const total = Math.max(0, subtotal - discount);
+        const invNumber = await getNextInvoiceNumber(companyId);
+        await db.insert(invoices).values({ companyId, studentId: sId, termId, invoiceNumber: invNumber, status: 'draft', invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(), dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 14 * 86400000), subtotal: String(subtotal), discountAmount: String(discount), discountType: discountType || null, total: String(total), createdBy: user.id, createdByName: `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim(), bulkRunId });
+        const [inserted] = await db.select().from(invoices).where(eq(invoices.invoiceNumber, invNumber)).limit(1);
+        if (inserted && lineItems2.length > 0) {
+          await db.insert(invoiceLineItems).values(lineItems2.map((l: any, i: number) => ({ ...l, invoiceId: inserted.id, sortOrder: i })));
+        }
+        results.push({ studentId: sId, invoiceNumber: invNumber, status: 'created' });
+      }
+      const created = results.filter(r => r.status === 'created').length;
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      await db.insert(inAppNotifications).values({ userId: user.id, companyId, type: 'bulk_invoice_complete', title: 'Bulk Invoice Generation Complete', message: `${created} invoices generated for term. ${results.filter(r => r.status === 'skipped').length} skipped.`, data: { bulkRunId, created, total: studentIds.length } });
+      res.json({ bulkRunId, created, skipped: results.filter(r => r.status === 'skipped').length, results });
+    } catch (err: any) { console.error('[ESLATE-38]', err); res.status(500).json({ message: 'Failed to bulk generate invoices' }); }
+  });
+
+  // Bulk-send invoices
+  app.post('/api/companies/:companyId/invoices/bulk-send', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { invoiceIds } = req.body;
+      if (!Array.isArray(invoiceIds) || invoiceIds.length === 0) return res.status(400).json({ message: 'invoiceIds required' });
+      let sent = 0, failed = 0;
+      for (const invId of invoiceIds) {
+        try {
+          const [inv] = await db.select().from(invoices).where(eq(invoices.id, invId)).limit(1);
+          if (!inv || inv.status !== 'draft') { failed++; continue; }
+          const s = await db.select().from(students).where(eq(students.id, inv.studentId)).limit(1);
+          const contacts = s[0] ? await db.select().from(studentContacts).where(and(eq(studentContacts.studentId, s[0].id), eq(studentContacts.isPrimary, true))).limit(1) : [];
+          const toEmail = contacts[0]?.email;
+          if (!toEmail) { failed++; continue; }
+          if (process.env.EMAIL_HOST && process.env.EMAIL_USER) {
+            const transporter = nodemailer.createTransport({ host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'), secure: false, auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
+            const html = `<h2>Invoice ${inv.invoiceNumber}</h2><p>Total: $${parseFloat(inv.total as string).toFixed(2)}</p><p>Due: ${new Date(inv.dueDate).toLocaleDateString('en-AU')}</p>`;
+            await transporter.sendMail({ from: process.env.EMAIL_FROM || 'noreply@eslate.com', to: toEmail, subject: `Invoice ${inv.invoiceNumber}`, html });
+          }
+          await db.update(invoices).set({ status: 'sent', sentAt: new Date(), sentToEmail: toEmail, sendStatus: 'sent', updatedAt: new Date() }).where(eq(invoices.id, invId));
+          sent++;
+        } catch { failed++; }
+      }
+      res.json({ sent, failed, total: invoiceIds.length });
+    } catch (err: any) { res.status(500).json({ message: 'Bulk send failed' }); }
+  });
+
+  // Fee configuration on class (add/update feePerSession/feePerTerm)
+  app.patch('/api/classes/:classId/fee', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { feePerSession, feePerTerm } = req.body;
+      await db.update(classes).set({ feePerSession: feePerSession != null ? String(feePerSession) : null, feePerTerm: feePerTerm != null ? String(feePerTerm) : null, updatedAt: new Date() }).where(eq(classes.id, classId));
+      res.json({ message: 'Fee updated' });
+    } catch (err: any) { res.status(500).json({ message: 'Failed to update fee' }); }
   });
 
   // Create HTTP server without WebSocket conflicts

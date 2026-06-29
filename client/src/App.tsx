@@ -54,6 +54,9 @@ import { WorksheetEditorPage } from "@/pages/admin/WorksheetEditorPage";
 import TestManagement from "@/pages/tests/TestManagement";
 import TestGrading from "@/pages/tests/TestGrading";
 import Reports from "@/pages/company/Reports";
+import Invoices from "@/pages/company/Invoices";
+import InvoiceDetail from "@/pages/company/InvoiceDetail";
+import Revenue from "@/pages/company/Revenue";
 import { MarkingPage } from "@/pages/company/MarkingPage";
 import PrivacyPolicy from "@/pages/legal/PrivacyPolicy";
 import TermsOfService from "@/pages/legal/TermsOfService";
@@ -198,6 +201,9 @@ function Router() {
           <Route path="/company/tests" component={TestManagement} />
           <Route path="/company/tests/:testId/grade/:attemptId" component={TestGrading} />
           <Route path="/company/reports" component={Reports} />
+          <Route path="/company/invoices" component={Invoices} />
+          <Route path="/company/invoices/:id" component={InvoiceDetail} />
+          <Route path="/company/revenue" component={Revenue} />
           <Route path="/student/portal">{() => <StudentPortal />}</Route>
           <Route path="/student/worksheets" component={StudentWorksheets} />
           <Route path="/student/worksheet/:id" component={WorksheetWorkPage} />

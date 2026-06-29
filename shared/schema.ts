@@ -10,6 +10,7 @@ import {
   int,
   boolean,
   json,
+  decimal,
 } from "drizzle-orm/mysql-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -101,6 +102,10 @@ export const tutoringCompanies = mysqlTable("tutoring_companies", {
   state: varchar("state", { length: 10 }),
   tutorChatEnabled: boolean("tutor_chat_enabled").notNull().default(true),
   isActive: boolean("is_active").notNull().default(true),
+  paymentBsb: varchar("payment_bsb", { length: 20 }),
+  paymentAccount: varchar("payment_account", { length: 50 }),
+  paymentReference: varchar("payment_reference", { length: 100 }),
+  paymentNotes: text("payment_notes"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -272,6 +277,8 @@ export const classes = mysqlTable("classes", {
   archivedBy: varchar("archived_by", { length: 36 }),
   archivedByName: varchar("archived_by_name", { length: 255 }),
   duplicatedFromId: varchar("duplicated_from_id", { length: 36 }),
+  feePerSession: decimal("fee_per_session", { precision: 8, scale: 2 }),
+  feePerTerm: decimal("fee_per_term", { precision: 8, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -682,6 +689,74 @@ export const classWaitlist = mysqlTable("class_waitlist", {
   notes: text("notes"),
 });
 
+// ==========================================
+// INVOICING & PAYMENTS (ESLATE-35/36/37/38)
+// ==========================================
+
+export const invoices = mysqlTable("invoices", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id, { onDelete: "cascade" }),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id, { onDelete: "set null" }),
+  invoiceNumber: varchar("invoice_number", { length: 20 }).notNull(),
+  status: mysqlEnum("status", ['draft', 'sent', 'paid', 'partially_paid', 'overdue', 'void']).notNull().default('draft'),
+  invoiceDate: timestamp("invoice_date").notNull(),
+  dueDate: timestamp("due_date").notNull(),
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull().default('0'),
+  discountAmount: decimal("discount_amount", { precision: 10, scale: 2 }).default('0'),
+  discountType: varchar("discount_type", { length: 20 }),
+  discountReason: text("discount_reason"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull().default('0'),
+  notes: text("notes"),
+  createdBy: varchar("created_by", { length: 36 }).references(() => users.id),
+  createdByName: varchar("created_by_name", { length: 255 }),
+  sentAt: timestamp("sent_at"),
+  sentToEmail: varchar("sent_to_email", { length: 255 }),
+  sendStatus: varchar("send_status", { length: 20 }),
+  voidedAt: timestamp("voided_at"),
+  voidReason: varchar("void_reason", { length: 100 }),
+  bulkRunId: varchar("bulk_run_id", { length: 36 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const invoiceLineItems = mysqlTable("invoice_line_items", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  description: varchar("description", { length: 255 }).notNull(),
+  classId: varchar("class_id", { length: 36 }).references(() => classes.id, { onDelete: "set null" }),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id, { onDelete: "set null" }),
+  sessions: int("sessions"),
+  unitPrice: decimal("unit_price", { precision: 8, scale: 2 }).notNull().default('0'),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull().default('0'),
+  isManual: boolean("is_manual").default(false),
+  sortOrder: int("sort_order").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const payments = mysqlTable("payments", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  invoiceId: varchar("invoice_id", { length: 36 }).notNull().references(() => invoices.id, { onDelete: "cascade" }),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  paymentDate: timestamp("payment_date").notNull(),
+  method: varchar("method", { length: 50 }).notNull().default('bank_transfer'),
+  reference: varchar("reference", { length: 100 }),
+  notes: text("notes"),
+  recordedBy: varchar("recorded_by", { length: 36 }).references(() => users.id),
+  recordedByName: varchar("recorded_by_name", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// Term reminders log to prevent duplicate sends (ESLATE-41)
+export const termReminders = mysqlTable("term_reminders", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  companyId: varchar("company_id", { length: 36 }).notNull().references(() => tutoringCompanies.id, { onDelete: "cascade" }),
+  termId: varchar("term_id", { length: 36 }).notNull().references(() => academicTerms.id, { onDelete: "cascade" }),
+  reminderType: varchar("reminder_type", { length: 50 }).notNull(),
+  recipient: varchar("recipient", { length: 20 }).notNull().default('admin'),
+  sentAt: timestamp("sent_at").defaultNow(),
+});
+
 // In-app notifications (used for WWCC reminders and other alerts)
 export const inAppNotifications = mysqlTable("in_app_notifications", {
   id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
@@ -850,6 +925,23 @@ export const inAppNotificationsRelations = relations(inAppNotifications, ({ one 
   company: one(tutoringCompanies, { fields: [inAppNotifications.companyId], references: [tutoringCompanies.id] }),
 }));
 
+export const invoicesRelations = relations(invoices, ({ one, many }) => ({
+  company: one(tutoringCompanies, { fields: [invoices.companyId], references: [tutoringCompanies.id] }),
+  student: one(students, { fields: [invoices.studentId], references: [students.id] }),
+  term: one(academicTerms, { fields: [invoices.termId], references: [academicTerms.id] }),
+  lineItems: many(invoiceLineItems),
+  payments: many(payments),
+}));
+
+export const invoiceLineItemsRelations = relations(invoiceLineItems, ({ one }) => ({
+  invoice: one(invoices, { fields: [invoiceLineItems.invoiceId], references: [invoices.id] }),
+  class: one(classes, { fields: [invoiceLineItems.classId], references: [classes.id] }),
+}));
+
+export const paymentsRelations = relations(payments, ({ one }) => ({
+  invoice: one(invoices, { fields: [payments.invoiceId], references: [invoices.id] }),
+}));
+
 // ==========================================
 // INSERT SCHEMAS & TYPES
 // ==========================================
@@ -890,6 +982,9 @@ export const insertReportRunSchema = createInsertSchema(reportRuns).omit({ id: t
 export const insertReportExportSchema = createInsertSchema(reportExports).omit({ id: true, createdAt: true });
 export const insertStudentProgressReportSchema = createInsertSchema(studentProgressReports).omit({ id: true, createdAt: true, updatedAt: true });
 export const insertInAppNotificationSchema = createInsertSchema(inAppNotifications).omit({ id: true, createdAt: true });
+export const insertInvoiceSchema = createInsertSchema(invoices).omit({ id: true, createdAt: true, updatedAt: true });
+export const insertInvoiceLineItemSchema = createInsertSchema(invoiceLineItems).omit({ id: true, createdAt: true });
+export const insertPaymentSchema = createInsertSchema(payments).omit({ id: true, createdAt: true });
 
 // Types
 export type User = typeof users.$inferSelect;
@@ -963,6 +1058,12 @@ export type StudentProgressReport = typeof studentProgressReports.$inferSelect;
 export type InsertStudentProgressReport = z.infer<typeof insertStudentProgressReportSchema>;
 export type InAppNotification = typeof inAppNotifications.$inferSelect;
 export type InsertInAppNotification = z.infer<typeof insertInAppNotificationSchema>;
+export type Invoice = typeof invoices.$inferSelect;
+export type InsertInvoice = z.infer<typeof insertInvoiceSchema>;
+export type InvoiceLineItem = typeof invoiceLineItems.$inferSelect;
+export type InsertInvoiceLineItem = z.infer<typeof insertInvoiceLineItemSchema>;
+export type Payment = typeof payments.$inferSelect;
+export type InsertPayment = z.infer<typeof insertPaymentSchema>;
 
 // ==========================================
 // AUTH SCHEMAS
