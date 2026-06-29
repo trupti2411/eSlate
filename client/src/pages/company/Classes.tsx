@@ -38,6 +38,7 @@ export default function ClassesPage() {
   const { user, logoutMutation } = useAuth();
   const [search, setSearch] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: ['/api/company-admin/profile'],
@@ -53,13 +54,20 @@ export default function ClassesPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return classes;
-    return classes.filter(c =>
+    let list = classes;
+    // Filter by status: active = not archived; archived = status 'archived'
+    if (statusFilter === 'archived') {
+      list = list.filter((c: any) => c.status === 'archived');
+    } else {
+      list = list.filter((c: any) => c.status !== 'archived');
+    }
+    if (!q) return list;
+    return list.filter((c: any) =>
       `${c.name} ${c.subject?.name ?? ''} ${c.yearGroup?.label ?? ''} ${c.tutor?.user?.name ?? ''}`
         .toLowerCase()
         .includes(q)
     );
-  }, [classes, search]);
+  }, [classes, search, statusFilter]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -95,6 +103,16 @@ export default function ClassesPage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {/* Status filter tabs */}
+        <div className="flex gap-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-1">
+          {(['active', 'archived'] as const).map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`flex-1 text-xs font-bold py-2 rounded-xl transition-colors capitalize ${statusFilter === s ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'}`}>
+              {s === 'active' ? 'Active' : 'Archived'}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]">
             <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -105,12 +123,14 @@ export default function ClassesPage() {
               className="w-full bg-white rounded-xl border border-gray-200 pl-9 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
             />
           </div>
-          <button
-            onClick={() => setCreateOpen(true)}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
-          >
-            <Plus size={14} /> Create class
-          </button>
+          {statusFilter === 'active' && (
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Plus size={14} /> Create class
+            </button>
+          )}
         </div>
 
         {isLoading ? (

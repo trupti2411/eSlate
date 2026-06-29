@@ -112,7 +112,13 @@ export const courses = mysqlTable("courses", {
   name: varchar("name", { length: 150 }).notNull(),
   description: text("description"),
   yearGroupCode: varchar("year_group_code", { length: 10 }),
+  status: varchar("status", { length: 20 }).default('active'),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by", { length: 36 }),
+  archivedByName: varchar("archived_by_name", { length: 255 }),
+  duplicatedFromId: varchar("duplicated_from_id", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
 });
 
 // Course subjects
@@ -256,12 +262,16 @@ export const classes = mysqlTable("classes", {
   daysOfWeek: json("days_of_week").$type<number[]>().default([]),
   startTime: varchar("start_time", { length: 10 }).notNull().default(''),
   endTime: varchar("end_time", { length: 10 }).notNull().default(''),
-  maxStudents: int("max_students").default(20),
+  maxStudents: int("max_students"),
   isActive: boolean("is_active").default(true),
   courseId: varchar("course_id", { length: 36 }).references(() => courses.id, { onDelete: "set null" }),
   yearGroupCode: varchar("year_group_code", { length: 20 }),
   level: varchar("level", { length: 50 }),
   status: varchar("status", { length: 20 }).default('draft'),
+  archivedAt: timestamp("archived_at"),
+  archivedBy: varchar("archived_by", { length: 36 }),
+  archivedByName: varchar("archived_by_name", { length: 255 }),
+  duplicatedFromId: varchar("duplicated_from_id", { length: 36 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -654,6 +664,22 @@ export const studentProgressReports = mysqlTable("student_progress_reports", {
   createdByName: varchar("created_by_name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Class Waitlist (ESLATE-31)
+export const classWaitlist = mysqlTable("class_waitlist", {
+  id: varchar("id", { length: 36 }).primaryKey().default(sql`(UUID())`),
+  classId: varchar("class_id", { length: 36 }).notNull().references(() => classes.id, { onDelete: "cascade" }),
+  studentId: varchar("student_id", { length: 36 }).notNull().references(() => students.id, { onDelete: "cascade" }),
+  termId: varchar("term_id", { length: 36 }).references(() => academicTerms.id, { onDelete: "set null" }),
+  position: int("position").notNull().default(1),
+  status: mysqlEnum("status", ['waiting', 'enrolled', 'removed']).notNull().default('waiting'),
+  addedAt: timestamp("added_at").defaultNow(),
+  addedBy: varchar("added_by", { length: 36 }),
+  addedByName: varchar("added_by_name", { length: 255 }),
+  enrolledAt: timestamp("enrolled_at"),
+  removedAt: timestamp("removed_at"),
+  notes: text("notes"),
 });
 
 // In-app notifications (used for WWCC reminders and other alerts)

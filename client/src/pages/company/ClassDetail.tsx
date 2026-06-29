@@ -7,8 +7,10 @@ import { apiRequest, withBase, authHeaders } from '@/lib/queryClient';
 import {
   BookOpen, Bell, LogOut, ArrowLeft, UserPlus, Trash2, X, Save,
   User, Users, GraduationCap, Calendar, CalendarDays, School,
-  Pencil, Play, CheckCircle2, Archive,
-  ClipboardPlus, FileText, Download, Clock,
+  Pencil, Play, CheckCircle2, Archive, RotateCcw, Copy,
+  ClipboardPlus, FileText, Download, Clock, ClipboardCheck,
+  ListOrdered, CheckSquare, XSquare, AlertCircle, MinusCircle,
+  ChevronDown, ChevronUp,
 } from 'lucide-react';
 
 interface ClassData {
@@ -75,6 +77,8 @@ const STATUS_TONE: Record<string, { bg: string; text: string; label: string }> =
   archived:  { bg: 'bg-rose-100', text: 'text-rose-800', label: 'Archived' },
 };
 
+type PageTab = 'overview' | 'sessions' | 'waitlist';
+
 export default function ClassDetailPage() {
   const [, params] = useRoute('/company/classes/:id');
   const classId = params?.id;
@@ -82,6 +86,7 @@ export default function ClassDetailPage() {
   const [enrolOpen, setEnrolOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [createAssignmentOpen, setCreateAssignmentOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<PageTab>('overview');
 
   const { data: cls, isLoading } = useQuery<ClassData>({
     queryKey: [`/api/classes/${classId}`],
@@ -216,24 +221,55 @@ export default function ClassDetailPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <RosterSection
-                  classId={cls.id}
-                  students={cls.students ?? []}
-                  capacity={cls.capacity}
-                  atCap={atCap}
-                  onEnrolClick={() => setEnrolOpen(true)}
-                />
-                <AssignmentsSection
-                  classId={cls.id}
-                  onCreateClick={() => setCreateAssignmentOpen(true)}
-                />
-              </div>
-              <div>
-                <LifecycleSection classId={cls.id} businessId={cls.business_id} status={cls.status} />
-              </div>
+            {/* Tab bar */}
+            <div className="flex gap-1 bg-white rounded-2xl border border-gray-100 shadow-sm p-1.5">
+              {([
+                { id: 'overview', label: 'Overview', icon: <BookOpen size={13} /> },
+                { id: 'sessions', label: 'Sessions', icon: <ClipboardCheck size={13} /> },
+                { id: 'waitlist', label: 'Waitlist', icon: <ListOrdered size={13} /> },
+              ] as { id: PageTab; label: string; icon: React.ReactNode }[]).map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-1 flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl transition-colors ${
+                    activeTab === tab.id ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
             </div>
+
+            {activeTab === 'overview' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2 space-y-6">
+                  <RosterSection
+                    classId={cls.id}
+                    students={cls.students ?? []}
+                    capacity={cls.capacity}
+                    atCap={atCap}
+                    enrolledCount={enrolledCount}
+                    onEnrolClick={() => setEnrolOpen(true)}
+                    onWaitlistClick={() => setActiveTab('waitlist')}
+                  />
+                  <AssignmentsSection
+                    classId={cls.id}
+                    onCreateClick={() => setCreateAssignmentOpen(true)}
+                  />
+                </div>
+                <div>
+                  <LifecycleSection classId={String(cls.id)} businessId={cls.business_id} status={cls.status} className={cls} />
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'sessions' && (
+              <SessionsTab classId={String(cls.id)} cls={cls} />
+            )}
+
+            {activeTab === 'waitlist' && (
+              <WaitlistTab classId={String(cls.id)} cls={cls} />
+            )}
           </>
         )}
       </main>
@@ -492,7 +528,7 @@ function AField({ label, hint, required, children }: { label: string; hint?: str
 
 /* ---------- Lifecycle ---------- */
 
-function LifecycleSection({ classId, businessId, status }: { classId: number; businessId: number; status: string }) {
+function LifecycleSection({ classId, businessId, status, className: cls }: { classId: string; businessId: number; status: string; className: ClassData }) {
   const { toast } = useToast();
   const qc = useQueryClient();
   const [, navigate] = useLocation();
@@ -505,6 +541,36 @@ function LifecycleSection({ classId, businessId, status }: { classId: number; bu
       qc.invalidateQueries({ queryKey: ['/api/classes'] });
     },
     onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/classes/${classId}/archive`, 'POST', {}),
+    onSuccess: () => {
+      toast({ title: 'Class archived' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}`] });
+      qc.invalidateQueries({ queryKey: ['/api/classes'] });
+    },
+    onError: (e: any) => toast({ title: 'Failed to archive', description: e.message, variant: 'destructive' }),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/classes/${classId}/restore`, 'POST', {}),
+    onSuccess: () => {
+      toast({ title: 'Class restored to active' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}`] });
+      qc.invalidateQueries({ queryKey: ['/api/classes'] });
+    },
+    onError: (e: any) => toast({ title: 'Failed to restore', description: e.message, variant: 'destructive' }),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/classes/${classId}/duplicate`, 'POST', {}),
+    onSuccess: (data: any) => {
+      toast({ title: `Duplicated as "${data.name}"` });
+      qc.invalidateQueries({ queryKey: ['/api/classes'] });
+      if (data.id) navigate(`/company/classes/${data.id}`);
+    },
+    onError: (e: any) => toast({ title: 'Could not duplicate', description: e.message, variant: 'destructive' }),
   });
 
   const deleteMutation = useMutation({
@@ -529,42 +595,70 @@ function LifecycleSection({ classId, businessId, status }: { classId: number; bu
     transitions.push({ to: 'active', label: 'Reopen as active', icon: <Play size={12} />, tone: 'bg-amber-600 hover:bg-amber-700' });
   }
 
+  const isPending = transition.isPending || archiveMutation.isPending || restoreMutation.isPending || duplicateMutation.isPending;
+
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
       <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Lifecycle</h3>
       <p className="text-xs text-gray-500 mb-3">
-        Current status: <span className="font-bold text-gray-700 capitalize">{status}</span>
+        Status: <span className="font-bold text-gray-700 capitalize">{status}</span>
       </p>
       <div className="space-y-2">
         {transitions.map(t => (
           <button
             key={t.to}
             onClick={() => transition.mutate(t.to)}
-            disabled={transition.isPending}
+            disabled={isPending}
             className={`w-full ${t.tone} text-white text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60`}
           >
             {t.icon} {t.label}
           </button>
         ))}
-        {status !== 'archived' && (
+
+        {/* Duplicate (ESLATE-28) */}
+        <button
+          onClick={() => {
+            if (confirm(`Duplicate "${cls.name}"? A copy will be created in draft status (no terms or students).`)) {
+              duplicateMutation.mutate();
+            }
+          }}
+          disabled={isPending}
+          className="w-full bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
+        >
+          <Copy size={12} /> Duplicate class
+        </button>
+
+        {/* Archive / Restore (ESLATE-27) */}
+        {status !== 'archived' ? (
           <button
             onClick={() => {
               if (confirm('Archive this class? Students will keep their historical record.')) {
-                transition.mutate('archived');
+                archiveMutation.mutate();
               }
             }}
-            disabled={transition.isPending}
+            disabled={isPending}
             className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
           >
             <Archive size={12} /> Archive class
           </button>
+        ) : (
+          <>
+            <div className="text-xs text-rose-600 bg-rose-50 rounded-xl px-3 py-2 border border-rose-100">
+              Archived — read-only. Restore to make active again.
+            </div>
+            <button
+              onClick={() => restoreMutation.mutate()}
+              disabled={isPending}
+              className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
+            >
+              <RotateCcw size={12} /> Restore class
+            </button>
+          </>
         )}
-        {status === 'archived' && (
-          <p className="text-xs text-gray-500">Archived classes are read-only.</p>
-        )}
+
         <button
           onClick={() => {
-            if (confirm('Permanently delete this class? This cannot be undone — all enrolments and assignments will be removed.')) {
+            if (confirm('Permanently delete this class? This cannot be undone.')) {
               deleteMutation.mutate();
             }
           }}
@@ -848,23 +942,31 @@ function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; va
 }
 
 function RosterSection({
-  classId, students, capacity, atCap, onEnrolClick,
+  classId, students, capacity, atCap, enrolledCount, onEnrolClick, onWaitlistClick,
 }: {
   classId: number;
   students: StudentRow[];
   capacity: number | null;
   atCap: boolean;
+  enrolledCount: number;
   onEnrolClick: () => void;
+  onWaitlistClick: () => void;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
 
+  const fillPct = capacity != null && capacity > 0 ? Math.min(100, Math.round((enrolledCount / capacity) * 100)) : 0;
+  const fillColor = fillPct >= 100 ? 'bg-rose-500' : fillPct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
+
   const unenrol = useMutation({
     mutationFn: (studentId: number) =>
       apiRequest(`/api/classes/${classId}/students/${studentId}`, 'DELETE', {}),
-    onSuccess: () => {
+    onSuccess: (data: any) => {
       toast({ title: 'Removed from class' });
       qc.invalidateQueries({ queryKey: [`/api/classes/${classId}`] });
+      if (data?.waitlistInfo) {
+        toast({ title: `Waitlist: ${data.waitlistInfo.nextStudentName} is next`, description: `${data.waitlistInfo.waitlistCount} student(s) on waitlist` });
+      }
     },
     onError: (e: any) => toast({ title: 'Failed to remove', description: e.message, variant: 'destructive' }),
   });
@@ -875,15 +977,38 @@ function RosterSection({
         <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">
           Roster ({students.length}{capacity != null ? ` / ${capacity}` : ''})
         </h3>
-        <button
-          onClick={onEnrolClick}
-          disabled={atCap}
-          title={atCap ? 'Capacity reached' : undefined}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
-        >
-          <UserPlus size={12} /> {atCap ? 'At capacity' : 'Enrol students'}
-        </button>
+        <div className="flex gap-2">
+          {atCap && (
+            <button onClick={onWaitlistClick} className="text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-2 rounded-xl flex items-center gap-1.5">
+              <ListOrdered size={12} /> Waitlist
+            </button>
+          )}
+          <button
+            onClick={onEnrolClick}
+            disabled={atCap}
+            title={atCap ? 'Class is full — use waitlist' : undefined}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            <UserPlus size={12} /> {atCap ? 'Full' : 'Enrol students'}
+          </button>
+        </div>
       </div>
+      {capacity != null && (
+        <div className="px-5 pt-3">
+          <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+            <span>Capacity</span>
+            <span className={`font-bold ${fillPct >= 100 ? 'text-rose-600' : fillPct >= 80 ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {enrolledCount} / {capacity} ({fillPct}%)
+            </span>
+          </div>
+          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div className={`h-full rounded-full transition-all ${fillColor}`} style={{ width: `${fillPct}%` }} />
+          </div>
+          {fillPct >= 80 && fillPct < 100 && (
+            <p className="text-xs text-amber-600 mt-1 font-semibold">Almost full — {capacity - enrolledCount} spot{capacity - enrolledCount === 1 ? '' : 's'} remaining</p>
+          )}
+        </div>
+      )}
       <div className="p-5">
         {students.length === 0 ? (
           <p className="text-sm text-gray-500">No students enrolled yet. Click "Enrol students" to add from your roster.</p>
@@ -1049,6 +1174,402 @@ function EnrolModal({
             <Save size={14} /> {m.isPending ? 'Enrolling…' : `Enrol ${selected.size}`}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== ESLATE-29: Sessions Tab ===== */
+
+interface SessionRow {
+  id: string;
+  sessionDate: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  attendanceCount: number;
+  presentCount: number;
+  hasAttendance: boolean;
+}
+
+interface RollEntry {
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  rollNumber: string | null;
+  yearGroupCode: string | null;
+  attendanceStatus: string;
+  notes: string;
+}
+
+const ATTENDANCE_OPTIONS = [
+  { value: 'present', label: 'Present', icon: <CheckSquare size={13} className="text-emerald-600" /> },
+  { value: 'absent', label: 'Absent', icon: <XSquare size={13} className="text-rose-600" /> },
+  { value: 'late', label: 'Late', icon: <AlertCircle size={13} className="text-amber-600" /> },
+  { value: 'excused', label: 'Excused', icon: <MinusCircle size={13} className="text-indigo-500" /> },
+];
+
+function SessionsTab({ classId, cls }: { classId: string; cls: ClassData }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  const [roll, setRoll] = useState<Record<string, string>>({}); // studentId → status
+  const [addDate, setAddDate] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+
+  const { data: sessions = [], isLoading } = useQuery<SessionRow[]>({
+    queryKey: [`/api/classes/${classId}/sessions`],
+    enabled: !!classId,
+  });
+
+  const { data: rollData = [], isLoading: rollLoading } = useQuery<RollEntry[]>({
+    queryKey: [`/api/classes/${classId}/sessions/${openSessionId}/roll`],
+    enabled: !!openSessionId,
+    onSuccess: (data: RollEntry[]) => {
+      const initial: Record<string, string> = {};
+      data.forEach((r: RollEntry) => { initial[r.studentId] = r.attendanceStatus === 'not_marked' ? 'present' : r.attendanceStatus; });
+      setRoll(initial);
+    },
+  } as any);
+
+  const saveAttendanceMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/sessions/${openSessionId}/attendance/save`, 'POST', {
+      records: rollData.map((r: RollEntry) => ({ studentId: r.studentId, status: roll[r.studentId] ?? 'absent', notes: '' })),
+    }),
+    onSuccess: () => {
+      toast({ title: 'Attendance saved' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}/sessions`] });
+      setOpenSessionId(null);
+    },
+    onError: (e: any) => toast({ title: 'Save failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const cancelSessionMutation = useMutation({
+    mutationFn: (sid: string) => apiRequest(`/api/classes/${classId}/sessions/${sid}/cancel`, 'PATCH', {}),
+    onSuccess: () => {
+      toast({ title: 'Session cancelled' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}/sessions`] });
+    },
+  });
+
+  const addSessionMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/classes/${classId}/sessions`, 'POST', { sessionDate: addDate }),
+    onSuccess: () => {
+      toast({ title: 'Session added' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}/sessions`] });
+      setAddDate('');
+      setShowAdd(false);
+    },
+    onError: (e: any) => toast({ title: 'Failed to add session', description: e.message, variant: 'destructive' }),
+  });
+
+  const markAllPresent = () => {
+    const next: Record<string, string> = {};
+    rollData.forEach((r: RollEntry) => { next[r.studentId] = 'present'; });
+    setRoll(next);
+  };
+
+  const sessionStatusBadge = (s: SessionRow) => {
+    if (s.status === 'cancelled') return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Cancelled</span>;
+    if (s.hasAttendance) return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Marked ({s.presentCount}/{s.attendanceCount})</span>;
+    return <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Not marked</span>;
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">Sessions ({sessions.length})</h3>
+          <button
+            onClick={() => setShowAdd(!showAdd)}
+            className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl flex items-center gap-1.5"
+          >
+            + Add session
+          </button>
+        </div>
+
+        {showAdd && (
+          <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
+            <input type="date" value={addDate} onChange={e => setAddDate(e.target.value)}
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <button
+              onClick={() => addSessionMutation.mutate()}
+              disabled={!addDate || addSessionMutation.isPending}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-bold px-3 py-2 rounded-xl"
+            >
+              {addSessionMutation.isPending ? 'Adding…' : 'Add'}
+            </button>
+            <button onClick={() => setShowAdd(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+          </div>
+        )}
+
+        <div className="p-5">
+          {isLoading ? <p className="text-sm text-gray-500">Loading…</p> :
+            sessions.length === 0 ? (
+              <p className="text-sm text-gray-500">No sessions yet. Use "Generate Sessions" in the class settings or add individual sessions above.</p>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {sessions.map(s => (
+                  <li key={s.id} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <Calendar size={14} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {new Date(s.sessionDate).toLocaleDateString('en-AU', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                        <p className="text-xs text-gray-500 flex items-center gap-2">
+                          {s.startTime && <span>{s.startTime.slice(0, 5)}–{s.endTime?.slice(0, 5)}</span>}
+                          {sessionStatusBadge(s)}
+                        </p>
+                      </div>
+                      <div className="flex gap-1.5">
+                        {s.status !== 'cancelled' && (
+                          <button
+                            onClick={() => setOpenSessionId(openSessionId === s.id ? null : s.id)}
+                            className="text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1.5 rounded-xl flex items-center gap-1"
+                          >
+                            <ClipboardCheck size={12} /> {openSessionId === s.id ? 'Close' : 'Mark'}
+                          </button>
+                        )}
+                        {s.status !== 'cancelled' && (
+                          <button
+                            onClick={() => { if (confirm('Cancel this session?')) cancelSessionMutation.mutate(s.id); }}
+                            className="text-xs text-gray-400 hover:text-rose-600 px-2 py-1.5 rounded-xl"
+                            title="Cancel session"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Roll call panel */}
+                    {openSessionId === s.id && (
+                      <div className="mt-3 ml-12 bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
+                        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-200 bg-white">
+                          <p className="text-xs font-bold uppercase tracking-widest text-gray-500">Roll call</p>
+                          <button onClick={markAllPresent} className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 rounded-xl">
+                            Mark all present
+                          </button>
+                        </div>
+                        {rollLoading ? <p className="p-4 text-sm text-gray-500">Loading roll…</p> : (
+                          rollData.length === 0 ? (
+                            <p className="p-4 text-sm text-gray-500">No students enrolled in this class.</p>
+                          ) : (
+                            <ul className="divide-y divide-gray-100">
+                              {rollData.map((r: RollEntry) => (
+                                <li key={r.studentId} className="flex items-center gap-3 px-4 py-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-black flex-shrink-0">
+                                    {(r.firstName[0] ?? '').toUpperCase()}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-gray-900">{r.firstName} {r.lastName}</p>
+                                    {(r.rollNumber || r.yearGroupCode) && (
+                                      <p className="text-xs text-gray-500">{[r.rollNumber, r.yearGroupCode].filter(Boolean).join(' · ')}</p>
+                                    )}
+                                  </div>
+                                  <div className="flex gap-1">
+                                    {ATTENDANCE_OPTIONS.map(opt => (
+                                      <button
+                                        key={opt.value}
+                                        onClick={() => setRoll(prev => ({ ...prev, [r.studentId]: opt.value }))}
+                                        title={opt.label}
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                                          roll[r.studentId] === opt.value ? 'bg-indigo-100 ring-2 ring-indigo-400' : 'hover:bg-gray-100'
+                                        }`}
+                                      >
+                                        {opt.icon}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </li>
+                              ))}
+                            </ul>
+                          )
+                        )}
+                        <div className="flex justify-end gap-2 px-4 py-2.5 border-t border-gray-200 bg-white">
+                          <button onClick={() => setOpenSessionId(null)} className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 rounded-xl">Cancel</button>
+                          <button
+                            onClick={() => saveAttendanceMutation.mutate()}
+                            disabled={saveAttendanceMutation.isPending || rollData.length === 0}
+                            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+                          >
+                            <Save size={13} /> {saveAttendanceMutation.isPending ? 'Saving…' : 'Save attendance'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )
+          }
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ===== ESLATE-31: Waitlist Tab ===== */
+
+interface WaitlistEntry {
+  id: string;
+  position: number;
+  studentId: string;
+  firstName: string;
+  lastName: string;
+  rollNumber: string | null;
+  yearGroupCode: string | null;
+  addedAt: string;
+  addedByName: string | null;
+  status: string;
+}
+
+function WaitlistTab({ classId, cls }: { classId: string; cls: ClassData }) {
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [addStudentId, setAddStudentId] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+
+  const { data: waitlist = [], isLoading } = useQuery<WaitlistEntry[]>({
+    queryKey: [`/api/classes/${classId}/waitlist`],
+    enabled: !!classId,
+  });
+
+  const { data: allStudents = [] } = useQuery<StudentRow[]>({
+    queryKey: [`/api/companies/${cls.business_id}/students`],
+  });
+
+  const enrolledIds = new Set((cls.students ?? []).map(s => String(s.id)));
+  const waitlistedIds = new Set(waitlist.map(w => w.studentId));
+  const eligibleForWaitlist = allStudents.filter(s => !enrolledIds.has(String(s.id)) && !waitlistedIds.has(String(s.id)));
+
+  const addToWaitlist = useMutation({
+    mutationFn: () => apiRequest(`/api/classes/${classId}/waitlist`, 'POST', { studentId: addStudentId }),
+    onSuccess: (data: any) => {
+      toast({ title: data.message ?? 'Added to waitlist' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}/waitlist`] });
+      setAddStudentId('');
+      setShowAdd(false);
+    },
+    onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const removeFromWaitlist = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/waitlist/${id}`, 'DELETE', {}),
+    onSuccess: () => {
+      toast({ title: 'Removed from waitlist' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}/waitlist`] });
+    },
+    onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
+  });
+
+  const enrolFromWaitlist = useMutation({
+    mutationFn: (id: string) => apiRequest(`/api/waitlist/${id}/enrol`, 'POST', {}),
+    onSuccess: () => {
+      toast({ title: 'Student enrolled from waitlist' });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}/waitlist`] });
+      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}`] });
+    },
+    onError: (e: any) => toast({ title: 'Could not enrol', description: e.message, variant: 'destructive' }),
+  });
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
+      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">
+          Waitlist ({waitlist.length})
+        </h3>
+        <button onClick={() => setShowAdd(!showAdd)}
+          className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl flex items-center gap-1.5">
+          <UserPlus size={12} /> Add to waitlist
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="px-5 py-3 border-b border-gray-100 bg-gray-50 flex items-center gap-3">
+          <select value={addStudentId} onChange={e => setAddStudentId(e.target.value)}
+            className="flex-1 rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <option value="">Select student…</option>
+            {eligibleForWaitlist.map(s => (
+              <option key={s.id} value={String(s.id)}>
+                {`${s.first_name ?? ''} ${s.last_name ?? ''}`.trim() || `Student #${s.id}`}
+                {s.year_group_code ? ` (${s.year_group_code})` : ''}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => addToWaitlist.mutate()}
+            disabled={!addStudentId || addToWaitlist.isPending}
+            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-bold px-3 py-2 rounded-xl"
+          >
+            {addToWaitlist.isPending ? 'Adding…' : 'Add'}
+          </button>
+          <button onClick={() => setShowAdd(false)} className="text-sm text-gray-500 hover:text-gray-700">Cancel</button>
+        </div>
+      )}
+
+      <div className="p-5">
+        {isLoading ? <p className="text-sm text-gray-500">Loading…</p> :
+          waitlist.length === 0 ? (
+            <p className="text-sm text-gray-500">No students on the waitlist. Add students using the button above.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left border-b border-gray-100">
+                    <th className="pb-2 text-xs font-bold uppercase tracking-wider text-gray-400 pr-4">Pos</th>
+                    <th className="pb-2 text-xs font-bold uppercase tracking-wider text-gray-400 pr-4">Student</th>
+                    <th className="pb-2 text-xs font-bold uppercase tracking-wider text-gray-400 pr-4 hidden sm:table-cell">Year</th>
+                    <th className="pb-2 text-xs font-bold uppercase tracking-wider text-gray-400 pr-4 hidden sm:table-cell">Added</th>
+                    <th className="pb-2 text-xs font-bold uppercase tracking-wider text-gray-400">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {waitlist.map(w => (
+                    <tr key={w.id}>
+                      <td className="py-3 pr-4">
+                        <span className="w-7 h-7 rounded-full bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center">
+                          {w.position}
+                        </span>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <p className="font-semibold text-gray-900">{w.firstName} {w.lastName}</p>
+                        {w.rollNumber && <p className="text-xs text-gray-500">{w.rollNumber}</p>}
+                      </td>
+                      <td className="py-3 pr-4 hidden sm:table-cell">
+                        <span className="text-gray-600">{w.yearGroupCode ?? '—'}</span>
+                      </td>
+                      <td className="py-3 pr-4 hidden sm:table-cell">
+                        <span className="text-gray-500 text-xs">{new Date(w.addedAt).toLocaleDateString('en-AU')}</span>
+                      </td>
+                      <td className="py-3">
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => { if (confirm(`Enrol ${w.firstName} ${w.lastName} from waitlist?`)) enrolFromWaitlist.mutate(w.id); }}
+                            disabled={enrolFromWaitlist.isPending}
+                            className="text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 px-2.5 py-1.5 rounded-xl disabled:opacity-60"
+                          >
+                            Enrol now
+                          </button>
+                          <button
+                            onClick={() => { if (confirm(`Remove ${w.firstName} ${w.lastName} from waitlist?`)) removeFromWaitlist.mutate(w.id); }}
+                            disabled={removeFromWaitlist.isPending}
+                            className="text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 px-2.5 py-1.5 rounded-xl disabled:opacity-60"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )
+        }
       </div>
     </div>
   );

@@ -19,8 +19,8 @@ import {
 import multer from "multer";
 import { randomUUID } from "crypto";
 import { db } from "./db";
-import { eq, desc, inArray, and, lte, isNotNull, sql } from "drizzle-orm";
-import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs, studentProgressReports, inAppNotifications, academicTerms } from "@shared/schema";
+import { eq, desc, inArray, and, lte, isNotNull, sql, ne, gt, max, asc } from "drizzle-orm";
+import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs, studentProgressReports, inAppNotifications, academicTerms, courses, classes, classWaitlist, classSessions, sessionAttendance, studentClassAssignments } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Report generation helper functions
@@ -4372,6 +4372,475 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ── end ESLATE-8 ──────────────────────────────────────────────────────────
 
+  // ── ESLATE-27: Archive / Restore class ──────────────────────────────────
+
+  // GET /api/classes — support ?status= filter (active/archived/all)
+  // (Already handled above; this middleware adds status filtering via storage)
+  // Classes list already calls storage.getClassesWithDetailsForCompany — we patch it below.
+
+  // POST /api/classes/:classId/restore — restore archived class (ESLATE-27)
+  app.post('/api/classes/:classId/restore', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      await db.update(classes)
+        .set({ status: 'active', archivedAt: null, archivedBy: null, archivedByName: null, updatedAt: new Date() })
+        .where(eq(classes.id, classId));
+      res.json({ message: "Class restored" });
+    } catch (err: any) {
+      console.error("Error restoring class:", err);
+      res.status(500).json({ message: err.message ?? "Failed to restore class" });
+    }
+  });
+
+  // POST /api/classes/:classId/archive — explicitly archive with audit fields (ESLATE-27)
+  app.post('/api/classes/:classId/archive', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const adminName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+      await db.update(classes)
+        .set({ status: 'archived', archivedAt: new Date(), archivedBy: user.id, archivedByName: adminName, updatedAt: new Date() })
+        .where(eq(classes.id, classId));
+      res.json({ message: "Class archived" });
+    } catch (err: any) {
+      console.error("Error archiving class:", err);
+      res.status(500).json({ message: err.message ?? "Failed to archive class" });
+    }
+  });
+
+  // GET /api/courses/:courseId/classes — list classes for a course (ESLATE-27)
+  app.get('/api/courses/:courseId/classes', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { courseId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const rows = await db.select({ id: classes.id, name: classes.name, status: classes.status })
+        .from(classes).where(eq(classes.courseId, courseId));
+      res.json(rows);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch course classes" });
+    }
+  });
+
+  // POST /api/courses/:courseId/archive — archive course + cascade to linked classes (ESLATE-27)
+  app.post('/api/courses/:courseId/archive', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { courseId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const adminName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+      const now = new Date();
+      await db.update(courses)
+        .set({ status: 'archived', archivedAt: now, archivedBy: user.id, archivedByName: adminName, updatedAt: now })
+        .where(eq(courses.id, courseId));
+      // Cascade archive to all linked active classes
+      await db.update(classes)
+        .set({ status: 'archived', archivedAt: now, archivedBy: user.id, archivedByName: adminName, updatedAt: now })
+        .where(and(eq(classes.courseId, courseId), ne(classes.status, 'archived')));
+      res.json({ message: "Course archived and linked classes archived" });
+    } catch (err: any) {
+      console.error("Error archiving course:", err);
+      res.status(500).json({ message: err.message ?? "Failed to archive course" });
+    }
+  });
+
+  // POST /api/courses/:courseId/restore — restore archived course (ESLATE-27)
+  app.post('/api/courses/:courseId/restore', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { courseId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      await db.update(courses)
+        .set({ status: 'active', archivedAt: null, archivedBy: null, archivedByName: null, updatedAt: new Date() })
+        .where(eq(courses.id, courseId));
+      res.json({ message: "Course restored" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message ?? "Failed to restore course" });
+    }
+  });
+
+  // ── ESLATE-28: Duplicate class / course ─────────────────────────────────
+
+  // POST /api/classes/:classId/duplicate (ESLATE-28)
+  app.post('/api/classes/:classId/duplicate', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+
+      const original = await storage.getClassDetailById(classId, ca.companyId);
+      if (!original) return res.status(404).json({ message: "Class not found" });
+
+      const newName = `Copy of ${original.name}`;
+      // Use a fresh UUID for the new class
+      const newId = randomUUID();
+      await db.insert(classes).values({
+        id: newId,
+        companyId: ca.companyId,
+        termId: original.term_id ?? original.termId ?? original.terms?.[0]?.id ?? '',
+        name: newName,
+        subject: original.subject ?? 'TBD',
+        description: original.description ?? null,
+        location: original.location ?? null,
+        tutorId: original.tutor_id ? String(original.tutor_id) : null,
+        dayOfWeek: original.schedule_day_of_week ?? null,
+        startTime: original.schedule_start_time ?? '',
+        endTime: original.schedule_end_time ?? '',
+        maxStudents: original.capacity ?? null,
+        isActive: true,
+        courseId: original.course_id ? String(original.course_id) : null,
+        yearGroupCode: original.yearGroup?.code ?? null,
+        level: original.level ?? null,
+        status: 'draft',
+        duplicatedFromId: classId,
+      });
+      const newClass = await storage.getClassDetailById(newId, ca.companyId);
+      res.status(201).json(newClass);
+    } catch (err: any) {
+      console.error("Error duplicating class:", err);
+      res.status(500).json({ message: err.message ?? "Failed to duplicate class" });
+    }
+  });
+
+  // POST /api/courses/:courseId/duplicate (ESLATE-28)
+  app.post('/api/courses/:courseId/duplicate', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { courseId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const ca = await storage.getCompanyAdminByUserId(user.id);
+      if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
+
+      const [original] = await db.select().from(courses).where(and(eq(courses.id, courseId), eq(courses.companyId, ca.companyId)));
+      if (!original) return res.status(404).json({ message: "Course not found" });
+
+      const [newCourse] = await db.insert(courses).values({
+        companyId: ca.companyId,
+        name: `Copy of ${original.name}`,
+        description: original.description ?? null,
+        yearGroupCode: original.yearGroupCode ?? null,
+        status: 'active',
+        duplicatedFromId: courseId,
+      }).$returningId();
+      res.status(201).json({ id: newCourse.id, name: `Copy of ${original.name}`, message: "Course duplicated" });
+    } catch (err: any) {
+      console.error("Error duplicating course:", err);
+      res.status(500).json({ message: err.message ?? "Failed to duplicate course" });
+    }
+  });
+
+  // ── ESLATE-29: Sessions list for a class ────────────────────────────────
+
+  // GET /api/classes/:classId/sessions — list all sessions for a class (ESLATE-29)
+  app.get('/api/classes/:classId/sessions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin', 'tutor'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const sessions = await db.select().from(classSessions)
+        .where(eq(classSessions.classId, classId))
+        .orderBy(asc(classSessions.sessionDate));
+
+      // For each session, get attendance summary
+      const sessionsWithSummary = await Promise.all(sessions.map(async (s) => {
+        const attendance = await db.select().from(sessionAttendance).where(eq(sessionAttendance.sessionId, s.id));
+        const presentCount = attendance.filter(a => a.status === 'present' || a.status === 'late').length;
+        const hasAttendance = attendance.length > 0;
+        return { ...s, attendanceCount: attendance.length, presentCount, hasAttendance };
+      }));
+
+      res.json(sessionsWithSummary);
+    } catch (err: any) {
+      console.error("Error fetching class sessions:", err);
+      res.status(500).json({ message: "Failed to fetch sessions" });
+    }
+  });
+
+  // GET /api/classes/:classId/sessions/:sessionId/roll — load roll call for a session (ESLATE-29)
+  app.get('/api/classes/:classId/sessions/:sessionId/roll', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId, sessionId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin', 'tutor'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      // Get enrolled students
+      const enrolments = await db.select({ studentId: studentClassAssignments.studentId })
+        .from(studentClassAssignments)
+        .where(and(eq(studentClassAssignments.classId, classId), eq(studentClassAssignments.isActive, true)));
+
+      // Get student details + existing attendance
+      const attendance = await db.select().from(sessionAttendance).where(eq(sessionAttendance.sessionId, sessionId));
+      const attendanceByStudent = new Map(attendance.map(a => [a.studentId, a]));
+
+      const roll = await Promise.all(enrolments.map(async (e) => {
+        const [student] = await db.select({ id: students.id, userId: students.userId, rollNumber: students.rollNumber, yearGroupCode: students.yearGroupCode })
+          .from(students).where(eq(students.id, e.studentId));
+        if (!student) return null;
+        const [u] = await db.select({ firstName: users.firstName, lastName: users.lastName })
+          .from(users).where(eq(users.id, student.userId));
+        const att = attendanceByStudent.get(e.studentId);
+        return {
+          studentId: e.studentId,
+          firstName: u?.firstName ?? '',
+          lastName: u?.lastName ?? '',
+          rollNumber: student.rollNumber,
+          yearGroupCode: student.yearGroupCode,
+          attendanceStatus: att?.status ?? 'not_marked',
+          notes: att?.notes ?? '',
+        };
+      }));
+
+      res.json(roll.filter(Boolean));
+    } catch (err: any) {
+      console.error("Error fetching roll:", err);
+      res.status(500).json({ message: "Failed to fetch roll call" });
+    }
+  });
+
+  // POST /api/classes/:classId/sessions — create a session manually (ESLATE-29)
+  app.post('/api/classes/:classId/sessions', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { sessionDate, startTime, endTime, notes } = req.body;
+      if (!sessionDate) return res.status(400).json({ message: "sessionDate is required" });
+
+      const cls = await storage.getClass(classId);
+      if (!cls) return res.status(404).json({ message: "Class not found" });
+
+      const [session] = await db.insert(classSessions).values({
+        classId,
+        tutorId: cls.tutorId ?? null,
+        sessionDate: new Date(sessionDate),
+        startTime: startTime || cls.startTime || '',
+        endTime: endTime || cls.endTime || '',
+        durationMinutes: 60,
+        status: 'scheduled',
+        notes: notes ?? null,
+      }).$returningId();
+
+      res.status(201).json({ id: session.id, message: "Session created" });
+    } catch (err: any) {
+      console.error("Error creating session:", err);
+      res.status(500).json({ message: err.message ?? "Failed to create session" });
+    }
+  });
+
+  // PATCH /api/classes/:classId/sessions/:sessionId/cancel — cancel a session (ESLATE-29)
+  app.patch('/api/classes/:classId/sessions/:sessionId/cancel', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { sessionId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      await db.update(classSessions).set({ status: 'cancelled', updatedAt: new Date() }).where(eq(classSessions.id, sessionId));
+      res.json({ message: "Session cancelled" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to cancel session" });
+    }
+  });
+
+  // POST /api/sessions/:sessionId/attendance/save — save full roll call (ESLATE-29)
+  app.post('/api/sessions/:sessionId/attendance/save', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { sessionId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin', 'tutor'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const { records } = req.body; // [{ studentId, status, notes }]
+      if (!Array.isArray(records)) return res.status(400).json({ message: "records array required" });
+
+      for (const rec of records) {
+        const existing = await db.select({ id: sessionAttendance.id })
+          .from(sessionAttendance)
+          .where(and(eq(sessionAttendance.sessionId, sessionId), eq(sessionAttendance.studentId, rec.studentId)));
+
+        if (existing.length > 0) {
+          await db.update(sessionAttendance)
+            .set({ status: rec.status, notes: rec.notes ?? null, markedBy: user.id, markedAt: new Date(), updatedAt: new Date() })
+            .where(and(eq(sessionAttendance.sessionId, sessionId), eq(sessionAttendance.studentId, rec.studentId)));
+        } else {
+          await db.insert(sessionAttendance).values({
+            sessionId, studentId: rec.studentId, status: rec.status, notes: rec.notes ?? null,
+            markedBy: user.id, markedAt: new Date(),
+          });
+        }
+      }
+
+      // Update session status to completed if it was scheduled
+      await db.update(classSessions)
+        .set({ status: 'completed', attendedCount: records.filter((r: any) => r.status === 'present' || r.status === 'late').length, updatedAt: new Date() })
+        .where(and(eq(classSessions.id, sessionId), eq(classSessions.status, 'scheduled')));
+
+      res.json({ message: `Attendance saved for ${records.length} students` });
+    } catch (err: any) {
+      console.error("Error saving attendance:", err);
+      res.status(500).json({ message: err.message ?? "Failed to save attendance" });
+    }
+  });
+
+  // ── ESLATE-31: Waitlist ──────────────────────────────────────────────────
+
+  // GET /api/classes/:classId/waitlist — list waitlist for a class (ESLATE-31)
+  app.get('/api/classes/:classId/waitlist', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const waitlistEntries = await db.select({
+        id: classWaitlist.id,
+        position: classWaitlist.position,
+        studentId: classWaitlist.studentId,
+        addedAt: classWaitlist.addedAt,
+        addedByName: classWaitlist.addedByName,
+        status: classWaitlist.status,
+      })
+        .from(classWaitlist)
+        .where(and(eq(classWaitlist.classId, classId), eq(classWaitlist.status, 'waiting')))
+        .orderBy(asc(classWaitlist.position));
+
+      const enriched = await Promise.all(waitlistEntries.map(async (entry) => {
+        const [student] = await db.select({ id: students.id, userId: students.userId, rollNumber: students.rollNumber, yearGroupCode: students.yearGroupCode })
+          .from(students).where(eq(students.id, entry.studentId));
+        const [u] = student ? await db.select({ firstName: users.firstName, lastName: users.lastName, email: users.email })
+          .from(users).where(eq(users.id, student.userId)) : [null];
+        return { ...entry, firstName: u?.firstName ?? '', lastName: u?.lastName ?? '', rollNumber: student?.rollNumber, yearGroupCode: student?.yearGroupCode };
+      }));
+
+      res.json(enriched);
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to fetch waitlist" });
+    }
+  });
+
+  // POST /api/classes/:classId/waitlist — add student to waitlist (ESLATE-31)
+  app.post('/api/classes/:classId/waitlist', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const { studentId, termId } = req.body;
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      if (!studentId) return res.status(400).json({ message: "studentId is required" });
+
+      // Check already on waitlist
+      const [existing] = await db.select().from(classWaitlist)
+        .where(and(eq(classWaitlist.classId, classId), eq(classWaitlist.studentId, studentId), eq(classWaitlist.status, 'waiting')));
+      if (existing) return res.status(409).json({ message: "Student is already on the waitlist for this class" });
+
+      // Get next position
+      const [maxPos] = await db.select({ maxPos: max(classWaitlist.position) })
+        .from(classWaitlist)
+        .where(and(eq(classWaitlist.classId, classId), eq(classWaitlist.status, 'waiting')));
+      const nextPosition = (maxPos?.maxPos ?? 0) + 1;
+
+      const adminName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+      const [entry] = await db.insert(classWaitlist).values({
+        classId, studentId, termId: termId ?? null, position: nextPosition,
+        addedBy: user.id, addedByName: adminName, status: 'waiting',
+      }).$returningId();
+
+      res.status(201).json({ id: entry.id, position: nextPosition, message: `Added to waitlist at position ${nextPosition}` });
+    } catch (err: any) {
+      console.error("Error adding to waitlist:", err);
+      res.status(500).json({ message: err.message ?? "Failed to add to waitlist" });
+    }
+  });
+
+  // DELETE /api/waitlist/:waitlistId — remove from waitlist (ESLATE-31)
+  app.delete('/api/waitlist/:waitlistId', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { waitlistId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const [entry] = await db.select().from(classWaitlist).where(eq(classWaitlist.id, waitlistId));
+      if (!entry) return res.status(404).json({ message: "Waitlist entry not found" });
+
+      await db.update(classWaitlist).set({ status: 'removed', removedAt: new Date() }).where(eq(classWaitlist.id, waitlistId));
+
+      // Reorder positions
+      const remaining = await db.select({ id: classWaitlist.id })
+        .from(classWaitlist)
+        .where(and(eq(classWaitlist.classId, entry.classId), eq(classWaitlist.status, 'waiting'), gt(classWaitlist.position, entry.position)))
+        .orderBy(asc(classWaitlist.position));
+      for (let i = 0; i < remaining.length; i++) {
+        await db.update(classWaitlist).set({ position: entry.position + i }).where(eq(classWaitlist.id, remaining[i].id));
+      }
+
+      res.json({ message: "Removed from waitlist" });
+    } catch (err: any) {
+      res.status(500).json({ message: "Failed to remove from waitlist" });
+    }
+  });
+
+  // POST /api/waitlist/:waitlistId/enrol — enrol from waitlist (ESLATE-31)
+  app.post('/api/waitlist/:waitlistId/enrol', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { waitlistId } = req.params;
+      const user = req.user!;
+      if (!['company_admin', 'admin'].includes(user.role)) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+      const [entry] = await db.select().from(classWaitlist).where(eq(classWaitlist.id, waitlistId));
+      if (!entry || entry.status !== 'waiting') return res.status(404).json({ message: "Waitlist entry not found or already processed" });
+
+      // Enrol the student
+      const enrollment = await storage.assignStudentToClass({ studentId: entry.studentId, classId: entry.classId, isActive: true });
+
+      // Mark waitlist entry as enrolled
+      await db.update(classWaitlist).set({ status: 'enrolled', enrolledAt: new Date() }).where(eq(classWaitlist.id, waitlistId));
+
+      // Reorder remaining waitlist
+      const remaining = await db.select({ id: classWaitlist.id })
+        .from(classWaitlist)
+        .where(and(eq(classWaitlist.classId, entry.classId), eq(classWaitlist.status, 'waiting'), gt(classWaitlist.position, entry.position)))
+        .orderBy(asc(classWaitlist.position));
+      for (let i = 0; i < remaining.length; i++) {
+        await db.update(classWaitlist).set({ position: entry.position + i }).where(eq(classWaitlist.id, remaining[i].id));
+      }
+
+      res.json({ enrollment, message: "Student enrolled from waitlist" });
+    } catch (err: any) {
+      console.error("Error enrolling from waitlist:", err);
+      res.status(500).json({ message: err.message ?? "Failed to enrol from waitlist" });
+    }
+  });
+
   // Create student for a business (company admin or admin)
   app.post('/api/businesses/:businessId/students', isAuthenticated, async (req: any, res: any) => {
     try {
@@ -5535,7 +6004,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       await storage.removeStudentFromClass(studentId, classId);
-      res.json({ message: "Student removed from class successfully" });
+
+      // ESLATE-31: Check if waitlist exists for this class; notify admin if so
+      const [topWaiting] = await db.select({
+        id: classWaitlist.id, position: classWaitlist.position, studentId: classWaitlist.studentId, classId: classWaitlist.classId,
+      })
+        .from(classWaitlist)
+        .where(and(eq(classWaitlist.classId, classId), eq(classWaitlist.status, 'waiting')))
+        .orderBy(asc(classWaitlist.position))
+        .limit(1);
+
+      let waitlistInfo = null;
+      if (topWaiting) {
+        const [wStudent] = await db.select({ id: students.id, userId: students.userId })
+          .from(students).where(eq(students.id, topWaiting.studentId));
+        const [wUser] = wStudent ? await db.select({ firstName: users.firstName, lastName: users.lastName })
+          .from(users).where(eq(users.id, wStudent.userId)) : [null];
+        const studentName = `${wUser?.firstName ?? ''} ${wUser?.lastName ?? ''}`.trim();
+
+        // Count total waiting
+        const allWaiting = await db.select({ id: classWaitlist.id })
+          .from(classWaitlist)
+          .where(and(eq(classWaitlist.classId, classId), eq(classWaitlist.status, 'waiting')));
+
+        // Create in-app notification for the requesting admin
+        const cls = await storage.getClass(classId);
+        await db.insert(inAppNotifications).values({
+          userId: user.id,
+          type: 'waitlist_spot_open',
+          title: 'Spot opened in class',
+          message: `A spot opened in ${cls?.name ?? classId}. ${allWaiting.length} student${allWaiting.length === 1 ? '' : 's'} on waitlist. Next: ${studentName}.`,
+          data: { classId, waitlistId: topWaiting.id, nextStudentName: studentName },
+        });
+
+        waitlistInfo = { waitlistCount: allWaiting.length, nextStudentName: studentName, waitlistId: topWaiting.id };
+      }
+
+      res.json({ message: "Student removed from class successfully", waitlistInfo });
     } catch (error) {
       console.error("Error removing student from class:", error);
       res.status(500).json({ message: "Failed to remove student from class" });
