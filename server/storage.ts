@@ -1240,6 +1240,7 @@ export class DatabaseStorage implements IStorage {
       lastName?: string;
       schoolName?: string | null;
       yearGroupCode?: string | null;
+      rollNumber?: string | null;
       dateOfBirth?: Date | null;
       address?: string | null;
       learningGoals?: string | null;

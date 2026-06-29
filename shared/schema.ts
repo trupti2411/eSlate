@@ -47,6 +47,7 @@ export const students = mysqlTable("students", {
   gradeLevel: varchar("grade_level", { length: 50 }),
   schoolName: varchar("school_name", { length: 255 }),
   yearGroupCode: varchar("year_group_code", { length: 20 }),
+  rollNumber: varchar("roll_number", { length: 50 }),
   dateOfBirth: timestamp("date_of_birth"),
   address: text("address"),
   learningGoals: text("learning_goals"),

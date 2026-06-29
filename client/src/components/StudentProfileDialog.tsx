@@ -23,6 +23,7 @@ interface Student {
   id: string;
   userId: string;
   schoolName: string;
+  rollNumber: string;
   yearId: string;
   termId: string;
   classId: string;
@@ -70,6 +71,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   const [editMode, setEditMode] = useState(false);
   const [formData, setFormData] = useState({
     schoolName: "",
+    rollNumber: "",
   });
 
   // Fetch student data
@@ -98,7 +100,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
 
   // Update student mutation
   const updateStudentMutation = useMutation({
-    mutationFn: async (data: Partial<Student>) => {
+    mutationFn: async (data: Partial<Student> & { roll_number?: string | null }) => {
       return await apiRequest(`/api/students/${studentId}`, "PATCH", data);
     },
     onSuccess: () => {
@@ -124,6 +126,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
     if (student) {
       setFormData({
         schoolName: student.schoolName || "",
+        rollNumber: student.rollNumber || "",
       });
     }
   }, [student]);
@@ -134,7 +137,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
       return;
     }
     console.log("Saving student profile with data:", formData);
-    updateStudentMutation.mutate(formData);
+    updateStudentMutation.mutate({ school: formData.schoolName, roll_number: formData.rollNumber || null } as any);
   };
 
   const selectedClass = allClasses.find(cls => cls.id === student?.classId);
@@ -190,6 +193,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                       setEditMode(false);
                       setFormData({
                         schoolName: student.schoolName || "",
+                        rollNumber: student.rollNumber || "",
                       });
                     }}
                   >
@@ -241,13 +245,26 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
               <div>
                 <Label>School Name</Label>
                 {editMode ? (
-                  <Input 
-                    value={formData.schoolName} 
+                  <Input
+                    value={formData.schoolName}
                     onChange={(e) => setFormData({...formData, schoolName: e.target.value})}
                     placeholder="Enter school name"
                   />
                 ) : (
                   <Input value={student.schoolName || "Not set"} disabled />
+                )}
+              </div>
+
+              <div>
+                <Label>Roll Number</Label>
+                {editMode ? (
+                  <Input
+                    value={formData.rollNumber}
+                    onChange={(e) => setFormData({...formData, rollNumber: e.target.value})}
+                    placeholder="e.g., 2024-001"
+                  />
+                ) : (
+                  <Input value={student.rollNumber || "Not set"} disabled />
                 )}
               </div>
 

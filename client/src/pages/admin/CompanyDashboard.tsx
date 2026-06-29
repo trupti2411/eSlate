@@ -77,6 +77,7 @@ interface CompanyStudent {
   tutorId: string | null;
   classId: string | null;
   schoolName: string | null;
+  rollNumber: string | null;
   user: {
     id: string;
     email: string;
@@ -799,6 +800,7 @@ export default function CompanyDashboard() {
     lastName: "",
     gradeLevel: "",
     schoolName: "",
+    rollNumber: "",
     classId: "",
     tutorId: "",
   });
@@ -809,6 +811,7 @@ export default function CompanyDashboard() {
     email: "",
     gradeLevel: "",
     schoolName: "",
+    rollNumber: "",
     classId: "",
     tutorId: "",
   });
@@ -1212,7 +1215,7 @@ export default function CompanyDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/students`] });
       setIsCreateStudentOpen(false);
-      setStudentFormData({ email: "", firstName: "", lastName: "", gradeLevel: "", schoolName: "", classId: "", tutorId: "" });
+      setStudentFormData({ email: "", firstName: "", lastName: "", gradeLevel: "", schoolName: "", rollNumber: "", classId: "", tutorId: "" });
       toast({ title: "Success", description: "Student created successfully" });
     },
     onError: (error: any) => {
@@ -1223,7 +1226,7 @@ export default function CompanyDashboard() {
   const updateStudentMutation = useMutation({
     mutationFn: async ({ studentId, userId, data }: { studentId: string; userId: string; data: any }) => {
       await apiRequest(`/api/admin/users/${userId}`, "PATCH", { firstName: data.firstName, lastName: data.lastName, email: data.email });
-      return await apiRequest(`/api/students/${studentId}`, "PATCH", { gradeLevel: data.gradeLevel, schoolName: data.schoolName, classId: data.classId || null, tutorId: data.tutorId || null });
+      return await apiRequest(`/api/students/${studentId}`, "PATCH", { gradeLevel: data.gradeLevel, schoolName: data.schoolName, roll_number: data.rollNumber || null, classId: data.classId || null, tutorId: data.tutorId || null });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyAdmin?.companyId}/students`] });
@@ -1268,6 +1271,7 @@ export default function CompanyDashboard() {
       email: student.user?.email || "",
       gradeLevel: student.gradeLevel || "",
       schoolName: student.schoolName || "",
+      rollNumber: student.rollNumber || "",
       classId: student.classId || "__none__",
       tutorId: student.tutorId || "__none__",
     });
@@ -2586,6 +2590,10 @@ export default function CompanyDashboard() {
                     </div>
                   </div>
                   <div>
+                    <Label htmlFor="rollNumber">Roll Number</Label>
+                    <Input id="rollNumber" value={studentFormData.rollNumber} onChange={(e) => setStudentFormData({ ...studentFormData, rollNumber: e.target.value })} placeholder="e.g., 2024-001" />
+                  </div>
+                  <div>
                     <Label htmlFor="studentClass">Assign to Class</Label>
                     <Select value={studentFormData.classId} onValueChange={(value) => setStudentFormData({ ...studentFormData, classId: value })}>
                       <SelectTrigger>
@@ -2754,6 +2762,11 @@ export default function CompanyDashboard() {
                             {student.schoolName}
                           </Badge>
                         )}
+                        {student.rollNumber && (
+                          <Badge variant="outline" className="border-purple-400 text-purple-700 bg-purple-50 dark:bg-purple-900/30 dark:text-purple-300 text-[10px] px-1.5 py-0">
+                            #{student.rollNumber}
+                          </Badge>
+                        )}
                         {student.class?.name ? (
                           <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50 dark:bg-green-900/30 dark:text-green-300 text-[10px] px-1.5 py-0">
                             {student.class.name}
@@ -2825,6 +2838,10 @@ export default function CompanyDashboard() {
                 <Label htmlFor="editSchoolName">School Name</Label>
                 <Input id="editSchoolName" value={editStudentFormData.schoolName} onChange={(e) => setEditStudentFormData({ ...editStudentFormData, schoolName: e.target.value })} placeholder="e.g., St. Mary's" />
               </div>
+            </div>
+            <div>
+              <Label htmlFor="editRollNumber">Roll Number</Label>
+              <Input id="editRollNumber" value={editStudentFormData.rollNumber} onChange={(e) => setEditStudentFormData({ ...editStudentFormData, rollNumber: e.target.value })} placeholder="e.g., 2024-001" />
             </div>
             <div>
               <Label htmlFor="editStudentClass">Assign to Class</Label>

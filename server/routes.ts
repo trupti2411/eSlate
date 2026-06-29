@@ -2032,7 +2032,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const { first_name, last_name, year_group_code, school, date_of_birth, address, notes, learning_goals, parents } = req.body;
+      const { first_name, last_name, year_group_code, school, roll_number, date_of_birth, address, notes, learning_goals, parents } = req.body;
 
       if (first_name !== undefined && !String(first_name).trim()) {
         return res.status(400).json({ message: "First name cannot be blank" });
@@ -2066,6 +2066,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           ...(address !== undefined ? { address: address?.trim() || null } : {}),
           ...(notes !== undefined ? { notes: notes?.trim() || null } : {}),
           ...(learning_goals !== undefined ? { learningGoals: learning_goals?.trim() || null } : {}),
+          ...(roll_number !== undefined ? { rollNumber: roll_number?.trim() || null } : {}),
           updatedAt: new Date(),
           updatedByName: updaterName,
         },
@@ -3374,7 +3375,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Company admin or admin access required" });
       }
 
-      const { email, firstName, lastName, gradeLevel, schoolName, classId, tutorId, companyId } = req.body;
+      const { email, firstName, lastName, gradeLevel, schoolName, rollNumber, classId, tutorId, companyId } = req.body;
 
       if (!email || !firstName || !lastName) {
         return res.status(400).json({ message: "Email, first name, and last name are required" });
@@ -3415,6 +3416,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         companyId: companyId || null,
         gradeLevel: gradeLevel || null,
         schoolName: schoolName || null,
+        rollNumber: rollNumber || null,
         classId: classId || null,
         tutorId: tutorId || null,
         parentId: null,
