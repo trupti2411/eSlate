@@ -10,6 +10,7 @@ deployment:
     - npm run build 2>&1
     - echo "=== npm build done, exit: $? ==="
     - echo "=== dist/public contents: ===" && ls dist/public/ 2>&1
+    - echo "BUILD_TIMESTAMP=$(date)" > dist/public/build-test.txt 2>&1
     - npm run db:push 2>&1
     - npm run db:seed 2>&1
     - pkill -f "node.*dist/index" 2>/dev/null || true
