@@ -233,8 +233,9 @@ function AllocateModal({ item, companyId, onClose }: { item: LibraryItem; compan
 
   const allocateMutation = useMutation({
     mutationFn: () => apiRequest('POST', `/api/assignment-library/${item.id}/allocate`, {
+      targetType: 'class',
       classId,
-      dueDate: dueDate || undefined,
+      dueAt: dueDate ? `${dueDate}T23:59:00.000Z` : undefined,
     }),
     onSuccess: () => {
       setSuccess(true);

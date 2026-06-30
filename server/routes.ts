@@ -9945,13 +9945,13 @@ Good luck with your assignment!"
       const { status, subject, yearGroup, search } = req.query as Record<string, string>;
 
       // Verify access
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
         const tutor = await storage.getTutorByUserId(user.id);
         if (!tutor || tutor.companyId !== companyId) return res.status(403).json({ message: 'Access denied' });
-      } else {
+      } else if (user.role !== 'admin') {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -9989,7 +9989,7 @@ Good luck with your assignment!"
       if (!companyId || !title) return res.status(400).json({ message: 'companyId and title are required' });
 
       // Verify user belongs to this company
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -9997,7 +9997,9 @@ Good luck with your assignment!"
         if (!tutor || tutor.companyId !== companyId) return res.status(403).json({ message: 'Access denied' });
       }
 
-      const [item] = await db.insert(assignmentLibraryItems).values({
+      const itemId = crypto.randomUUID();
+      await db.insert(assignmentLibraryItems).values({
+        id: itemId,
         companyId, title, description, instructions,
         subjects: subjects ?? [],
         yearGroups: yearGroups ?? [],
@@ -10005,14 +10007,14 @@ Good luck with your assignment!"
         libStatus: 'draft',
         createdBy: user.id,
         lastUpdatedBy: user.id,
-      }).$returningId();
+      });
 
       // Insert questions if provided
       if (Array.isArray(questions) && questions.length > 0) {
         for (let i = 0; i < questions.length; i++) {
           const q = questions[i];
           await db.insert(assignmentLibraryQuestions).values({
-            libraryItemId: item.id,
+            libraryItemId: itemId,
             questionNumber: i + 1,
             questionText: q.questionText,
             questionType: q.questionType ?? 'subjective',
@@ -10023,7 +10025,7 @@ Good luck with your assignment!"
         }
       }
 
-      const [created] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, item.id)).limit(1);
+      const [created] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, itemId)).limit(1);
       res.status(201).json(created);
     } catch (err: any) { res.status(500).json({ message: 'Failed to create library item' }); }
   });
@@ -10038,7 +10040,7 @@ Good luck with your assignment!"
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
       // Access check
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10050,7 +10052,7 @@ Good luck with your assignment!"
         if (!st) return res.status(403).json({ message: 'Access denied' });
         const allocs = await db.select().from(assignmentAllocations).where(and(eq(assignmentAllocations.libraryItemId, id), eq(assignmentAllocations.studentId, st.id))).limit(1);
         if (allocs.length === 0) return res.status(403).json({ message: 'Access denied' });
-      } else {
+      } else if (user.role !== 'admin') {
         return res.status(403).json({ message: 'Access denied' });
       }
 
@@ -10080,7 +10082,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, id)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10121,7 +10123,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, id)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10150,7 +10152,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, id)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10173,7 +10175,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, id)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10188,7 +10190,9 @@ Good luck with your assignment!"
       const [maxQ] = await db.select({ maxNum: max(assignmentLibraryQuestions.questionNumber) }).from(assignmentLibraryQuestions).where(eq(assignmentLibraryQuestions.libraryItemId, id));
       const nextNum = (maxQ?.maxNum ?? 0) + 1;
 
-      const [inserted] = await db.insert(assignmentLibraryQuestions).values({
+      const questionId = crypto.randomUUID();
+      await db.insert(assignmentLibraryQuestions).values({
+        id: questionId,
         libraryItemId: id,
         questionNumber: nextNum,
         questionText,
@@ -10197,9 +10201,9 @@ Good luck with your assignment!"
         maxMarks: maxMarks ?? 1,
         options: options ?? [],
         regionCoords,
-      }).$returningId();
+      });
 
-      const [question] = await db.select().from(assignmentLibraryQuestions).where(eq(assignmentLibraryQuestions.id, inserted.id)).limit(1);
+      const [question] = await db.select().from(assignmentLibraryQuestions).where(eq(assignmentLibraryQuestions.id, questionId)).limit(1);
       res.status(201).json(question);
     } catch (err: any) { res.status(500).json({ message: 'Failed to add question' }); }
   });
@@ -10217,7 +10221,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, question.libraryItemId)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10254,7 +10258,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, question.libraryItemId)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10280,7 +10284,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, question.libraryItemId)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10297,14 +10301,16 @@ Good luck with your assignment!"
       const inserted = [];
       for (let i = 0; i < criteria.length; i++) {
         const c = criteria[i];
-        const [r] = await db.insert(assignmentLibraryRubrics).values({
+        const rubricId = crypto.randomUUID();
+        await db.insert(assignmentLibraryRubrics).values({
+          id: rubricId,
           questionId,
           criterion: c.criterion,
           descriptor: c.descriptor,
           maxMarks: c.maxMarks ?? 1,
           sortOrder: i,
-        }).$returningId();
-        inserted.push(r.id);
+        });
+        inserted.push(rubricId);
       }
 
       const rubrics = await db.select().from(assignmentLibraryRubrics).where(eq(assignmentLibraryRubrics.questionId, questionId)).orderBy(asc(assignmentLibraryRubrics.sortOrder));
@@ -10324,7 +10330,7 @@ Good luck with your assignment!"
       const [item] = await db.select().from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, id)).limit(1);
       if (!item) return res.status(404).json({ message: 'Library item not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10404,7 +10410,7 @@ Good luck with your assignment!"
       if (user.role === 'student') {
         const st = await storage.getStudentByUserId(user.id);
         if (!st || st.id !== alloc.studentId) return res.status(403).json({ message: 'Access denied' });
-      } else if (user.role === 'company_admin' || user.role === 'admin') {
+      } else if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10432,7 +10438,7 @@ Good luck with your assignment!"
       const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, id)).limit(1);
       if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10479,7 +10485,7 @@ Good luck with your assignment!"
       const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, id)).limit(1);
       if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10524,16 +10530,19 @@ Good luck with your assignment!"
       for (const li of libItems) libMap[li.id] = li;
 
       const result = allocs.map(a => {
+        const lib = libMap[a.libraryItemId] ?? null;
         const isOverdue = a.dueAt < now && !['returned', 'submitted', 'auto_marked', 'under_review', 'revoked'].includes(a.allocStatus);
-        const subs = [] as any[];
+        const status: string = isOverdue ? 'overdue' : a.allocStatus;
         return {
-          allocationId: a.id,
-          libraryItem: libMap[a.libraryItemId] ?? null,
-          dueAt: a.dueAt,
-          status: a.allocStatus,
-          isLate: false,
-          isOverdue,
-          currentAttempt: a.currentAttempt,
+          id: a.id,
+          assignmentTitle: lib?.title ?? '',
+          subjects: lib?.subjects ?? [],
+          dueDate: a.dueAt?.toISOString() ?? null,
+          status,
+          isLate: isOverdue,
+          score: null as number | null,
+          maxMarks: lib?.maxMarks ?? null,
+          feedback: null as string | null,
         };
       });
 
@@ -10562,8 +10571,52 @@ Good luck with your assignment!"
 
       // Get latest submission if any
       const subs = await db.select().from(assignmentSubmissions).where(and(eq(assignmentSubmissions.allocationId, allocationId), eq(assignmentSubmissions.studentId, st.id))).orderBy(desc(assignmentSubmissions.attemptNo)).limit(1);
+      const latestSub = subs[0] ?? null;
 
-      res.json({ ...alloc, libraryItem: { ...libItem, questions }, latestSubmission: subs[0] ?? null });
+      // Get marks and transcriptions if returned
+      const marks = latestSub
+        ? await db.select().from(submissionMarks).where(eq(submissionMarks.submissionId, latestSub.id))
+        : [];
+      const transcriptions = latestSub
+        ? await db.select().from(submissionTranscriptions).where(eq(submissionTranscriptions.submissionId, latestSub.id))
+        : [];
+
+      const now2 = new Date();
+      const isOverdue = alloc.dueAt < now2 && !['returned', 'submitted', 'auto_marked', 'under_review', 'revoked'].includes(alloc.allocStatus);
+      const enteredAnswers: Record<string, string> = (typeof latestSub?.enteredAnswers === 'object' && latestSub?.enteredAnswers) ? latestSub.enteredAnswers as Record<string, string> : {};
+
+      const marksMap: Record<string, any> = {};
+      for (const m of marks) { if (m.questionId) marksMap[m.questionId] = m; }
+      const ocrMap: Record<string, any> = {};
+      for (const t of transcriptions) { if (t.questionId) ocrMap[t.questionId] = t; }
+
+      const shapedQuestions = questions.map(q => ({
+        questionId: q.id,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        maxMarks: q.maxMarks,
+        answer: enteredAnswers[q.id] ?? null,
+        score: marksMap[q.id]?.finalScore ?? marksMap[q.id]?.provisionalScore ?? null,
+        tutorComment: marksMap[q.id]?.tutorComments ?? null,
+        isHandwritten: false,
+      }));
+
+      const totalScore = alloc.allocStatus === 'returned' && marks.length > 0
+        ? marks.reduce((s, m) => s + ((m.finalScore ?? m.provisionalScore) ?? 0), 0)
+        : null;
+
+      res.json({
+        id: alloc.id,
+        assignmentTitle: libItem?.title ?? '',
+        instructions: libItem?.instructions ?? null,
+        status: isOverdue ? 'overdue' : alloc.allocStatus,
+        dueDate: alloc.dueAt?.toISOString() ?? null,
+        isLate: isOverdue,
+        totalScore,
+        maxMarks: libItem?.maxMarks ?? null,
+        overallFeedback: latestSub?.tutorFeedback ?? null,
+        questions: shapedQuestions,
+      });
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch assignment detail' }); }
   });
 
@@ -10598,7 +10651,9 @@ Good luck with your assignment!"
         }).where(eq(assignmentSubmissions.id, existing[0].id));
         res.json({ message: 'Draft saved', submissionId: existing[0].id });
       } else {
-        const [inserted] = await db.insert(assignmentSubmissions).values({
+        const newSubId = crypto.randomUUID();
+        await db.insert(assignmentSubmissions).values({
+          id: newSubId,
           allocationId,
           studentId: st.id,
           attemptNo: alloc.currentAttempt,
@@ -10608,14 +10663,14 @@ Good luck with your assignment!"
           autoMarkStatus: 'pending',
           isLate: false,
           syncStatus: 'synced',
-        }).$returningId();
+        });
 
         // Update allocation status to in_progress
         if (alloc.allocStatus === 'assigned' || alloc.allocStatus === 'scheduled') {
           await db.update(assignmentAllocations).set({ allocStatus: 'in_progress', updatedAt: new Date() }).where(eq(assignmentAllocations.id, allocationId));
         }
 
-        res.status(201).json({ message: 'Draft created', submissionId: inserted.id });
+        res.status(201).json({ message: 'Draft created', submissionId: newSubId });
       }
     } catch (err: any) { res.status(500).json({ message: 'Failed to save draft' }); }
   });
@@ -10657,12 +10712,14 @@ Good luck with your assignment!"
         }).where(eq(assignmentSubmissions.id, existing[0].id));
         submissionId = existing[0].id;
       } else {
-        const [inserted] = await db.insert(assignmentSubmissions).values({
+        const newSubId2 = crypto.randomUUID();
+        await db.insert(assignmentSubmissions).values({
+          id: newSubId2,
           allocationId, studentId: st.id, attemptNo: alloc.currentAttempt,
           submittedAt: now, isLate, inkData, enteredAnswers,
           ocrStatus: 'pending', autoMarkStatus: 'pending', syncStatus: 'synced',
-        }).$returningId();
-        submissionId = inserted.id;
+        });
+        submissionId = newSubId2;
       }
 
       // Simulate OCR – mark complete with placeholder transcriptions
@@ -10751,7 +10808,7 @@ Good luck with your assignment!"
       if (!['admin', 'company_admin', 'tutor'].includes(user.role)) return res.status(403).json({ message: 'Access denied' });
 
       let companyId: string | null = null;
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         companyId = ca?.companyId ?? null;
       } else {
@@ -10776,18 +10833,26 @@ Good luck with your assignment!"
       for (const alloc of allocs) {
         const [st] = await db.select().from(students).where(eq(students.id, alloc.studentId)).limit(1);
         const [studentUser] = st ? await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, st.userId)).limit(1) : [null];
-        const [libItem] = await db.select({ title: assignmentLibraryItems.title }).from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, alloc.libraryItemId)).limit(1);
+        const [libItem] = await db.select({ title: assignmentLibraryItems.title, maxMarks: assignmentLibraryItems.maxMarks }).from(assignmentLibraryItems).where(eq(assignmentLibraryItems.id, alloc.libraryItemId)).limit(1);
         const [sub] = await db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.allocationId, alloc.id)).orderBy(desc(assignmentSubmissions.attemptNo)).limit(1);
+        if (!sub) continue;
+
+        let className = '';
+        if (alloc.classId) {
+          const [cls] = await db.select({ name: classes.name }).from(classes).where(eq(classes.id, alloc.classId)).limit(1);
+          className = cls?.name ?? '';
+        }
 
         result.push({
-          allocationId: alloc.id,
+          id: sub.id,
           studentName: studentUser ? `${studentUser.firstName ?? ''} ${studentUser.lastName ?? ''}`.trim() : 'Unknown',
           assignmentTitle: libItem?.title ?? '',
+          className,
           status: alloc.allocStatus,
-          submittedAt: sub?.submittedAt ?? null,
-          provisionalScore: sub?.provisionalScore ?? null,
-          isLate: sub?.isLate ?? false,
-          currentAttempt: alloc.currentAttempt,
+          submittedAt: sub.submittedAt?.toISOString() ?? null,
+          provisionalScore: sub.provisionalScore ?? null,
+          maxMarks: libItem?.maxMarks ?? null,
+          isLate: sub.isLate ?? false,
         });
       }
 
@@ -10795,8 +10860,8 @@ Good luck with your assignment!"
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch marking queue' }); }
   });
 
-  // GET /api/submissions/:submissionId/review – Full review payload
-  app.get('/api/submissions/:submissionId/review', isAuthenticated, async (req: any, res: any) => {
+  // GET /api/library-submissions/:submissionId/review – Full review payload
+  app.get('/api/library-submissions/:submissionId/review', isAuthenticated, async (req: any, res: any) => {
     try {
       const { submissionId } = req.params;
       const user = req.user!;
@@ -10808,7 +10873,7 @@ Good luck with your assignment!"
       const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, sub.allocationId)).limit(1);
       if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10826,7 +10891,45 @@ Good luck with your assignment!"
         await db.update(assignmentAllocations).set({ allocStatus: 'under_review', updatedAt: new Date() }).where(eq(assignmentAllocations.id, alloc.id));
       }
 
-      res.json({ submission: sub, allocation: { ...alloc, allocStatus: alloc.allocStatus === 'auto_marked' ? 'under_review' : alloc.allocStatus }, libraryItem: libItem, questions, transcriptions, marks });
+      // Look up student name
+      const [st] = await db.select().from(students).where(eq(students.id, alloc.studentId)).limit(1);
+      const [studentUser] = st ? await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, st.userId)).limit(1) : [null];
+      const studentName = studentUser ? `${studentUser.firstName ?? ''} ${studentUser.lastName ?? ''}`.trim() : 'Unknown';
+
+      let className = '';
+      if (alloc.classId) {
+        const [cls] = await db.select({ name: classes.name }).from(classes).where(eq(classes.id, alloc.classId)).limit(1);
+        className = cls?.name ?? '';
+      }
+
+      const ocrMap: Record<string, string> = {};
+      for (const t of transcriptions) { if (t.questionId) ocrMap[t.questionId] = t.transcribedText ?? ''; }
+      const marksMap: Record<string, any> = {};
+      for (const m of marks) { if (m.questionId) marksMap[m.questionId] = m; }
+      const enteredAnswers: Record<string, string> = (typeof sub.enteredAnswers === 'object' && sub.enteredAnswers) ? sub.enteredAnswers as Record<string, string> : {};
+      const inkData: Record<string, any> = (typeof sub.inkData === 'object' && sub.inkData) ? sub.inkData as Record<string, any> : {};
+
+      const shapedQuestions = questions.map(q => ({
+        questionId: q.id,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        maxMarks: q.maxMarks,
+        studentAnswer: enteredAnswers[q.id] ?? null,
+        ocrTranscription: ocrMap[q.id] ?? null,
+        provisionalScore: marksMap[q.id]?.provisionalScore ?? null,
+        isHandwritten: !!inkData[q.id],
+      }));
+
+      res.json({
+        id: sub.id,
+        studentName,
+        assignmentTitle: libItem?.title ?? '',
+        className,
+        submittedAt: sub.submittedAt?.toISOString() ?? '',
+        isLate: sub.isLate ?? false,
+        maxMarks: libItem?.maxMarks ?? 0,
+        questions: shapedQuestions,
+      });
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch review payload' }); }
   });
 
@@ -10843,7 +10946,7 @@ Good luck with your assignment!"
       const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, sub.allocationId)).limit(1);
       if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10851,18 +10954,19 @@ Good luck with your assignment!"
         if (!tutor || tutor.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       }
 
-      const { questionId, finalScore, tutorComments } = req.body;
+      const { questionId, finalScore, tutorComment, tutorComments } = req.body;
+      const commentText = tutorComment ?? tutorComments ?? null;
       if (!questionId || finalScore === undefined) return res.status(400).json({ message: 'questionId and finalScore are required' });
 
       // Upsert submissionMark
       const [existing] = await db.select().from(submissionMarks).where(and(eq(submissionMarks.submissionId, submissionId), eq(submissionMarks.questionId, questionId))).limit(1);
       if (existing) {
         await db.update(submissionMarks).set({
-          finalScore, tutorComments, markSource: 'tutor', isProvisional: false, updatedAt: new Date(),
+          finalScore, tutorComments: commentText, markSource: 'tutor', isProvisional: false, updatedAt: new Date(),
         }).where(eq(submissionMarks.id, existing.id));
       } else {
         await db.insert(submissionMarks).values({
-          submissionId, questionId, markSource: 'tutor', finalScore, tutorComments, isProvisional: false,
+          submissionId, questionId, markSource: 'tutor', finalScore, tutorComments: commentText, isProvisional: false,
         });
       }
 
@@ -10888,7 +10992,7 @@ Good luck with your assignment!"
       const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, sub.allocationId)).limit(1);
       if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10896,15 +11000,30 @@ Good luck with your assignment!"
         if (!tutor || tutor.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       }
 
-      const { tutorFeedback, tutorAnnotations, grantResubmission, resubmissionDueAt, resubmissionNote } = req.body;
+      const { overallFeedback, tutorFeedback: legacyFeedback, tutorAnnotations, grantResubmission, resubmissionDueAt, resubmissionNote, questions: questionMarks } = req.body;
+      const feedbackText = overallFeedback ?? legacyFeedback ?? null;
       const now = new Date();
+
+      // Save per-question marks/comments from the questions array if provided
+      if (Array.isArray(questionMarks)) {
+        for (const qm of questionMarks as any[]) {
+          const { questionId, finalScore: qFinalScore, tutorComment } = qm;
+          if (!questionId) continue;
+          const [existing] = await db.select().from(submissionMarks).where(and(eq(submissionMarks.submissionId, submissionId), eq(submissionMarks.questionId, questionId))).limit(1);
+          if (existing) {
+            await db.update(submissionMarks).set({ finalScore: qFinalScore, tutorComments: tutorComment ?? null, markSource: 'tutor', isProvisional: false, updatedAt: new Date() }).where(eq(submissionMarks.id, existing.id));
+          } else {
+            await db.insert(submissionMarks).values({ submissionId, questionId, markSource: 'tutor', finalScore: qFinalScore, tutorComments: tutorComment ?? null, isProvisional: false });
+          }
+        }
+      }
 
       // Calculate final score from all marks
       const allMarks = await db.select({ finalScore: submissionMarks.finalScore, provisionalScore: submissionMarks.provisionalScore }).from(submissionMarks).where(eq(submissionMarks.submissionId, submissionId));
       const finalScore = allMarks.reduce((s, m) => s + (m.finalScore ?? m.provisionalScore ?? 0), 0);
 
       await db.update(assignmentSubmissions).set({
-        tutorFeedback, tutorAnnotations, finalisedBy: user.id, finalisedAt: now, finalScore, updatedAt: new Date(),
+        tutorFeedback: feedbackText, tutorAnnotations, finalisedBy: user.id, finalisedAt: now, finalScore, updatedAt: new Date(),
       }).where(eq(assignmentSubmissions.id, submissionId));
 
       // Get library item for maxMarks and subjects
@@ -10944,12 +11063,14 @@ Good luck with your assignment!"
 
       // Grant resubmission if requested
       if (grantResubmission) {
-        const [resub] = await db.insert(resubmissions).values({
+        const resubId = crypto.randomUUID();
+        await db.insert(resubmissions).values({
+          id: resubId,
           allocationId: alloc.id,
           grantedBy: user.id,
           newDueAt: resubmissionDueAt ? new Date(resubmissionDueAt) : null,
           note: resubmissionNote ?? null,
-        }).$returningId();
+        });
 
         await db.update(assignmentAllocations).set({
           allocStatus: 'assigned',
@@ -10986,7 +11107,7 @@ Good luck with your assignment!"
       const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, id)).limit(1);
       if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -10996,12 +11117,14 @@ Good luck with your assignment!"
 
       const { newDueAt, note } = req.body;
 
-      const [resub] = await db.insert(resubmissions).values({
+      const resubId2 = crypto.randomUUID();
+      await db.insert(resubmissions).values({
+        id: resubId2,
         allocationId: id,
         grantedBy: user.id,
         newDueAt: newDueAt ? new Date(newDueAt) : null,
         note: note ?? null,
-      }).$returningId();
+      });
 
       const newAttempt = alloc.currentAttempt + 1;
       await db.update(assignmentAllocations).set({
@@ -11020,11 +11143,11 @@ Good luck with your assignment!"
           type: 'assignment_notification',
           title: 'Resubmission Granted',
           message: `You may resubmit "${libItem?.title}"${newDueAt ? '. New due: ' + new Date(newDueAt).toLocaleDateString('en-AU') : ''}`,
-          data: { allocationId: id, resubmissionId: resub.id },
+          data: { allocationId: id, resubmissionId: resubId2 },
         });
       }
 
-      res.status(201).json({ message: 'Resubmission granted', resubmissionId: resub.id, newAttempt });
+      res.status(201).json({ message: 'Resubmission granted', resubmissionId: resubId2, newAttempt });
     } catch (err: any) { res.status(500).json({ message: 'Failed to grant resubmission' }); }
   });
 
@@ -11038,7 +11161,7 @@ Good luck with your assignment!"
       const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, id)).limit(1);
       if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -11154,7 +11277,7 @@ Good luck with your assignment!"
         if (!tutor) return res.status(403).json({ message: 'Access denied' });
         const [st] = await db.select().from(students).where(and(eq(students.id, studentId), eq(students.companyId, tutor.companyId!))).limit(1);
         if (!st) return res.status(403).json({ message: 'Access denied' });
-      } else if (user.role === 'company_admin' || user.role === 'admin') {
+      } else if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca) return res.status(403).json({ message: 'Access denied' });
         const [st] = await db.select().from(students).where(and(eq(students.id, studentId), eq(students.companyId, ca.companyId))).limit(1);
@@ -11251,7 +11374,7 @@ Good luck with your assignment!"
       const user = req.user!;
       if (!['admin', 'company_admin', 'tutor'].includes(user.role)) return res.status(403).json({ message: 'Access denied' });
 
-      if (user.role === 'company_admin' || user.role === 'admin') {
+      if (user.role === 'company_admin') {
         const ca = await storage.getCompanyAdminByUserId(user.id);
         if (!ca || ca.companyId !== companyId) return res.status(403).json({ message: 'Access denied' });
       } else if (user.role === 'tutor') {
@@ -11330,11 +11453,12 @@ Good luck with your assignment!"
         });
       }
 
+      const submittedPct = allocated > 0 ? Math.round((submitted / allocated) * 100) : 0;
       res.json({
-        completion: { allocated, submitted, onTime, late: lateSubmissions, notSubmitted },
-        marking: { avgTurnaroundDays: Math.round(avgTurnaroundDays * 10) / 10, awaitingReview, inReview, returned },
-        aiVsTutor: { avgDelta: Math.round(avgDelta * 10) / 10, pctAdjusted: Math.round(pctAdjusted * 10) / 10 },
-        byTutor,
+        metrics: { allocated, submitted, submittedPct, onTime, notSubmitted },
+        marking: { avgTurnaroundDays: Math.round(avgTurnaroundDays * 10) / 10, awaitingReview, inReview },
+        aiVsTutor: { avgScoreDelta: Math.round(avgDelta * 10) / 10, pctAdjusted: Math.round(pctAdjusted * 10) / 10 },
+        byTutor: byTutor.map(t => ({ ...t, avgTurnaroundDays: t.avgTurnaround })),
       });
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch oversight data' }); }
   });

@@ -45,7 +45,7 @@ export default function LibraryMarkingDetail() {
   const [initialised, setInitialised] = useState(false);
 
   const { data: review, isLoading } = useQuery<SubmissionReview>({
-    queryKey: [`/api/submissions/${params.submissionId}/review`],
+    queryKey: [`/api/library-submissions/${params.submissionId}/review`],
     enabled: !!params.submissionId && !!user?.id,
   });
 
