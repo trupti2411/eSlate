@@ -2,15 +2,16 @@
 deployment:
   tasks:
     - export PATH="/usr/local/bin:/usr/bin:/bin:$PATH"
-    - echo "HOME=$HOME PWD=$(pwd) DATE=$(date)" > $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - npm install --production 2>&1
-    - npm run db:push 2>&1
-    - npm run db:seed 2>&1
+    - echo "START=$(date) HOME=$HOME" > $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - mkdir -p $HOME/public_html/dev.eslate.com.au 2>&1
     - cp -r dist/public/. $HOME/public_html/dev.eslate.com.au/ 2>&1
     - echo "COPY_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - npm install --production 2>&1
+    - echo "NPM_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - npm run db:push 2>&1
+    - npm run db:seed 2>&1
     - pkill -f "node.*dist/index" 2>/dev/null || true
     - sleep 1
     - export $(cat .env | grep -v '^#' | grep '=' | xargs) 2>/dev/null; PORT=3000 NODE_ENV=production nohup node dist/index.js >> $HOME/eslate-server.log 2>&1 &
     - sleep 2
-    - echo "Deployment complete. Server starting on port 3000."
+    - echo "SERVER_STARTED=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
