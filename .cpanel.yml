@@ -7,8 +7,7 @@ deployment:
     - cp -r dist/public/. $HOME/public_html/dev.eslate.com.au/ 2>&1
     - echo "COPY_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - pkill -f "node.*dist/index" 2>/dev/null || true
-    - sleep 1
+    - echo "" > $HOME/eslate-server.log 2>&1
     - set -a; . ./.env 2>/dev/null; set +a; PORT=3000 NODE_ENV=production nohup node dist/index.js >> $HOME/eslate-server.log 2>&1 & echo "NODE_PID=$!" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - sleep 20
-    - curl -sk --max-time 10 http://127.0.0.1:3000/api/auth/csrf-token 2>&1 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt
     - echo "ALL_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - cp $HOME/eslate-server.log $HOME/public_html/dev.eslate.com.au/server-log.txt 2>&1
