@@ -5,6 +5,8 @@ deployment:
     - npm install --production 2>&1
     - npm run db:push 2>&1
     - npm run db:seed 2>&1
+    - cp -r dist/public/. ~/public_html/dev.eslate.com.au/ 2>&1
+    - echo "=== Files copied to document root ==="
     - pkill -f "node.*dist/index" 2>/dev/null || true
     - sleep 1
     - export $(cat .env | grep -v '^#' | grep '=' | xargs) 2>/dev/null; PORT=3000 NODE_ENV=production nohup node dist/index.js >> ~/eslate-server.log 2>&1 &
