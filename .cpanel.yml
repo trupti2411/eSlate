@@ -8,12 +8,10 @@ deployment:
     - echo "COPY_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - pkill -f "node.*dist/index" 2>/dev/null || true
     - sleep 1
-    - set -a; . ./.env 2>/dev/null; set +a; echo "DB_SET=$([ -n \"$DATABASE_URL\" ] && echo YES || echo NO)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - set -a; . ./.env 2>/dev/null; set +a; PORT=3000 NODE_ENV=production nohup node dist/index.js >> $HOME/eslate-server.log 2>&1 & echo "NODE_PID=$!" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - sleep 3
-    - curl -sk http://127.0.0.1:3000/api/auth/csrf-token | head -c 50 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - sleep 4
+    - curl -sk http://127.0.0.1:3000/api/auth/csrf-token 2>&1 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt
     - echo "SERVER_CHECK_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - npm install --production 2>&1
-    - npm run db:push 2>&1
-    - npm run db:seed 2>&1
+    - set -a; . ./.env 2>/dev/null; set +a; npm run db:push 2>&1
+    - set -a; . ./.env 2>/dev/null; set +a; npm run db:seed 2>&1
     - echo "ALL_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
