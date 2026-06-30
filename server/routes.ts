@@ -4577,15 +4577,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [original] = await db.select().from(courses).where(and(eq(courses.id, courseId), eq(courses.companyId, ca.companyId)));
       if (!original) return res.status(404).json({ message: "Course not found" });
 
-      const [newCourse] = await db.insert(courses).values({
+      const newId = randomUUID();
+      await db.insert(courses).values({
+        id: newId,
         companyId: ca.companyId,
         name: `Copy of ${original.name}`,
         description: original.description ?? null,
         yearGroupCode: original.yearGroupCode ?? null,
         status: 'active',
         duplicatedFromId: courseId,
-      }).$returningId();
-      res.status(201).json({ id: newCourse.id, name: `Copy of ${original.name}`, message: "Course duplicated" });
+      });
+      res.status(201).json({ id: newId, name: `Copy of ${original.name}`, message: "Course duplicated" });
     } catch (err: any) {
       console.error("Error duplicating course:", err);
       res.status(500).json({ message: err.message ?? "Failed to duplicate course" });
@@ -4898,8 +4900,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [company] = await db.select().from(tutoringCompanies).where(eq(tutoringCompanies.id, businessId));
       if (!company) return res.status(404).json({ message: 'Not found' });
       // get active subject ids
-      const subjectRows = await db.select({ subjectId: companySubjects.subjectId }).from(companySubjects).where(eq(companySubjects.companyId, businessId));
-      res.json({ ...company, active_subject_ids: subjectRows.map(s => s.subjectId) });
+      const subjectRows = await db.select({ code: companySubjects.code }).from(companySubjects).where(eq(companySubjects.companyId, businessId));
+      const codeToId = new Map(SUBJECTS.map(s => [s.code, s.id]));
+      const activeSubjectIds = subjectRows.map(s => codeToId.get(s.code)).filter(Boolean);
+      res.json({ ...company, active_subject_ids: activeSubjectIds });
     } catch (err: any) {
       res.status(500).json({ message: err.message ?? 'Failed to fetch business' });
     }
@@ -4949,7 +4953,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // replace all company subjects
       await db.delete(companySubjects).where(eq(companySubjects.companyId, businessId));
       if (active_subject_ids.length > 0) {
-        await db.insert(companySubjects).values(active_subject_ids.map((subjectId: number) => ({ companyId: businessId, subjectId })));
+        await db.insert(companySubjects).values(active_subject_ids.map((subjectId: number) => {
+          const s = SUBJECTS.find(sub => sub.id === subjectId);
+          return { companyId: businessId, name: s?.name ?? String(subjectId), code: s?.code ?? String(subjectId) };
+        }));
       }
       res.json({ message: 'Subjects updated', count: active_subject_ids.length });
     } catch (err: any) {
