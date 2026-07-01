@@ -5,11 +5,8 @@ deployment:
     - echo "START=$(date)" > $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - mkdir -p $HOME/public_html/dev.eslate.com.au 2>&1
     - cp -r dist/public/. $HOME/public_html/dev.eslate.com.au/ 2>&1
-    - echo "COPY_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - which node >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "node not in PATH" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - node --version >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "node --version failed" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - ls /opt/alt/*/bin/node >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "no node in /opt/alt" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - pkill -f "node.*dist/index" 2>/dev/null || true
-    - echo "NODE_START=$(date)" > $HOME/public_html/dev.eslate.com.au/server-log.txt 2>&1
-    - set -a; . ./.env 2>/dev/null; set +a; PORT=3000 NODE_ENV=production node dist/index.js >> $HOME/public_html/dev.eslate.com.au/server-log.txt 2>&1 & echo "NODE_PID=$!" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - which npm >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "npm not found" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - npm --version >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "npm failed" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - find /usr /opt /home/zk3vhefl1psj -name "node" -type f -executable 2>/dev/null | head -5 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - find /usr /opt /home/zk3vhefl1psj -name "npm" -type f -executable 2>/dev/null | head -5 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - echo "ALL_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
