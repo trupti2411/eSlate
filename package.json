@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "NODE_ENV=development tsx --env-file=.env server/index.ts",
     "build": "echo 'Using pre-built dist'",
-    "build:local": "vite build && esbuild server/index.ts --platform=node --bundle --format=esm --minify --outdir=dist --external:fsevents --external:\"*.node\" --external:@babel/preset-typescript --external:lightningcss",
-    "start": "NODE_ENV=production node dist/index.js",
+    "build:local": "vite build && esbuild server/index.ts --platform=node --bundle --format=cjs --minify --outfile=dist/index.cjs --external:fsevents --external:\"*.node\" --external:@babel/preset-typescript --external:lightningcss --external:vite --external:\"../vite.config\" --external:\"./vite.config\"",
+    "start": "NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "db:push": "drizzle-kit push",
     "db:seed": "tsx --env-file=.env server/seed.ts"
