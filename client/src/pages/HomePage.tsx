@@ -254,13 +254,11 @@ export default function HomePage() {
               <Link href="/contact" className="text-gray-600 hover:text-gray-900 font-medium transition-colors">
                 Contact Us
               </Link>
-              {!import.meta.env.PROD && (
-                <Link href="/auth">
-                  <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
-                    Sign In
-                  </Button>
-                </Link>
-              )}
+              <Link href="/auth">
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg">
+                  Sign In
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
