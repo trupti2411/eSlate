@@ -111,7 +111,7 @@ function freePort(port: number) {
       freePort(port);
       setTimeout(() => {
         server.close();
-        server.listen({ port, host: "localhost" }, () => {
+        server.listen({ port, host: "0.0.0.0" }, () => {
           log(`serving on port ${port}`);
         });
       }, 1000);
@@ -123,7 +123,7 @@ function freePort(port: number) {
 
   server.listen({
     port,
-    host: "localhost",
+    host: "0.0.0.0",
   }, () => {
     log(`serving on port ${port}`);
     startWwccReminderJob();
