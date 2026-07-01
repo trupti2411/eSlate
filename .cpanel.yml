@@ -5,8 +5,9 @@ deployment:
     - echo "START=$(date)" > $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - mkdir -p $HOME/public_html/dev.eslate.com.au 2>&1
     - cp -r dist/public/. $HOME/public_html/dev.eslate.com.au/ 2>&1
-    - which npm >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "npm not found" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - npm --version >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "npm failed" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - find /usr /opt /home/zk3vhefl1psj -name "node" -type f -executable 2>/dev/null | head -5 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
-    - find /usr /opt /home/zk3vhefl1psj -name "npm" -type f -executable 2>/dev/null | head -5 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - set -a; . ./.env 2>/dev/null; set +a; echo "PATH_AFTER_ENV=$PATH" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - set -a; . ./.env 2>/dev/null; set +a; which node >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "no node after env" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - set -a; . ./.env 2>/dev/null; set +a; node --version >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1 || echo "node failed after env" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - ls $HOME/nodevenv 2>&1 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt || echo "no nodevenv dir" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
+    - ls $HOME/.nvm/versions 2>&1 >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt || echo "no nvm" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
     - echo "ALL_DONE=$(date)" >> $HOME/public_html/dev.eslate.com.au/deploy-status.txt 2>&1
