@@ -6594,6 +6594,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Object storage upload endpoint
   app.post('/api/objects/upload', isAuthenticated, async (req: any, res: any) => {
     try {
+      // Local dev fallback when GCS object storage is not configured
+      if (!process.env.PRIVATE_OBJECT_DIR) {
+        const { randomUUID: uuid } = await import('crypto');
+        const objectId = uuid();
+        const port = process.env.PORT || 3000;
+        return res.json({ uploadURL: `http://localhost:${port}/api/objects/local-upload/${objectId}` });
+      }
       const contentType = req.body?.contentType || undefined;
       const objectStorageService = new ObjectStorageService();
       const uploadURL = await objectStorageService.getObjectEntityUploadURL(contentType);
@@ -6601,6 +6608,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating upload URL:", error);
       res.status(500).json({ message: "Failed to generate upload URL" });
+    }
+  });
+
+  // Local dev: accept raw file PUT and save to disk
+  app.put('/api/objects/local-upload/:objectId', async (req: any, res: any) => {
+    try {
+      const { mkdirSync, createWriteStream } = await import('fs');
+      const { join } = await import('path');
+      const dir = join(process.cwd(), 'local-uploads');
+      mkdirSync(dir, { recursive: true });
+      const filePath = join(dir, req.params.objectId);
+      const writer = createWriteStream(filePath);
+      req.pipe(writer);
+      writer.on('finish', () => res.status(200).send('OK'));
+      writer.on('error', (err: any) => { console.error(err); res.status(500).send('Write failed'); });
+    } catch (err) {
+      console.error(err);
+      res.status(500).send('Upload failed');
     }
   });
 
@@ -6625,8 +6650,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Public document route for Google Docs Viewer (no authentication required)
   app.get('/api/public-objects/:objectPath(*)', async (req: any, res: any) => {
+    // Local dev fallback
+    if (!process.env.PRIVATE_OBJECT_DIR) {
+      const { join } = await import('path');
+      const { existsSync } = await import('fs');
+      const objectId = req.params.objectPath.split('/').pop();
+      const localPath = join(process.cwd(), 'local-uploads', objectId);
+      if (existsSync(localPath)) {
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        return res.sendFile(localPath);
+      }
+      return res.sendStatus(404);
+    }
+
     const objectStorageService = new ObjectStorageService();
-    
+
     try {
       const objectPath = `/objects/${req.params.objectPath}`;
       const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
@@ -6661,6 +6699,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Serve uploaded objects (for file viewing)
   app.get('/objects/:objectPath(*)', isAuthenticated, async (req: any, res: any) => {
+    // Local dev fallback
+    if (!process.env.PRIVATE_OBJECT_DIR) {
+      const { join } = await import('path');
+      const { existsSync } = await import('fs');
+      const objectId = req.params.objectPath.split('/').pop();
+      const localPath = join(process.cwd(), 'local-uploads', objectId);
+      if (existsSync(localPath)) return res.sendFile(localPath);
+      return res.sendStatus(404);
+    }
+
     const objectStorageService = new ObjectStorageService();
     const isEditMode = req.query.edit === 'true';
     

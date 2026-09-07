@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Link, useLocation, useParams } from 'wouter';
 import {
-  ChevronLeft, Plus, Trash2, Edit2, X, BookOpen, FileText, Clock, Award,
+  ChevronLeft, Plus, Trash2, Edit2, X, BookOpen, FileText, Clock, Award, Upload, CheckCircle,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -65,12 +65,35 @@ export default function AssignmentLibraryEditor() {
   const [estimatedDuration, setEstimatedDuration] = useState('');
   const [maxMarks, setMaxMarks] = useState('');
   const [fileUrl, setFileUrl] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [isUploading, setIsUploading] = useState(false);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [formError, setFormError] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [showAddQuestion, setShowAddQuestion] = useState(false);
   const initialised = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    setFormError('');
+    try {
+      const result = await apiRequest('/api/objects/upload', 'POST', { contentType: file.type });
+      if (!result?.uploadURL) throw new Error('No upload URL returned');
+      await fetch(result.uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      const objectKey = result.uploadURL.split('/').pop()?.split('?')[0];
+      const storedUrl = `/objects/uploads/${objectKey}?name=${encodeURIComponent(file.name)}`;
+      setFileUrl(storedUrl);
+      setUploadedFileName(file.name);
+    } catch {
+      setFormError('File upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (item && !initialised.current) {
@@ -83,6 +106,10 @@ export default function AssignmentLibraryEditor() {
       setEstimatedDuration(item.estimatedDuration != null ? String(item.estimatedDuration) : '');
       setMaxMarks(item.maxMarks != null ? String(item.maxMarks) : '');
       setFileUrl(item.fileUrl ?? '');
+      if (item.fileUrl) {
+        const nameParam = new URLSearchParams(item.fileUrl.split('?')[1] ?? '').get('name');
+        setUploadedFileName(nameParam || item.fileUrl.split('/').pop()?.split('?')[0] || 'Uploaded file');
+      }
       setQuestions(item.questions ?? []);
     }
   }, [item]);
@@ -92,7 +119,7 @@ export default function AssignmentLibraryEditor() {
   }, [item?.questions]);
 
   const createMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/assignment-library', {
+    mutationFn: () => apiRequest('/api/assignment-library', 'POST', {
       companyId,
       title: title.trim(),
       description,
@@ -111,7 +138,7 @@ export default function AssignmentLibraryEditor() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => apiRequest('PATCH', `/api/assignment-library/${params.id}`, {
+    mutationFn: () => apiRequest(`/api/assignment-library/${params.id}`, 'PATCH', {
       title: title.trim(),
       description,
       instructions,
@@ -130,18 +157,18 @@ export default function AssignmentLibraryEditor() {
   });
 
   const publishMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `/api/assignment-library/${params.id}/publish`, {}),
+    mutationFn: () => apiRequest(`/api/assignment-library/${params.id}/publish`, 'POST', {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/assignment-library/${params.id}`] }),
   });
 
   const archiveMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `/api/assignment-library/${params.id}/archive`, {}),
+    mutationFn: () => apiRequest(`/api/assignment-library/${params.id}/archive`, 'POST', {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/assignment-library/${params.id}`] }),
   });
 
   const addQuestionMutation = useMutation({
     mutationFn: (q: Omit<Question, 'id' | 'orderIndex'>) =>
-      apiRequest('POST', `/api/assignment-library/${params.id}/questions`, q),
+      apiRequest(`/api/assignment-library/${params.id}/questions`, 'POST', q),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/assignment-library/${params.id}`] });
       setShowAddQuestion(false);
@@ -150,7 +177,7 @@ export default function AssignmentLibraryEditor() {
 
   const updateQuestionMutation = useMutation({
     mutationFn: (q: Question) =>
-      apiRequest('PATCH', `/api/assignment-library/questions/${q.id}`, q),
+      apiRequest(`/api/assignment-library/questions/${q.id}`, 'PATCH', q),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/assignment-library/${params.id}`] });
       setEditingQuestion(null);
@@ -159,7 +186,7 @@ export default function AssignmentLibraryEditor() {
 
   const deleteQuestionMutation = useMutation({
     mutationFn: (qId: string) =>
-      apiRequest('DELETE', `/api/assignment-library/questions/${qId}`, {}),
+      apiRequest(`/api/assignment-library/questions/${qId}`, 'DELETE', {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/assignment-library/${params.id}`] }),
   });
 
@@ -266,14 +293,43 @@ export default function AssignmentLibraryEditor() {
           </div>
 
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">File / Resource URL</label>
-            <input
-              type="url"
-              value={fileUrl}
-              onChange={e => setFileUrl(e.target.value)}
-              placeholder="https://…"
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            />
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Assignment File</label>
+            <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" className="hidden" onChange={handleFileUpload} />
+            {uploadedFileName ? (
+              <div className="flex items-center justify-between border border-green-200 bg-green-50 rounded-xl px-4 py-2.5">
+                <div className="flex items-center gap-2 text-sm text-green-800 min-w-0">
+                  <CheckCircle size={16} className="flex-shrink-0 text-green-600" />
+                  <span className="truncate">{uploadedFileName}</span>
+                </div>
+                <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+                  <a
+                    href={`/api/public-objects/uploads/${fileUrl.split('/uploads/')[1]?.split('?')[0]}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                  >
+                    View
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => { setFileUrl(''); setUploadedFileName(''); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                    className="text-xs text-gray-500 hover:text-rose-600"
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
+                className="w-full border-2 border-dashed border-gray-200 rounded-xl px-4 py-4 text-sm text-gray-500 hover:border-indigo-300 hover:text-indigo-600 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Upload size={16} />
+                {isUploading ? 'Uploading…' : 'Click to upload PDF, DOC, or image'}
+              </button>
+            )}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">

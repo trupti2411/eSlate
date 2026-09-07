@@ -21,3 +21,4 @@ api/storage/framework/views/
 api/database/database.sqlite
 api/.env
 api/bootstrap/cache/*.php
+local-uploads/

@@ -51,14 +51,16 @@ export default function AssignmentLibrary() {
     return p.toString() ? `?${p.toString()}` : '';
   };
 
-  const { data: items = [], isLoading } = useQuery<LibraryItem[]>({
+  const { data: rawItems, isLoading } = useQuery<LibraryItem[]>({
     queryKey: [`/api/companies/${companyId}/assignment-library`, statusFilter, subjectFilter, search],
     queryFn: async () => {
       const res = await fetch(`/api/companies/${companyId}/assignment-library${buildParams()}`);
+      if (!res.ok) throw new Error('Failed to fetch library items');
       return res.json();
     },
     enabled: !!companyId,
   });
+  const items = Array.isArray(rawItems) ? rawItems : [];
 
   const publishMutation = useMutation({
     mutationFn: (id: string) => apiRequest('POST', `/api/assignment-library/${id}/publish`, {}),
