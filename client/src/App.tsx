@@ -188,7 +188,15 @@ function Router() {
           <Route path="/admin/companies/:id" component={CompanyManagement} />
           <Route path="/admin/settings" component={AdminSettings} />
           <Route path="/admin/test" component={TestUserCreation} />
-          <Route path="/company">{() => <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><CompanyDashboard /></Suspense>}</Route>
+          <Route path="/company">
+            {() =>
+              design === 'new' ? (
+                <NewCompanyDashboard setDesign={setDesign} />
+              ) : (
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><CompanyDashboard /></Suspense>
+              )
+            }
+          </Route>
           <Route path="/company/tutors" component={Staff} />
           <Route path="/company/students" component={Students} />
           <Route path="/company/classes" component={Classes} />
