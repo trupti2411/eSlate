@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { DesignNavToggle } from '@/components/DesignSwitchBanner';
-import type { Design } from '@/hooks/useDesignPreference';
 import { isPast, format, differenceInDays, startOfWeek, endOfWeek } from 'date-fns';
 import {
   CheckSquare, BookOpen, BarChart2, Bell, LogOut,
@@ -12,8 +10,6 @@ import { useLocation } from 'wouter';
 import type { Assignment, Submission, Class } from '@shared/schema';
 import MarkedWorkViewer from '@/components/MarkedWorkViewer';
 
-interface Props { setDesign: (d: Design) => void; }
-
 type Tab = 'homework' | 'classes' | 'results';
 
 function statusBadge(status: 'overdue' | 'pending' | 'done') {
@@ -22,7 +18,7 @@ function statusBadge(status: 'overdue' | 'pending' | 'done') {
   return <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-green-100 text-green-700 border border-green-200">Done</span>;
 }
 
-export default function NewStudentDashboard({ setDesign }: Props) {
+export default function NewStudentDashboard() {
   const { user, logoutMutation } = useAuth();
   const [, navigate] = useLocation();
   const [tab, setTab] = useState<Tab>('homework');
@@ -144,7 +140,6 @@ export default function NewStudentDashboard({ setDesign }: Props) {
         </nav>
 
         <div className="px-3 pb-4 space-y-1 border-t border-indigo-500 pt-3">
-          <DesignNavToggle design="new" onSwitch={setDesign} accentClass="bg-indigo-600" />
           <button
             onClick={() => logoutMutation.mutate()}
             className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold text-indigo-300 hover:text-white hover:bg-white/10 transition-all"
@@ -170,7 +165,6 @@ export default function NewStudentDashboard({ setDesign }: Props) {
                 <span className="text-sm text-indigo-200">{firstName}</span>
               </div>
               <div className="flex items-center gap-1">
-                <DesignNavToggle design="new" onSwitch={setDesign} accentClass="bg-indigo-600" />
                 <button onClick={() => logoutMutation.mutate()} className="w-8 h-8 rounded-xl hover:bg-white/10 flex items-center justify-center">
                   <LogOut size={15} />
                 </button>

@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
-import { DesignNavToggle } from '@/components/DesignSwitchBanner';
-import type { Design } from '@/hooks/useDesignPreference';
 import { isPast, format, startOfWeek } from 'date-fns';
 import {
   Users, CheckSquare, MessageCircle, Bell, LogOut, AlertCircle,
@@ -14,7 +12,6 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import MarkedWorkViewer from '@/components/MarkedWorkViewer';
 
-interface Props { setDesign: (d: Design) => void; }
 type Tab = 'children' | 'homework' | 'reports' | 'messages';
 
 interface ProgressReport {
@@ -603,7 +600,7 @@ function ParentProgressReports({ studentId, childName }: { studentId: string; ch
   );
 }
 
-export default function NewParentDashboard({ setDesign }: Props) {
+export default function NewParentDashboard() {
   const { user, logoutMutation } = useAuth();
   const [tab, setTab] = useState<Tab>('children');
   const [selectedChildIdx, setSelectedChildIdx] = useState(0);
@@ -646,7 +643,6 @@ export default function NewParentDashboard({ setDesign }: Props) {
             <p className="text-sm text-gray-500">Parent dashboard</p>
           </div>
           <div className="flex items-center gap-2">
-            <DesignNavToggle design="new" onSwitch={setDesign} />
             <button
               onClick={() => logoutMutation.mutate()}
               className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center hover:bg-gray-100"

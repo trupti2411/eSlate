@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Sparkles, X, LayoutDashboard } from 'lucide-react';
-import type { Design } from '@/hooks/useDesignPreference';
+import { Sparkles, X } from 'lucide-react';
 
 interface Props {
   bannerSeen: boolean;
@@ -60,37 +59,6 @@ export function DesignSwitchBanner({ bannerSeen, onDismiss, onSwitch }: Props) {
       >
         <Sparkles size={14} />
         New design
-      </button>
-    </div>
-  );
-}
-
-interface NavToggleProps {
-  design: Design;
-  onSwitch: (d: Design) => void;
-  accentClass?: string;
-}
-
-export function DesignNavToggle({ design, onSwitch, accentClass = 'bg-indigo-600' }: NavToggleProps) {
-  return (
-    <div className="flex items-center gap-0.5 bg-black/10 rounded-xl p-1">
-      <button
-        onClick={() => onSwitch('classic')}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-          design === 'classic' ? 'bg-white text-gray-800 shadow-sm' : 'text-white/70 hover:text-white'
-        }`}
-      >
-        <LayoutDashboard size={12} />
-        Classic
-      </button>
-      <button
-        onClick={() => onSwitch('new')}
-        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-          design === 'new' ? 'bg-white text-gray-800 shadow-sm' : 'text-white/70 hover:text-white'
-        }`}
-      >
-        <Sparkles size={12} />
-        New
       </button>
     </div>
   );

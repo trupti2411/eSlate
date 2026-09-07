@@ -164,12 +164,12 @@ function Router() {
           <Route path="/">
             {user?.role === 'student' && <NewStudentHome />}
             {user?.role === 'parent' && (
-              design === 'new' ? <NewParentDashboard setDesign={setDesign} /> : <ParentDashboard />
+              design === 'new' ? <NewParentDashboard /> : <ParentDashboard />
             )}
             {user?.role === 'tutor' && <TutorDashboard />}
             {user?.role === 'admin' && <AdminDashboard />}
             {user?.role === 'company_admin' && (
-              design === 'new' ? <NewCompanyDashboard setDesign={setDesign} /> : <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><CompanyDashboard /></Suspense>
+              design === 'new' ? <NewCompanyDashboard /> : <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><CompanyDashboard /></Suspense>
             )}
           </Route>
           <Route path="/student" component={NewStudentHome} />
@@ -191,7 +191,7 @@ function Router() {
           <Route path="/company">
             {() =>
               design === 'new' ? (
-                <NewCompanyDashboard setDesign={setDesign} />
+                <NewCompanyDashboard />
               ) : (
                 <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" /></div>}><CompanyDashboard /></Suspense>
               )

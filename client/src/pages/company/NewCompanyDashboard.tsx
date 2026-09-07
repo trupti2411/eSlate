@@ -2,8 +2,6 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
-import { DesignNavToggle } from '@/components/DesignSwitchBanner';
-import type { Design } from '@/hooks/useDesignPreference';
 import {
   Building2, Users, GraduationCap, BookOpen, ShieldCheck, ShieldAlert,
   CalendarDays, FileBarChart, Bell, LogOut, ArrowRight, UserPlus,
@@ -12,8 +10,6 @@ import {
   DollarSign, BarChart2, X, Check,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
-
-interface Props { setDesign: (d: Design) => void; }
 
 interface AdminProfile {
   userId: string;
@@ -113,7 +109,7 @@ function dateOnly(s: string | null | undefined): string {
   return m ? m[1] : String(s);
 }
 
-export default function NewCompanyDashboard({ setDesign }: Props) {
+export default function NewCompanyDashboard() {
   const { user, logoutMutation } = useAuth();
   const qc = useQueryClient();
   const [showNotifs, setShowNotifs] = useState(false);
@@ -288,7 +284,6 @@ export default function NewCompanyDashboard({ setDesign }: Props) {
               <span className="hidden md:inline text-xs text-indigo-200 mr-1">
                 {ownerFirstName ? `Owner · ${ownerFirstName}` : ''}
               </span>
-              <DesignNavToggle design="new" onSwitch={setDesign} accentClass="bg-indigo-600" />
               <Link
                 href="/company/settings"
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
