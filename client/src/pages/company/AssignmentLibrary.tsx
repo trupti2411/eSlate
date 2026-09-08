@@ -53,11 +53,7 @@ export default function AssignmentLibrary() {
 
   const { data: rawItems, isLoading } = useQuery<LibraryItem[]>({
     queryKey: [`/api/companies/${companyId}/assignment-library`, statusFilter, subjectFilter, search],
-    queryFn: async () => {
-      const res = await fetch(`/api/companies/${companyId}/assignment-library${buildParams()}`);
-      if (!res.ok) throw new Error('Failed to fetch library items');
-      return res.json();
-    },
+    queryFn: async () => apiRequest(`/api/companies/${companyId}/assignment-library${buildParams()}`, 'GET'),
     enabled: !!companyId,
   });
   const items = Array.isArray(rawItems) ? rawItems : [];

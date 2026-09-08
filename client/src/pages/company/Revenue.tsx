@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'wouter';
 import { ChevronLeft, Download, TrendingUp, DollarSign, AlertTriangle, Clock } from 'lucide-react';
+import { apiRequest } from '@/lib/queryClient';
 
 interface AdminProfile { userId: string; companyId: string; companyName: string; }
 interface Term { id: string; name: string; startDate: string; endDate: string; }
@@ -32,8 +33,7 @@ export default function Revenue() {
     queryKey: [`/api/companies/${companyId}/reports/revenue`, termId],
     queryFn: async () => {
       const params = termId ? `?term_id=${termId}` : '';
-      const res = await fetch(`/api/companies/${companyId}/reports/revenue${params}`);
-      return res.json();
+      return apiRequest(`/api/companies/${companyId}/reports/revenue${params}`, 'GET');
     },
     enabled: !!companyId,
   });

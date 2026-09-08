@@ -49,8 +49,7 @@ export default function Invoices() {
       const params = new URLSearchParams();
       if (statusFilter !== 'all') params.set('status', statusFilter);
       if (termFilter) params.set('term_id', termFilter);
-      const res = await fetch(`/api/companies/${companyId}/invoices?${params}`);
-      return res.json();
+      return apiRequest(`/api/companies/${companyId}/invoices?${params}`, 'GET');
     },
     enabled: !!companyId,
   });

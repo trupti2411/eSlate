@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { apiRequest } from '@/lib/queryClient';
 import { Link } from 'wouter';
 import {
   ChevronLeft, CheckSquare, AlertCircle, Clock, Users, BarChart2, Inbox, Edit2,
@@ -53,8 +54,7 @@ export default function AssignmentOversight() {
     queryKey: [`/api/companies/${companyId}/assignment-oversight`, termId],
     queryFn: async () => {
       const p = termId ? `?termId=${termId}` : '';
-      const res = await fetch(`/api/companies/${companyId}/assignment-oversight${p}`);
-      return res.json();
+      return apiRequest(`/api/companies/${companyId}/assignment-oversight${p}`, 'GET');
     },
     enabled: !!companyId,
   });

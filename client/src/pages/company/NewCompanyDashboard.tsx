@@ -10,6 +10,7 @@ import {
   DollarSign, BarChart2, Search,
 } from 'lucide-react';
 import { NotificationBell } from '@/components/NotificationBell';
+import { apiRequest } from '@/lib/queryClient';
 
 interface AdminProfile {
   userId: string;
@@ -148,8 +149,7 @@ export default function NewCompanyDashboard() {
     queryKey: [`/api/companies/${companyId}/enrolment-summary`, enrolmentTermId],
     queryFn: async () => {
       const params = enrolmentTermId ? `?term_id=${enrolmentTermId}` : '';
-      const res = await fetch(`/api/companies/${companyId}/enrolment-summary${params}`);
-      return res.json();
+      return apiRequest(`/api/companies/${companyId}/enrolment-summary${params}`, 'GET');
     },
     enabled: !!companyId,
   });
