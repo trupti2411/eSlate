@@ -17,6 +17,8 @@ import StudentAssignmentsNew from "@/pages/student/Assignments";
 import NewStudentDashboard from "@/pages/student/NewStudentDashboard";
 import ParentDashboard from "@/pages/parent/Dashboard";
 import NewParentDashboard from "@/pages/parent/NewParentDashboard";
+import ParentLibraryAssignments from "@/pages/parent/LibraryAssignments";
+import ParentLibraryAssignmentDetail from "@/pages/parent/LibraryAssignmentDetail";
 import TutorDashboard from "@/pages/tutor/Dashboard";
 import TutorProfile from "@/pages/tutor/Profile";
 import CompanyTutorDashboard from "@/pages/company/TutorDashboard";
@@ -24,6 +26,7 @@ import NewTutorDashboard from "@/pages/company/NewTutorDashboard";
 import NewCompanyDashboard from "@/pages/company/NewCompanyDashboard";
 import Staff from "@/pages/company/Staff";
 import Students from "@/pages/company/Students";
+import StudentProfile from "@/pages/company/StudentProfile";
 import Classes from "@/pages/company/Classes";
 import ClassDetail from "@/pages/company/ClassDetail";
 import Timetable from "@/pages/company/Timetable";
@@ -32,6 +35,7 @@ import CourseOfferingDetail from "@/pages/company/CourseOfferingDetail";
 import Subjects from "@/pages/company/Subjects";
 import Terms from "@/pages/company/Terms";
 import CompanySettings from "@/pages/company/Settings";
+import MyDevices from "@/pages/MyDevices";
 import AdminDashboard from "@/pages/admin/Dashboard";
 import UserManagement from "@/pages/admin/UserManagement";
 import Users from "@/pages/admin/Users";
@@ -177,7 +181,10 @@ function Router() {
           <Route path="/student/home-legacy" component={StudentHome} />
           <Route path="/student/assignments" component={StudentAssignmentsNew} />
           <Route path="/student/dashboard" component={StudentDashboard} />
+          <Route path="/my-devices" component={MyDevices} />
           <Route path="/parent" component={ParentDashboard} />
+          <Route path="/parent/students/:studentId/library-assignments/:allocationId" component={ParentLibraryAssignmentDetail} />
+          <Route path="/parent/students/:studentId/library-assignments" component={ParentLibraryAssignments} />
           <Route path="/tutor" component={TutorDashboard} />
           <Route path="/tutor/profile" component={TutorProfile} />
           <Route path="/tutor/tests" component={TestManagement} />
@@ -198,6 +205,7 @@ function Router() {
             }
           </Route>
           <Route path="/company/tutors" component={Staff} />
+          <Route path="/company/students/:id" component={StudentProfile} />
           <Route path="/company/students" component={Students} />
           <Route path="/company/classes" component={Classes} />
           <Route path="/company/classes/:id" component={ClassDetail} />

@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Link } from 'wouter';
 import {
-  ChevronLeft, Plus, Edit2, BookOpen, Archive, Users, Search, X, CheckCircle,
+  ChevronLeft, Plus, Edit2, BookOpen, Archive, Users, Search, X, CheckCircle, AlertTriangle, User as UserIcon,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
@@ -63,11 +63,11 @@ export default function AssignmentLibrary() {
   const items = Array.isArray(rawItems) ? rawItems : [];
 
   const publishMutation = useMutation({
-    mutationFn: (id: string) => apiRequest('POST', `/api/assignment-library/${id}/publish`, {}),
+    mutationFn: (id: string) => apiRequest(`/api/assignment-library/${id}/publish`, 'POST', {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/assignment-library`] }),
   });
   const archiveMutation = useMutation({
-    mutationFn: (id: string) => apiRequest('POST', `/api/assignment-library/${id}/archive`, {}),
+    mutationFn: (id: string) => apiRequest(`/api/assignment-library/${id}/archive`, 'POST', {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/assignment-library`] }),
   });
 
@@ -197,12 +197,14 @@ export default function AssignmentLibrary() {
                       <Archive size={12} /> Archive
                     </button>
                   )}
-                  <button
-                    onClick={() => setAllocateItem(item)}
-                    className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors"
-                  >
-                    <Users size={12} /> Allocate
-                  </button>
+                  {item.libStatus === 'published' && (
+                    <button
+                      onClick={() => setAllocateItem(item)}
+                      className="flex-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-colors"
+                    >
+                      <Users size={12} /> Allocate
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -221,30 +223,75 @@ export default function AssignmentLibrary() {
   );
 }
 
+interface EnrolledStudentRow { studentId: string; student?: { id: string; firstName?: string | null; lastName?: string | null; user?: { firstName?: string | null; lastName?: string | null } } }
+interface StudentOption { id: string; first_name?: string | null; last_name?: string | null; user?: { firstName?: string | null; lastName?: string | null } }
+
+type Step = 'form' | 'summary';
+
 function AllocateModal({ item, companyId, onClose }: { item: LibraryItem; companyId: string; onClose: () => void }) {
   const queryClient = useQueryClient();
+  const [step, setStep] = useState<Step>('form');
+  const [targetType, setTargetType] = useState<'class' | 'students'>('class');
   const [classId, setClassId] = useState('');
+  const [excludedIds, setExcludedIds] = useState<Set<string>>(new Set());
+  const [selectedStudentIds, setSelectedStudentIds] = useState<Set<string>>(new Set());
   const [dueDate, setDueDate] = useState('');
+  const [dueTime, setDueTime] = useState('23:59');
+  const [releaseDate, setReleaseDate] = useState('');
+  const [allowResubmission, setAllowResubmission] = useState(false);
+  const [studentNote, setStudentNote] = useState('');
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState<{ impact: string; studentIds: string[] } | null>(null);
+  const [success, setSuccess] = useState<{ allocated: number } | null>(null);
 
   const { data: classes = [] } = useQuery<Classroom[]>({
     queryKey: [`/api/companies/${companyId}/classes`],
     enabled: !!companyId,
   });
+  const { data: allStudents = [] } = useQuery<StudentOption[]>({
+    queryKey: [`/api/companies/${companyId}/students`],
+    enabled: !!companyId && targetType === 'students',
+  });
+  const { data: enrolledRows = [] } = useQuery<EnrolledStudentRow[]>({
+    queryKey: [`/api/classes/${classId}/students`],
+    enabled: !!classId && targetType === 'class',
+  });
+
+  const enrolledStudents = useMemo(() => enrolledRows.map(r => ({
+    id: r.studentId,
+    name: r.student ? `${r.student.firstName ?? r.student.user?.firstName ?? ''} ${r.student.lastName ?? r.student.user?.lastName ?? ''}`.trim() || 'Student' : 'Student',
+  })), [enrolledRows]);
+
+  const targetCount = targetType === 'class'
+    ? enrolledStudents.filter(s => !excludedIds.has(s.id)).length
+    : selectedStudentIds.size;
+
+  const buildPayload = (confirmDuplicates?: boolean) => ({
+    targetType,
+    ...(targetType === 'class' ? { classId, excludeStudentIds: Array.from(excludedIds) } : { studentIds: Array.from(selectedStudentIds) }),
+    dueAt: dueDate ? new Date(`${dueDate}T${dueTime}:00`).toISOString() : undefined,
+    releaseAt: releaseDate ? new Date(`${releaseDate}T00:00:00`).toISOString() : undefined,
+    allowResubmission,
+    studentNote: studentNote.trim() || undefined,
+    ...(confirmDuplicates ? { confirmDuplicates: true } : {}),
+  });
 
   const allocateMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `/api/assignment-library/${item.id}/allocate`, {
-      targetType: 'class',
-      classId,
-      dueAt: dueDate ? `${dueDate}T23:59:00.000Z` : undefined,
-    }),
-    onSuccess: () => {
-      setSuccess(true);
+    mutationFn: (confirmDuplicates?: boolean) => apiRequest(`/api/assignment-library/${item.id}/allocate`, 'POST', buildPayload(confirmDuplicates)),
+    onSuccess: (data: any) => {
+      setSuccess({ allocated: data.allocated ?? targetCount });
       queryClient.invalidateQueries({ queryKey: [`/api/companies/${companyId}/assignment-library`] });
     },
-    onError: (e: any) => setError(e?.message ?? 'Failed to allocate. Please try again.'),
+    onError: (e: any) => {
+      if (e?.body?.message === 'confirm_required') {
+        setDuplicateWarning({ impact: e.body.impact, studentIds: e.body.studentIds ?? [] });
+        return;
+      }
+      setError(e?.message ?? 'Failed to allocate. Please try again.');
+    },
   });
+
+  const canProceed = targetCount > 0 && !!dueDate && (targetType === 'class' ? !!classId : true);
 
   if (success) {
     return (
@@ -252,7 +299,7 @@ function AllocateModal({ item, companyId, onClose }: { item: LibraryItem; compan
         <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
           <CheckCircle size={40} className="text-green-500 mx-auto mb-3" />
           <h3 className="text-lg font-black text-gray-900">Allocated!</h3>
-          <p className="text-sm text-gray-500 mt-2">"{item.title}" has been allocated to the class.</p>
+          <p className="text-sm text-gray-500 mt-2">"{item.title}" allocated to {success.allocated} student{success.allocated === 1 ? '' : 's'}.</p>
           <button onClick={onClose} className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 py-2 rounded-xl text-sm">
             Done
           </button>
@@ -261,47 +308,196 @@ function AllocateModal({ item, companyId, onClose }: { item: LibraryItem; compan
     );
   }
 
+  if (step === 'summary') {
+    const dueLabel = dueDate ? new Date(`${dueDate}T${dueTime}:00`).toLocaleString('en-AU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+    return (
+      <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-black text-gray-900">Confirm Allocation</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          </div>
+          <div className="space-y-3 text-sm">
+            <div className="flex justify-between"><span className="text-gray-500">Assignment</span><span className="font-semibold text-gray-900 text-right">{item.title}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Target</span><span className="font-semibold text-gray-900 text-right">{targetType === 'class' ? classes.find(c => c.id === classId)?.name : `${targetCount} selected student${targetCount === 1 ? '' : 's'}`}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Students</span><span className="font-semibold text-gray-900">{targetCount}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Due</span><span className="font-semibold text-gray-900 text-right">{dueLabel}</span></div>
+            {releaseDate && <div className="flex justify-between"><span className="text-gray-500">Release date</span><span className="font-semibold text-gray-900">{new Date(releaseDate).toLocaleDateString('en-AU')}</span></div>}
+            <div className="flex justify-between"><span className="text-gray-500">Resubmission</span><span className="font-semibold text-gray-900">{allowResubmission ? 'Allowed' : 'Not allowed'}</span></div>
+          </div>
+
+          {duplicateWarning && (
+            <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5 flex items-start gap-2">
+              <AlertTriangle size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-amber-800">{duplicateWarning.impact}</p>
+            </div>
+          )}
+          {error && <p className="text-sm text-rose-600 mt-3 bg-rose-50 px-3 py-2 rounded-lg">{error}</p>}
+
+          <div className="flex gap-3 mt-6">
+            <button onClick={() => setStep('form')} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-sm">
+              Back
+            </button>
+            <button
+              onClick={() => allocateMutation.mutate(!!duplicateWarning)}
+              disabled={allocateMutation.isPending}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl text-sm"
+            >
+              {allocateMutation.isPending ? 'Allocating…' : duplicateWarning ? 'Allocate Anyway' : 'Confirm & Allocate'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-black text-gray-900">Allocate Assignment</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
         </div>
         <p className="text-sm text-gray-600 mb-4">Allocating: <span className="font-semibold text-gray-900">{item.title}</span></p>
         {error && <p className="text-sm text-rose-600 mb-3 bg-rose-50 px-3 py-2 rounded-lg">{error}</p>}
+
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Class</label>
-            <select
-              value={classId}
-              onChange={e => setClassId(e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            >
-              <option value="">Select a class…</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">Target</label>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setTargetType('class')}
+                className={`flex-1 text-xs font-bold px-3 py-2 rounded-xl border ${targetType === 'class' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}
+              >
+                Whole Class
+              </button>
+              <button
+                onClick={() => setTargetType('students')}
+                className={`flex-1 text-xs font-bold px-3 py-2 rounded-xl border ${targetType === 'students' ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-600 border-gray-200'}`}
+              >
+                Specific Students
+              </button>
+            </div>
           </div>
+
+          {targetType === 'class' ? (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Class</label>
+              <select
+                value={classId}
+                onChange={e => { setClassId(e.target.value); setExcludedIds(new Set()); }}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              >
+                <option value="">Select a class…</option>
+                {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              {classId && enrolledStudents.length > 0 && (
+                <div className="mt-2 border border-gray-100 rounded-xl max-h-36 overflow-y-auto divide-y divide-gray-50">
+                  {enrolledStudents.map(s => (
+                    <label key={s.id} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
+                      <input
+                        type="checkbox"
+                        checked={!excludedIds.has(s.id)}
+                        onChange={e => setExcludedIds(prev => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.delete(s.id); else next.add(s.id);
+                          return next;
+                        })}
+                      />
+                      <span className="text-gray-700">{s.name}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+              {classId && (
+                <p className="text-[11px] text-gray-500 mt-1.5 flex items-center gap-1"><Users size={11} /> Will allocate to {targetCount} of {enrolledStudents.length} enrolled students</p>
+              )}
+            </div>
+          ) : (
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Students</label>
+              <div className="border border-gray-100 rounded-xl max-h-40 overflow-y-auto divide-y divide-gray-50">
+                {allStudents.map(s => (
+                  <label key={s.id} className="flex items-center gap-2 px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-50">
+                    <input
+                      type="checkbox"
+                      checked={selectedStudentIds.has(s.id)}
+                      onChange={e => setSelectedStudentIds(prev => {
+                        const next = new Set(prev);
+                        if (e.target.checked) next.add(s.id); else next.delete(s.id);
+                        return next;
+                      })}
+                    />
+                    <UserIcon size={11} className="text-gray-400" />
+                    <span className="text-gray-700">{`${s.user?.firstName ?? s.first_name ?? ''} ${s.user?.lastName ?? s.last_name ?? ''}`.trim() || 'Student'}</span>
+                  </label>
+                ))}
+              </div>
+              <p className="text-[11px] text-gray-500 mt-1.5">{targetCount} student{targetCount === 1 ? '' : 's'} selected</p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Due Date *</label>
+              <input
+                type="date"
+                value={dueDate}
+                min={new Date().toISOString().slice(0, 10)}
+                onChange={e => setDueDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Due Time</label>
+              <input
+                type="time"
+                value={dueTime}
+                onChange={e => setDueTime(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              />
+            </div>
+          </div>
+
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Due Date (optional)</label>
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Release Date (optional)</label>
             <input
               type="date"
-              value={dueDate}
-              onChange={e => setDueDate(e.target.value)}
+              value={releaseDate}
+              min={new Date().toISOString().slice(0, 10)}
+              onChange={e => setReleaseDate(e.target.value)}
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            />
+            <p className="text-[11px] text-gray-400 mt-1">Hidden from students until this date. Leave blank to make available immediately.</p>
+          </div>
+
+          <label className="flex items-center justify-between bg-gray-50 rounded-xl px-3 py-2.5 cursor-pointer">
+            <span className="text-sm font-semibold text-gray-700">Allow resubmission</span>
+            <input type="checkbox" checked={allowResubmission} onChange={e => setAllowResubmission(e.target.checked)} />
+          </label>
+
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 mb-1">Note to Students (optional)</label>
+            <textarea
+              value={studentNote}
+              onChange={e => setStudentNote(e.target.value)}
+              rows={2}
+              placeholder="Overrides or supplements the assignment description…"
+              className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </div>
         </div>
+
         <div className="flex gap-3 mt-6">
           <button onClick={onClose} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-sm">
             Cancel
           </button>
           <button
-            onClick={() => allocateMutation.mutate()}
-            disabled={!classId || allocateMutation.isPending}
+            onClick={() => { setDuplicateWarning(null); setError(''); setStep('summary'); }}
+            disabled={!canProceed}
             className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold px-4 py-2 rounded-xl text-sm"
           >
-            {allocateMutation.isPending ? 'Allocating…' : 'Allocate'}
+            Review &amp; Allocate
           </button>
         </div>
       </div>

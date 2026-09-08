@@ -4,10 +4,8 @@ import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import {
-  BookOpen, Bell, LogOut, ArrowLeft, Plus, X, Save, Search,
-  User, GraduationCap, CalendarDays, Download,
-} from 'lucide-react';
+import { BookOpen, LogOut, ArrowLeft, Plus, X, Save, Search, User, GraduationCap, CalendarDays, Download } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface AdminProfile { userId: string; companyId: string; companyName?: string; company?: { id: string; name: string } }
 interface SubjectRow { id: number; code: string; name: string; state_code?: string; }
@@ -32,6 +30,10 @@ interface ClassRow {
   yearGroup?: { id: number; label: string; code: string };
   tutor?: { id: number; user?: { name?: string; firstName?: string; lastName?: string } };
   academicYear?: { id: number; year: number };
+  capacity?: number | null;
+  enrolledCount?: number;
+  isFull?: boolean;
+  waitlistCount?: number;
 }
 
 export default function ClassesPage() {
@@ -87,9 +89,7 @@ export default function ClassesPage() {
               <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -205,6 +205,12 @@ function ClassRowItem({ c }: { c: ClassRow }) {
           {c.academicYear?.year && (
             <span className="flex items-center gap-1">
               <CalendarDays size={11} /> {c.academicYear.year}
+            </span>
+          )}
+          {c.capacity != null && (
+            <span className={`font-bold ${c.isFull ? 'text-rose-600' : 'text-gray-500'}`}>
+              {c.isFull ? 'Full' : `${c.enrolledCount ?? 0}/${c.capacity}`}
+              {c.isFull && (c.waitlistCount ?? 0) > 0 ? ` · ${c.waitlistCount} on waitlist` : ''}
             </span>
           )}
         </div>

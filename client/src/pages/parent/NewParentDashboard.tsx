@@ -510,6 +510,37 @@ function AssignmentCard({ a, childName }: { a: AssignmentItem; childName: string
   );
 }
 
+interface AssignmentPerformanceSummary {
+  summary: { count: number; avgScore: number; completionRate: number; onTimeRate: number };
+}
+
+function AssignmentPerformanceSummary({ studentId }: { studentId: string }) {
+  const { data } = useQuery<AssignmentPerformanceSummary>({
+    queryKey: [`/api/students/${studentId}/assignment-performance`],
+  });
+  if (!data || data.summary.count === 0) return null;
+  const { summary } = data;
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-4">
+      <p className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-3">Assignment Performance</p>
+      <div className="grid grid-cols-3 gap-3 text-center">
+        <div>
+          <p className="text-xl font-black text-indigo-700">{summary.avgScore}%</p>
+          <p className="text-[11px] text-gray-500 font-semibold">Avg Score</p>
+        </div>
+        <div>
+          <p className="text-xl font-black text-emerald-700">{summary.onTimeRate}%</p>
+          <p className="text-[11px] text-gray-500 font-semibold">On Time</p>
+        </div>
+        <div>
+          <p className="text-xl font-black text-gray-700">{summary.count}</p>
+          <p className="text-[11px] text-gray-500 font-semibold">Completed</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ParentProgressReports({ studentId, childName }: { studentId: string; childName: string }) {
   const { data: reports = [], isLoading } = useQuery<ProgressReport[]>({
     queryKey: [`/api/students/${studentId}/progress-reports`, { status: 'shared_with_parent' }],
@@ -527,18 +558,22 @@ function ParentProgressReports({ studentId, childName }: { studentId: string; ch
 
   if (reports.length === 0) {
     return (
-      <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
-        <TrendingUp className="h-10 w-10 mx-auto text-gray-300 mb-3" />
-        <p className="font-bold text-gray-800">No progress reports yet</p>
-        <p className="text-sm text-gray-500 mt-1">
-          Progress reports for {childName} will appear here once your tutor shares them.
-        </p>
+      <div>
+        <AssignmentPerformanceSummary studentId={studentId} />
+        <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 shadow-sm">
+          <TrendingUp className="h-10 w-10 mx-auto text-gray-300 mb-3" />
+          <p className="font-bold text-gray-800">No progress reports yet</p>
+          <p className="text-sm text-gray-500 mt-1">
+            Progress reports for {childName} will appear here once your tutor shares them.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-4">
+      <AssignmentPerformanceSummary studentId={studentId} />
       <p className="text-xs font-bold text-rose-600 uppercase tracking-widest px-1">
         {childName}'s Progress Reports
       </p>
@@ -756,6 +791,15 @@ export default function NewParentDashboard() {
                   </div>
                 )}
 
+                {selectedChild && (
+                  <a
+                    href={`/parent/students/${selectedChild.id}/library-assignments`}
+                    className="mb-4 flex items-center justify-between bg-rose-600 hover:bg-rose-700 text-white rounded-xl px-4 py-3 text-sm font-bold transition-colors"
+                  >
+                    <span className="flex items-center gap-2"><BookOpen size={15} /> View library assignments</span>
+                    <span className="text-rose-200">&rarr;</span>
+                  </a>
+                )}
                 {selectedChild ? (
                   selectedChild.assignments.length === 0 ? (
                     <div className="text-center py-12">

@@ -5,6 +5,8 @@ import { securityHeaders, auditMiddleware } from "./security";
 import { execSync } from "child_process";
 import { startWwccReminderJob } from "./services/wwccReminder";
 import { startTermReminderJob } from "./services/termReminder";
+import { startInvoiceOverdueJob } from "./services/invoiceReminder";
+import { startAssignmentReminderJob } from "./services/assignmentReminder";
 
 const app = express();
 
@@ -128,5 +130,7 @@ function freePort(port: number) {
     log(`serving on port ${port}`);
     startWwccReminderJob();
     startTermReminderJob();
+    startInvoiceOverdueJob();
+    startAssignmentReminderJob();
   });
 })();

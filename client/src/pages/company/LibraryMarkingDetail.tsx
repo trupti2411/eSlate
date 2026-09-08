@@ -2,8 +2,9 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Link, useParams, useLocation } from 'wouter';
-import { ChevronLeft, Check, AlertCircle, FileText, RefreshCw } from 'lucide-react';
+import { ChevronLeft, Check, AlertCircle, FileText, RefreshCw, Pen, Save } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { LibraryAnnotator } from '@/components/LibraryAnnotator';
 
 interface QuestionReview {
   questionId: string;
@@ -14,6 +15,7 @@ interface QuestionReview {
   ocrTranscription: string | null;
   provisionalScore: number | null;
   isHandwritten: boolean;
+  answerImageUrl: string | null;
 }
 interface QuestionLocal extends QuestionReview {
   finalScore: string;
@@ -27,6 +29,7 @@ interface SubmissionReview {
   submittedAt: string;
   isLate: boolean;
   maxMarks: number;
+  tutorAnnotations: string | null;
   questions: QuestionReview[];
 }
 
@@ -43,6 +46,9 @@ export default function LibraryMarkingDetail() {
   const [markError, setMarkError] = useState('');
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [initialised, setInitialised] = useState(false);
+  const [showAnnotator, setShowAnnotator] = useState(false);
+  const [tutorAnnotations, setTutorAnnotations] = useState<string | null>(null);
+  const [progressSaved, setProgressSaved] = useState(false);
 
   const { data: review, isLoading } = useQuery<SubmissionReview>({
     queryKey: [`/api/library-submissions/${params.submissionId}/review`],
@@ -57,21 +63,40 @@ export default function LibraryMarkingDetail() {
         finalScore: q.provisionalScore != null ? String(q.provisionalScore) : '',
         tutorComment: '',
       })));
+      setTutorAnnotations(review.tutorAnnotations ?? null);
     }
   }, [review, initialised]);
 
+  const saveAnnotationsMutation = useMutation({
+    mutationFn: (annotationsJson: string) =>
+      apiRequest(`/api/submissions/${params.submissionId}/save-progress`, 'PATCH', { tutorAnnotations: annotationsJson }),
+    onSuccess: (_data, annotationsJson) => setTutorAnnotations(annotationsJson),
+  });
+
+  const saveProgressMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/submissions/${params.submissionId}/save-progress`, 'PATCH', {
+      overallFeedback,
+      tutorAnnotations,
+    }),
+    onSuccess: () => {
+      setProgressSaved(true);
+      setTimeout(() => setProgressSaved(false), 2500);
+    },
+  });
+
   const updateMarkMutation = useMutation({
     mutationFn: (payload: { questionId: string; finalScore: number; tutorComment: string }) =>
-      apiRequest('PATCH', `/api/submissions/${params.submissionId}/marks`, payload),
+      apiRequest(`/api/submissions/${params.submissionId}/marks`, 'PATCH', payload),
     onMutate: () => setSaveStatus('saving'),
     onSuccess: () => setSaveStatus('saved'),
     onError: () => setSaveStatus('idle'),
   });
 
   const finaliseMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `/api/submissions/${params.submissionId}/finalise`, {
+    mutationFn: () => apiRequest(`/api/submissions/${params.submissionId}/finalise`, 'POST', {
       overallFeedback,
       grantResubmission,
+      tutorAnnotations,
       questions: localQuestions.map(q => ({
         questionId: q.questionId,
         finalScore: Number(q.finalScore) || 0,
@@ -197,7 +222,7 @@ export default function LibraryMarkingDetail() {
                   <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5">Student Answer</p>
                   <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 min-h-[80px]">
                     {q.isHandwritten ? (
-                      <p className="text-sm text-gray-500 italic">Handwriting submitted</p>
+                      <p className="text-sm text-gray-500 italic">{q.answerImageUrl ? 'Handwriting submitted (see image below)' : 'Handwriting submitted'}</p>
                     ) : q.studentAnswer ? (
                       <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{q.studentAnswer}</p>
                     ) : (
@@ -211,6 +236,13 @@ export default function LibraryMarkingDetail() {
                         <p className="text-xs text-amber-800 leading-relaxed">{q.ocrTranscription}</p>
                       </div>
                     </div>
+                  )}
+                  {q.answerImageUrl && (
+                    <img
+                      src={q.answerImageUrl}
+                      alt={`Handwritten answer to question ${i + 1}`}
+                      className="mt-2 w-full max-h-56 object-contain rounded-xl border border-gray-200 bg-gray-50"
+                    />
                   )}
                 </div>
 
@@ -254,6 +286,26 @@ export default function LibraryMarkingDetail() {
           ))}
         </div>
 
+        {/* Pen annotation */}
+        {localQuestions.some(q => q.answerImageUrl) && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2 mb-1">
+                <Pen size={14} className="text-indigo-500" /> Pen Annotation
+              </h3>
+              <p className="text-xs text-gray-500">
+                {tutorAnnotations ? 'Markup saved on the student\'s handwritten work.' : 'Mark up the student\'s handwritten work with ticks, crosses, circles or freehand pen.'}
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAnnotator(true)}
+              className="bg-gray-900 hover:bg-black text-white font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm shadow-sm flex-shrink-0"
+            >
+              <Pen size={14} /> {tutorAnnotations ? 'Edit Annotations' : 'Annotate Work'}
+            </button>
+          </div>
+        )}
+
         {/* Overall feedback + finalise */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4">
           <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
@@ -277,7 +329,15 @@ export default function LibraryMarkingDetail() {
               <RefreshCw size={14} className="text-indigo-500" /> Grant resubmission
             </span>
           </label>
-          <div className="flex justify-end">
+          <div className="flex justify-end items-center gap-3">
+            {progressSaved && <span className="text-xs font-semibold text-emerald-600">Draft saved</span>}
+            <button
+              onClick={() => saveProgressMutation.mutate()}
+              disabled={saveProgressMutation.isPending}
+              className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-6 py-3 rounded-xl flex items-center gap-2 text-sm"
+            >
+              <Save size={14} /> {saveProgressMutation.isPending ? 'Saving…' : 'Save Progress'}
+            </button>
             <button
               onClick={() => setShowConfirm(true)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-8 py-3 rounded-xl flex items-center gap-2 text-sm shadow-sm"
@@ -287,6 +347,20 @@ export default function LibraryMarkingDetail() {
           </div>
         </div>
       </main>
+
+      {showAnnotator && (
+        <LibraryAnnotator
+          images={localQuestions
+            .map((q, i) => ({ questionId: q.questionId, questionNumber: i + 1, imageUrl: q.answerImageUrl }))
+            .filter((q): q is { questionId: string; questionNumber: number; imageUrl: string } => !!q.imageUrl)}
+          existingAnnotations={tutorAnnotations}
+          isViewOnly={false}
+          studentName={review.studentName}
+          assignmentTitle={review.assignmentTitle}
+          onSave={async (json) => { await saveAnnotationsMutation.mutateAsync(json); }}
+          onClose={() => setShowAnnotator(false)}
+        />
+      )}
 
       {/* Confirm dialog */}
       {showConfirm && (

@@ -2,11 +2,9 @@ import { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { Link } from "wouter";
-import {
-  Users, BookOpen, GraduationCap, Bell, LogOut, ChevronRight, CalendarDays,
-  Trophy, Settings as SettingsIcon, AlertTriangle,
-} from "lucide-react";
+import { Users, BookOpen, GraduationCap, LogOut, ChevronRight, CalendarDays, Trophy, Settings as SettingsIcon, AlertTriangle } from 'lucide-react';
 import { format } from "date-fns";
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface TutorProfile {
   id: string;
@@ -106,9 +104,7 @@ export default function TutorDashboard() {
                   <SettingsIcon size={16} />
                 </Link>
               )}
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"

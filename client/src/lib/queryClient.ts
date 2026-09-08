@@ -42,13 +42,17 @@ export async function apiRequest(endpoint: string, method: string = "GET", data?
     }
 
     let errorMessage: string;
+    let errorBody: any = null;
     try {
-      const errorData = await response.json();
-      errorMessage = errorData?.message || `HTTP ${response.status}`;
+      errorBody = await response.json();
+      errorMessage = errorBody?.message || `HTTP ${response.status}`;
     } catch {
       errorMessage = `HTTP ${response.status}`;
     }
-    throw new Error(errorMessage);
+    const err: any = new Error(errorMessage);
+    err.body = errorBody;
+    err.status = response.status;
+    throw err;
   }
 
   try {

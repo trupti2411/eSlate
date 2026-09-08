@@ -3,10 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { withBase, authHeaders } from '@/lib/queryClient';
-import {
-  ClipboardList, Bell, LogOut, ArrowLeft, FileText, Clock, Download,
-  CheckCircle2, AlertTriangle, GraduationCap,
-} from 'lucide-react';
+import { ClipboardList, LogOut, ArrowLeft, FileText, Clock, Download, CheckCircle2, AlertTriangle, GraduationCap } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface MyAssignment {
   id: number;
@@ -110,9 +108,7 @@ export default function StudentAssignmentsPage() {
               <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"

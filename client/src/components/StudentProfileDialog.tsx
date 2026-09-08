@@ -32,6 +32,7 @@ interface Student {
   classId: string;
   status: 'active' | 'archived';
   archivedAt?: string | null;
+  archivedByName?: string | null;
   user: {
     id: string;
     email: string;
@@ -84,6 +85,7 @@ type ActiveTab = 'profile' | 'classes' | 'reports';
 export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: StudentProfileDialogProps) {
   const { toast } = useToast();
   const [editMode, setEditMode] = useState(false);
+  const [archiveImpact, setArchiveImpact] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('profile');
   const [formData, setFormData] = useState({ schoolName: "", rollNumber: "" });
   const [showNewReport, setShowNewReport] = useState(false);
@@ -134,14 +136,21 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
   });
 
   const archiveMutation = useMutation({
-    mutationFn: () => apiRequest(`/api/students/${studentId}/archive`, "POST"),
+    mutationFn: (confirmWithdraw?: boolean) => apiRequest(`/api/students/${studentId}/archive`, "POST", confirmWithdraw ? { confirmWithdraw: true } : undefined),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/students"] });
       queryClient.invalidateQueries({ queryKey: ["/api/companies", companyId, "students"] });
       toast({ title: "Student archived" });
+      setArchiveImpact(null);
       onClose();
     },
-    onError: (e: any) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+    onError: (e: any) => {
+      if (e?.body?.message === 'confirm_required') {
+        setArchiveImpact(e.body.impact);
+        return;
+      }
+      toast({ title: "Error", description: e.message, variant: "destructive" });
+    },
   });
 
   const reactivateMutation = useMutation({
@@ -218,11 +227,7 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
                   size="sm"
                   variant="outline"
                   className="text-red-600 border-red-200 hover:bg-red-50"
-                  onClick={() => {
-                    if (confirm(`Archive ${student.user?.firstName} ${student.user?.lastName}? They will be hidden from active lists.`)) {
-                      archiveMutation.mutate();
-                    }
-                  }}
+                  onClick={() => archiveMutation.mutate(false)}
                   disabled={archiveMutation.isPending}
                 >
                   <Archive className="w-4 h-4 mr-1" /> Archive
@@ -240,7 +245,24 @@ export function StudentProfileDialog({ studentId, companyId, isOpen, onClose }: 
               )}
             </div>
           </DialogTitle>
+          {isArchived && student.archivedByName && (
+            <p className="text-xs text-gray-400">
+              Archived by {student.archivedByName}{student.archivedAt ? ` on ${new Date(student.archivedAt).toLocaleDateString('en-AU')}` : ''}
+            </p>
+          )}
         </DialogHeader>
+
+        {archiveImpact && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-2">
+            <p className="font-bold flex items-center gap-1.5"><AlertTriangle className="w-3.5 h-3.5" /> {archiveImpact}</p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setArchiveImpact(null)}>Cancel</Button>
+              <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => archiveMutation.mutate(true)} disabled={archiveMutation.isPending}>
+                <Archive className="w-3.5 h-3.5 mr-1" /> Confirm Archive
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Tab navigation */}
         <div className="flex gap-1 border-b border-gray-200 mb-4">

@@ -7,10 +7,8 @@ import { apiRequest } from '@/lib/queryClient';
 import { format, differenceInYears, isValid } from 'date-fns';
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/dist/style.css';
-import {
-  GraduationCap, Bell, LogOut, ArrowLeft, Plus, X, Save, Search, School,
-  User, Mail, Phone, Star, Trash2, CalendarIcon, AlertTriangle, Pencil, Clock, Download,
-} from 'lucide-react';
+import { GraduationCap, LogOut, ArrowLeft, Plus, X, Save, Search, School, User, Mail, Phone, Star, Trash2, CalendarIcon, AlertTriangle, Pencil, Clock, Download, Archive, RotateCcw, Laptop, Smartphone, Tablet, Circle } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface AdminProfile { userId: string; companyId: string; companyName?: string; company?: { id: string; name: string } }
 interface ParentRow {
@@ -25,6 +23,7 @@ interface Student {
   id: number | string;
   business_id?: number;
   user_id?: number | null;
+  userId?: string | null;
   first_name?: string | null;
   last_name?: string | null;
   year_group_code?: string | null;
@@ -39,7 +38,7 @@ interface Student {
   updated_at?: string | null;
   updated_by_name?: string | null;
   // Legacy compat — companyStudents may include a `user` relation
-  user?: { firstName?: string; lastName?: string; email?: string };
+  user?: { firstName?: string; lastName?: string; email?: string; profileImageUrl?: string | null };
 }
 interface YearGroup {
   id: number;
@@ -116,9 +115,7 @@ export default function StudentsPage() {
               <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -241,7 +238,7 @@ function StudentRow({ s, onEdit }: { s: Student; onEdit: () => void }) {
         {initials}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-black text-gray-900 truncate">{name}</p>
+        <Link href={`/company/students/${s.id}`} className="font-black text-gray-900 truncate hover:text-indigo-600 hover:underline block">{name}</Link>
         <div className="text-xs text-gray-500 truncate flex items-center gap-2 flex-wrap">
           {s.year_group_code && (
             <span className="font-semibold text-gray-700">{s.year_group_code}</span>
@@ -866,6 +863,8 @@ function EditStudentModal({ student, businessId, onClose }: { student: Student; 
   const [notes, setNotes] = useState(initNotes);
   const [learningGoals, setLearningGoals] = useState(initLearningGoals);
   const [parents, setParents] = useState<ParentDraft[]>(initParents);
+  const [photoUrl, setPhotoUrl] = useState<string>(student.user?.profileImageUrl ?? '');
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [errors, setErrors] = useState<FormErrors>({});
   const [ageWarning, setAgeWarning] = useState(false);
   const [confirmed, setConfirmed] = useState(true);
@@ -886,9 +885,10 @@ function EditStudentModal({ student, businessId, onClose }: { student: Student; 
       address !== initAddress ||
       notes !== initNotes ||
       learningGoals !== initLearningGoals ||
-      parentsChanged
+      parentsChanged ||
+      photoUrl !== (student.user?.profileImageUrl ?? '')
     );
-  }, [firstName, lastName, yearGroupCode, school, dob, address, notes, learningGoals, parents]);
+  }, [firstName, lastName, yearGroupCode, school, dob, address, notes, learningGoals, parents, photoUrl]);
 
   const handleDobChange = (d: Date | undefined) => {
     setDob(d);
@@ -947,6 +947,7 @@ function EditStudentModal({ student, businessId, onClose }: { student: Student; 
         notes: notes.trim() || null,
         learning_goals: learningGoals.trim() || null,
         parents: cleanedParents,
+        profile_image_url: photoUrl || null,
       }),
     onSuccess: () => {
       toast({ title: 'Student record updated successfully' });
@@ -963,6 +964,31 @@ function EditStudentModal({ student, businessId, onClose }: { student: Student; 
     if (ageWarning && !confirmed) return;
     m.mutate();
   };
+
+  const isArchived = student.status === 'archived';
+  const [archiveImpact, setArchiveImpact] = useState<string | null>(null);
+  const archiveMutation = useMutation({
+    mutationFn: (confirmWithdraw?: boolean) => apiRequest(`/api/students/${student.id}/archive`, 'POST', confirmWithdraw ? { confirmWithdraw: true } : undefined),
+    onSuccess: () => {
+      toast({ title: 'Student archived' });
+      qc.invalidateQueries({ queryKey: [`/api/companies/${businessId}/students`] });
+      setArchiveImpact(null);
+      onClose();
+    },
+    onError: (e: any) => {
+      if (e?.body?.message === 'confirm_required') { setArchiveImpact(e.body.impact); return; }
+      toast({ title: 'Could not archive', description: e.message, variant: 'destructive' });
+    },
+  });
+  const reactivateMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/students/${student.id}/reactivate`, 'POST'),
+    onSuccess: () => {
+      toast({ title: 'Student reactivated' });
+      qc.invalidateQueries({ queryKey: [`/api/companies/${businessId}/students`] });
+      onClose();
+    },
+    onError: (e: any) => toast({ title: 'Could not reactivate', description: e.message, variant: 'destructive' }),
+  });
 
   const handleCancel = () => {
     if (isDirty) {
@@ -1007,6 +1033,49 @@ function EditStudentModal({ student, businessId, onClose }: { student: Student; 
         </div>
         <div className="p-5 space-y-6 overflow-y-auto">
           <Section title="About">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-2xl bg-indigo-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+                {photoUrl ? (
+                  <img src={photoUrl} alt="Student photo" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-xl font-black text-indigo-600">
+                    {(firstName[0] ?? '').toUpperCase()}{(lastName[0] ?? '').toUpperCase()}
+                  </span>
+                )}
+              </div>
+              <div>
+                <input
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  id="student-photo-input"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    setUploadingPhoto(true);
+                    try {
+                      const result: any = await apiRequest('/api/objects/upload', 'POST');
+                      await fetch(result.uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+                      const objectId = result.uploadURL.split('?')[0].split('/').filter(Boolean).pop();
+                      setPhotoUrl(`/objects/${objectId}`);
+                    } catch {
+                      toast({ title: 'Photo upload failed', variant: 'destructive' });
+                    } finally {
+                      setUploadingPhoto(false);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <label htmlFor="student-photo-input" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer">
+                  {uploadingPhoto ? 'Uploading…' : photoUrl ? 'Change photo' : 'Upload photo'}
+                </label>
+                {photoUrl && (
+                  <button type="button" onClick={() => setPhotoUrl('')} className="block text-xs text-gray-400 hover:text-rose-600 mt-0.5">
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="First name *" error={errors.firstName}>
                 <input
@@ -1129,21 +1198,128 @@ function EditStudentModal({ student, businessId, onClose }: { student: Student; 
               />
             </Field>
           </div>
+          {student.userId && <StudentDevicesSection userId={student.userId} businessId={businessId} />}
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
-          <button onClick={handleCancel} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
-            Cancel
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={m.isPending || (ageWarning && !confirmed)}
-            className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
-          >
-            <Save size={14} /> {m.isPending ? 'Saving…' : 'Save changes'}
-          </button>
+        {archiveImpact && (
+          <div className="mx-5 mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800">
+            <p className="font-bold mb-1">This will affect active enrolments</p>
+            <p className="mb-2">{archiveImpact}</p>
+            <div className="flex gap-2">
+              <button onClick={() => setArchiveImpact(null)} className="text-xs font-bold text-gray-600 hover:bg-gray-100 px-2 py-1 rounded-lg">Cancel</button>
+              <button onClick={() => archiveMutation.mutate(true)} disabled={archiveMutation.isPending} className="text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-lg">
+                Confirm Archive
+              </button>
+            </div>
+          </div>
+        )}
+        <div className="flex items-center justify-between gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <div>
+            {isArchived ? (
+              <button
+                onClick={() => reactivateMutation.mutate()}
+                disabled={reactivateMutation.isPending}
+                className="text-sm font-bold text-emerald-700 hover:bg-emerald-50 px-3 py-2 rounded-xl flex items-center gap-1.5"
+              >
+                <RotateCcw size={14} /> {reactivateMutation.isPending ? 'Reactivating…' : 'Reactivate student'}
+              </button>
+            ) : (
+              <button
+                onClick={() => archiveMutation.mutate(false)}
+                disabled={archiveMutation.isPending}
+                className="text-sm font-bold text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl flex items-center gap-1.5"
+              >
+                <Archive size={14} /> {archiveMutation.isPending ? 'Archiving…' : 'Archive student'}
+              </button>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={handleCancel} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+              Cancel
+            </button>
+            <button
+              onClick={handleSubmit}
+              disabled={m.isPending || (ageWarning && !confirmed)}
+              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
+            >
+              <Save size={14} /> {m.isPending ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
+  );
+}
+
+const DEVICE_ICON: Record<string, any> = { mobile: Smartphone, tablet: Tablet, desktop: Laptop };
+
+function deviceTimeAgo(iso: string | null): string {
+  if (!iso) return 'Never';
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+function StudentDevicesSection({ userId, businessId }: { userId: string; businessId: string }) {
+  const qc = useQueryClient();
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const { data: devices = [], isLoading } = useQuery<any[]>({
+    queryKey: [`/api/companies/${businessId}/users/${userId}/devices`],
+  });
+
+  const unlinkMutation = useMutation({
+    mutationFn: (deviceId: string) => apiRequest(`/api/companies/${businessId}/users/${userId}/devices/${deviceId}`, 'DELETE'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [`/api/companies/${businessId}/users/${userId}/devices`] });
+      setConfirmId(null);
+    },
+  });
+
+  if (isLoading) return null;
+
+  return (
+    <Section title="Devices">
+      {devices.length === 0 ? (
+        <p className="text-xs text-gray-400">No devices linked yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {devices.map((d: any) => {
+            const Icon = DEVICE_ICON[d.deviceType ?? ''] ?? Laptop;
+            return (
+              <div key={d.id} className="flex items-center gap-3 bg-gray-50 rounded-xl px-3 py-2.5">
+                <Icon size={16} className="text-gray-400 flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">{d.deviceName ?? 'Unknown device'}</p>
+                  <p className="text-[11px] text-gray-500 flex items-center gap-1">
+                    <Circle size={6} className={d.isOnline ? 'text-emerald-500 fill-emerald-500' : 'text-gray-300 fill-gray-300'} />
+                    {d.isOnline ? 'Online' : `Last active ${deviceTimeAgo(d.lastActiveAt)}`}
+                  </p>
+                </div>
+                {confirmId === d.id ? (
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button onClick={() => setConfirmId(null)} className="text-[11px] font-bold text-gray-500 px-1.5 py-1 rounded-lg hover:bg-gray-200">Cancel</button>
+                    <button
+                      onClick={() => unlinkMutation.mutate(d.id)}
+                      disabled={unlinkMutation.isPending}
+                      className="text-[11px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-2 py-1 rounded-lg disabled:opacity-50"
+                    >
+                      Confirm
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setConfirmId(d.id)} className="text-[11px] font-bold text-rose-600 hover:bg-rose-100 px-2 py-1 rounded-lg flex-shrink-0">
+                    Deactivate
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </Section>
   );
 }
 

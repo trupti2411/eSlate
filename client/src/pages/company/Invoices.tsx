@@ -37,6 +37,7 @@ export default function Invoices() {
   const [termFilter, setTermFilter] = useState('');
   const [showCreate, setShowCreate] = useState(false);
   const [showBulk, setShowBulk] = useState(false);
+  const [showBulkHistory, setShowBulkHistory] = useState(false);
 
   const { data: adminProfile } = useQuery<AdminProfile>({ queryKey: [`/api/admin/company-admin/${user?.id}`], enabled: !!user?.id });
   const companyId = adminProfile?.companyId;
@@ -55,14 +56,14 @@ export default function Invoices() {
   });
 
   const sendMutation = useMutation({
-    mutationFn: (invoiceId: string) => apiRequest('POST', `/api/invoices/${invoiceId}/send`, {}),
+    mutationFn: (invoiceId: string) => apiRequest(`/api/invoices/${invoiceId}/send`, 'POST', {}),
     onSuccess: () => { toast({ title: 'Invoice sent' }); qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/invoices`] }); },
     onError: () => toast({ title: 'Failed to send', variant: 'destructive' }),
   });
 
   const voidMutation = useMutation({
     mutationFn: ({ invoiceId, reason }: { invoiceId: string; reason: string }) =>
-      apiRequest('PATCH', `/api/invoices/${invoiceId}/void`, { voidReason: reason }),
+      apiRequest(`/api/invoices/${invoiceId}/void`, 'PATCH', { voidReason: reason }),
     onSuccess: () => { toast({ title: 'Invoice voided' }); qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/invoices`] }); },
     onError: () => toast({ title: 'Failed to void invoice', variant: 'destructive' }),
   });
@@ -83,6 +84,9 @@ export default function Invoices() {
             <h1 className="text-xl font-black">Invoices</h1>
           </div>
           <div className="ml-auto flex gap-2">
+            <button onClick={() => setShowBulkHistory(true)} className="bg-white/15 hover:bg-white/25 text-white text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-2">
+              <Clock size={14} /> Bulk Run History
+            </button>
             <button onClick={() => setShowBulk(true)} className="bg-white/15 hover:bg-white/25 text-white text-sm font-bold px-3 py-2 rounded-xl flex items-center gap-2">
               <Users size={14} /> Bulk Generate
             </button>
@@ -199,7 +203,14 @@ export default function Invoices() {
       )}
       {showBulk && companyId && (
         <BulkInvoiceModal companyId={companyId} terms={terms} onClose={() => setShowBulk(false)}
-          onDone={() => { setShowBulk(false); qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/invoices`] }); }} />
+          onDone={() => {
+            setShowBulk(false);
+            qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/invoices`] });
+            qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/invoices/bulk-runs`] });
+          }} />
+      )}
+      {showBulkHistory && companyId && (
+        <BulkRunHistoryModal companyId={companyId} onClose={() => setShowBulkHistory(false)} />
       )}
     </div>
   );
@@ -223,7 +234,7 @@ function CreateInvoiceModal({ companyId, terms, onClose, onCreated }: { companyI
     if (!studentId) { toast({ title: 'Select a student', variant: 'destructive' }); return; }
     setSaving(true);
     try {
-      await apiRequest('POST', `/api/companies/${companyId}/invoices`, {
+      await apiRequest(`/api/companies/${companyId}/invoices`, 'POST', {
         studentId, termId: termId || undefined,
         dueDate, lineItems: lines.map(l => ({ ...l, unitPrice: l.unitPrice, total: l.total })),
         discountAmount: discount || '0',
@@ -300,12 +311,58 @@ function CreateInvoiceModal({ companyId, terms, onClose, onCreated }: { companyI
   );
 }
 
+interface BulkRun {
+  bulkRunId: string;
+  count: number;
+  totalValue: number;
+  totalDiscount: number;
+  termName: string;
+  createdByName: string | null;
+  createdAt: string | null;
+}
+
+function BulkRunHistoryModal({ companyId, onClose }: { companyId: string; onClose: () => void }) {
+  const { data: runs = [], isLoading } = useQuery<BulkRun[]>({
+    queryKey: [`/api/companies/${companyId}/invoices/bulk-runs`],
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] overflow-y-auto">
+        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+          <h2 className="font-black text-lg">Bulk Run History</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold">×</button>
+        </div>
+        <div className="p-5 space-y-3">
+          {isLoading ? (
+            <p className="text-sm text-gray-500">Loading…</p>
+          ) : runs.length === 0 ? (
+            <p className="text-sm text-gray-500">No bulk invoice runs yet.</p>
+          ) : (
+            runs.map(run => (
+              <div key={run.bulkRunId} className="border border-gray-100 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="font-bold text-gray-900">{run.termName}</p>
+                  <p className="text-xs text-gray-400">{run.createdAt ? new Date(run.createdAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}</p>
+                </div>
+                <p className="text-sm text-gray-600">{run.count} invoice{run.count === 1 ? '' : 's'} · ${run.totalValue.toFixed(2)} total{run.totalDiscount > 0 ? ` · $${run.totalDiscount.toFixed(2)} discounted` : ''}</p>
+                {run.createdByName && <p className="text-xs text-gray-400 mt-1">By {run.createdByName}</p>}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BulkInvoiceModal({ companyId, terms, onClose, onDone }: { companyId: string; terms: Term[]; onClose: () => void; onDone: () => void }) {
   const { toast } = useToast();
   const [step, setStep] = useState(1);
   const [termId, setTermId] = useState('');
   const [dueDate, setDueDate] = useState(new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10));
   const [selectedStudents, setSelectedStudents] = useState<Set<string>>(new Set());
+  const [discountAmount, setDiscountAmount] = useState('');
   const [generating, setGenerating] = useState(false);
   const [result, setResult] = useState<{ created: number; skipped: number } | null>(null);
 
@@ -319,8 +376,9 @@ function BulkInvoiceModal({ companyId, terms, onClose, onDone }: { companyId: st
     if (selectedStudents.size === 0) { toast({ title: 'Select at least one student', variant: 'destructive' }); return; }
     setGenerating(true);
     try {
-      const res = await apiRequest('POST', `/api/companies/${companyId}/invoices/bulk`, {
+      const res = await apiRequest(`/api/companies/${companyId}/invoices/bulk`, 'POST', {
         termId, studentIds: Array.from(selectedStudents), dueDate, skipExisting: true,
+        discountAmount: discountAmount || '0', discountType: discountAmount ? 'fixed' : null,
       }) as any;
       setResult({ created: res.created, skipped: res.skipped });
       setStep(3);
@@ -349,6 +407,22 @@ function BulkInvoiceModal({ companyId, terms, onClose, onDone }: { companyId: st
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Due Date</label>
                 <input type="date" value={dueDate} onChange={e => setDueDate(e.target.value)} className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Discount per invoice (optional)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-400">$</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={discountAmount}
+                    onChange={e => setDiscountAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full border border-gray-200 rounded-xl pl-7 pr-3 py-2 text-sm"
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Applied as a flat discount to every invoice in this run — e.g. a term-wide promotion or sibling discount.</p>
               </div>
             </>
           )}

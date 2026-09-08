@@ -2,8 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Link, useParams } from 'wouter';
-import { ChevronLeft, Send, Check, AlertCircle, Star, FileText, Clock } from 'lucide-react';
+import { ChevronLeft, Send, Check, AlertCircle, Star, FileText, Clock, Camera, Keyboard, X, Pen } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import { LibraryAnnotator } from '@/components/LibraryAnnotator';
 
 interface QuestionAnswer {
   questionId: string;
@@ -11,6 +13,8 @@ interface QuestionAnswer {
   questionType: string;
   maxMarks: number;
   answer: string | null;
+  answerImage: string | null;
+  transcribedText: string | null;
   score: number | null;
   tutorComment: string | null;
   isHandwritten: boolean;
@@ -25,6 +29,7 @@ interface AllocationDetail {
   totalScore: number | null;
   maxMarks: number | null;
   overallFeedback: string | null;
+  tutorAnnotations: string | null;
   questions: QuestionAnswer[];
 }
 
@@ -33,7 +38,10 @@ export default function LibraryAssignmentWork() {
   const params = useParams<{ allocationId: string }>();
   const queryClient = useQueryClient();
   const [answers, setAnswers] = useState<Record<string, string>>({});
+  const [answerImages, setAnswerImages] = useState<Record<string, string>>({});
+  const [uploadMode, setUploadMode] = useState<Record<string, boolean>>({});
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showAnnotations, setShowAnnotations] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -48,15 +56,34 @@ export default function LibraryAssignmentWork() {
   useEffect(() => {
     if (allocation && !answersInitialised.current) {
       answersInitialised.current = true;
-      const initial: Record<string, string> = {};
-      allocation.questions.forEach(q => { initial[q.questionId] = q.answer ?? ''; });
-      setAnswers(initial);
+      const initialAnswers: Record<string, string> = {};
+      const initialImages: Record<string, string> = {};
+      const initialMode: Record<string, boolean> = {};
+      allocation.questions.forEach(q => {
+        initialAnswers[q.questionId] = q.answer ?? '';
+        if (q.answerImage) {
+          initialImages[q.questionId] = q.answerImage;
+          initialMode[q.questionId] = true;
+        }
+      });
+      setAnswers(initialAnswers);
+      setAnswerImages(initialImages);
+      setUploadMode(initialMode);
     }
   }, [allocation]);
 
+  const saveDraft = (nextAnswers: Record<string, string>, nextImages: Record<string, string>) => {
+    setAutoSaveStatus('idle');
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    autoSaveTimer.current = setTimeout(() => saveDraftMutation.mutate({ answers: nextAnswers, answerImages: nextImages }), 1500);
+  };
+
   const saveDraftMutation = useMutation({
-    mutationFn: (ans: Record<string, string>) =>
-      apiRequest('PATCH', `/api/me/library-assignments/${params.allocationId}/draft`, { answers: ans }),
+    mutationFn: (payload: { answers: Record<string, string>; answerImages: Record<string, string> }) =>
+      apiRequest(`/api/me/library-assignments/${params.allocationId}/draft`, 'PATCH', {
+        enteredAnswers: payload.answers,
+        answerImages: payload.answerImages,
+      }),
     onMutate: () => setAutoSaveStatus('saving'),
     onSuccess: () => setAutoSaveStatus('saved'),
     onError: () => setAutoSaveStatus('idle'),
@@ -64,7 +91,7 @@ export default function LibraryAssignmentWork() {
 
   const submitMutation = useMutation({
     mutationFn: () =>
-      apiRequest('POST', `/api/me/library-assignments/${params.allocationId}/submit`, { answers }),
+      apiRequest(`/api/me/library-assignments/${params.allocationId}/submit`, 'POST', { enteredAnswers: answers, answerImages }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [`/api/me/library-assignments/${params.allocationId}`] });
       queryClient.invalidateQueries({ queryKey: ['/api/me/library-assignments'] });
@@ -79,11 +106,37 @@ export default function LibraryAssignmentWork() {
   const handleAnswerChange = (questionId: string, value: string) => {
     setAnswers(prev => {
       const next = { ...prev, [questionId]: value };
-      setAutoSaveStatus('idle');
-      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      autoSaveTimer.current = setTimeout(() => saveDraftMutation.mutate(next), 1500);
+      saveDraft(next, answerImages);
       return next;
     });
+  };
+
+  const handleGetUploadParameters = async () => {
+    const response = await apiRequest('/api/objects/upload', 'POST');
+    return { method: 'PUT' as const, url: response.uploadURL };
+  };
+
+  const handleImageUploadComplete = (questionId: string) => (result: any) => {
+    const uploaded = result?.successful?.[0]?.uploadURL as string | undefined;
+    if (!uploaded) return;
+    // Store the GET-viewable object path, not the (possibly PUT-only) upload URL.
+    const objectId = uploaded.split('/').filter(Boolean).pop();
+    const viewablePath = `/objects/${objectId}`;
+    setAnswerImages(prev => {
+      const next = { ...prev, [questionId]: viewablePath };
+      saveDraft(answers, next);
+      return next;
+    });
+  };
+
+  const clearImage = (questionId: string) => {
+    setAnswerImages(prev => {
+      const next = { ...prev };
+      delete next[questionId];
+      saveDraft(answers, next);
+      return next;
+    });
+    setUploadMode(prev => ({ ...prev, [questionId]: false }));
   };
 
   if (isLoading) {
@@ -156,6 +209,16 @@ export default function LibraryAssignmentWork() {
               </div>
             )}
           </div>
+          {isReturned && allocation.tutorAnnotations && allocation.questions.some(q => q.answerImage) && (
+            <div className="mt-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={() => setShowAnnotations(true)}
+                className="w-full sm:w-auto bg-gray-900 hover:bg-black text-white font-bold px-5 py-2.5 rounded-xl flex items-center justify-center gap-2 text-sm"
+              >
+                <Pen size={14} /> View Marked-Up Work
+              </button>
+            </div>
+          )}
           {isReturned && allocation.overallFeedback && (
             <div className="mt-4 pt-4 border-t border-gray-100">
               <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-1.5 flex items-center gap-1">
@@ -193,25 +256,89 @@ export default function LibraryAssignmentWork() {
                 </div>
               </div>
 
-              {q.isHandwritten ? (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-gray-500 italic">
-                  Handwriting submitted
-                </div>
-              ) : isEditable ? (
-                <textarea
-                  value={answers[q.questionId] ?? ''}
-                  onChange={e => handleAnswerChange(q.questionId, e.target.value)}
-                  rows={4}
-                  placeholder="Type your answer here…"
-                  className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y"
-                />
-              ) : (
-                <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 min-h-[60px]">
-                  <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
-                    {answers[q.questionId] || q.answer || (
-                      <span className="text-gray-400 italic">No answer provided</span>
+              {!isEditable ? (
+                // Read-only: submitted or returned
+                answerImages[q.questionId] || q.answerImage ? (
+                  <div className="space-y-2">
+                    <img
+                      src={answerImages[q.questionId] ?? q.answerImage ?? undefined}
+                      alt={`Handwritten answer to question ${i + 1}`}
+                      className="w-full max-h-80 object-contain rounded-xl border border-gray-200 bg-gray-50"
+                    />
+                    {q.transcribedText && (
+                      <p className="text-xs text-gray-500 italic">Transcribed: “{q.transcribedText}”</p>
                     )}
-                  </p>
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 min-h-[60px]">
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">
+                      {answers[q.questionId] || q.answer || (
+                        <span className="text-gray-400 italic">No answer provided</span>
+                      )}
+                    </p>
+                  </div>
+                )
+              ) : (
+                // Editable: let the student choose typed answer vs a photo of handwritten work
+                <div className="space-y-2">
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode(prev => ({ ...prev, [q.questionId]: false }))}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                        !uploadMode[q.questionId] ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Keyboard size={12} /> Type answer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUploadMode(prev => ({ ...prev, [q.questionId]: true }))}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                        uploadMode[q.questionId] ? 'bg-indigo-100 text-indigo-700' : 'text-gray-500 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Camera size={12} /> Upload photo
+                    </button>
+                  </div>
+
+                  {uploadMode[q.questionId] ? (
+                    answerImages[q.questionId] ? (
+                      <div className="relative">
+                        <img
+                          src={answerImages[q.questionId]}
+                          alt={`Uploaded answer to question ${i + 1}`}
+                          className="w-full max-h-80 object-contain rounded-xl border border-gray-200 bg-gray-50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => clearImage(q.questionId)}
+                          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-white/90 hover:bg-white shadow flex items-center justify-center"
+                          aria-label="Remove photo"
+                        >
+                          <X size={14} className="text-gray-600" />
+                        </button>
+                      </div>
+                    ) : (
+                      <ObjectUploader
+                        maxNumberOfFiles={1}
+                        allowedFileTypes={['.png', '.jpeg', '.jpg', '.heic']}
+                        onGetUploadParameters={handleGetUploadParameters}
+                        onComplete={handleImageUploadComplete(q.questionId)}
+                        buttonClassName="w-full border-2 border-dashed border-gray-300 hover:border-indigo-400 rounded-xl px-4 py-6 text-sm font-semibold text-gray-500 hover:text-indigo-600 flex items-center justify-center gap-2 bg-transparent"
+                      >
+                        <Camera size={16} /> Take or upload a photo of your handwritten answer
+                      </ObjectUploader>
+                    )
+                  ) : (
+                    <textarea
+                      value={answers[q.questionId] ?? ''}
+                      onChange={e => handleAnswerChange(q.questionId, e.target.value)}
+                      rows={4}
+                      placeholder="Type your answer here…"
+                      className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-y"
+                    />
+                  )}
                 </div>
               )}
 
@@ -272,6 +399,18 @@ export default function LibraryAssignmentWork() {
             </div>
           </div>
         </div>
+      )}
+
+      {showAnnotations && allocation.tutorAnnotations && (
+        <LibraryAnnotator
+          images={allocation.questions
+            .map((q, i) => ({ questionId: q.questionId, questionNumber: i + 1, imageUrl: q.answerImage }))
+            .filter((q): q is { questionId: string; questionNumber: number; imageUrl: string } => !!q.imageUrl)}
+          existingAnnotations={allocation.tutorAnnotations}
+          isViewOnly
+          assignmentTitle={allocation.assignmentTitle}
+          onClose={() => setShowAnnotations(false)}
+        />
       )}
     </div>
   );

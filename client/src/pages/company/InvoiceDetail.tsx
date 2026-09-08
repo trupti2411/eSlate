@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Link, useParams } from 'wouter';
 import {
   ChevronLeft, Send, DollarSign, XCircle, RefreshCw, CheckCircle,
-  AlertTriangle, Clock, FileText,
+  AlertTriangle, Clock, FileText, Bell, BellOff,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -17,6 +17,7 @@ interface InvoiceDetail {
   termId?: string; status: string; invoiceDate: string; dueDate: string;
   subtotal: string; discountAmount?: string; total: string; notes?: string;
   sentAt?: string; sentToEmail?: string; voidReason?: string;
+  remindersSuppressed?: boolean; lastOverdueReminderAt?: string;
   lineItems: LineItem[]; payments: PaymentRow[]; amountPaid: number; outstanding: number;
 }
 
@@ -43,9 +44,18 @@ export default function InvoiceDetail() {
   });
 
   const resendMutation = useMutation({
-    mutationFn: () => apiRequest('POST', `/api/invoices/${id}/resend`, {}),
+    mutationFn: () => apiRequest(`/api/invoices/${id}/resend`, 'POST', {}),
     onSuccess: () => toast({ title: 'Invoice resent' }),
     onError: () => toast({ title: 'Resend failed', variant: 'destructive' }),
+  });
+
+  const suppressRemindersMutation = useMutation({
+    mutationFn: (suppressed: boolean) => apiRequest(`/api/invoices/${id}/suppress-reminders`, 'PATCH', { suppressed }),
+    onSuccess: (_data, suppressed) => {
+      toast({ title: suppressed ? 'Overdue reminders paused' : 'Overdue reminders resumed' });
+      qc.invalidateQueries({ queryKey: [`/api/invoices/${id}`] });
+    },
+    onError: () => toast({ title: 'Could not update reminder settings', variant: 'destructive' }),
   });
 
   if (isLoading) return <div className="min-h-screen flex items-center justify-center text-gray-500">Loading…</div>;
@@ -196,6 +206,14 @@ export default function InvoiceDetail() {
               <button onClick={() => resendMutation.mutate()} className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
                 <RefreshCw size={14} /> Resend
               </button>
+              <button
+                onClick={() => suppressRemindersMutation.mutate(!inv.remindersSuppressed)}
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2"
+                title={inv.remindersSuppressed ? 'Overdue reminder emails are paused for this invoice' : 'Pause automatic overdue reminder emails (e.g. payment plan agreed)'}
+              >
+                {inv.remindersSuppressed ? <BellOff size={14} /> : <Bell size={14} />}
+                {inv.remindersSuppressed ? 'Resume Reminders' : 'Pause Reminders'}
+              </button>
             </>
           )}
           {inv.status !== 'void' && inv.status !== 'paid' && (
@@ -219,15 +237,21 @@ export default function InvoiceDetail() {
 function SendModal({ invoiceId, defaultEmail, onClose, onSent }: { invoiceId: string; defaultEmail?: string; onClose: () => void; onSent: () => void }) {
   const { toast } = useToast();
   const [email, setEmail] = useState(defaultEmail ?? '');
+  const [cc, setCc] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
 
   async function send() {
     if (!email) { toast({ title: 'Email required', variant: 'destructive' }); return; }
     setSending(true);
+    setError('');
     try {
-      await apiRequest('POST', `/api/invoices/${invoiceId}/send`, { recipientEmail: email });
+      const ccEmails = cc.split(',').map(e => e.trim()).filter(Boolean);
+      await apiRequest(`/api/invoices/${invoiceId}/send`, 'POST', { recipientEmail: email, ccEmails });
       onSent();
-    } catch { toast({ title: 'Send failed', variant: 'destructive' }); }
+    } catch (e: any) {
+      setError(e?.message ?? 'Send failed. Please try again.');
+    }
     setSending(false);
   }
 
@@ -239,8 +263,15 @@ function SendModal({ invoiceId, defaultEmail, onClose, onSent }: { invoiceId: st
           <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-xl font-bold">×</button>
         </div>
         <div className="p-5 space-y-3">
-          <label className="block text-sm font-semibold text-gray-700">Recipient email</label>
-          <input value={email} onChange={e => setEmail(e.target.value)} type="email" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="parent@email.com" />
+          {error && <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">{error}</p>}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Recipient email</label>
+            <input value={email} onChange={e => setEmail(e.target.value)} type="email" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="parent@email.com" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">CC (optional)</label>
+            <input value={cc} onChange={e => setCc(e.target.value)} type="text" className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm" placeholder="comma-separated emails" />
+          </div>
         </div>
         <div className="p-5 border-t border-gray-100 flex gap-3 justify-end">
           <button onClick={onClose} className="px-4 py-2 rounded-xl border border-gray-200 text-sm font-semibold">Cancel</button>
@@ -265,7 +296,7 @@ function PaymentModal({ invoiceId, onClose, onRecorded }: { invoiceId: string; o
     if (!amount || parseFloat(amount) <= 0) { toast({ title: 'Enter a valid amount', variant: 'destructive' }); return; }
     setSaving(true);
     try {
-      await apiRequest('POST', `/api/invoices/${invoiceId}/payments`, { amount, method, reference, paymentDate });
+      await apiRequest(`/api/invoices/${invoiceId}/payments`, 'POST', { amount, method, reference, paymentDate });
       onRecorded();
     } catch { toast({ title: 'Failed to record payment', variant: 'destructive' }); }
     setSaving(false);
@@ -321,7 +352,7 @@ function VoidModal({ invoiceId, onClose, onVoided }: { invoiceId: string; onClos
   async function doVoid() {
     setVoiding(true);
     try {
-      await apiRequest('PATCH', `/api/invoices/${invoiceId}/void`, { voidReason: reason });
+      await apiRequest(`/api/invoices/${invoiceId}/void`, 'PATCH', { voidReason: reason });
       onVoided();
     } catch { toast({ title: 'Failed to void', variant: 'destructive' }); }
     setVoiding(false);

@@ -18,6 +18,7 @@ import {
   companySubjects,
   classes,
   studentClassAssignments,
+  classWaitlist,
   assignments,
   submissions,
   worksheets,
@@ -177,7 +178,7 @@ export interface IStorage {
   getCompanyAdminByUserId(userId: string): Promise<CompanyAdmin | undefined>;
   createCompanyAdmin(adminData: InsertCompanyAdmin): Promise<CompanyAdmin>;
   updateCompanyAdmin(id: string, updates: Partial<InsertCompanyAdmin>): Promise<CompanyAdmin>;
-  getTutorsByCompany(companyId: string): Promise<any[]>;
+  getTutorsByCompany(companyId: string, statusFilter?: 'active' | 'inactive'): Promise<any[]>;
   getTutorById(tutorId: string, companyId: string): Promise<any | null>;
   updateTutorProfile(tutorId: string, companyId: string, data: {
     firstName?: string;
@@ -466,6 +467,7 @@ export class DatabaseStorage implements IStorage {
         gradeLevel: students.gradeLevel,
         schoolName: students.schoolName,
         yearGroupCode: students.yearGroupCode,
+        rollNumber: students.rollNumber,
         dateOfBirth: students.dateOfBirth,
         address: students.address,
         learningGoals: students.learningGoals,
@@ -479,6 +481,9 @@ export class DatabaseStorage implements IStorage {
         createdAt: students.createdAt,
         updatedAt: students.updatedAt,
         updatedByName: students.updatedByName,
+        status: students.status,
+        archivedAt: students.archivedAt,
+        archivedByName: students.archivedByName,
         user: {
           id: users.id,
           email: users.email,
@@ -486,6 +491,7 @@ export class DatabaseStorage implements IStorage {
           lastName: users.lastName,
           isActive: users.isActive,
           createdAt: users.createdAt,
+          profileImageUrl: users.profileImageUrl,
         }
       })
       .from(students)
@@ -1408,12 +1414,26 @@ export class DatabaseStorage implements IStorage {
     ];
     const subjectById = new Map(SUBJECTS.map(s => [s.id, s]));
 
+    const [enrolCounts, waitlistCounts] = await Promise.all([
+      db.select({ classId: studentClassAssignments.classId, count: sql<number>`count(*)`.as('count') })
+        .from(studentClassAssignments)
+        .where(and(inArray(studentClassAssignments.classId, classIds), eq(studentClassAssignments.isActive, true)))
+        .groupBy(studentClassAssignments.classId),
+      db.select({ classId: classWaitlist.classId, count: sql<number>`count(*)`.as('count') })
+        .from(classWaitlist)
+        .where(and(inArray(classWaitlist.classId, classIds), eq(classWaitlist.status, 'waiting')))
+        .groupBy(classWaitlist.classId),
+    ]);
+    const enrolCountMap = new Map(enrolCounts.map((e: any) => [e.classId, Number(e.count)]));
+    const waitlistCountMap = new Map(waitlistCounts.map((w: any) => [w.classId, Number(w.count)]));
+
     return classList.map(c => {
       const tutor = c.tutorId ? tutorMap.get(c.tutorId) : null;
       const academicYear = termYearMap.get(c.termId);
       const subs = subjectsByClass.get(c.id) ?? [];
       const subjects = subs.map(s => ({ ...subjectById.get(s.id), pivot: { is_primary: s.isPrimary } })).filter(s => s.id);
       const primarySub = subs.find(s => s.isPrimary);
+      const enrolledCount = enrolCountMap.get(c.id) ?? 0;
 
       return {
         id: c.id,
@@ -1426,6 +1446,10 @@ export class DatabaseStorage implements IStorage {
         status: c.status,
         location: c.location,
         description: c.description,
+        capacity: c.maxStudents,
+        enrolledCount,
+        isFull: c.maxStudents != null && enrolledCount >= c.maxStudents,
+        waitlistCount: waitlistCountMap.get(c.id) ?? 0,
         yearGroup: c.yearGroupCode
           ? { id: 0, label: c.yearGroupCode, code: c.yearGroupCode }
           : undefined,
@@ -1469,12 +1493,13 @@ export class DatabaseStorage implements IStorage {
 
     let tutorDetail: any = null;
     if (cls.tutorId) {
-      const [tRow] = await db.select({ id: tutors.id, userId: tutors.userId })
+      const [tRow] = await db.select({ id: tutors.id, userId: tutors.userId, wwccExpiry: tutors.wwccExpiry })
         .from(tutors).where(eq(tutors.id, cls.tutorId));
       if (tRow) {
         const [uRow] = await db.select({ email: users.email, firstName: users.firstName, lastName: users.lastName })
           .from(users).where(eq(users.id, tRow.userId));
-        tutorDetail = { id: tRow.id, user: uRow ?? undefined };
+        const wwccNonCompliant = !tRow.wwccExpiry || tRow.wwccExpiry < new Date();
+        tutorDetail = { id: tRow.id, user: uRow ?? undefined, wwccNonCompliant };
       }
     }
 
@@ -1543,6 +1568,8 @@ export class DatabaseStorage implements IStorage {
       academicYear: academicYear ? { id: academicYear.id, year: academicYear.yearNumber } : null,
       terms: term ? [{ id: term.id, name: term.name, start_date: term.startDate?.toISOString().slice(0, 10) ?? '', end_date: term.endDate?.toISOString().slice(0, 10) ?? '' }] : [],
       students: studentList,
+      updatedByName: cls.updatedByName ?? null,
+      updatedAt: cls.updatedAt?.toISOString() ?? null,
     };
   }
 
@@ -1594,7 +1621,7 @@ export class DatabaseStorage implements IStorage {
     return updatedAdmin!;
   }
 
-  async getTutorsByCompany(companyId: string): Promise<any[]> {
+  async getTutorsByCompany(companyId: string, statusFilter?: 'active' | 'inactive'): Promise<any[]> {
     try {
       // Get all tutors in this company with their user information
       const companyTutors = await db.select({
@@ -1604,6 +1631,9 @@ export class DatabaseStorage implements IStorage {
         qualifications: tutors.qualifications,
         isVerified: tutors.isVerified,
         companyId: tutors.companyId,
+        tutorStatus: tutors.status,
+        deactivatedAt: tutors.deactivatedAt,
+        deactivatedByName: tutors.deactivatedByName,
         user: {
           id: users.id,
           email: users.email,
@@ -1615,7 +1645,11 @@ export class DatabaseStorage implements IStorage {
       })
       .from(tutors)
       .innerJoin(users, eq(tutors.userId, users.id))
-      .where(and(eq(tutors.companyId, companyId), eq(users.isDeleted, false)))
+      .where(and(
+        eq(tutors.companyId, companyId),
+        eq(users.isDeleted, false),
+        statusFilter ? eq(tutors.status, statusFilter) : undefined,
+      ))
       .orderBy(users.firstName, users.lastName);
 
       // Get class schedules for each tutor (upcoming sessions grouped by class/day/time)
@@ -1662,6 +1696,15 @@ export class DatabaseStorage implements IStorage {
 
       const studentCountMap = new Map(studentCounts.map((sc: any) => [sc.tutorId, Number(sc.count)]));
 
+      // ESLATE-23 — active class count per tutor, shown in the assign-tutor picker
+      const classCounts = tutorIds.length > 0
+        ? await db.select({ tutorId: classes.tutorId, count: sql<number>`count(*)`.as('count') })
+          .from(classes)
+          .where(and(inArray(classes.tutorId, tutorIds), ne(classes.status, 'archived')))
+          .groupBy(classes.tutorId)
+        : [];
+      const classCountMap = new Map(classCounts.map((cc: any) => [cc.tutorId, Number(cc.count)]));
+
       // Group sessions by tutor and create unique schedule entries
       const tutorSchedulesMap = new Map<string, Set<string>>();
       for (const session of upcomingSessions) {
@@ -1695,9 +1738,13 @@ export class DatabaseStorage implements IStorage {
           qualifications: tutor.qualifications,
           isVerified: tutor.isVerified,
           status: tutor.user.isActive ? 'active' : 'invited',
+          tutorStatus: tutor.tutorStatus,
+          deactivatedAt: tutor.deactivatedAt,
+          deactivatedByName: tutor.deactivatedByName,
           complianceStatus: tutor.isVerified ? 'compliant' : 'pending_compliance',
           schedules,
           studentCount: studentCountMap.get(tutor.id) || 0,
+          classCount: classCountMap.get(tutor.id) || 0,
         };
       });
     } catch (error) {
@@ -1716,6 +1763,9 @@ export class DatabaseStorage implements IStorage {
       branch: tutors.branch,
       isVerified: tutors.isVerified,
       companyId: tutors.companyId,
+      tutorStatus: tutors.status,
+      deactivatedAt: tutors.deactivatedAt,
+      deactivatedByName: tutors.deactivatedByName,
       firstName: users.firstName,
       lastName: users.lastName,
       email: users.email,

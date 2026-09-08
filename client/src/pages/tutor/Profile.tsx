@@ -4,11 +4,8 @@ import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import {
-  GraduationCap, Bell, LogOut, ShieldCheck, ShieldAlert, ShieldX,
-  ArrowLeft, Mail, Building2, Briefcase, BookOpen, ChevronRight,
-  Save,
-} from 'lucide-react';
+import { GraduationCap, LogOut, ShieldCheck, ShieldAlert, ShieldX, ArrowLeft, Mail, Building2, Briefcase, BookOpen, ChevronRight, Save, Lock } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 type ComplianceStatus = 'compliant' | 'pending_compliance' | 'compliance_hold' | string;
 
@@ -76,6 +73,23 @@ export default function TutorProfilePage() {
     }
   }, [profile]);
 
+  const isDirty = !!profile && (
+    bio !== (profile.bio ?? '')
+    || phoneNumber !== (profile.phoneNumber ?? '')
+    || address !== (profile.address ?? '')
+    || availability !== (profile.availability ?? '')
+  );
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (!isDirty) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
   const saveMutation = useMutation({
     mutationFn: () =>
       apiRequest('/api/me/tutor-profile', 'PATCH', {
@@ -109,12 +123,18 @@ export default function TutorProfilePage() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Link href="/tutor" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
+              <Link
+                href="/tutor"
+                onClick={(e) => {
+                  if (isDirty && !window.confirm('You have unsaved changes to your teaching profile. Leave without saving?')) {
+                    e.preventDefault();
+                  }
+                }}
+                className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl"
+              >
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -227,10 +247,75 @@ export default function TutorProfilePage() {
               <ListCard icon={<BookOpen size={16} />} title="Year levels" items={profile.year_levels} empty="None set" />
               <ListCard icon={<ChevronRight size={16} />} title="Delivery modes" items={profile.delivery_modes} empty="In-person / online — not set" />
             </div>
+
+            <ChangePasswordCard />
+
+            <Link href="/my-devices" className="flex items-center justify-between text-sm font-semibold text-gray-700 hover:text-indigo-700 bg-white border border-gray-100 shadow-sm hover:bg-indigo-50 rounded-2xl px-5 py-4 transition-colors">
+              My Devices
+              <span className="text-xs text-gray-400">Manage signed-in devices →</span>
+            </Link>
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function ChangePasswordCard() {
+  const { toast } = useToast();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [error, setError] = useState('');
+
+  const m = useMutation({
+    mutationFn: () => apiRequest('/api/me/change-password', 'POST', { currentPassword, newPassword }),
+    onSuccess: () => {
+      toast({ title: 'Password updated' });
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword(''); setError('');
+    },
+    onError: (e: any) => setError(e?.message ?? 'Failed to change password.'),
+  });
+
+  const handleSubmit = () => {
+    setError('');
+    if (!currentPassword || !newPassword) { setError('All fields are required.'); return; }
+    if (newPassword.length < 8) { setError('New password must be at least 8 characters.'); return; }
+    if (newPassword !== confirmPassword) { setError('New password and confirmation do not match.'); return; }
+    m.mutate();
+  };
+
+  return (
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4 flex items-center gap-2">
+        <Lock size={14} className="text-indigo-500" /> Change Password
+      </h3>
+      {error && <p className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-3">{error}</p>}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Current password</label>
+          <input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500">New password</label>
+          <input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+        <div>
+          <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Confirm new password</label>
+          <input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
+            className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+        </div>
+      </div>
+      <button
+        onClick={handleSubmit}
+        disabled={m.isPending}
+        className="mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-bold px-4 py-2 rounded-xl"
+      >
+        {m.isPending ? 'Updating…' : 'Update Password'}
+      </button>
+    </section>
   );
 }
 

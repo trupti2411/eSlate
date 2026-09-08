@@ -96,7 +96,7 @@ export default function Reports() {
 
   const runReportMutation = useMutation({
     mutationFn: async (data: { companyId: string; reportType: string; name: string; parameters?: any }) => {
-      const response = await apiRequest('POST', '/api/reports/run', data);
+      const response = await apiRequest('/api/reports/run', 'POST', data);
       return response.json();
     },
     onSuccess: (data) => {

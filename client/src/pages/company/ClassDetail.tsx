@@ -4,14 +4,8 @@ import { Link, useRoute, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, withBase, authHeaders } from '@/lib/queryClient';
-import {
-  BookOpen, Bell, LogOut, ArrowLeft, UserPlus, Trash2, X, Save,
-  User, Users, GraduationCap, Calendar, CalendarDays, School,
-  Pencil, Play, CheckCircle2, Archive, RotateCcw, Copy,
-  ClipboardPlus, FileText, Download, Clock, ClipboardCheck,
-  ListOrdered, CheckSquare, XSquare, AlertCircle, MinusCircle,
-  ChevronDown, ChevronUp,
-} from 'lucide-react';
+import { BookOpen, LogOut, ArrowLeft, UserPlus, Trash2, X, Save, User, Users, GraduationCap, Calendar, CalendarDays, School, Pencil, Play, CheckCircle2, Archive, RotateCcw, Copy, ClipboardPlus, FileText, Download, Clock, ClipboardCheck, ListOrdered, CheckSquare, XSquare, AlertCircle, AlertTriangle, MinusCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface ClassData {
   id: number;
@@ -38,11 +32,13 @@ interface ClassData {
   subjects?: { id: number; name: string; code?: string; pivot?: { is_primary?: boolean } }[];
   yearGroup?: { id: number; label: string; code: string } | null;
   year_group?: { id: number; label: string; code: string } | null;
-  tutor?: { id: number; user?: { name?: string; email?: string } } | null;
+  tutor?: { id: number; user?: { firstName?: string | null; lastName?: string | null; email?: string }; wwccNonCompliant?: boolean } | null;
   academicYear?: { id: number; year: number } | null;
   academic_year?: { id: number; year: number } | null;
   terms?: { id: number; name: string; start_date: string; end_date: string }[];
   students?: StudentRow[];
+  updatedByName?: string | null;
+  updatedAt?: string | null;
 }
 
 interface StudentRow {
@@ -96,8 +92,10 @@ export default function ClassDetailPage() {
   const yearGroup = cls?.yearGroup ?? cls?.year_group;
   const academicYear = cls?.academicYear ?? cls?.academic_year;
   const tone = STATUS_TONE[cls?.status ?? 'draft'] ?? STATUS_TONE.draft;
-  const tutorName = cls?.tutor?.user?.name
-    || (cls?.tutor_id ? `Tutor #${cls.tutor_id}` : 'Not assigned');
+  const tutorName = cls?.tutor?.user
+    ? `${cls.tutor.user.firstName ?? ''} ${cls.tutor.user.lastName ?? ''}`.trim() || cls.tutor.user.email || 'Tutor'
+    : (cls?.tutor_id ? `Tutor #${cls.tutor_id}` : 'Not assigned');
+  const tutorWwccNonCompliant = !!cls?.tutor?.wwccNonCompliant;
   const enrolledCount = cls?.students?.length ?? 0;
   const atCap = cls?.capacity != null && enrolledCount >= cls.capacity;
 
@@ -119,9 +117,7 @@ export default function ClassDetailPage() {
               <Link href="/company/classes" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Back
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -191,6 +187,12 @@ export default function ClassDetailPage() {
                 <Stat icon={<Users size={14} />} label="Roster" value={`${enrolledCount}${cls.capacity != null ? ` / ${cls.capacity}` : ''}`} />
               </div>
 
+              {tutorWwccNonCompliant && (
+                <div className="mt-3 flex items-center gap-1.5 text-xs font-bold text-rose-100 bg-rose-500/30 px-2.5 py-1.5 rounded-lg w-fit">
+                  <AlertTriangle size={12} /> {tutorName}'s WWCC is expired or missing — compliance risk
+                </div>
+              )}
+
               {(cls.starts_on || cls.ends_on) && (
                 <div className="mt-3 flex items-center gap-2 text-xs text-indigo-100 flex-wrap">
                   <Calendar size={12} />
@@ -218,6 +220,12 @@ export default function ClassDetailPage() {
                     </span>
                   ))}
                 </div>
+              )}
+
+              {cls.updatedByName && (
+                <p className="mt-3 text-[11px] text-indigo-200">
+                  Last updated by {cls.updatedByName}{cls.updatedAt ? ` on ${formatDate(cls.updatedAt)}` : ''}
+                </p>
               )}
             </div>
 
@@ -678,11 +686,14 @@ function LifecycleSection({ classId, businessId, status, className: cls }: { cla
 /* ---------- Edit ---------- */
 
 interface CourseSummary { id: number; name: string; }
-interface TutorPickerRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; }
+interface TutorPickerRow { id: string; firstName?: string | null; lastName?: string | null; email?: string | null; classCount?: number; }
 
 function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  const initialSubjectIds = (cls.subjects ?? (cls.subject ? [cls.subject] : [])).map(s => s.id);
+  const initialYearGroupCode = cls.yearGroup?.code ?? cls.year_group?.code ?? '';
 
   const [name, setName] = useState(cls.name);
   const [description, setDescription] = useState(cls.description ?? '');
@@ -691,15 +702,23 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
   const [courseId, setCourseId] = useState<string>(cls.course_id ? String(cls.course_id) : '');
   const [tutorId, setTutorId] = useState<string>(cls.tutor_id ? String(cls.tutor_id) : '');
   const [pickedTermIds, setPickedTermIds] = useState<Set<string>>(new Set((cls.terms ?? []).map(t => String(t.id))));
+  const [yearGroupCode, setYearGroupCode] = useState<string>(initialYearGroupCode);
+  const [pickedSubjectIds, setPickedSubjectIds] = useState<Set<number>>(new Set(initialSubjectIds));
   const [scheduleDay, setScheduleDay] = useState<string>(cls.schedule_day_of_week ? String(cls.schedule_day_of_week) : '');
   const [startTime, setStartTime] = useState<string>(cls.schedule_start_time?.slice(0, 5) ?? '');
   const [endTime, setEndTime] = useState<string>(cls.schedule_end_time?.slice(0, 5) ?? '');
   const [location, setLocation] = useState<string>(cls.location ?? '');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [impacts, setImpacts] = useState<{ type: string; message: string }[] | null>(null);
+  const [notifyParents, setNotifyParents] = useState(true);
 
   const { data: courses = [] } = useQuery<CourseSummary[]>({ queryKey: ['/api/courses'] });
   const { data: tutors = [] } = useQuery<TutorPickerRow[]>({
     queryKey: [`/api/companies/${cls.business_id}/tutors`],
   });
+  const { data: subjectOptions = [] } = useQuery<{ id: number; code: string; name: string }[]>({ queryKey: ['/api/subjects'] });
+  const { data: yearGroupOptions = [] } = useQuery<{ id: number; code: string; label: string }[]>({ queryKey: ['/api/year-groups?state=NSW'] });
   const { data: hierarchy } = useQuery<any>({
     queryKey: [`/api/companies/${cls.business_id}/academic-hierarchy`],
   });
@@ -712,6 +731,10 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
     return (y?.terms ?? []) as { id: string; name: string; startDate?: string; endDate?: string }[];
   }, [allYears, cls.academic_year_id]);
 
+  // Restrict subject choices to the linked course's subjects, when a course is set
+  const selectedCourse = courses.find(c => String(c.id) === courseId) as any;
+  const availableSubjects = selectedCourse?.subjects?.length ? subjectOptions.filter(s => selectedCourse.subjects.some((cs: any) => cs.id === s.id)) : subjectOptions;
+
   const toggleTerm = (id: string) => {
     setPickedTermIds(prev => {
       const next = new Set(prev);
@@ -720,8 +743,39 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
     });
   };
 
+  const toggleSubject = (id: number) => {
+    setPickedSubjectIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const isDirty = name.trim() !== cls.name
+    || (description.trim() || null) !== (cls.description ?? null)
+    || (level.trim() || null) !== (cls.level ?? null)
+    || (capacity || null) !== (cls.capacity != null ? String(cls.capacity) : null)
+    || courseId !== (cls.course_id ? String(cls.course_id) : '')
+    || tutorId !== (cls.tutor_id ? String(cls.tutor_id) : '')
+    || yearGroupCode !== initialYearGroupCode
+    || pickedSubjectIds.size !== initialSubjectIds.length || initialSubjectIds.some(id => !pickedSubjectIds.has(id))
+    || Array.from(pickedTermIds).join(',') !== (cls.terms ?? []).map(t => String(t.id)).join(',')
+    || scheduleDay !== (cls.schedule_day_of_week ? String(cls.schedule_day_of_week) : '')
+    || startTime !== (cls.schedule_start_time?.slice(0, 5) ?? '')
+    || endTime !== (cls.schedule_end_time?.slice(0, 5) ?? '')
+    || location !== (cls.location ?? '');
+
+  const valid = name.trim().length > 0 && !!yearGroupCode && pickedSubjectIds.size > 0 && pickedTermIds.size > 0;
+
+  // ESLATE-39 — these fields trigger a parent email when changed; let the admin choose whether to send it.
+  const willNotifyParents = tutorId !== (cls.tutor_id ? String(cls.tutor_id) : '')
+    || scheduleDay !== (cls.schedule_day_of_week ? String(cls.schedule_day_of_week) : '')
+    || startTime !== (cls.schedule_start_time?.slice(0, 5) ?? '')
+    || endTime !== (cls.schedule_end_time?.slice(0, 5) ?? '')
+    || Array.from(pickedTermIds).join(',') !== (cls.terms ?? []).map(t => String(t.id)).join(',');
+
   const m = useMutation({
-    mutationFn: () =>
+    mutationFn: (confirmImpact?: boolean) =>
       apiRequest(`/api/classes/${cls.id}`, 'PATCH', {
         name: name.trim() || undefined,
         description: description.trim() || null,
@@ -730,10 +784,14 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
         course_id: courseId || null,
         tutor_id: tutorId || null,
         term_ids: Array.from(pickedTermIds),
+        year_group_code: yearGroupCode || null,
+        subject_ids: Array.from(pickedSubjectIds),
         schedule_day_of_week: scheduleDay ? Number(scheduleDay) : null,
         schedule_start_time: startTime || null,
         schedule_end_time: endTime || null,
         location: location.trim() || null,
+        notify_parents: notifyParents,
+        ...(confirmImpact && { confirmImpact: true }),
       }),
     onSuccess: () => {
       toast({ title: 'Class updated' });
@@ -741,8 +799,19 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
       qc.invalidateQueries({ queryKey: ['/api/classes'] });
       onClose();
     },
-    onError: (e: any) => toast({ title: 'Could not save', description: e.message, variant: 'destructive' }),
+    onError: (e: any) => {
+      if (e?.body?.message === 'confirm_required') {
+        setImpacts(e.body.impacts);
+        return;
+      }
+      toast({ title: 'Could not save', description: e.message, variant: 'destructive' });
+    },
   });
+
+  const handleClose = () => {
+    if (isDirty) setConfirmDiscard(true);
+    else onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -751,11 +820,20 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
           <h3 className="text-base font-black flex items-center gap-2">
             <Pencil size={16} className="text-indigo-600" /> Edit class
           </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
+          <button onClick={handleClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
             <X size={16} />
           </button>
         </div>
         <div className="p-5 space-y-5 overflow-y-auto">
+          {impacts && impacts.length > 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5"><AlertTriangle size={12} /> This will affect enrolled students</p>
+              <ul className="list-disc list-inside space-y-0.5">
+                {impacts.map((imp, i) => <li key={i}>{imp.message}</li>)}
+              </ul>
+            </div>
+          )}
+
           <EditField label="Class name">
             <input
               value={name}
@@ -763,6 +841,7 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
               className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               autoFocus
             />
+            {submitAttempted && !name.trim() && <p className="text-xs text-rose-600 mt-1">Class name is required.</p>}
           </EditField>
 
           <div className="grid grid-cols-2 gap-3">
@@ -785,11 +864,46 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
                 <option value="">Not assigned</option>
                 {tutors.map(t => {
                   const nm = `${t.firstName ?? ''} ${t.lastName ?? ''}`.trim() || t.email || `Tutor #${t.id}`;
-                  return <option key={t.id} value={t.id}>{nm}</option>;
+                  const classCount = t.classCount ?? 0;
+                  return <option key={t.id} value={t.id}>{nm} — {classCount} class{classCount === 1 ? '' : 'es'}</option>;
                 })}
               </select>
             </EditField>
           </div>
+
+          <EditField label="Year group">
+            <select
+              value={yearGroupCode}
+              onChange={(e) => setYearGroupCode(e.target.value)}
+              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+            >
+              <option value="">Select a year group…</option>
+              {yearGroupOptions.map(y => <option key={y.id} value={y.code}>{y.label}</option>)}
+            </select>
+            {submitAttempted && !yearGroupCode && <p className="text-xs text-rose-600 mt-1">Year group is required.</p>}
+          </EditField>
+
+          <EditField label="Subjects">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {availableSubjects.map(s => {
+                const isOn = pickedSubjectIds.has(s.id);
+                return (
+                  <button key={s.id} type="button" onClick={() => toggleSubject(s.id)}
+                    className={`text-left rounded-xl border px-3 py-2 text-sm transition-colors ${isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <span className={`inline-flex w-4 h-4 rounded mr-2 items-center justify-center flex-shrink-0 ${isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300'}`}>
+                      {isOn && <span className="text-[10px]">✓</span>}
+                    </span>
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+            {selectedCourse?.subjects?.length > 0 && (
+              <p className="text-xs text-gray-400 mt-1.5">Constrained to {selectedCourse.name}'s subjects.</p>
+            )}
+            {submitAttempted && pickedSubjectIds.size === 0 && <p className="text-xs text-rose-600 mt-1">Select at least one subject.</p>}
+          </EditField>
 
           <EditField label="Terms">
             {thisYearTerms.length === 0 ? (
@@ -820,6 +934,7 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
                 })}
               </div>
             )}
+            {submitAttempted && pickedTermIds.size === 0 && <p className="text-xs text-rose-600 mt-1">Select at least one term.</p>}
           </EditField>
 
           <div>
@@ -901,22 +1016,58 @@ function EditClassModal({ cls, onClose }: { cls: ClassData; onClose: () => void 
           </EditField>
 
           <p className="text-xs text-gray-400">
-            Year group, subject, and academic year are fixed for a class — create a new class if those need to change.
+            Academic year is fixed for a class — create a new class if that needs to change.
           </p>
         </div>
+        {willNotifyParents && (
+          <div className="px-5 py-3 border-t border-amber-100 bg-amber-50 flex-shrink-0">
+            <label className="flex items-start gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={notifyParents}
+                onChange={e => setNotifyParents(e.target.checked)}
+                className="w-4 h-4 rounded accent-amber-600 mt-0.5"
+              />
+              <span className="text-xs text-amber-800">
+                <span className="font-bold">Email enrolled students' parents about this change.</span>{' '}
+                Tutor, schedule, or term changes are usually worth notifying families about — untick to save quietly instead.
+              </span>
+            </label>
+          </div>
+        )}
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
-          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
+          <button onClick={handleClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
             Cancel
           </button>
           <button
-            onClick={() => m.mutate()}
-            disabled={!name.trim() || m.isPending}
+            onClick={() => {
+              setSubmitAttempted(true);
+              if (valid) m.mutate(!!impacts);
+            }}
+            disabled={m.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
           >
-            <Save size={14} /> {m.isPending ? 'Saving…' : 'Save changes'}
+            <Save size={14} /> {m.isPending ? 'Saving…' : impacts ? 'Confirm & Save' : 'Save changes'}
           </button>
         </div>
       </div>
+
+      {confirmDiscard && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+            <h3 className="text-base font-black text-gray-900 mb-2">Discard changes?</h3>
+            <p className="text-sm text-gray-600 mb-5">You have unsaved changes. Are you sure you want to discard them?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDiscard(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-sm">
+                Keep editing
+              </button>
+              <button onClick={onClose} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 rounded-xl text-sm">
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -954,6 +1105,11 @@ function RosterSection({
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
+
+  const { data: attendanceSummary = {} } = useQuery<Record<string, number>>({
+    queryKey: [`/api/classes/${classId}/attendance-summary`],
+    enabled: !!classId,
+  });
 
   const fillPct = capacity != null && capacity > 0 ? Math.min(100, Math.round((enrolledCount / capacity) * 100)) : 0;
   const fillColor = fillPct >= 100 ? 'bg-rose-500' : fillPct >= 80 ? 'bg-amber-500' : 'bg-emerald-500';
@@ -1034,6 +1190,16 @@ function RosterSection({
                       {s.pivot?.enrolled_at && <> · enrolled {formatDate(s.pivot.enrolled_at)}</>}
                     </p>
                   </div>
+                  {attendanceSummary[String(s.id)] != null && (
+                    <span
+                      className={`text-[11px] font-bold px-2 py-1 rounded-full flex-shrink-0 ${
+                        attendanceSummary[String(s.id)] < 80 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-700'
+                      }`}
+                      title="Attendance rate"
+                    >
+                      {attendanceSummary[String(s.id)]}% attendance
+                    </span>
+                  )}
                   <button
                     onClick={() => {
                       if (confirm(`Remove ${name} from this class?`)) unenrol.mutate(s.id);
@@ -1067,6 +1233,12 @@ function EnrolModal({
   const qc = useQueryClient();
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [search, setSearch] = useState('');
+  const [queue, setQueue] = useState<number[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [enrolledCount, setEnrolledCount] = useState(0);
+  const [conflict, setConflict] = useState<{ studentId: number; conflictType: string; message: string } | null>(null);
+  const [confirmedFlags, setConfirmedFlags] = useState<Record<string, unknown>>({});
+  const [rollNumberInput, setRollNumberInput] = useState('');
 
   const { data: allStudents = [] } = useQuery<StudentRow[]>({
     queryKey: [`/api/companies/${businessId}/students`],
@@ -1091,23 +1263,80 @@ function EnrolModal({
     });
   };
 
-  // The classroom enrol endpoint takes one student_id per call. Loop for multi-select.
-  const m = useMutation({
-    mutationFn: async () => {
-      const ids = Array.from(selected);
-      for (const studentId of ids) {
-        await apiRequest(`/api/classes/${classId}/students`, 'POST', { studentId });
+  // The classroom enrol endpoint takes one student_id per call. Process sequentially so a
+  // year-group-mismatch or missing-roll-number conflict on one student can be resolved inline
+  // without losing progress on the rest of the batch.
+  const enrolOne = (studentId: number, extra?: Record<string, unknown>) =>
+    apiRequest(`/api/classes/${classId}/students`, 'POST', { studentId, ...extra });
+
+  const runQueue = async (ids: number[], totalRequested: number) => {
+    setProcessing(true);
+    let remaining = [...ids];
+    while (remaining.length > 0) {
+      const studentId = remaining[0];
+      try {
+        await enrolOne(studentId);
+        remaining = remaining.slice(1);
+        setEnrolledCount(prev => prev + 1);
+        setConfirmedFlags({});
+      } catch (e: any) {
+        const body = e?.body;
+        if (body?.conflictType && body.conflictType !== 'duplicate_enrollment') {
+          setQueue(remaining.slice(1));
+          setConflict({ studentId, conflictType: body.conflictType, message: body.message });
+          setProcessing(false);
+          return;
+        }
+        toast({ title: 'Could not enrol', description: e.message ?? 'Try again.', variant: 'destructive' });
+        setProcessing(false);
+        setQueue([]);
+        return;
       }
-      return ids.length;
-    },
-    onSuccess: (count) => {
-      toast({ title: `Enrolled ${count} student${count === 1 ? '' : 's'}` });
-      qc.invalidateQueries({ queryKey: [`/api/classes/${classId}`] });
-      onClose();
-    },
-    onError: (e: any) =>
-      toast({ title: 'Could not enrol', description: e.message ?? 'Try again.', variant: 'destructive' }),
-  });
+    }
+    setQueue([]);
+    setProcessing(false);
+    toast({ title: `Enrolled ${totalRequested} student${totalRequested === 1 ? '' : 's'}` });
+    qc.invalidateQueries({ queryKey: [`/api/classes/${classId}`] });
+    onClose();
+  };
+
+  const startEnrolling = () => {
+    const ids = Array.from(selected);
+    setEnrolledCount(0);
+    runQueue(ids, ids.length);
+  };
+
+  const resolveConflict = async () => {
+    if (!conflict) return;
+    const flags: Record<string, unknown> = { ...confirmedFlags };
+    if (conflict.conflictType === 'year_group_mismatch') flags.confirmYearGroupMismatch = true;
+    if (conflict.conflictType === 'roll_number_required') {
+      if (!rollNumberInput.trim()) return;
+      flags.rollNumber = rollNumberInput.trim();
+    }
+    setConfirmedFlags(flags);
+    setRollNumberInput('');
+
+    setProcessing(true);
+    try {
+      await enrolOne(conflict.studentId, flags);
+      setEnrolledCount(prev => prev + 1);
+      setConfirmedFlags({});
+      setConflict(null);
+      await runQueue(queue, selected.size);
+    } catch (e: any) {
+      const body = e?.body;
+      if (body?.conflictType && body.conflictType !== 'duplicate_enrollment') {
+        setConflict({ studentId: conflict.studentId, conflictType: body.conflictType, message: body.message });
+        setProcessing(false);
+      } else {
+        toast({ title: 'Could not enrol', description: e.message ?? 'Try again.', variant: 'destructive' });
+        setProcessing(false);
+        setQueue([]);
+        setConflict(null);
+      }
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
@@ -1166,16 +1395,57 @@ function EnrolModal({
             </ul>
           )}
         </div>
+
+        {conflict && (
+          <div className="px-5 py-4 border-t border-amber-200 bg-amber-50 space-y-3">
+            <p className="text-sm text-amber-800 font-semibold">{conflict.message}</p>
+            {conflict.conflictType === 'roll_number_required' ? (
+              <div className="flex items-center gap-2">
+                <input
+                  autoFocus
+                  value={rollNumberInput}
+                  onChange={e => setRollNumberInput(e.target.value)}
+                  placeholder="Roll number…"
+                  className="flex-1 rounded-xl border border-amber-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                />
+                <button
+                  onClick={resolveConflict}
+                  disabled={!rollNumberInput.trim() || processing}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl"
+                >
+                  Confirm
+                </button>
+              </div>
+            ) : (
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => { setConflict(null); setQueue([]); setProcessing(false); }}
+                  className="text-sm font-bold text-gray-600 hover:bg-gray-100 px-3 py-2 rounded-xl"
+                >
+                  Skip this student
+                </button>
+                <button
+                  onClick={resolveConflict}
+                  disabled={processing}
+                  className="bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl"
+                >
+                  Enrol anyway
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
           <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
             Cancel
           </button>
           <button
-            onClick={() => m.mutate()}
-            disabled={selected.size === 0 || m.isPending}
+            onClick={startEnrolling}
+            disabled={selected.size === 0 || processing || !!conflict}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
           >
-            <Save size={14} /> {m.isPending ? 'Enrolling…' : `Enrol ${selected.size}`}
+            <Save size={14} /> {processing ? 'Enrolling…' : `Enrol ${selected.size}`}
           </button>
         </div>
       </div>

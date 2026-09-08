@@ -78,6 +78,10 @@ export function csrfProtection(req: Request, res: Response, next: NextFunction):
     '/api/auth/forgot-password',
     '/api/auth/reset-password',
     '/api/contact',
+    // Local-dev object upload: the objectId is a fresh, unguessable UUID minted by an
+    // authenticated POST /api/objects/upload immediately beforehand — the same
+    // capability-URL trust model as a real signed GCS PUT URL, which also carries no CSRF token.
+    '/api/objects/local-upload/',
   ];
   if (exemptPaths.some(p => req.path.startsWith(p))) {
     return next();

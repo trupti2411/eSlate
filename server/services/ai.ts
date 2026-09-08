@@ -45,6 +45,17 @@ interface GradingResult {
   improvements: string[];
 }
 
+interface TranscriptionParams {
+  question: string;
+  imageBuffer: Buffer;
+  mimeType: string;
+}
+
+interface TranscriptionResult {
+  text: string;
+  confidence: number;
+}
+
 interface HintParams {
   question: string;
   questionType: string;
@@ -298,6 +309,39 @@ Return the response as JSON with this exact structure (no markdown, just raw JSO
     } catch (error: any) {
       console.error("Error getting grading suggestion:", error);
       throw new Error(error.message || "Failed to generate grading suggestion. Please try again.");
+    }
+  }
+
+  async transcribeHandwriting(params: TranscriptionParams): Promise<TranscriptionResult> {
+    const prompt = `You are transcribing a student's handwritten answer from a photo, for OCR purposes.
+
+Question: ${params.question}
+
+Read the handwritten text in the image carefully and transcribe exactly what the student wrote. Correct only obvious OCR artifacts — do not correct the student's spelling, grammar, or working. If part of the handwriting is illegible, write [illegible] for that portion instead of guessing.
+
+Return the response as JSON with this exact structure (no markdown, just raw JSON):
+{
+  "text": "the transcribed answer, exactly as written",
+  "confidence": number
+}
+
+"confidence" is 0-100: your confidence that the transcription accurately reflects what was written.`;
+
+    const contentParts: any[] = [
+      { text: prompt },
+      { inlineData: { mimeType: params.mimeType, data: params.imageBuffer.toString('base64') } },
+    ];
+
+    try {
+      const response = await this.generateWithFallback(contentParts);
+      const result = this.safeParseJSON<{ text: string; confidence: number }>(response, 'object');
+      return {
+        text: (result.text || '').trim(),
+        confidence: Math.max(0, Math.min(100, result.confidence ?? 50)),
+      };
+    } catch (error: any) {
+      console.error("Error transcribing handwriting:", error);
+      throw new Error(error.message || "Failed to transcribe handwriting.");
     }
   }
 
@@ -699,4 +743,4 @@ Extract all content comprehensively. Do not summarize or skip any questions.`;
 }
 
 export const aiService = new AIService();
-export type { QuestionGenerationParams, GeneratedQuestion, GradingParams, GradingResult, HintParams, ProgressInsightParams };
+export type { QuestionGenerationParams, GeneratedQuestion, GradingParams, GradingResult, TranscriptionParams, TranscriptionResult, HintParams, ProgressInsightParams };

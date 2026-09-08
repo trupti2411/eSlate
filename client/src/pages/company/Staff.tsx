@@ -4,10 +4,8 @@ import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import {
-  Users, Building2, Bell, LogOut, ArrowLeft, UserPlus, ShieldCheck, ShieldAlert, ShieldX,
-  Mail, X, Save, Search, Eye, Edit2, UserX, UserCheck, AlertTriangle,
-} from 'lucide-react';
+import { Users, Building2, LogOut, ArrowLeft, UserPlus, ShieldCheck, ShieldAlert, ShieldX, Mail, X, Save, Search, Eye, Edit2, UserX, UserCheck, AlertTriangle } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface AdminProfile {
   userId: string;
@@ -38,6 +36,11 @@ interface Tutor {
   isVerified?: boolean;
   phoneNumber?: string | null;
   address?: string | null;
+  tutorStatus?: 'active' | 'inactive' | string;
+  deactivatedAt?: string | null;
+  deactivatedByName?: string | null;
+  classCount?: number;
+  studentCount?: number;
 }
 
 function formatDate(s: string | null | undefined): string {
@@ -67,6 +70,13 @@ interface WwccAlert {
   status: string;
 }
 
+interface TutorClassRow {
+  id: string; name: string; courseName?: string | null; subjects: string[];
+  yearGroupCode?: string | null; dayOfWeek?: number | null; startTime?: string | null; endTime?: string | null;
+  termId?: string | null; termName?: string | null; studentCount: number;
+}
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
 export default function Staff() {
   const { user, logoutMutation } = useAuth();
   const qc = useQueryClient();
@@ -94,14 +104,23 @@ export default function Staff() {
     enabled: !!companyId,
   });
 
+  const [deactivateImpact, setDeactivateImpact] = useState<string | null>(null);
   const deactivateMutation = useMutation({
-    mutationFn: (tutorId: string) => apiRequest(`/api/tutors/${tutorId}/deactivate`, 'POST'),
+    mutationFn: ({ tutorId, confirmUnassign }: { tutorId: string; confirmUnassign?: boolean }) =>
+      apiRequest(`/api/tutors/${tutorId}/deactivate`, 'POST', confirmUnassign ? { confirmUnassign: true } : undefined),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: [`/api/companies/${companyId}/tutors`] });
       setProfileTutor(null);
+      setDeactivateImpact(null);
       toast({ title: 'Tutor deactivated' });
     },
-    onError: (e: any) => toast({ title: 'Error', description: e.message, variant: 'destructive' }),
+    onError: (e: any) => {
+      if (e?.body?.message === 'confirm_required') {
+        setDeactivateImpact(e.body.impact);
+        return;
+      }
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    },
   });
 
   const reactivateMutation = useMutation({
@@ -151,9 +170,7 @@ export default function Staff() {
               <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -264,10 +281,11 @@ export default function Staff() {
         <TutorProfileModal
           tutor={profileTutor}
           companyId={companyId}
-          onClose={() => setProfileTutor(null)}
-          onDeactivate={() => deactivateMutation.mutate(profileTutor.id)}
+          onClose={() => { setProfileTutor(null); setDeactivateImpact(null); }}
+          onDeactivate={() => deactivateMutation.mutate({ tutorId: profileTutor.id, confirmUnassign: !!deactivateImpact })}
           onReactivate={() => reactivateMutation.mutate(profileTutor.id)}
           actionPending={deactivateMutation.isPending || reactivateMutation.isPending}
+          deactivateImpact={deactivateImpact}
         />
       )}
     </div>
@@ -321,6 +339,7 @@ function TutorRow({ t, onView }: { t: Tutor; onView: () => void }) {
         <p className="font-black text-gray-900 truncate">{fullName}</p>
         <p className="text-xs text-gray-500 truncate">{t.email}</p>
         {t.branch && <p className="text-xs text-gray-400 truncate">{t.branch}</p>}
+        <p className="text-[11px] text-gray-400 mt-0.5">{t.classCount ?? 0} class{(t.classCount ?? 0) === 1 ? '' : 'es'} · {t.studentCount ?? 0} students</p>
       </div>
       <div className="hidden sm:flex flex-col items-end gap-1 flex-shrink-0">
         <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-full inline-flex items-center gap-1 ${palette}`}>
@@ -452,9 +471,9 @@ function InviteModal({ businessId, onClose }: { businessId: string; onClose: () 
   );
 }
 
-function TutorProfileModal({ tutor, companyId, onClose, onDeactivate, onReactivate, actionPending }: {
+function TutorProfileModal({ tutor, companyId, onClose, onDeactivate, onReactivate, actionPending, deactivateImpact }: {
   tutor: Tutor; companyId: string; onClose: () => void;
-  onDeactivate?: () => void; onReactivate?: () => void; actionPending?: boolean;
+  onDeactivate?: () => void; onReactivate?: () => void; actionPending?: boolean; deactivateImpact?: string | null;
 }) {
   const { toast } = useToast();
   const qc = useQueryClient();
@@ -465,6 +484,11 @@ function TutorProfileModal({ tutor, companyId, onClose, onDeactivate, onReactiva
   const [qualifications, setQualifications] = useState(tutor.qualifications ?? '');
   const [availability, setAvailability] = useState(tutor.availability ?? '');
   const [branch, setBranch] = useState(tutor.branch ?? '');
+
+  const { data: tutorClasses = [] } = useQuery<TutorClassRow[]>({
+    queryKey: [`/api/tutors/${tutor.id}/classes`],
+  });
+  const termsCovered = new Set(tutorClasses.map(c => c.termId).filter(Boolean)).size;
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -610,28 +634,64 @@ function TutorProfileModal({ tutor, companyId, onClose, onDeactivate, onReactiva
                 </div>
               </div>
             )}
+            {/* Schedule (ESLATE-24) */}
+            <div className="mt-2 pt-3 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold uppercase tracking-widest text-gray-400">Schedule</p>
+                <p className="text-[11px] text-gray-500">
+                  {tutorClasses.length} class{tutorClasses.length === 1 ? '' : 'es'} · {tutorClasses.reduce((s, c) => s + c.studentCount, 0)} students · {termsCovered} term{termsCovered === 1 ? '' : 's'}
+                </p>
+              </div>
+              {tutorClasses.length === 0 ? (
+                <p className="text-xs text-gray-400 italic">No classes assigned.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {tutorClasses.map(c => (
+                    <li key={c.id} className="text-xs bg-gray-50 rounded-lg px-2.5 py-2">
+                      <p className="font-semibold text-gray-800">{c.name}{c.courseName ? ` · ${c.courseName}` : ''}</p>
+                      <p className="text-gray-500">
+                        {[c.yearGroupCode, c.subjects.join(', '), c.termName].filter(Boolean).join(' · ')}
+                        {c.dayOfWeek != null && c.startTime ? ` · ${DAY_LABELS[c.dayOfWeek]} ${c.startTime.slice(0, 5)}` : ''}
+                        {` · ${c.studentCount} student${c.studentCount === 1 ? '' : 's'}`}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             {/* Deactivate / reactivate */}
             <div className="mt-3 pt-3 border-t border-gray-100">
-              {tutor.status === 'inactive' ? (
-                <button
-                  onClick={onReactivate}
-                  disabled={actionPending}
-                  className="flex items-center gap-1.5 text-sm font-bold text-green-700 hover:bg-green-50 px-3 py-2 rounded-xl w-full disabled:opacity-60"
-                >
-                  <UserCheck size={14} /> Reactivate tutor
-                </button>
+              {tutor.tutorStatus === 'inactive' ? (
+                <>
+                  {tutor.deactivatedByName && (
+                    <p className="text-xs text-gray-400 mb-2">
+                      Deactivated by {tutor.deactivatedByName}{tutor.deactivatedAt ? ` on ${formatDate(tutor.deactivatedAt)}` : ''}
+                    </p>
+                  )}
+                  <button
+                    onClick={onReactivate}
+                    disabled={actionPending}
+                    className="flex items-center gap-1.5 text-sm font-bold text-green-700 hover:bg-green-50 px-3 py-2 rounded-xl w-full disabled:opacity-60"
+                  >
+                    <UserCheck size={14} /> Reactivate tutor
+                  </button>
+                </>
               ) : (
-                <button
-                  onClick={() => {
-                    if (confirm(`Deactivate ${tutor.firstName} ${tutor.lastName}? They will lose portal access.`)) {
-                      onDeactivate?.();
-                    }
-                  }}
-                  disabled={actionPending}
-                  className="flex items-center gap-1.5 text-sm font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl w-full disabled:opacity-60"
-                >
-                  <UserX size={14} /> Deactivate tutor
-                </button>
+                <>
+                  {deactivateImpact && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 mb-2">
+                      <p className="font-bold flex items-center gap-1.5 mb-1"><AlertTriangle size={12} /> This will affect active classes</p>
+                      <p>{deactivateImpact}</p>
+                    </div>
+                  )}
+                  <button
+                    onClick={onDeactivate}
+                    disabled={actionPending}
+                    className="flex items-center gap-1.5 text-sm font-bold text-red-600 hover:bg-red-50 px-3 py-2 rounded-xl w-full disabled:opacity-60"
+                  >
+                    <UserX size={14} /> {deactivateImpact ? 'Confirm deactivate' : 'Deactivate tutor'}
+                  </button>
+                </>
               )}
             </div>
             </>

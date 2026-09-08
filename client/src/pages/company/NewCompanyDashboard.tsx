@@ -1,15 +1,15 @@
-import { useMemo, useState, useRef, useEffect } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import {
   Building2, Users, GraduationCap, BookOpen, ShieldCheck, ShieldAlert,
-  CalendarDays, FileBarChart, Bell, LogOut, ArrowRight, UserPlus,
+  CalendarDays, FileBarChart, LogOut, ArrowRight, UserPlus,
   ClipboardPlus, Plus, AlertTriangle, ChevronRight, Activity, Mail,
   UserCheck, FileEdit, CircleSlash, Settings as SettingsIcon, Trophy,
-  DollarSign, BarChart2, X, Check,
+  DollarSign, BarChart2, Search,
 } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface AdminProfile {
   userId: string;
@@ -67,10 +67,6 @@ interface AuditEntry {
   payload: Record<string, unknown> | null;
 }
 
-interface InAppNotif {
-  id: string; type: string; title: string; message: string; isRead: boolean; createdAt: string;
-}
-
 interface EnrolmentSummary {
   termId: string | null;
   metrics: { totalStudents: number; totalClasses: number; totalEnrolments: number; availableSpots: number; waitlisted: number; };
@@ -111,18 +107,6 @@ function dateOnly(s: string | null | undefined): string {
 
 export default function NewCompanyDashboard() {
   const { user, logoutMutation } = useAuth();
-  const qc = useQueryClient();
-  const [showNotifs, setShowNotifs] = useState(false);
-  const notifRef = useRef<HTMLDivElement>(null);
-
-  // Close notif panel on outside click
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (notifRef.current && !notifRef.current.contains(e.target as Node)) setShowNotifs(false);
-    }
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
 
   const { data: adminProfile } = useQuery<AdminProfile>({
     queryKey: [`/api/admin/company-admin/${user?.id}`],
@@ -154,26 +138,6 @@ export default function NewCompanyDashboard() {
     enabled: !!companyId,
   });
 
-  const { data: notifications = [] } = useQuery<InAppNotif[]>({
-    queryKey: ['/api/notifications'],
-    enabled: !!user?.id,
-    refetchInterval: 60000,
-  });
-  const { data: unreadCountData } = useQuery<{ count: number }>({
-    queryKey: ['/api/notifications/unread-count'],
-    enabled: !!user?.id,
-    refetchInterval: 60000,
-  });
-  const unreadCount = unreadCountData?.count ?? 0;
-
-  const markReadMutation = useMutation({
-    mutationFn: () => apiRequest('POST', '/api/notifications/read-all', {}),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['/api/notifications'] }); qc.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] }); },
-  });
-  const deleteNotifMutation = useMutation({
-    mutationFn: (id: string) => apiRequest('DELETE', `/api/notifications/${id}`, {}),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['/api/notifications'] }); qc.invalidateQueries({ queryKey: ['/api/notifications/unread-count'] }); },
-  });
 
   const [enrolmentTermId, setEnrolmentTermId] = useState('');
   const { data: terms = [] } = useQuery<{ id: string; name: string }[]>({
@@ -291,44 +255,7 @@ export default function NewCompanyDashboard() {
               >
                 <SettingsIcon size={16} />
               </Link>
-              <div className="relative" ref={notifRef}>
-                <button onClick={() => setShowNotifs(v => !v)} className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center relative" aria-label="Notifications">
-                  <Bell size={16} />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-rose-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
-                  )}
-                </button>
-                {showNotifs && (
-                  <div className="absolute right-0 top-12 w-96 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 max-h-[480px] flex flex-col">
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                      <h3 className="font-black text-gray-900 text-sm">Notifications {unreadCount > 0 && <span className="ml-1 text-rose-500">({unreadCount})</span>}</h3>
-                      <div className="flex gap-2">
-                        {unreadCount > 0 && <button onClick={() => markReadMutation.mutate()} className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold">Mark all read</button>}
-                        <button onClick={() => setShowNotifs(false)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
-                      </div>
-                    </div>
-                    <div className="overflow-y-auto flex-1">
-                      {notifications.length === 0 ? (
-                        <p className="text-center text-sm text-gray-400 py-8">No notifications</p>
-                      ) : (
-                        notifications.map(n => (
-                          <div key={n.id} className={`flex items-start gap-3 px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.isRead ? 'bg-indigo-50/40' : ''}`}>
-                            <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${!n.isRead ? 'bg-indigo-500' : 'bg-transparent'}`} />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-gray-900 leading-snug">{n.title}</p>
-                              <p className="text-xs text-gray-500 mt-0.5 leading-snug">{n.message}</p>
-                              <p className="text-[10px] text-gray-400 mt-1">{relativeTime(n.createdAt)}</p>
-                            </div>
-                            <button onClick={() => deleteNotifMutation.mutate(n.id)} className="text-gray-300 hover:text-gray-500 flex-shrink-0"><X size={12} /></button>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -342,9 +269,6 @@ export default function NewCompanyDashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {/* WWCC compliance alerts (top-of-page so owners see them first) */}
-        {wwccAlerts.length > 0 && <WwccAlertsBanner alerts={wwccAlerts} />}
-
         {/* Active term banner */}
         <TermBanner
           academicYear={currentYear}
@@ -352,60 +276,33 @@ export default function NewCompanyDashboard() {
           progress={termProgress}
         />
 
-        {/* KPI cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <KpiCard
-            href="/company/tutors"
-            icon={<Users size={18} />}
-            label="Staff"
-            value={tutors.length}
-            sub={staffSub}
-            tone="indigo"
-            warning={complianceFlags > 0 || (cap != null && tutors.length >= cap)}
-          />
-          <KpiCard
-            href="/company/students"
-            icon={<GraduationCap size={18} />}
-            label="Students"
-            value={students.length}
-            sub={students.length === 0 ? 'add your first' : 'enrolled'}
-            tone="emerald"
-          />
-          <KpiCard
-            href="/company/classes"
-            icon={<BookOpen size={18} />}
-            label="Classes"
-            value={classes.length}
-            sub={classes.length === 0 ? 'create a class' : 'active'}
-            tone="amber"
-          />
-          <KpiCard
-            href="/company/courses"
-            icon={<Trophy size={18} />}
-            label="Test-prep"
-            value={courseOfferings.length}
-            sub={courseOfferings.length === 0 ? 'OC, Selective, NAPLAN' : `${activeCourseCount} active`}
-            tone="rose"
-          />
-        </div>
+        {/* Status strip — every headline number in one scannable row */}
+        <StatusStrip
+          items={[
+            { href: '/company/tutors', label: 'Staff', value: tutors.length, sub: staffSub, warning: complianceFlags > 0 || (cap != null && tutors.length >= cap) },
+            { href: '/company/students', label: 'Students', value: students.length, sub: students.length === 0 ? 'add your first' : 'enrolled' },
+            { href: '/company/classes', label: 'Classes', value: classes.length, sub: classes.length === 0 ? 'create a class' : 'active' },
+            { href: '/company/courses', label: 'Test-prep', value: courseOfferings.length, sub: courseOfferings.length === 0 ? 'OC, Selective, NAPLAN' : `${activeCourseCount} active` },
+          ]}
+        />
 
-        {/* Two-column body: Quick actions + Compliance */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            <QuickActionsCard hasStudents={students.length > 0} hasClasses={classes.length > 0} hasTutors={tutors.length > 0} />
-            <EnrolmentSummaryCard summary={enrolmentSummary} terms={terms} termId={enrolmentTermId} onTermChange={setEnrolmentTermId} />
-            <AcademicCard year={currentYear} />
-            <ActivityCard entries={auditLog} />
-          </div>
-          <div className="space-y-6">
-            <ComplianceCard tutors={tutors} />
-            <GettingStartedCard
-              hasTutors={tutors.length > 0}
-              hasStudents={students.length > 0}
-              hasClasses={classes.length > 0}
-              hasYear={!!currentYear}
-            />
-          </div>
+        {/* Needs attention — every alert and setup nudge, as one actionable feed */}
+        <NeedsAttentionCard
+          hasYear={!!currentYear}
+          wwccAlerts={wwccAlerts}
+          compliantCount={tutors.length - wwccAlerts.length}
+          totalTutors={tutors.length}
+          hasTutors={tutors.length > 0}
+          hasStudents={students.length > 0}
+          hasClasses={classes.length > 0}
+        />
+
+        <QuickActionsCard hasStudents={students.length > 0} hasClasses={classes.length > 0} hasTutors={tutors.length > 0} />
+        <EnrolmentSummaryCard summary={enrolmentSummary} terms={terms} termId={enrolmentTermId} onTermChange={setEnrolmentTermId} />
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <AcademicCard year={currentYear} />
+          <ActivityCard entries={auditLog} />
         </div>
       </main>
     </div>
@@ -514,53 +411,42 @@ function TermBanner({
   );
 }
 
-const TONE = {
-  indigo: { card: 'bg-white border-indigo-100 hover:border-indigo-300', icon: 'bg-indigo-50 text-indigo-600', value: 'text-indigo-700' },
-  emerald: { card: 'bg-white border-emerald-100 hover:border-emerald-300', icon: 'bg-emerald-50 text-emerald-600', value: 'text-emerald-700' },
-  amber: { card: 'bg-white border-amber-100 hover:border-amber-300', icon: 'bg-amber-50 text-amber-600', value: 'text-amber-700' },
-  rose: { card: 'bg-white border-rose-100 hover:border-rose-300', icon: 'bg-rose-50 text-rose-600', value: 'text-rose-700' },
-} as const;
-
-function KpiCard({
-  href, icon, label, value, sub, tone, warning,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  label: string;
-  value: number | string;
-  sub: string;
-  tone: keyof typeof TONE;
-  warning?: boolean;
-}) {
-  const t = TONE[tone];
+function StatusStrip({
+  items,
+}: { items: { href: string; label: string; value: number | string; sub: string; warning?: boolean }[] }) {
   return (
-    <Link
-      href={href}
-      className={`block rounded-2xl border ${t.card} p-4 shadow-sm transition-all hover:shadow-md`}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <div className={`w-9 h-9 rounded-xl ${t.icon} flex items-center justify-center`}>{icon}</div>
-        <ChevronRight size={14} className="text-gray-300 mt-1" />
-      </div>
-      <p className={`text-3xl font-black ${t.value}`}>{value}</p>
-      <p className="text-sm font-semibold text-gray-700 mt-0.5">{label}</p>
-      <p className={`text-xs mt-1 ${warning ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>{sub}</p>
-    </Link>
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 sm:divide-x divide-gray-100 overflow-hidden">
+      {items.map(item => (
+        <Link
+          key={item.label}
+          href={item.href}
+          className="px-5 py-4 hover:bg-gray-50 transition-colors group"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">{item.label}</p>
+            <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400 transition-colors" />
+          </div>
+          <p className="text-2xl font-black text-gray-900 mt-1 leading-none">{item.value}</p>
+          <p className={`text-xs mt-1 ${item.warning ? 'text-amber-600 font-semibold' : 'text-gray-500'}`}>{item.sub}</p>
+        </Link>
+      ))}
+    </section>
   );
 }
 
 function QuickActionsCard({
   hasStudents, hasClasses, hasTutors,
 }: { hasStudents: boolean; hasClasses: boolean; hasTutors: boolean }) {
+  const [query, setQuery] = useState('');
   const actions = [
     { href: '/company/tutors', label: 'Invite tutor', icon: <UserPlus size={16} />, tone: 'indigo' as const, primary: !hasTutors },
     { href: '/company/students', label: 'Add student', icon: <Plus size={16} />, tone: 'emerald' as const, primary: hasTutors && !hasStudents },
     { href: '/company/classes', label: 'Create class', icon: <BookOpen size={16} />, tone: 'amber' as const, primary: hasStudents && !hasClasses },
+    { href: '/company/courses?create=1', label: 'Create course', icon: <Trophy size={16} />, tone: 'teal' as const, primary: false },
     { href: '/company/invoices', label: 'Invoices', icon: <DollarSign size={16} />, tone: 'rose' as const, primary: false },
     { href: '/company/revenue', label: 'Revenue', icon: <BarChart2 size={16} />, tone: 'violet' as const, primary: false },
     { href: '/company/assignment-library', label: 'Assignment Library', icon: <BookOpen size={16} />, tone: 'teal' as const, primary: false },
     { href: '/company/library-marking', label: 'Marking Queue', icon: <FileEdit size={16} />, tone: 'indigo' as const, primary: false },
-    { href: '/company/courses', label: 'Courses', icon: <Trophy size={16} />, tone: 'teal' as const, primary: false },
     { href: '/company/timetable', label: 'Timetable', icon: <CalendarDays size={16} />, tone: 'indigo' as const, primary: false },
     { href: '/company/terms', label: 'Terms', icon: <CalendarDays size={16} />, tone: 'indigo' as const, primary: false },
   ];
@@ -576,23 +462,39 @@ function QuickActionsCard({
     };
     return primary ? map[k].primary : map[k].ghost;
   };
+  const filtered = query.trim()
+    ? actions.filter(a => a.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : actions;
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">Quick actions</h3>
       </div>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {actions.map(a => (
-          <Link
-            key={a.label}
-            href={a.href}
-            className={`${toneClass(a.tone as any, a.primary)} rounded-xl px-3 py-3 text-sm font-bold flex items-center gap-2 justify-center transition-colors`}
-          >
-            {a.icon}
-            <span className="truncate">{a.label}</span>
-          </Link>
-        ))}
+      <div className="relative mb-4">
+        <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search tools — try “invoice” or “timetable”"
+          className="w-full rounded-xl border border-gray-200 bg-gray-50 pl-9 pr-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:bg-white transition-colors"
+        />
       </div>
+      {filtered.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-4">No tools match “{query}”.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {filtered.map(a => (
+            <Link
+              key={a.label}
+              href={a.href}
+              className={`${toneClass(a.tone as any, a.primary)} rounded-xl px-3 py-3 text-sm font-bold flex items-center gap-2 justify-center transition-colors`}
+            >
+              {a.icon}
+              <span className="truncate">{a.label}</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </section>
   );
 }
@@ -624,47 +526,113 @@ function AcademicCard({ year }: { year?: AcademicYear }) {
   );
 }
 
-function WwccAlertsBanner({
-  alerts,
-}: { alerts: { tutor: Tutor; severity: 'red' | 'amber'; reason: string }[] }) {
-  const hasRed = alerts.some(a => a.severity === 'red');
-  const palette = hasRed
-    ? { bg: 'bg-rose-50', border: 'border-rose-200', icon: 'bg-rose-100 text-rose-700', text: 'text-rose-900', sub: 'text-rose-700' }
-    : { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'bg-amber-100 text-amber-700', text: 'text-amber-900', sub: 'text-amber-700' };
-  const headline = hasRed
-    ? `${alerts.length} tutor${alerts.length === 1 ? '' : 's'} need urgent WWCC attention`
-    : `${alerts.length} tutor${alerts.length === 1 ? '' : 's'} with WWCC expiring soon`;
+interface AttentionRow {
+  key: string;
+  tone: 'critical' | 'warning' | 'info' | 'good';
+  icon: React.ReactNode;
+  title: string;
+  sub: string;
+  ctaLabel: string;
+  ctaHref: string;
+}
+
+const ATTENTION_TONE = {
+  critical: { bg: 'bg-rose-50', border: 'border-rose-100', icon: 'bg-white text-rose-600', title: 'text-rose-900', sub: 'text-rose-700', cta: 'bg-rose-600 hover:bg-rose-700 text-white' },
+  warning: { bg: 'bg-amber-50', border: 'border-amber-100', icon: 'bg-white text-amber-600', title: 'text-amber-900', sub: 'text-amber-700', cta: 'bg-amber-600 hover:bg-amber-700 text-white' },
+  info: { bg: 'bg-indigo-50', border: 'border-indigo-100', icon: 'bg-white text-indigo-600', title: 'text-indigo-900', sub: 'text-indigo-700', cta: 'bg-indigo-600 hover:bg-indigo-700 text-white' },
+  good: { bg: 'bg-emerald-50', border: 'border-emerald-100', icon: 'bg-white text-emerald-600', title: 'text-emerald-900', sub: 'text-emerald-700', cta: 'bg-white hover:bg-emerald-100 text-emerald-700 border border-emerald-200' },
+} as const;
+
+function NeedsAttentionCard({
+  hasYear, wwccAlerts, compliantCount, totalTutors, hasTutors, hasStudents, hasClasses,
+}: {
+  hasYear: boolean;
+  wwccAlerts: { tutor: Tutor; severity: 'red' | 'amber'; reason: string }[];
+  compliantCount: number;
+  totalTutors: number;
+  hasTutors: boolean;
+  hasStudents: boolean;
+  hasClasses: boolean;
+}) {
+  const rows: AttentionRow[] = [];
+
+  const redAlerts = wwccAlerts.filter(a => a.severity === 'red');
+  const amberAlerts = wwccAlerts.filter(a => a.severity === 'amber');
+  if (redAlerts.length > 0) {
+    rows.push({
+      key: 'wwcc-red',
+      tone: 'critical',
+      icon: <ShieldAlert size={16} />,
+      title: `${redAlerts.length} tutor${redAlerts.length === 1 ? '' : 's'} need urgent WWCC attention`,
+      sub: redAlerts.slice(0, 3).map(a => `${a.tutor.firstName ?? a.tutor.email ?? 'Tutor'} — ${a.reason}`).join(' · ') + (redAlerts.length > 3 ? ` +${redAlerts.length - 3} more` : ''),
+      ctaLabel: 'View staff', ctaHref: '/company/tutors',
+    });
+  }
+  if (amberAlerts.length > 0) {
+    rows.push({
+      key: 'wwcc-amber',
+      tone: 'warning',
+      icon: <ShieldAlert size={16} />,
+      title: `${amberAlerts.length} tutor${amberAlerts.length === 1 ? '' : 's'} with WWCC expiring soon`,
+      sub: amberAlerts.slice(0, 3).map(a => `${a.tutor.firstName ?? a.tutor.email ?? 'Tutor'} — ${a.reason}`).join(' · ') + (amberAlerts.length > 3 ? ` +${amberAlerts.length - 3} more` : ''),
+      ctaLabel: 'View staff', ctaHref: '/company/tutors',
+    });
+  }
+  if (!hasYear) {
+    rows.push({
+      key: 'no-year',
+      tone: 'warning',
+      icon: <AlertTriangle size={16} />,
+      title: 'No academic year set up',
+      sub: 'Apply your state’s academic calendar to start scheduling classes.',
+      ctaLabel: 'Set up', ctaHref: '/onboarding',
+    });
+  }
+  if (hasYear && !hasTutors) {
+    rows.push({ key: 'no-tutors', tone: 'info', icon: <UserPlus size={16} />, title: 'No tutors yet', sub: 'Invite your first tutor to start building classes.', ctaLabel: 'Invite tutor', ctaHref: '/company/tutors' });
+  }
+  if (hasYear && hasTutors && !hasStudents) {
+    rows.push({ key: 'no-students', tone: 'info', icon: <GraduationCap size={16} />, title: 'No students yet', sub: 'Add your first student to start enrolling them in classes.', ctaLabel: 'Add student', ctaHref: '/company/students' });
+  }
+  if (hasYear && hasStudents && !hasClasses) {
+    rows.push({ key: 'no-classes', tone: 'info', icon: <BookOpen size={16} />, title: 'No classes yet', sub: 'Create a class to start enrolling and timetabling students.', ctaLabel: 'Create class', ctaHref: '/company/classes' });
+  }
+
+  if (rows.length === 0) {
+    rows.push({
+      key: 'all-good',
+      tone: 'good',
+      icon: <ShieldCheck size={16} />,
+      title: `${compliantCount} of ${totalTutors} staff compliant`,
+      sub: 'WWCC active for everyone — nothing needs attention right now.',
+      ctaLabel: 'View staff', ctaHref: '/company/tutors',
+    });
+  }
+
   return (
-    <section className={`rounded-2xl border ${palette.border} ${palette.bg} p-5`}>
-      <div className="flex items-start gap-4">
-        <div className={`w-10 h-10 rounded-xl ${palette.icon} flex items-center justify-center flex-shrink-0`}>
-          <ShieldAlert size={18} />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={`text-sm font-black ${palette.text}`}>{headline}</p>
-          <ul className={`mt-2 space-y-1 text-sm ${palette.sub}`}>
-            {alerts.slice(0, 4).map(a => {
-              const fn = `${a.tutor.firstName ?? ''} ${a.tutor.lastName ?? ''}`.trim() || a.tutor.email || `Tutor #${a.tutor.id}`;
-              return (
-                <li key={a.tutor.id}>
-                  <span className="font-semibold">{fn}</span> — {a.reason}
-                  {a.tutor.wwccExpiry && a.reason.startsWith('expires') && (
-                    <span className="opacity-75"> ({formatDate(a.tutor.wwccExpiry)})</span>
-                  )}
-                </li>
-              );
-            })}
-            {alerts.length > 4 && (
-              <li className="opacity-75">+ {alerts.length - 4} more</li>
-            )}
-          </ul>
-        </div>
-        <Link
-          href="/company/tutors"
-          className={`text-xs font-bold ${hasRed ? 'bg-rose-600 hover:bg-rose-700' : 'bg-amber-600 hover:bg-amber-700'} text-white px-3 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0`}
-        >
-          View staff <ChevronRight size={12} />
-        </Link>
+    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">Needs attention</h3>
+        {rows.length > 0 && rows[0].key !== 'all-good' && (
+          <span className="text-xs font-bold text-gray-400">{rows.length}</span>
+        )}
+      </div>
+      <div className="space-y-2">
+        {rows.map(row => {
+          const t = ATTENTION_TONE[row.tone];
+          return (
+            <div key={row.key} className={`flex items-center gap-3 rounded-xl border ${t.border} ${t.bg} px-4 py-3`}>
+              <div className={`w-8 h-8 rounded-lg ${t.icon} flex items-center justify-center flex-shrink-0`}>{row.icon}</div>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm font-bold ${t.title} truncate`}>{row.title}</p>
+                <p className={`text-xs ${t.sub} truncate`}>{row.sub}</p>
+              </div>
+              <Link href={row.ctaHref} className={`text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1 flex-shrink-0 ${t.cta}`}>
+                {row.ctaLabel} <ChevronRight size={12} />
+              </Link>
+            </div>
+          );
+        })}
       </div>
     </section>
   );
@@ -747,45 +715,6 @@ function relativeTime(iso: string): string {
   if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
   if (diffSec < 7 * 86400) return `${Math.floor(diffSec / 86400)}d ago`;
   return formatDate(iso);
-}
-
-function ComplianceCard({ tutors }: { tutors: Tutor[] }) {
-  const flagged = tutors.filter(
-    t => t.complianceStatus === 'pending_compliance' || t.complianceStatus === 'compliance_hold'
-  );
-  const compliant = tutors.length - flagged.length;
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">Compliance</h3>
-        <Link href="/company/tutors" className="text-xs font-bold text-indigo-600 hover:text-indigo-700">
-          View staff
-        </Link>
-      </div>
-      {tutors.length === 0 ? (
-        <p className="text-sm text-gray-500">No tutors yet — invite one to begin.</p>
-      ) : (
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50">
-            <ShieldCheck size={18} className="text-emerald-700" />
-            <div className="flex-1">
-              <p className="text-sm font-bold text-emerald-900">{compliant} compliant</p>
-              <p className="text-xs text-emerald-700">WWCC active</p>
-            </div>
-          </div>
-          {flagged.length > 0 && (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50">
-              <ShieldAlert size={18} className="text-amber-700" />
-              <div className="flex-1">
-                <p className="text-sm font-bold text-amber-900">{flagged.length} pending</p>
-                <p className="text-xs text-amber-700">WWCC missing or expired</p>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  );
 }
 
 function EnrolmentSummaryCard({
@@ -878,41 +807,6 @@ function EnrolmentSummaryCard({
           )}
         </>
       )}
-    </section>
-  );
-}
-
-function GettingStartedCard({
-  hasTutors, hasStudents, hasClasses, hasYear,
-}: { hasTutors: boolean; hasStudents: boolean; hasClasses: boolean; hasYear: boolean }) {
-  const steps = [
-    { done: hasYear, label: 'Apply academic calendar' },
-    { done: hasTutors, label: 'Invite a tutor' },
-    { done: hasStudents, label: 'Add a student' },
-    { done: hasClasses, label: 'Create a class' },
-  ];
-  const completed = steps.filter(s => s.done).length;
-  if (completed === steps.length) return null;
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">Getting started</h3>
-        <span className="text-xs font-bold text-gray-500">{completed}/{steps.length}</span>
-      </div>
-      <ul className="space-y-2">
-        {steps.map((s, i) => (
-          <li key={i} className="flex items-center gap-3 text-sm">
-            <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${
-              s.done ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'
-            }`}>
-              {s.done ? '✓' : i + 1}
-            </span>
-            <span className={s.done ? 'text-gray-400 line-through' : 'text-gray-700 font-semibold'}>
-              {s.label}
-            </span>
-          </li>
-        ))}
-      </ul>
     </section>
   );
 }

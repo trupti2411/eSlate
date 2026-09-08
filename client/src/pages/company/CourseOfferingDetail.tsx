@@ -1,117 +1,142 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Link, useRoute } from 'wouter';
+import { Link, useRoute, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import {
-  Trophy, Bell, LogOut, ArrowLeft, UserPlus, Trash2, X, Save,
-  Target, Calendar, User, BookOpen, Play, CheckCircle2, Archive, ChevronDown,
-  Users as UsersIcon, GraduationCap, ChevronRight,
-} from 'lucide-react';
+import { Trophy, LogOut, ArrowLeft, Pencil, X, Save, Archive, RotateCcw, Copy, BookOpen, GraduationCap, AlertTriangle, Clock } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
-interface Enrolment {
-  id: number;
-  course_offering_id: number;
-  student_id: number;
-  status: 'active' | 'withdrawn' | 'completed';
-  enrolled_at: string;
-  student?: { id: number; first_name?: string; last_name?: string; year_group_code?: string };
-}
-interface Template {
-  id: number; code: string; name: string; short_name: string;
-  kind: 'foundations' | 'theory' | 'mock_tests';
-  test_alignment: string | null;
-  year_group_code: string;
-  components?: Component[];
-}
-interface Component {
-  id: number; code: string; name: string;
-  weight_pct?: number | null; duration_minutes?: number | null;
-  question_count?: number | null; question_format: string;
-}
-interface Offering {
-  id: number;
-  business_id: number;
-  course_template_id: number;
-  tutor_id: number;
+interface SubjectRow { id: number; code: string; name: string; }
+interface CourseData {
+  id: string;
+  companyId: string;
   name: string;
-  target_test_date: string | null;
-  starts_on: string;
-  ends_on: string;
-  capacity: number | null;
-  status: 'draft' | 'active' | 'completed' | 'archived';
-  notes?: string | null;
-  template?: Template;
-  tutor?: { id: number; user?: { name?: string; email?: string } };
-  enrolments?: Enrolment[];
-  academicYear?: { id: number; year: number };
+  description: string | null;
+  status: 'active' | 'archived' | string;
+  subjectIds: number[];
+  archivedAt: string | null;
+  archivedByName: string | null;
+  updatedByName: string | null;
+  updatedAt: string | null;
+  createdAt: string;
 }
-interface StudentRow {
-  id: number;
-  first_name?: string | null;
-  last_name?: string | null;
-  year_group_code?: string | null;
+interface LinkedClass {
+  id: string;
+  name: string;
+  status: string;
+  yearGroupCode: string | null;
+  level: string | null;
+  startTime: string;
+  endTime: string;
+  daysOfWeek: number[];
 }
+
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function formatDate(s: string | null | undefined): string {
   if (!s) return '';
-  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!m) return String(s);
-  const [, y, mo, d] = m;
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${d} ${months[parseInt(mo, 10) - 1]} ${y}`;
+  return new Date(s).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-function daysUntil(s: string | null | undefined): number | null {
-  if (!s) return null;
-  const m = String(s).match(/^(\d{4}-\d{2}-\d{2})/);
-  if (!m) return null;
-  const t = new Date(m[1] + 'T00:00:00Z').getTime();
-  const today = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00Z').getTime();
-  return Math.round((t - today) / 86400000);
+function scheduleLabel(c: LinkedClass): string {
+  const days = (c.daysOfWeek ?? []).map(d => DAY_LABELS[d]).join('/');
+  if (!days && !c.startTime) return '';
+  return `${days}${c.startTime ? ` ${c.startTime.slice(0, 5)}` : ''}`;
 }
 
 export default function CourseOfferingDetail() {
   const [, params] = useRoute('/company/courses/:id');
-  const offeringId = params?.id;
+  const [, navigate] = useLocation();
+  const courseId = params?.id;
   const { logoutMutation } = useAuth();
-  const [enrolOpen, setEnrolOpen] = useState(false);
+  const { toast } = useToast();
+  const qc = useQueryClient();
+  const [editOpen, setEditOpen] = useState(false);
+  const [archiveConfirm, setArchiveConfirm] = useState(false);
 
-  const { data: offering, isLoading } = useQuery<Offering>({
-    queryKey: [`/api/course-offerings/${offeringId}`],
-    enabled: !!offeringId,
+  const { data: course, isLoading } = useQuery<CourseData>({
+    queryKey: [`/api/courses/${courseId}`],
+    enabled: !!courseId,
+  });
+  const { data: subjects = [] } = useQuery<SubjectRow[]>({ queryKey: ['/api/subjects'] });
+  const { data: linkedClasses = [] } = useQuery<LinkedClass[]>({
+    queryKey: [`/api/courses/${courseId}/classes`],
+    enabled: !!courseId,
   });
 
-  const countdown = daysUntil(offering?.target_test_date);
-  const activeEnrolments = (offering?.enrolments ?? []).filter(e => e.status === 'active');
+  const subjectNames = (course?.subjectIds ?? [])
+    .map(id => subjects.find(s => s.id === id)?.name)
+    .filter(Boolean) as string[];
+
+  const archiveMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/courses/${courseId}/archive`, 'POST', {}),
+    onSuccess: () => {
+      toast({ title: 'Course archived', description: 'Linked classes were archived too.' });
+      qc.invalidateQueries({ queryKey: [`/api/courses/${courseId}`] });
+      qc.invalidateQueries({ queryKey: [`/api/courses/${courseId}/classes`] });
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
+      setArchiveConfirm(false);
+    },
+    onError: (e: any) => toast({ title: 'Could not archive course', description: e.message, variant: 'destructive' }),
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/courses/${courseId}/restore`, 'POST', {}),
+    onSuccess: () => {
+      toast({ title: 'Course restored' });
+      qc.invalidateQueries({ queryKey: [`/api/courses/${courseId}`] });
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
+    },
+    onError: (e: any) => toast({ title: 'Could not restore course', description: e.message, variant: 'destructive' }),
+  });
+
+  const duplicateMutation = useMutation({
+    mutationFn: () => apiRequest(`/api/courses/${courseId}/duplicate`, 'POST', {}),
+    onSuccess: (data: any) => {
+      toast({ title: `Duplicated as "${data.name}"` });
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
+      navigate(`/company/courses/${data.id}`);
+    },
+    onError: (e: any) => toast({ title: 'Could not duplicate course', description: e.message, variant: 'destructive' }),
+  });
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-gray-50 flex items-center justify-center text-gray-500 text-sm">Loading…</div>;
+  }
+  if (!course) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-500 font-semibold">Course not found.</p>
+          <Link href="/company/courses" className="mt-3 inline-block text-indigo-600 text-sm font-semibold hover:underline">Back to courses</Link>
+        </div>
+      </div>
+    );
+  }
+
+  const isArchived = course.status === 'archived';
 
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-indigo-700 text-white shadow-lg">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
+              <Link href="/company/courses" className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center flex-shrink-0">
+                <ArrowLeft size={16} />
+              </Link>
               <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-                <Trophy size={20} />
+                <Trophy size={18} />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">Course offering</p>
-                <h1 className="text-xl sm:text-2xl font-black truncate">{offering?.name ?? 'Loading…'}</h1>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">Course</p>
+                <h1 className="text-xl sm:text-2xl font-black truncate">{course.name}</h1>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Link href="/company/courses" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
-                <ArrowLeft size={12} /> Back
-              </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
-              <button
-                onClick={() => logoutMutation.mutate()}
-                className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
-                aria-label="Sign out"
-              >
+              <NotificationBell />
+              <button onClick={() => logoutMutation.mutate()} className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Sign out">
                 <LogOut size={15} />
               </button>
             </div>
@@ -119,447 +144,291 @@ export default function CourseOfferingDetail() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
-        {isLoading || !offering ? (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-10 text-center text-sm text-gray-500">
-            Loading…
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        {isArchived && (
+          <div className="bg-rose-50 border border-rose-200 text-rose-700 text-sm font-semibold px-4 py-3 rounded-xl flex items-center gap-2">
+            <Archive size={14} /> This course is archived. Restore it to make it active again.
           </div>
-        ) : (
-          <>
-            <OverviewCard offering={offering} countdown={countdown} activeCount={activeEnrolments.length} />
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 space-y-6">
-                <ClassesUnderCourseSection offeringId={offering.id} />
-                <EnrolmentSection
-                  offering={offering}
-                  activeEnrolments={activeEnrolments}
-                  onEnrolClick={() => setEnrolOpen(true)}
-                />
-                <ComponentsSection template={offering.template} />
-              </div>
-              <div className="space-y-6">
-                <StatusSection offering={offering} />
-              </div>
-            </div>
-          </>
         )}
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500">About</h2>
+            {!isArchived && (
+              <button
+                onClick={() => setEditOpen(true)}
+                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-indigo-200 hover:border-indigo-300"
+              >
+                <Pencil size={12} /> Edit
+              </button>
+            )}
+          </div>
+
+          <p className="text-sm text-gray-700 leading-relaxed mb-4">
+            {course.description || <span className="text-gray-400 italic">No description</span>}
+          </p>
+
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {subjectNames.length > 0 ? subjectNames.map(name => (
+              <span key={name} className="text-xs font-bold bg-indigo-50 text-indigo-700 px-2.5 py-1 rounded-full">{name}</span>
+            )) : <span className="text-xs text-gray-400 italic">No subjects</span>}
+          </div>
+
+          <div className="text-xs text-gray-400 pt-3 border-t border-gray-100 space-y-0.5">
+            <p>Date created: {formatDate(course.createdAt)}</p>
+            {course.updatedByName && <p>Last updated by {course.updatedByName} on {formatDate(course.updatedAt)}</p>}
+            {isArchived && course.archivedByName && <p>Archived by {course.archivedByName} on {formatDate(course.archivedAt)}</p>}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
+            Linked Classes ({linkedClasses.length})
+          </h2>
+          {linkedClasses.length === 0 ? (
+            <p className="text-sm text-gray-400 italic">No classes linked to this course yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {linkedClasses.map(c => (
+                <li key={c.id}>
+                  <Link
+                    href={`/company/classes/${c.id}`}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-gray-100 p-3 hover:border-indigo-200 transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center flex-shrink-0">
+                        <GraduationCap size={14} />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold text-gray-900 truncate">{c.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {[c.yearGroupCode, c.level, scheduleLabel(c)].filter(Boolean).join(' · ')}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
+                      c.status === 'archived' ? 'bg-gray-100 text-gray-500' : 'bg-emerald-100 text-emerald-700'
+                    }`}>
+                      {c.status === 'archived' ? 'Archived' : 'Active'}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="flex justify-end gap-2 pb-6">
+          {!isArchived && (
+            <button
+              onClick={() => duplicateMutation.mutate()}
+              disabled={duplicateMutation.isPending}
+              className="bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2"
+            >
+              <Copy size={14} /> {duplicateMutation.isPending ? 'Duplicating…' : 'Duplicate Course'}
+            </button>
+          )}
+          {isArchived ? (
+            <button
+              onClick={() => restoreMutation.mutate()}
+              disabled={restoreMutation.isPending}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2"
+            >
+              <RotateCcw size={14} /> {restoreMutation.isPending ? 'Restoring…' : 'Restore Course'}
+            </button>
+          ) : (
+            <button
+              onClick={() => setArchiveConfirm(true)}
+              className="bg-white border border-rose-200 hover:bg-rose-50 text-rose-700 font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2"
+            >
+              <Archive size={14} /> Archive Course
+            </button>
+          )}
+        </div>
       </main>
 
-      {enrolOpen && offering && (
-        <EnrolmentModal
-          offering={offering}
-          alreadyEnrolledIds={new Set(activeEnrolments.map(e => e.student_id))}
-          onClose={() => setEnrolOpen(false)}
+      {editOpen && (
+        <EditCourseModal
+          course={course}
+          subjects={subjects}
+          onClose={() => setEditOpen(false)}
         />
+      )}
+
+      {archiveConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full">
+            <h3 className="text-lg font-black text-gray-900 mb-2 flex items-center gap-2">
+              <AlertTriangle size={18} className="text-rose-500" /> Archive this course?
+            </h3>
+            <p className="text-sm text-gray-600 mb-2">
+              {linkedClasses.filter(c => c.status !== 'archived').length > 0
+                ? `This will also archive ${linkedClasses.filter(c => c.status !== 'archived').length} linked class${linkedClasses.filter(c => c.status !== 'archived').length === 1 ? '' : 'es'}.`
+                : 'This course has no active linked classes.'}
+            </p>
+            <p className="text-sm text-gray-500 mb-5">Archived courses can be restored at any time — this is not permanent.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setArchiveConfirm(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2.5 rounded-xl text-sm">
+                Cancel
+              </button>
+              <button
+                onClick={() => archiveMutation.mutate()}
+                disabled={archiveMutation.isPending}
+                className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-bold px-4 py-2.5 rounded-xl text-sm flex items-center justify-center gap-2"
+              >
+                <Archive size={14} /> {archiveMutation.isPending ? 'Archiving…' : 'Archive'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-/* ---------- subcomponents ---------- */
-
-function OverviewCard({ offering, countdown, activeCount }: { offering: Offering; countdown: number | null; activeCount: number }) {
-  const tone = STATUS_TONE[offering.status] ?? STATUS_TONE.draft;
-  return (
-    <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 text-white p-5 shadow-md">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div className="flex items-start gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-            <BookOpen size={18} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-200">
-              {offering.template?.short_name ?? 'Template'} · {offering.template?.year_group_code}
-            </p>
-            <h2 className="text-2xl font-black mt-0.5 truncate">{offering.name}</h2>
-            <p className="text-sm text-indigo-100 mt-0.5">{offering.template?.name}</p>
-          </div>
-        </div>
-        <span className={`text-xs font-bold uppercase tracking-widest px-3 py-1.5 rounded-full ${tone.lightBg} ${tone.text}`}>
-          {tone.label}
-        </span>
-      </div>
-
-      <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <Stat icon={<Calendar size={14} />} label="Starts" value={formatDate(offering.starts_on)} />
-        <Stat icon={<Calendar size={14} />} label="Ends" value={formatDate(offering.ends_on)} />
-        <Stat
-          icon={<Target size={14} />}
-          label="Test date"
-          value={offering.target_test_date
-            ? `${formatDate(offering.target_test_date)}${countdown !== null ? ` (${countdown}d)` : ''}`
-            : 'Not set'}
-        />
-        <Stat icon={<User size={14} />} label="Enrolled" value={`${activeCount}${offering.capacity != null ? ` / ${offering.capacity}` : ''}`} />
-      </div>
-    </div>
-  );
-}
-
-function Stat({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return (
-    <div className="bg-white/10 rounded-xl px-3 py-2">
-      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-indigo-200">
-        {icon} {label}
-      </div>
-      <p className="text-sm font-black mt-0.5 text-white truncate">{value}</p>
-    </div>
-  );
-}
-
-const STATUS_TONE: Record<string, { lightBg: string; text: string; label: string }> = {
-  draft:     { lightBg: 'bg-white/15', text: 'text-white', label: 'Draft' },
-  active:    { lightBg: 'bg-emerald-200', text: 'text-emerald-900', label: 'Active' },
-  completed: { lightBg: 'bg-indigo-200', text: 'text-indigo-900', label: 'Completed' },
-  archived:  { lightBg: 'bg-rose-200', text: 'text-rose-900', label: 'Archived' },
-};
-
-function EnrolmentSection({
-  offering, activeEnrolments, onEnrolClick,
-}: { offering: Offering; activeEnrolments: Enrolment[]; onEnrolClick: () => void }) {
+function EditCourseModal({ course, subjects, onClose }: { course: CourseData; subjects: SubjectRow[]; onClose: () => void }) {
   const { toast } = useToast();
   const qc = useQueryClient();
-  const atCap = offering.capacity != null && activeEnrolments.length >= offering.capacity;
+  const [name, setName] = useState(course.name);
+  const [description, setDescription] = useState(course.description ?? '');
+  const [pickedSubjectIds, setPickedSubjectIds] = useState<Set<number>>(new Set(course.subjectIds));
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [removalWarning, setRemovalWarning] = useState<{ removedSubjects: string[]; affectedClasses: { id: string; name: string }[] } | null>(null);
 
-  const withdraw = useMutation({
-    mutationFn: (enrolmentId: number) =>
-      apiRequest(`/api/course-offerings/${offering.id}/enrolments/${enrolmentId}`, 'DELETE', {}),
-    onSuccess: () => {
-      toast({ title: 'Withdrew' });
-      qc.invalidateQueries({ queryKey: [`/api/course-offerings/${offering.id}`] });
-    },
-    onError: (e: any) => toast({ title: 'Failed to withdraw', description: e.message, variant: 'destructive' }),
-  });
+  const isDirty = name.trim() !== course.name
+    || (description.trim() || null) !== (course.description ?? null)
+    || pickedSubjectIds.size !== course.subjectIds.length
+    || course.subjectIds.some(id => !pickedSubjectIds.has(id));
 
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500">
-          Enrolment ({activeEnrolments.length}{offering.capacity != null ? ` / ${offering.capacity}` : ''})
-        </h3>
-        <button
-          onClick={onEnrolClick}
-          disabled={atCap}
-          title={atCap ? 'Capacity reached' : undefined}
-          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5"
-        >
-          <UserPlus size={12} /> {atCap ? 'At capacity' : 'Enrol students'}
-        </button>
-      </div>
-      <div className="p-5">
-        {activeEnrolments.length === 0 ? (
-          <p className="text-sm text-gray-500">No students enrolled yet. Click "Enrol students" to add from your roster.</p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {activeEnrolments.map(e => {
-              const name = `${e.student?.first_name ?? ''} ${e.student?.last_name ?? ''}`.trim() || `Student #${e.student_id}`;
-              const initials = name.split(' ').map(p => p[0]?.toUpperCase()).slice(0, 2).join('') || 'S';
-              return (
-                <li key={e.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center font-black flex-shrink-0">
-                    {initials}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-900 truncate">{name}</p>
-                    <p className="text-xs text-gray-500">
-                      {e.student?.year_group_code && <span className="font-semibold">{e.student.year_group_code}</span>}
-                      {e.enrolled_at && <span> · enrolled {formatDate(e.enrolled_at)}</span>}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => withdraw.mutate(e.id)}
-                    disabled={withdraw.isPending}
-                    className="text-gray-400 hover:text-rose-600 transition-colors flex-shrink-0"
-                    aria-label="Withdraw"
-                    title="Withdraw"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </section>
-  );
-}
-
-interface ClassRow {
-  id: number;
-  name: string;
-  course_offering_id: number | null;
-  tutor?: { id: number; user?: { name?: string } };
-  subject?: { id: number; name: string };
-  yearGroup?: { id: number; label: string };
-}
-
-function ClassesUnderCourseSection({ offeringId }: { offeringId: number }) {
-  const { data: allClasses = [] } = useQuery<ClassRow[]>({
-    queryKey: ['/api/classes'],
-  });
-  const classes = allClasses.filter(c => c.course_offering_id === offeringId);
-
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 flex items-center gap-2">
-          <UsersIcon size={14} className="text-indigo-600" /> Classes under this course ({classes.length})
-        </h3>
-        <Link
-          href="/company/classes"
-          className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1"
-        >
-          Manage classes <ChevronRight size={12} />
-        </Link>
-      </div>
-      <div className="p-5">
-        {classes.length === 0 ? (
-          <p className="text-sm text-gray-500">
-            No classes linked to this course yet. Create a class on the Classes page and link it here — the class becomes the place where this course meets.
-          </p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {classes.map(c => {
-              const tutorName = c.tutor?.user?.name ?? '—';
-              return (
-                <li key={c.id}>
-                  <Link
-                    href={`/company/classes/${c.id}`}
-                    className="flex items-center gap-3 py-3 first:pt-0 last:pb-0 hover:bg-gray-50 rounded-lg -mx-2 px-2 transition-colors"
-                  >
-                    <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center font-black flex-shrink-0">
-                      <BookOpen size={14} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 truncate">{c.name}</p>
-                      <p className="text-xs text-gray-500 flex items-center gap-2 flex-wrap">
-                        {c.yearGroup?.label && <span className="flex items-center gap-1"><GraduationCap size={11} /> {c.yearGroup.label}</span>}
-                        {c.subject?.name && <span>{c.subject.name}</span>}
-                        <span className="flex items-center gap-1"><User size={11} /> {tutorName}</span>
-                      </p>
-                    </div>
-                    <ChevronRight size={14} className="text-gray-300 flex-shrink-0" />
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-    </section>
-  );
-}
-
-function ComponentsSection({ template }: { template?: Template }) {
-  const components = template?.components ?? [];
-  if (components.length === 0) return null;
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">
-        Test components ({components.length})
-      </h3>
-      <ul className="space-y-2">
-        {components.map(c => (
-          <li key={c.id} className="flex items-center justify-between rounded-xl border border-gray-100 px-3 py-2.5">
-            <div className="min-w-0">
-              <p className="font-semibold text-gray-900">{c.name}</p>
-              <p className="text-xs text-gray-500">
-                {c.duration_minutes ? `${c.duration_minutes} min` : null}
-                {c.question_count ? ` · ${c.question_count} Q` : null}
-                {c.weight_pct ? ` · ${c.weight_pct}%` : null}
-                {c.question_format && <span className="ml-1 text-gray-400">({c.question_format.replace(/_/g, ' ')})</span>}
-              </p>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <p className="text-xs text-gray-400 mt-3">
-        Tag PDF assignments with a component to track what each piece of homework is training.
-      </p>
-    </section>
-  );
-}
-
-function StatusSection({ offering }: { offering: Offering }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const [open, setOpen] = useState(false);
-
-  const transition = useMutation({
-    mutationFn: (status: string) =>
-      apiRequest(`/api/course-offerings/${offering.id}`, 'PATCH', { status }),
-    onSuccess: (_, status) => {
-      toast({ title: `Status changed to ${status}` });
-      qc.invalidateQueries({ queryKey: [`/api/course-offerings/${offering.id}`] });
-      qc.invalidateQueries({ queryKey: ['/api/course-offerings'] });
-      setOpen(false);
-    },
-    onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
-  });
-
-  const archive = useMutation({
-    mutationFn: () => apiRequest(`/api/course-offerings/${offering.id}`, 'DELETE', {}),
-    onSuccess: () => {
-      toast({ title: 'Archived' });
-      qc.invalidateQueries({ queryKey: [`/api/course-offerings/${offering.id}`] });
-      qc.invalidateQueries({ queryKey: ['/api/course-offerings'] });
-    },
-    onError: (e: any) => toast({ title: 'Failed', description: e.message, variant: 'destructive' }),
-  });
-
-  const transitions: { to: string; label: string; icon: React.ReactNode; tone: string }[] = [];
-  if (offering.status === 'draft') {
-    transitions.push({ to: 'active', label: 'Activate', icon: <Play size={12} />, tone: 'bg-emerald-600 hover:bg-emerald-700' });
-  }
-  if (offering.status === 'active') {
-    transitions.push({ to: 'completed', label: 'Mark completed', icon: <CheckCircle2 size={12} />, tone: 'bg-indigo-600 hover:bg-indigo-700' });
-  }
-
-  return (
-    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <h3 className="text-sm font-bold uppercase tracking-widest text-gray-500 mb-4">Lifecycle</h3>
-      <div className="space-y-2">
-        {transitions.map(t => (
-          <button
-            key={t.to}
-            onClick={() => transition.mutate(t.to)}
-            disabled={transition.isPending}
-            className={`w-full ${t.tone} text-white text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60`}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
-        {offering.status !== 'archived' && (
-          <button
-            onClick={() => archive.mutate()}
-            disabled={archive.isPending}
-            className="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 text-sm font-bold px-3 py-2.5 rounded-xl flex items-center justify-center gap-2 disabled:opacity-60"
-          >
-            <Archive size={12} /> Archive offering
-          </button>
-        )}
-      </div>
-      <p className="text-xs text-gray-400 mt-3">
-        Draft → Active makes assignments visible to students. Completed locks new assignments but keeps history accessible.
-      </p>
-    </section>
-  );
-}
-
-function EnrolmentModal({
-  offering, alreadyEnrolledIds, onClose,
-}: { offering: Offering; alreadyEnrolledIds: Set<number>; onClose: () => void }) {
-  const { toast } = useToast();
-  const qc = useQueryClient();
-  const [selected, setSelected] = useState<Set<number>>(new Set());
-  const [search, setSearch] = useState('');
-
-  const { data: allStudents = [] } = useQuery<StudentRow[]>({
-    queryKey: [`/api/companies/${offering.business_id}/students`],
-  });
-
-  const eligible = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    return allStudents
-      .filter(s => !alreadyEnrolledIds.has(s.id))
-      .filter(s => {
-        if (!q) return true;
-        return `${s.first_name ?? ''} ${s.last_name ?? ''} ${s.year_group_code ?? ''}`.toLowerCase().includes(q);
-      });
-  }, [allStudents, alreadyEnrolledIds, search]);
-
-  const toggle = (id: number) => {
-    setSelected(prev => {
+  const toggleSubject = (id: number) => {
+    setPickedSubjectIds(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   };
 
-  const m = useMutation({
-    mutationFn: () =>
-      apiRequest(`/api/course-offerings/${offering.id}/enrolments`, 'POST', {
-        student_ids: Array.from(selected),
-      }),
+  const saveMutation = useMutation({
+    mutationFn: (confirmSubjectRemoval?: boolean) => apiRequest(`/api/courses/${course.id}`, 'PATCH', {
+      name: name.trim(),
+      description: description.trim() || null,
+      subject_ids: Array.from(pickedSubjectIds),
+      ...(confirmSubjectRemoval && { confirmSubjectRemoval: true }),
+    }),
     onSuccess: () => {
-      toast({ title: `Enrolled ${selected.size} student${selected.size === 1 ? '' : 's'}` });
-      qc.invalidateQueries({ queryKey: [`/api/course-offerings/${offering.id}`] });
+      toast({ title: 'Course updated' });
+      qc.invalidateQueries({ queryKey: [`/api/courses/${course.id}`] });
+      qc.invalidateQueries({ queryKey: ['/api/courses'] });
       onClose();
     },
-    onError: (e: any) => toast({ title: 'Could not enrol', description: e.message ?? 'Try again.', variant: 'destructive' }),
+    onError: (e: any) => {
+      if (e?.body?.message === 'confirm_required') {
+        setRemovalWarning({ removedSubjects: e.body.removedSubjects, affectedClasses: e.body.affectedClasses });
+        return;
+      }
+      toast({ title: 'Could not update', description: e.message, variant: 'destructive' });
+    },
   });
+
+  const valid = name.trim().length > 0 && pickedSubjectIds.size > 0;
+
+  const handleClose = () => {
+    if (isDirty) setConfirmDiscard(true);
+    else onClose();
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <h3 className="text-base font-black flex items-center gap-2">
-            <UserPlus size={16} className="text-indigo-600" /> Enrol students
-          </h3>
-          <button onClick={onClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center" aria-label="Close">
-            <X size={16} />
-          </button>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 flex-shrink-0">
+          <h3 className="text-base font-black flex items-center gap-2"><Pencil size={16} className="text-indigo-600" /> Edit course</h3>
+          <button onClick={handleClose} className="w-8 h-8 rounded-xl hover:bg-gray-100 flex items-center justify-center"><X size={16} /></button>
         </div>
-        <div className="p-5 space-y-3 overflow-y-auto flex-1">
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Filter students…"
-            className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-            autoFocus
-          />
-          {eligible.length === 0 ? (
-            <p className="text-sm text-gray-500 text-center py-6">
-              {allStudents.length === 0 ? 'No students yet — add some on the Students page first.' : 'All matching students are already enrolled.'}
-            </p>
-          ) : (
-            <ul className="space-y-1">
-              {eligible.map(s => {
-                const name = `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim() || `Student #${s.id}`;
-                const isOn = selected.has(s.id);
+        <div className="p-5 space-y-4 overflow-y-auto">
+          {removalWarning && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 space-y-1.5">
+              <p className="font-bold flex items-center gap-1.5"><AlertTriangle size={12} /> This will affect linked classes</p>
+              <p>
+                The following classes use a subject you're removing ({removalWarning.removedSubjects.join(', ')}) and will have it removed too:
+              </p>
+              <ul className="list-disc list-inside">
+                {removalWarning.affectedClasses.map(c => <li key={c.id}>{c.name}</li>)}
+              </ul>
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Course name <span className="text-rose-500">*</span></label>
+            <input
+              value={name}
+              onChange={e => setName(e.target.value)}
+              maxLength={150}
+              autoFocus
+              className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            {submitAttempted && !name.trim() && <p className="text-xs text-rose-600 mt-1">Course name is required.</p>}
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Description <span className="text-gray-400">(optional)</span></label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              maxLength={500}
+              rows={3}
+              className="mt-1.5 w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider text-gray-500">Subjects <span className="text-rose-500">*</span></label>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              {subjects.map(s => {
+                const isOn = pickedSubjectIds.has(s.id);
                 return (
-                  <li key={s.id}>
-                    <button
-                      type="button"
-                      onClick={() => toggle(s.id)}
-                      className={`w-full text-left rounded-xl px-3 py-2 flex items-center gap-3 transition-colors ${
-                        isOn ? 'bg-indigo-50 border border-indigo-200' : 'border border-transparent hover:bg-gray-50'
-                      }`}
-                    >
-                      <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${
-                        isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300 bg-white'
-                      }`}>
-                        {isOn && <span className="text-[10px]">✓</span>}
-                      </span>
-                      <span className="flex-1 min-w-0">
-                        <span className="font-semibold text-gray-900 truncate block">{name}</span>
-                        {s.year_group_code && (
-                          <span className="text-xs text-gray-500">{s.year_group_code}</span>
-                        )}
-                      </span>
-                    </button>
-                  </li>
+                  <button key={s.id} type="button" onClick={() => toggleSubject(s.id)}
+                    className={`text-left rounded-xl border px-3 py-2 text-sm transition-colors ${isOn ? 'bg-indigo-50 border-indigo-300 text-indigo-900 font-semibold' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'}`}
+                  >
+                    <span className={`inline-flex w-4 h-4 rounded mr-2 items-center justify-center flex-shrink-0 ${isOn ? 'bg-indigo-600 text-white' : 'border border-gray-300'}`}>
+                      {isOn && <span className="text-[10px]">✓</span>}
+                    </span>
+                    {s.name}
+                  </button>
                 );
               })}
-            </ul>
-          )}
+            </div>
+            {submitAttempted && pickedSubjectIds.size === 0 && <p className="text-xs text-rose-600 mt-1">Select at least one subject.</p>}
+          </div>
         </div>
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl">
-          <button onClick={onClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">
-            Cancel
-          </button>
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-gray-100 bg-gray-50 rounded-b-2xl flex-shrink-0">
+          <button onClick={handleClose} className="text-sm font-bold text-gray-700 hover:bg-gray-200 px-3 py-2 rounded-xl">Cancel</button>
           <button
-            onClick={() => m.mutate()}
-            disabled={selected.size === 0 || m.isPending}
+            onClick={() => {
+              setSubmitAttempted(true);
+              if (valid) saveMutation.mutate(!!removalWarning);
+            }}
+            disabled={saveMutation.isPending}
             className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-4 py-2 rounded-xl flex items-center gap-1.5"
           >
-            <Save size={14} /> {m.isPending ? 'Enrolling…' : `Enrol ${selected.size}`}
+            <Save size={14} /> {saveMutation.isPending ? 'Saving…' : removalWarning ? 'Confirm & Save' : 'Save changes'}
           </button>
         </div>
       </div>
+
+      {confirmDiscard && (
+        <div className="fixed inset-0 bg-black/40 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full">
+            <h3 className="text-base font-black text-gray-900 mb-2">Discard changes?</h3>
+            <p className="text-sm text-gray-600 mb-5">You have unsaved changes. Are you sure you want to discard them?</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmDiscard(false)} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-sm">
+                Keep editing
+              </button>
+              <button onClick={onClose} className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold px-4 py-2 rounded-xl text-sm">
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

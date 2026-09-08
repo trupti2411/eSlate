@@ -4,9 +4,8 @@ import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import {
-  GraduationCap, Bell, LogOut, ArrowLeft, Plus, X, Trash2, BookOpen, Lock,
-} from 'lucide-react';
+import { GraduationCap, LogOut, ArrowLeft, Plus, X, Trash2, BookOpen, Lock } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface Subject {
   id: number | string;
@@ -82,9 +81,7 @@ export default function SubjectsPage() {
               <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"

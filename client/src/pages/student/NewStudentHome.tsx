@@ -3,10 +3,8 @@ import { useQuery } from '@tanstack/react-query';
 import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { withBase, authHeaders } from '@/lib/queryClient';
-import {
-  GraduationCap, Bell, LogOut, ClipboardList, Clock, CheckCircle2,
-  AlertTriangle, FileText, Download, ChevronRight, BookOpen, Calendar,
-} from 'lucide-react';
+import { GraduationCap, LogOut, ClipboardList, Clock, CheckCircle2, AlertTriangle, FileText, Download, ChevronRight, BookOpen, Calendar } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface MyAssignment {
   id: number;
@@ -118,9 +116,7 @@ export default function NewStudentHome() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -229,6 +225,11 @@ export default function NewStudentHome() {
             </div>
           </section>
         )}
+
+        <Link href="/my-devices" className="flex items-center justify-between text-sm font-semibold text-gray-700 hover:text-indigo-700 bg-white border border-gray-100 shadow-sm hover:bg-indigo-50 rounded-2xl px-5 py-4 transition-colors">
+          My Devices
+          <span className="text-xs text-gray-400">Manage signed-in devices →</span>
+        </Link>
       </main>
     </div>
   );

@@ -1,6 +1,6 @@
 import * as nodemailer from 'nodemailer';
 import { db } from '../db';
-import { tutors, users, tutoringCompanies, inAppNotifications } from '../../shared/schema';
+import { tutors, users, tutoringCompanies, inAppNotifications, companyAdmins } from '../../shared/schema';
 import { eq, and, lte, isNotNull, sql } from 'drizzle-orm';
 
 const REMINDER_THRESHOLDS_DAYS = [60, 30, 7, 0];
@@ -98,6 +98,40 @@ export async function checkWwccExpiry(): Promise<void> {
         message: `Your WWCC ${urgency}. WWCC #${tutor.wwccNumber || 'unknown'} — expiry: ${tutor.wwccExpiry.toLocaleDateString('en-AU')}.`,
         data: { tutorId: tutor.tutorId, wwccExpiry: tutor.wwccExpiry, daysUntilExpiry: days },
       });
+
+      // Notify the Tutoring Company Admin(s) — this is the actual requester per ESLATE-25
+      if (tutor.companyId) {
+        const adminRows = await db
+          .select({ userId: companyAdmins.userId })
+          .from(companyAdmins)
+          .where(eq(companyAdmins.companyId, tutor.companyId));
+
+        for (const admin of adminRows) {
+          const adminUser = await db.select().from(users).where(eq(users.id, admin.userId)).limit(1);
+          if (!adminUser[0]) continue;
+
+          const adminHtml = `
+            <p>Hi ${adminUser[0].firstName || 'Admin'},</p>
+            <p>The Working With Children Check (WWCC) for <strong>${tutor.firstName} ${tutor.lastName}</strong> at ${tutor.companyName || 'your company'} ${urgency}.</p>
+            <p><strong>WWCC Number:</strong> ${tutor.wwccNumber || 'Not recorded'}<br>
+            <strong>Expiry Date:</strong> ${tutor.wwccExpiry.toLocaleDateString('en-AU')}</p>
+            <p>Please follow up with the tutor to ensure compliance is maintained before their WWCC lapses.</p>
+            <p>Regards,<br>eSlate Compliance System</p>
+          `;
+          if (adminUser[0].email) {
+            await sendEmail(adminUser[0].email, subject, adminHtml);
+          }
+
+          await db.insert(inAppNotifications).values({
+            userId: admin.userId,
+            companyId: tutor.companyId,
+            type: 'wwcc_expiry',
+            title: isExpired ? `Tutor WWCC Expired: ${tutor.firstName} ${tutor.lastName}` : `Tutor WWCC Expiring Soon: ${tutor.firstName} ${tutor.lastName}`,
+            message: `${tutor.firstName} ${tutor.lastName}'s WWCC ${urgency}. WWCC #${tutor.wwccNumber || 'unknown'} — expiry: ${tutor.wwccExpiry.toLocaleDateString('en-AU')}.`,
+            data: { tutorId: tutor.tutorId, wwccExpiry: tutor.wwccExpiry, daysUntilExpiry: days },
+          });
+        }
+      }
 
       console.log(`[WWCC] Reminder sent for tutor ${tutor.firstName} ${tutor.lastName} — ${urgency}`);
     }

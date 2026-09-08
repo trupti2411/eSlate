@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import nodemailer from "nodemailer";
 
 import { storage } from "./storage";
-import { setupCustomAuth, isAuthenticated, sendHomeworkSubmissionEmail } from "./customAuth";
+import { setupCustomAuth, isAuthenticated, sendHomeworkSubmissionEmail, hashPassword, comparePassword } from "./customAuth";
 import {
   insertMessageSchema,
   insertProgressSchema,
@@ -17,10 +17,10 @@ import {
   type InsertAcademicTerm,
 } from "@shared/schema";
 import multer from "multer";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { db } from "./db";
 import { eq, desc, inArray, and, lte, lt, isNotNull, sql, ne, gt, gte, max, asc, count, or, isNull, sum, like } from "drizzle-orm";
-import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs, studentProgressReports, inAppNotifications, academicTerms, academicYears, courses, classes, classWaitlist, classSessions, sessionAttendance, studentClassAssignments, invoices, invoiceLineItems, payments, termReminders, studentContacts, companySubjects, assignmentLibraryItems, assignmentLibraryQuestions, assignmentLibraryRubrics, assignmentAllocations, assignmentSubmissions, submissionTranscriptions, submissionMarks, resubmissions, userDevices, studentAssignmentResults, companyAdmins } from "@shared/schema";
+import { assignments, submissions, students, parents, tutors, users, companySupportContacts, tutoringCompanies, auditLogs, studentProgressReports, inAppNotifications, academicTerms, academicYears, courses, courseSubjects, classes, classSubjects, classWaitlist, classSessions, sessionAttendance, studentClassAssignments, invoices, invoiceLineItems, payments, termReminders, studentContacts, companySubjects, assignmentLibraryItems, assignmentLibraryQuestions, assignmentLibraryRubrics, assignmentAllocations, assignmentSubmissions, submissionTranscriptions, submissionMarks, resubmissions, userDevices, studentAssignmentResults, companyAdmins } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError, objectStorageClient } from "./objectStorage";
 
 // Report generation helper functions
@@ -291,6 +291,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/me', isAuthenticated, async (req: any, res: any) => {
     const { password, ...user } = req.user;
     res.json(user);
+  });
+
+  app.post('/api/me/change-password', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { currentPassword, newPassword } = req.body;
+      if (!currentPassword || !newPassword) return res.status(400).json({ message: 'currentPassword and newPassword are required' });
+      if (String(newPassword).length < 8) return res.status(400).json({ message: 'New password must be at least 8 characters' });
+
+      const fullUser = await storage.getUser(user.id);
+      if (!fullUser?.password) return res.status(400).json({ message: 'Password change is not available for this account' });
+
+      const valid = await comparePassword(currentPassword, fullUser.password);
+      if (!valid) return res.status(401).json({ message: 'Current password is incorrect' });
+
+      const hashed = await hashPassword(newPassword);
+      await storage.updateUser(user.id, { password: hashed } as any);
+      res.json({ message: 'Password updated' });
+    } catch (error) {
+      console.error('Error changing password:', error);
+      res.status(500).json({ message: 'Failed to change password' });
+    }
   });
 
   app.post('/api/me/accept-policies', isAuthenticated, async (req: any, res: any) => {
@@ -2032,7 +2054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ message: "Access denied" });
       }
 
-      const { first_name, last_name, year_group_code, school, roll_number, date_of_birth, address, notes, learning_goals, parents } = req.body;
+      const { first_name, last_name, year_group_code, school, roll_number, date_of_birth, address, notes, learning_goals, parents, profile_image_url } = req.body;
 
       if (first_name !== undefined && !String(first_name).trim()) {
         return res.status(400).json({ message: "First name cannot be blank" });
@@ -2072,6 +2094,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         },
         contacts,
       );
+
+      if (profile_image_url !== undefined) {
+        await db.update(users).set({ profileImageUrl: profile_image_url || null }).where(eq(users.id, student.userId));
+      }
 
       res.json(updatedStudent);
     } catch (error) {
@@ -3366,6 +3392,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ESLATE-24 — a tutor's assigned classes with schedule/term/subject detail, for the
+  // admin's "view tutor schedule" panel and the tutor's own "My Schedule" view.
+  app.get('/api/tutors/:tutorId/classes', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const user = req.user!;
+      const { tutorId } = req.params;
+      const tutor = await storage.getTutor(tutorId);
+      if (!tutor) return res.status(404).json({ message: "Tutor not found" });
+
+      const isSelf = user.role === 'tutor' && tutor.userId === user.id;
+      if (!isSelf) {
+        if (user.role === 'company_admin') {
+          const ca = await storage.getCompanyAdminByUserId(user.id);
+          if (!ca || ca.companyId !== tutor.companyId) return res.status(403).json({ message: "Access denied" });
+        } else if (user.role !== 'admin') {
+          return res.status(403).json({ message: "Access denied" });
+        }
+      }
+
+      const tutorClasses = await db.select({
+        id: classes.id, name: classes.name, status: classes.status,
+        dayOfWeek: classes.dayOfWeek, startTime: classes.startTime, endTime: classes.endTime,
+        yearGroupCode: classes.yearGroupCode, courseId: classes.courseId, termId: classes.termId,
+      }).from(classes).where(and(eq(classes.tutorId, tutorId), ne(classes.status, 'archived')));
+
+      const classIds = tutorClasses.map(c => c.id);
+      const termIds = [...new Set(tutorClasses.map(c => c.termId).filter(Boolean))];
+      const courseIds = [...new Set(tutorClasses.map(c => c.courseId).filter(Boolean))] as string[];
+
+      const [termRows, courseRows, subjectRows, enrolCounts] = await Promise.all([
+        termIds.length ? db.select().from(academicTerms).where(inArray(academicTerms.id, termIds)) : [],
+        courseIds.length ? db.select().from(courses).where(inArray(courses.id, courseIds)) : [],
+        classIds.length ? db.select().from(classSubjects).where(inArray(classSubjects.classId, classIds)) : [],
+        classIds.length ? db.select({ classId: studentClassAssignments.classId, count: sql<number>`count(*)`.as('count') })
+          .from(studentClassAssignments).where(and(inArray(studentClassAssignments.classId, classIds), eq(studentClassAssignments.isActive, true)))
+          .groupBy(studentClassAssignments.classId) : [],
+      ]);
+      const termById = new Map(termRows.map(t => [t.id, t]));
+      const courseById = new Map(courseRows.map(c => [c.id, c]));
+      const subjectsByClass = new Map<string, number[]>();
+      for (const s of subjectRows) {
+        if (!subjectsByClass.has(s.classId)) subjectsByClass.set(s.classId, []);
+        subjectsByClass.get(s.classId)!.push(s.subjectId);
+      }
+      const countByClass = new Map(enrolCounts.map((e: any) => [e.classId, Number(e.count)]));
+
+      const result = tutorClasses.map(c => ({
+        id: c.id,
+        name: c.name,
+        courseName: c.courseId ? courseById.get(c.courseId)?.name ?? null : null,
+        subjects: (subjectsByClass.get(c.id) ?? []).map(id => subjectById.get(id)?.name).filter(Boolean),
+        yearGroupCode: c.yearGroupCode,
+        dayOfWeek: c.dayOfWeek,
+        startTime: c.startTime,
+        endTime: c.endTime,
+        termId: c.termId,
+        termName: c.termId ? termById.get(c.termId)?.name ?? null : null,
+        studentCount: countByClass.get(c.id) ?? 0,
+      }));
+
+      res.json(result);
+    } catch (error) {
+      console.error("Error fetching tutor classes:", error);
+      res.status(500).json({ message: "Failed to fetch tutor classes" });
+    }
+  });
+
   // Create student endpoint for company admins
   app.post('/api/admin/create-student', isAuthenticated, async (req: any, res: any) => {
     try {
@@ -3791,7 +3884,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const tutors = await storage.getTutorsByCompany(companyId);
+      const statusFilter = req.query.status === 'active' || req.query.status === 'inactive' ? req.query.status : undefined;
+      const tutors = await storage.getTutorsByCompany(companyId, statusFilter);
       res.json(tutors);
     } catch (error) {
       console.error("Error fetching company tutors:", error);
@@ -4185,18 +4279,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: "Access denied" });
       const ca = await storage.getCompanyAdminByUserId(user.id);
       if (!ca) return res.status(403).json({ message: "Company admin profile not found" });
-      const { name, description, subject_ids } = req.body;
+      const { name, description, subject_ids, confirmSubjectRemoval } = req.body;
       if (name !== undefined && !name?.trim()) return res.status(400).json({ message: "Course name cannot be blank" });
       if (subject_ids !== undefined && (!Array.isArray(subject_ids) || subject_ids.length === 0)) {
         return res.status(400).json({ message: "At least one subject must be selected" });
       }
+
+      let removedSubjectIds: number[] = [];
+      if (subject_ids !== undefined) {
+        const existing = await storage.getCourseById(req.params.id, ca.companyId);
+        if (!existing) return res.status(404).json({ message: "Course not found" });
+        const nextIds = subject_ids.map(Number);
+        removedSubjectIds = (existing.subjectIds as number[]).filter(id => !nextIds.includes(id));
+
+        if (removedSubjectIds.length > 0) {
+          const linkedClasses = await db.select({ id: classes.id, name: classes.name }).from(classes).where(eq(classes.courseId, req.params.id));
+          const classIds = linkedClasses.map(c => c.id);
+          const affectedRows = classIds.length
+            ? await db.select().from(classSubjects).where(and(inArray(classSubjects.classId, classIds), inArray(classSubjects.subjectId, removedSubjectIds)))
+            : [];
+          const affectedClassIds = new Set(affectedRows.map(r => r.classId));
+          const affectedClasses = linkedClasses.filter(c => affectedClassIds.has(c.id));
+
+          if (affectedClasses.length > 0 && !confirmSubjectRemoval) {
+            return res.status(409).json({
+              message: 'confirm_required',
+              removedSubjects: removedSubjectIds.map(id => subjectById.get(id)?.name).filter(Boolean),
+              affectedClasses: affectedClasses.map(c => ({ id: c.id, name: c.name })),
+            });
+          }
+
+          // Confirmed — cascade the removal into the affected classes too
+          if (affectedRows.length > 0) {
+            await db.delete(classSubjects).where(and(inArray(classSubjects.classId, classIds), inArray(classSubjects.subjectId, removedSubjectIds)));
+          }
+        }
+      }
+
       const updated = await storage.updateCourse(req.params.id, ca.companyId, {
         name: name?.trim(),
         description: description ?? undefined,
         subjectIds: subject_ids?.map(Number),
       });
       if (!updated) return res.status(404).json({ message: "Course not found" });
-      res.json({ ...updated, subject_ids: updated.subjectIds });
+
+      const adminName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+      await db.update(courses).set({ updatedBy: user.id, updatedByName: adminName, updatedAt: new Date() }).where(eq(courses.id, req.params.id));
+      const [withAudit] = await db.select().from(courses).where(eq(courses.id, req.params.id)).limit(1);
+
+      res.json({ ...updated, ...withAudit, subject_ids: updated.subjectIds, subjectsLeftEmptyOnClasses: removedSubjectIds.length > 0 });
     } catch (err) {
       console.error("Error updating course:", err);
       res.status(500).json({ message: "Failed to update course" });
@@ -4344,7 +4475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const {
         name, description, level, capacity, course_id, tutor_id,
         term_ids, schedule_day_of_week, schedule_start_time, schedule_end_time,
-        location, status,
+        location, status, year_group_code, subject_ids, confirmImpact,
       } = req.body;
 
       const updates: Record<string, any> = {};
@@ -4360,6 +4491,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (location !== undefined) updates.location = location?.trim() || null;
       if (status !== undefined) updates.status = status;
       if (Array.isArray(term_ids) && term_ids.length > 0) updates.termId = String(term_ids[0]);
+      if (year_group_code !== undefined) updates.yearGroupCode = year_group_code || null;
+
+      // ESLATE-16 — impact checks: year group / term / subject changes affecting enrolled students,
+      // and course reassignment leaving the class with subjects the new course doesn't offer.
+      const enrolledCount = (existing.students ?? []).length;
+      const currentSubjectIds: number[] = (existing.subjects ?? []).map((s: any) => s.id);
+      const nextSubjectIds: number[] | undefined = Array.isArray(subject_ids) ? subject_ids.map(Number) : undefined;
+      const removedSubjectIds = nextSubjectIds ? currentSubjectIds.filter(id => !nextSubjectIds.includes(id)) : [];
+      const yearGroupChanged = year_group_code !== undefined && year_group_code !== existing.year_group_id;
+      const currentTermId = existing.terms?.[0]?.id;
+      const termChanged = updates.termId !== undefined && String(updates.termId) !== String(currentTermId);
+
+      let incompatibleSubjects: string[] = [];
+      if (updates.courseId !== undefined && updates.courseId !== existing.course_id && updates.courseId) {
+        const [newCourse] = await db.select().from(courses).where(eq(courses.id, updates.courseId)).limit(1);
+        if (newCourse) {
+          const newCourseSubjectRows = await db.select().from(courseSubjects).where(eq(courseSubjects.courseId, updates.courseId));
+          const newCourseSubjectIds = new Set(newCourseSubjectRows.map(r => r.subjectId));
+          const finalSubjectIds = nextSubjectIds ?? currentSubjectIds;
+          incompatibleSubjects = finalSubjectIds
+            .filter(id => !newCourseSubjectIds.has(id))
+            .map(id => subjectById.get(id)?.name)
+            .filter(Boolean) as string[];
+        }
+      }
+
+      // ESLATE-23 — tutor assignment checks: schedule conflict + WWCC compliance (non-blocking warnings)
+      let tutorConflictMessage: string | null = null;
+      let tutorWwccMessage: string | null = null;
+      const tutorChanged = updates.tutorId !== undefined && updates.tutorId !== (existing.tutor_id ? String(existing.tutor_id) : null);
+      if (tutorChanged && updates.tutorId) {
+        const [newTutor] = await db.select().from(tutors).where(eq(tutors.id, updates.tutorId)).limit(1);
+        if (newTutor) {
+          if (!newTutor.wwccExpiry || newTutor.wwccExpiry < new Date()) {
+            const [tutorUser] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, newTutor.userId)).limit(1);
+            const tutorName = tutorUser ? `${tutorUser.firstName ?? ''} ${tutorUser.lastName ?? ''}`.trim() : 'This tutor';
+            tutorWwccMessage = `${tutorName} has an expired or missing WWCC. Assigning them to a class may breach compliance requirements.`;
+          }
+
+          const finalTermId = updates.termId ?? currentTermId;
+          const finalDay = updates.dayOfWeek !== undefined ? updates.dayOfWeek : existing.schedule_day_of_week;
+          const finalStart = updates.startTime !== undefined ? updates.startTime : existing.schedule_start_time;
+          const finalEnd = updates.endTime !== undefined ? updates.endTime : existing.schedule_end_time;
+          if (finalTermId && finalDay && finalStart && finalEnd) {
+            const otherClasses = await db.select({ id: classes.id, name: classes.name, startTime: classes.startTime, endTime: classes.endTime })
+              .from(classes)
+              .where(and(
+                eq(classes.tutorId, updates.tutorId),
+                eq(classes.termId, finalTermId),
+                eq(classes.dayOfWeek, finalDay),
+                ne(classes.status, 'archived'),
+                ne(classes.id, classId),
+              ));
+            const conflicting = otherClasses.find(c => c.startTime < finalEnd && finalStart < c.endTime);
+            if (conflicting) {
+              const [tutorUser] = await db.select({ firstName: users.firstName, lastName: users.lastName }).from(users).where(eq(users.id, newTutor.userId)).limit(1);
+              const tutorName = tutorUser ? `${tutorUser.firstName ?? ''} ${tutorUser.lastName ?? ''}`.trim() : 'This tutor';
+              tutorConflictMessage = `${tutorName} is already assigned to ${conflicting.name} during this term and time. Do you still want to assign them?`;
+            }
+          }
+        }
+      }
+
+      if (!confirmImpact) {
+        const impacts: { type: string; message: string }[] = [];
+        if (tutorConflictMessage) impacts.push({ type: 'tutor_conflict', message: tutorConflictMessage });
+        if (tutorWwccMessage) impacts.push({ type: 'tutor_wwcc', message: tutorWwccMessage });
+        if (enrolledCount > 0 && removedSubjectIds.length > 0) {
+          const names = removedSubjectIds.map(id => subjectById.get(id)?.name).filter(Boolean).join(', ');
+          impacts.push({ type: 'subject', message: `${enrolledCount} student${enrolledCount === 1 ? ' is' : 's are'} enrolled in this class. Removing ${names} will update their enrolment.` });
+        }
+        if (enrolledCount > 0 && yearGroupChanged) {
+          impacts.push({ type: 'year_group', message: `${enrolledCount} student${enrolledCount === 1 ? ' is' : 's are'} enrolled in this class. Changing the year group will not automatically unenrol them — please review enrolments after saving.` });
+        }
+        if (enrolledCount > 0 && termChanged) {
+          impacts.push({ type: 'term', message: `Students are currently enrolled in ${existing.terms?.[0]?.name ?? 'the current term'}. Changing the term may affect their schedule.` });
+        }
+        if (incompatibleSubjects.length > 0) {
+          impacts.push({ type: 'course_subjects', message: `The new course doesn't offer: ${incompatibleSubjects.join(', ')}. These will remain on the class unless you remove them.` });
+        }
+        if (updates.maxStudents != null && updates.maxStudents < enrolledCount) {
+          impacts.push({ type: 'capacity', message: `${enrolledCount} students are already enrolled — reducing capacity to ${updates.maxStudents} won't remove anyone, but the class will show as over capacity until enrolment is reduced.` });
+        }
+        if (impacts.length > 0) {
+          return res.status(409).json({ message: 'confirm_required', impacts });
+        }
+      }
+
+      if (nextSubjectIds !== undefined) {
+        await db.delete(classSubjects).where(eq(classSubjects.classId, classId));
+        if (nextSubjectIds.length > 0) {
+          await db.insert(classSubjects).values(nextSubjectIds.map((sid, i) => ({ classId, subjectId: sid, isPrimary: i === 0 })));
+        }
+      }
+
+      const adminName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
+      updates.updatedBy = user.id;
+      updates.updatedByName = adminName;
 
       // ESLATE-39: detect notification-triggering changes
       const notifyFields = ['tutorId', 'dayOfWeek', 'startTime', 'endTime', 'termId', 'status'];
@@ -4467,8 +4696,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (user.role !== 'company_admin' && user.role !== 'admin') {
         return res.status(403).json({ message: "Access denied" });
       }
-      const rows = await db.select({ id: classes.id, name: classes.name, status: classes.status })
-        .from(classes).where(eq(classes.courseId, courseId));
+      const rows = await db.select({
+        id: classes.id, name: classes.name, status: classes.status,
+        yearGroupCode: classes.yearGroupCode, level: classes.level,
+        startTime: classes.startTime, endTime: classes.endTime, daysOfWeek: classes.daysOfWeek,
+      }).from(classes).where(eq(classes.courseId, courseId));
       res.json(rows);
     } catch (err: any) {
       res.status(500).json({ message: "Failed to fetch course classes" });
@@ -4587,6 +4819,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: 'active',
         duplicatedFromId: courseId,
       });
+
+      const originalSubjects = await db.select().from(courseSubjects).where(eq(courseSubjects.courseId, courseId));
+      if (originalSubjects.length > 0) {
+        await db.insert(courseSubjects).values(originalSubjects.map(s => ({ courseId: newId, subjectId: s.subjectId })));
+      }
+
       res.status(201).json({ id: newId, name: `Copy of ${original.name}`, message: "Course duplicated" });
     } catch (err: any) {
       console.error("Error duplicating course:", err);
@@ -4725,6 +4963,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { records } = req.body; // [{ studentId, status, notes }]
       if (!Array.isArray(records)) return res.status(400).json({ message: "records array required" });
 
+      // Tutors can only mark/edit attendance within 7 days of the session — admins can always override.
+      if (user.role === 'tutor') {
+        const [session] = await db.select({ sessionDate: classSessions.sessionDate }).from(classSessions).where(eq(classSessions.id, sessionId)).limit(1);
+        if (session) {
+          const daysSinceSession = (Date.now() - session.sessionDate.getTime()) / (24 * 60 * 60 * 1000);
+          if (daysSinceSession > 7) {
+            return res.status(403).json({ message: "This session is more than 7 days old — ask an admin to update attendance." });
+          }
+        }
+      }
+
       for (const rec of records) {
         const existing = await db.select({ id: sessionAttendance.id })
           .from(sessionAttendance)
@@ -4752,6 +5001,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error saving attendance:", err);
       res.status(500).json({ message: err.message ?? "Failed to save attendance" });
     }
+  });
+
+  // GET /api/classes/:classId/attendance-summary — per-student attendance % (ESLATE-29)
+  app.get('/api/classes/:classId/attendance-summary', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { classId } = req.params;
+      const sessions = await db.select({ id: classSessions.id }).from(classSessions)
+        .where(and(eq(classSessions.classId, classId), eq(classSessions.status, 'completed')));
+      const sessionIds = sessions.map(s => s.id);
+      if (sessionIds.length === 0) return res.json({});
+
+      const records = await db.select({ studentId: sessionAttendance.studentId, status: sessionAttendance.status })
+        .from(sessionAttendance)
+        .where(inArray(sessionAttendance.sessionId, sessionIds));
+
+      const byStudent: Record<string, { present: number; counted: number }> = {};
+      for (const r of records) {
+        if (r.status === 'excused') continue;
+        if (!byStudent[r.studentId]) byStudent[r.studentId] = { present: 0, counted: 0 };
+        byStudent[r.studentId].counted += 1;
+        if (r.status === 'present' || r.status === 'late') byStudent[r.studentId].present += 1;
+      }
+
+      const summary: Record<string, number> = {};
+      for (const [studentId, { present, counted }] of Object.entries(byStudent)) {
+        summary[studentId] = counted > 0 ? Math.round((present / counted) * 100) : 100;
+      }
+      res.json(summary);
+    } catch (err: any) { res.status(500).json({ message: 'Failed to fetch attendance summary' }); }
   });
 
   // ── ESLATE-31: Waitlist ──────────────────────────────────────────────────
@@ -4903,13 +5181,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const subjectRows = await db.select({ code: companySubjects.code }).from(companySubjects).where(eq(companySubjects.companyId, businessId));
       const codeToId = new Map(SUBJECTS.map(s => [s.code, s.id]));
       const activeSubjectIds = subjectRows.map(s => codeToId.get(s.code)).filter(Boolean);
-      res.json({ ...company, active_subject_ids: activeSubjectIds });
+      res.json({ ...company, legal_name: company.legalName, active_subject_ids: activeSubjectIds });
     } catch (err: any) {
       res.status(500).json({ message: err.message ?? 'Failed to fetch business' });
     }
   });
 
   // PATCH business profile (name, abn, timezone, currency, payment instructions)
+  // Official ATO ABN checksum: subtract 1 from the first digit, weight each digit,
+  // and the total must be divisible by 89.
+  function isValidAbnChecksum(digits: string): boolean {
+    const weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+    const adjusted = digits.split('').map((d, i) => (i === 0 ? Number(d) - 1 : Number(d)));
+    const sum = adjusted.reduce((total, d, i) => total + d * weights[i], 0);
+    return sum % 89 === 0;
+  }
+
   app.patch('/api/businesses/:businessId', isAuthenticated, async (req: any, res: any) => {
     try {
       const user = req.user!;
@@ -4920,6 +5207,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (!ca || ca.companyId !== businessId) return res.status(403).json({ message: 'Access denied' });
       }
       const { name, legal_name, abn, logo, timezone, currency, paymentBsb, paymentAccount, paymentReference, paymentNotes } = req.body;
+
+      if (abn) {
+        const digits = String(abn).replace(/\s/g, '');
+        if (!/^\d{11}$/.test(digits) || !isValidAbnChecksum(digits)) {
+          return res.status(400).json({ message: 'That ABN doesn\'t look valid — check the 11 digits and try again.' });
+        }
+      }
+
       const updates: Record<string, any> = {};
       if (name !== undefined) updates.name = name;
       if (legal_name !== undefined) updates.legalName = legal_name;
@@ -4931,6 +5226,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (paymentAccount !== undefined) updates.paymentAccount = paymentAccount;
       if (paymentReference !== undefined) updates.paymentReference = paymentReference;
       if (paymentNotes !== undefined) updates.paymentNotes = paymentNotes;
+      updates.updatedByName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
       const company = await storage.updateTutoringCompany(businessId, updates);
       res.json(company);
     } catch (err: any) {
@@ -6029,7 +6325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/classes/:classId/students', isAuthenticated, async (req: any, res: any) => {
     try {
       const { classId } = req.params;
-      const { studentId, ignoreConflicts } = req.body;
+      const { studentId, ignoreConflicts, confirmYearGroupMismatch, rollNumber } = req.body;
       const user = req.user!;
 
       if (user.role !== 'admin' && user.role !== 'company_admin') {
@@ -6043,7 +6339,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Check if student is already enrolled
       const existingEnrollments = await storage.getClassesByStudent(studentId);
       const alreadyEnrolled = existingEnrollments.some(e => e.classId === classId && e.isActive);
-      
+
       if (alreadyEnrolled) {
         return res.status(400).json({ message: "Student is already enrolled in this class", conflictType: 'duplicate_enrollment' });
       }
@@ -6052,6 +6348,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const classData = await storage.getClass(classId);
       if (!classData) {
         return res.status(404).json({ message: "Class not found" });
+      }
+
+      const studentData = await storage.getStudent(studentId);
+      if (!studentData) {
+        return res.status(404).json({ message: "Student not found" });
+      }
+
+      // Year-group mismatch — warn if the student's own year group differs from the class's
+      if (!ignoreConflicts && !confirmYearGroupMismatch && studentData.yearGroupCode && classData.yearGroupCode && studentData.yearGroupCode !== classData.yearGroupCode) {
+        return res.status(409).json({
+          message: `${studentData.user?.firstName ?? 'This student'} is in year group ${studentData.yearGroupCode}, but this class is for ${classData.yearGroupCode}.`,
+          conflictType: 'year_group_mismatch',
+          requiresConfirmation: true,
+        });
+      }
+
+      // Roll number — confirm/capture one at enrolment time if the student doesn't have one yet
+      if (!ignoreConflicts && !studentData.rollNumber && !rollNumber) {
+        return res.status(409).json({
+          message: `${studentData.user?.firstName ?? 'This student'} doesn't have a roll number yet. Enter one to continue.`,
+          conflictType: 'roll_number_required',
+          requiresConfirmation: true,
+        });
+      }
+      if (rollNumber && rollNumber !== studentData.rollNumber) {
+        await db.update(students).set({ rollNumber, updatedAt: new Date() }).where(eq(students.id, studentId));
       }
 
       const currentEnrollments = await storage.getStudentsByClass(classId);
@@ -6598,8 +6920,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!process.env.PRIVATE_OBJECT_DIR) {
         const { randomUUID: uuid } = await import('crypto');
         const objectId = uuid();
-        const port = process.env.PORT || 3000;
-        return res.json({ uploadURL: `http://localhost:${port}/api/objects/local-upload/${objectId}` });
+        // Relative URL — works from any host (localhost, dev.eslate.com.au, etc.) without
+        // depending on req.protocol, which is unreliable behind a reverse proxy.
+        return res.json({ uploadURL: `/api/objects/local-upload/${objectId}` });
       }
       const contentType = req.body?.contentType || undefined;
       const objectStorageService = new ObjectStorageService();
@@ -6614,11 +6937,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Local dev: accept raw file PUT and save to disk
   app.put('/api/objects/local-upload/:objectId', async (req: any, res: any) => {
     try {
-      const { mkdirSync, createWriteStream } = await import('fs');
+      const { mkdirSync, createWriteStream, writeFileSync } = await import('fs');
       const { join } = await import('path');
       const dir = join(process.cwd(), 'local-uploads');
       mkdirSync(dir, { recursive: true });
       const filePath = join(dir, req.params.objectId);
+      writeFileSync(`${filePath}.meta.json`, JSON.stringify({ mimeType: req.headers['content-type'] || 'application/octet-stream' }));
       const writer = createWriteStream(filePath);
       req.pipe(writer);
       writer.on('finish', () => res.status(200).send('OK'));
@@ -6628,6 +6952,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(500).send('Upload failed');
     }
   });
+
+  // Read back an uploaded file's bytes + mime type, for server-side processing (e.g. AI OCR).
+  // Only supports the local-uploads fallback used when PRIVATE_OBJECT_DIR isn't configured.
+  async function readUploadedObject(ref: string): Promise<{ buffer: Buffer; mimeType: string } | null> {
+    if (process.env.PRIVATE_OBJECT_DIR) return null;
+    const { readFileSync, existsSync } = await import('fs');
+    const { join } = await import('path');
+    const objectId = ref.split('/').filter(Boolean).pop();
+    if (!objectId) return null;
+    const filePath = join(process.cwd(), 'local-uploads', objectId);
+    if (!existsSync(filePath)) return null;
+    let mimeType = 'image/jpeg';
+    try {
+      const meta = JSON.parse(readFileSync(`${filePath}.meta.json`, 'utf-8'));
+      if (meta?.mimeType) mimeType = meta.mimeType;
+    } catch { /* no sidecar metadata — fall back to default */ }
+    return { buffer: readFileSync(filePath), mimeType };
+  }
 
   // Set metadata for uploaded object
   app.post('/api/objects/metadata', isAuthenticated, async (req: any, res: any) => {
@@ -8933,12 +9275,35 @@ Good luck with your assignment!"
         return res.status(403).json({ message: 'Access denied' });
       }
       const { studentId } = req.params;
+      const { confirmWithdraw } = req.body ?? {};
+
+      const activeEnrolments = await db
+        .select({ classId: studentClassAssignments.classId, className: classes.name })
+        .from(studentClassAssignments)
+        .innerJoin(classes, eq(classes.id, studentClassAssignments.classId))
+        .where(and(eq(studentClassAssignments.studentId, studentId), eq(studentClassAssignments.isActive, true)));
+
+      if (activeEnrolments.length > 0 && !confirmWithdraw) {
+        return res.status(409).json({
+          message: 'confirm_required',
+          impact: `This student will be withdrawn from ${activeEnrolments.length} active class${activeEnrolments.length === 1 ? '' : 'es'}: ${activeEnrolments.map(e => e.className).join(', ')}.`,
+          classes: activeEnrolments,
+        });
+      }
+
       const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email;
       await db.update(students)
         .set({ status: 'archived', archivedAt: new Date(), archivedBy: user.id, archivedByName: fullName })
         .where(eq(students.id, studentId));
+
+      if (activeEnrolments.length > 0) {
+        await db.update(studentClassAssignments)
+          .set({ isActive: false, updatedAt: new Date() })
+          .where(and(eq(studentClassAssignments.studentId, studentId), eq(studentClassAssignments.isActive, true)));
+      }
+
       const [updated] = await db.select().from(students).where(eq(students.id, studentId));
-      res.json(updated);
+      res.json({ ...updated, withdrawnFrom: activeEnrolments.map(e => e.className) });
     } catch (error) {
       res.status(500).json({ message: 'Failed to archive student' });
     }
@@ -8972,13 +9337,45 @@ Good luck with your assignment!"
         return res.status(403).json({ message: 'Access denied' });
       }
       const { tutorId } = req.params;
+      const { confirmUnassign } = req.body ?? {};
       const [tutor] = await db.select().from(tutors).where(eq(tutors.id, tutorId));
       if (!tutor) return res.status(404).json({ message: 'Tutor not found' });
+
+      const activeClasses = await db.select({ id: classes.id, name: classes.name })
+        .from(classes)
+        .where(and(eq(classes.tutorId, tutorId), ne(classes.status, 'archived')));
+
+      if (activeClasses.length > 0 && !confirmUnassign) {
+        return res.status(409).json({
+          message: 'confirm_required',
+          impact: `This tutor will be unassigned from ${activeClasses.length} active class${activeClasses.length === 1 ? '' : 'es'}: ${activeClasses.map(c => c.name).join(', ')}.`,
+          classes: activeClasses,
+        });
+      }
+
+      const adminName = `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email;
       await db.update(tutors)
-        .set({ status: 'inactive', deactivatedAt: new Date(), deactivatedBy: user.id })
+        .set({ status: 'inactive', deactivatedAt: new Date(), deactivatedBy: user.id, deactivatedByName: adminName })
         .where(eq(tutors.id, tutorId));
       await db.update(users).set({ isActive: false }).where(eq(users.id, tutor.userId));
-      res.json({ message: 'Tutor deactivated' });
+
+      if (activeClasses.length > 0) {
+        await db.update(classes).set({ tutorId: null, updatedAt: new Date() }).where(eq(classes.tutorId, tutorId));
+      }
+
+      // Notify the tutor by email, if configured
+      const [tutorUser] = await db.select({ email: users.email, firstName: users.firstName }).from(users).where(eq(users.id, tutor.userId)).limit(1);
+      if (tutorUser?.email && process.env.EMAIL_HOST && process.env.EMAIL_USER) {
+        const transporter = nodemailer.createTransport({ host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'), secure: false, auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM || 'noreply@eslate.com',
+          to: tutorUser.email,
+          subject: 'Your eSlate account has been deactivated',
+          html: `<p>Hi ${tutorUser.firstName ?? ''},</p><p>Your tutor account has been deactivated and you no longer have access to the eSlate portal. If you believe this is a mistake, please contact your company admin.</p>`,
+        }).catch(() => {});
+      }
+
+      res.json({ message: 'Tutor deactivated', unassignedFrom: activeClasses.map(c => c.name) });
     } catch (error) {
       res.status(500).json({ message: 'Failed to deactivate tutor' });
     }
@@ -9307,6 +9704,11 @@ Good luck with your assignment!"
         .orderBy(desc(inAppNotifications.createdAt))
         .limit(50);
       res.json(notifications);
+      // Fire-and-forget device presence heartbeat (this endpoint is polled every 60s while the app is open)
+      const sessionRef = currentDeviceSessionRef(user.id, req.headers['user-agent']);
+      db.update(userDevices).set({ lastActiveAt: new Date() })
+        .where(and(eq(userDevices.userId, user.id), eq(userDevices.sessionTokenRef, sessionRef), ne(userDevices.deviceStatus, 'unlinked')))
+        .catch(() => {});
     } catch (error) {
       res.status(500).json({ message: 'Failed to fetch notifications' });
     }
@@ -9828,9 +10230,27 @@ Good luck with your assignment!"
       const paymentInstructions = company?.paymentNotes ? `<p><strong>Payment Instructions:</strong><br>${company.paymentNotes}</p>` :
         company?.paymentBsb ? `<p><strong>Bank Transfer:</strong> BSB ${company.paymentBsb} · Account ${company.paymentAccount}<br>Reference: ${inv.invoiceNumber}</p>` : '';
       const html = `<h2>Invoice ${inv.invoiceNumber}</h2><p>Dear ${contacts[0]?.name || 'Parent/Guardian'},</p><p>Please find your invoice details below for ${u ? `${u.firstName} ${u.lastName}` : 'your child'}.</p><table border="1" cellpadding="6" style="border-collapse:collapse;width:100%"><tr><th>Description</th><th>Amount</th></tr>${itemsHtml}<tr><td><strong>Total Due</strong></td><td align="right"><strong>$${parseFloat(inv.total as string).toFixed(2)}</strong></td></tr></table><p><strong>Due Date:</strong> ${new Date(inv.dueDate).toLocaleDateString('en-AU')}</p>${paymentInstructions}<p>Thank you.</p>`;
+
       if (process.env.EMAIL_HOST && process.env.EMAIL_USER) {
-        const transporter = nodemailer.createTransport({ host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'), secure: false, auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
-        await transporter.sendMail({ from: process.env.EMAIL_FROM || 'noreply@eslate.com', to: toEmail, cc: ccEmails?.join(','), subject: `Invoice ${inv.invoiceNumber} — ${company?.name ?? ''}`, html });
+        try {
+          const transporter = nodemailer.createTransport({ host: process.env.EMAIL_HOST, port: parseInt(process.env.EMAIL_PORT || '587'), secure: false, auth: { user: process.env.EMAIL_USER, pass: process.env.EMAIL_PASS } });
+          await transporter.sendMail({ from: process.env.EMAIL_FROM || 'noreply@eslate.com', to: toEmail, cc: ccEmails?.join(','), subject: `Invoice ${inv.invoiceNumber} — ${company?.name ?? ''}`, html });
+        } catch (sendErr: any) {
+          console.error('[ESLATE-36] Invoice send failed:', sendErr);
+          await db.update(invoices).set({ sendStatus: 'failed', updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
+          const adminRows = await db.select({ userId: companyAdmins.userId }).from(companyAdmins).where(eq(companyAdmins.companyId, inv.companyId));
+          for (const admin of adminRows) {
+            await db.insert(inAppNotifications).values({
+              userId: admin.userId,
+              companyId: inv.companyId,
+              type: 'invoice_send_failure',
+              title: `Invoice ${inv.invoiceNumber} failed to send`,
+              message: `We couldn't email invoice ${inv.invoiceNumber} to ${toEmail}. Check the recipient address and try resending.`,
+              data: { invoiceId },
+            });
+          }
+          return res.status(502).json({ message: 'Failed to send invoice email. The company has been notified — please check the recipient address and try again.' });
+        }
       }
       await db.update(invoices).set({ status: 'sent', sentAt: new Date(), sentToEmail: toEmail, sendStatus: 'sent', updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
       res.json({ message: 'Invoice sent', sentTo: toEmail });
@@ -9884,6 +10304,18 @@ Good luck with your assignment!"
       await db.update(invoices).set({ status: 'void', voidedAt: new Date(), voidReason: voidReason || 'Other', updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
       res.json({ message: 'Invoice voided' });
     } catch (err: any) { res.status(500).json({ message: 'Failed to void invoice' }); }
+  });
+
+  // ESLATE-37 — Suppress/resume overdue reminders for a specific invoice (e.g. payment plan agreed)
+  app.patch('/api/invoices/:invoiceId/suppress-reminders', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { invoiceId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+      const { suppressed } = req.body;
+      await db.update(invoices).set({ remindersSuppressed: !!suppressed, updatedAt: new Date() }).where(eq(invoices.id, invoiceId));
+      res.json({ message: suppressed ? 'Reminders suppressed' : 'Reminders resumed' });
+    } catch (err: any) { res.status(500).json({ message: 'Failed to update reminder settings' }); }
   });
 
   // Student invoice history
@@ -9942,6 +10374,44 @@ Good luck with your assignment!"
       await db.insert(inAppNotifications).values({ userId: user.id, companyId, type: 'bulk_invoice_complete', title: 'Bulk Invoice Generation Complete', message: `${created} invoices generated for term. ${results.filter(r => r.status === 'skipped').length} skipped.`, data: { bulkRunId, created, total: studentIds.length } });
       res.json({ bulkRunId, created, skipped: results.filter(r => r.status === 'skipped').length, results });
     } catch (err: any) { console.error('[ESLATE-38]', err); res.status(500).json({ message: 'Failed to bulk generate invoices' }); }
+  });
+
+  // GET /api/companies/:companyId/invoices/bulk-runs — history of past bulk generation runs (ESLATE-38)
+  app.get('/api/companies/:companyId/invoices/bulk-runs', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { companyId } = req.params;
+      const user = req.user!;
+      if (user.role !== 'company_admin' && user.role !== 'admin') return res.status(403).json({ message: 'Access denied' });
+
+      const rows = await db.select({
+        bulkRunId: invoices.bulkRunId,
+        invoiceDate: invoices.invoiceDate,
+        total: invoices.total,
+        discountAmount: invoices.discountAmount,
+        termId: invoices.termId,
+        createdByName: invoices.createdByName,
+        createdAt: invoices.createdAt,
+      }).from(invoices).where(and(eq(invoices.companyId, companyId), isNotNull(invoices.bulkRunId)));
+
+      const termIds = [...new Set(rows.map(r => r.termId).filter(Boolean))] as string[];
+      const termRows = termIds.length > 0 ? await db.select({ id: academicTerms.id, name: academicTerms.name }).from(academicTerms).where(inArray(academicTerms.id, termIds)) : [];
+      const termMap: Record<string, string> = {};
+      for (const t of termRows) termMap[t.id] = t.name;
+
+      const byRun: Record<string, { bulkRunId: string; count: number; totalValue: number; totalDiscount: number; termName: string; createdByName: string | null; createdAt: Date | null }> = {};
+      for (const r of rows) {
+        const id = r.bulkRunId!;
+        if (!byRun[id]) {
+          byRun[id] = { bulkRunId: id, count: 0, totalValue: 0, totalDiscount: 0, termName: termMap[r.termId ?? ''] ?? 'Unknown term', createdByName: r.createdByName, createdAt: r.createdAt };
+        }
+        byRun[id].count += 1;
+        byRun[id].totalValue += parseFloat(r.total as string);
+        byRun[id].totalDiscount += parseFloat((r.discountAmount as string) || '0');
+      }
+
+      const runs = Object.values(byRun).sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+      res.json(runs);
+    } catch (err: any) { res.status(500).json({ message: 'Failed to fetch bulk run history' }); }
   });
 
   // Bulk-send invoices
@@ -10393,14 +10863,20 @@ Good luck with your assignment!"
         if (!tutor || tutor.companyId !== item.companyId) return res.status(403).json({ message: 'Access denied' });
       }
 
-      const { targetType, classId, studentIds, termId, dueAt, releaseAt, allowResubmission, studentNote } = req.body;
+      if (item.libStatus !== 'published') return res.status(400).json({ message: 'Only published assignments can be allocated' });
+
+      const { targetType, classId, studentIds, excludeStudentIds, termId, dueAt, releaseAt, allowResubmission, studentNote, confirmDuplicates } = req.body;
       if (!targetType || !dueAt) return res.status(400).json({ message: 'targetType and dueAt are required' });
+
+      const now = new Date();
+      if (new Date(dueAt) < now) return res.status(400).json({ message: 'Due date cannot be in the past' });
 
       let targetStudentIds: string[] = [];
       if (targetType === 'class') {
         if (!classId) return res.status(400).json({ message: 'classId is required for class allocations' });
         const enrolled = await db.select().from(studentClassAssignments).where(eq(studentClassAssignments.classId, classId));
-        targetStudentIds = enrolled.map(e => e.studentId);
+        const excluded = new Set(Array.isArray(excludeStudentIds) ? excludeStudentIds : []);
+        targetStudentIds = enrolled.map(e => e.studentId).filter(sid => !excluded.has(sid));
       } else if (targetType === 'students') {
         if (!Array.isArray(studentIds) || studentIds.length === 0) return res.status(400).json({ message: 'studentIds is required' });
         targetStudentIds = studentIds;
@@ -10408,7 +10884,23 @@ Good luck with your assignment!"
         return res.status(400).json({ message: 'targetType must be class or students' });
       }
 
-      const now = new Date();
+      if (!confirmDuplicates) {
+        const existingActive = await db.select({ studentId: assignmentAllocations.studentId })
+          .from(assignmentAllocations)
+          .where(and(
+            eq(assignmentAllocations.libraryItemId, id),
+            inArray(assignmentAllocations.studentId, targetStudentIds),
+            inArray(assignmentAllocations.allocStatus, ['scheduled', 'assigned', 'in_progress', 'overdue'] as any),
+          ));
+        if (existingActive.length > 0) {
+          return res.status(409).json({
+            message: 'confirm_required',
+            impact: `${existingActive.length} of the selected students already have an active allocation of "${item.title}". Allocating again will create a duplicate.`,
+            studentIds: existingActive.map(e => e.studentId),
+          });
+        }
+      }
+
       const releaseDate = releaseAt ? new Date(releaseAt) : null;
       const allocStatus = (releaseDate && releaseDate > now) ? 'scheduled' : 'assigned';
 
@@ -10502,11 +10994,13 @@ Good luck with your assignment!"
       }
 
       const { dueAt, releaseAt, studentNote, allowResubmission } = req.body;
+      const extendsPastDeadline = dueAt !== undefined && alloc.allocStatus === 'overdue' && new Date(dueAt) > new Date();
       await db.update(assignmentAllocations).set({
         ...(dueAt !== undefined && { dueAt: new Date(dueAt) }),
         ...(releaseAt !== undefined && { releaseAt: new Date(releaseAt) }),
         ...(studentNote !== undefined && { studentNote }),
         ...(allowResubmission !== undefined && { allowResubmission }),
+        ...(extendsPastDeadline && { allocStatus: 'assigned' as const, dueSoonReminderAt: null }),
         updatedAt: new Date(),
       }).where(eq(assignmentAllocations.id, id));
 
@@ -10548,7 +11042,7 @@ Good luck with your assignment!"
         if (!tutor || tutor.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
       }
 
-      if (!['scheduled', 'assigned'].includes(alloc.allocStatus)) {
+      if (!['scheduled', 'assigned', 'in_progress', 'overdue'].includes(alloc.allocStatus)) {
         return res.status(400).json({ message: 'Cannot revoke allocation in current status: ' + alloc.allocStatus });
       }
 
@@ -10639,6 +11133,7 @@ Good luck with your assignment!"
       const now2 = new Date();
       const isOverdue = alloc.dueAt < now2 && !['returned', 'submitted', 'auto_marked', 'under_review', 'revoked'].includes(alloc.allocStatus);
       const enteredAnswers: Record<string, string> = (typeof latestSub?.enteredAnswers === 'object' && latestSub?.enteredAnswers) ? latestSub.enteredAnswers as Record<string, string> : {};
+      const answerImages: Record<string, string> = (typeof latestSub?.answerImages === 'object' && latestSub?.answerImages) ? latestSub.answerImages as Record<string, string> : {};
 
       const marksMap: Record<string, any> = {};
       for (const m of marks) { if (m.questionId) marksMap[m.questionId] = m; }
@@ -10651,9 +11146,11 @@ Good luck with your assignment!"
         questionType: q.questionType,
         maxMarks: q.maxMarks,
         answer: enteredAnswers[q.id] ?? null,
+        answerImage: answerImages[q.id] ?? null,
+        transcribedText: ocrMap[q.id]?.text ?? null,
         score: marksMap[q.id]?.finalScore ?? marksMap[q.id]?.provisionalScore ?? null,
         tutorComment: marksMap[q.id]?.tutorComments ?? null,
-        isHandwritten: false,
+        isHandwritten: !!answerImages[q.id],
       }));
 
       const totalScore = alloc.allocStatus === 'returned' && marks.length > 0
@@ -10670,6 +11167,7 @@ Good luck with your assignment!"
         totalScore,
         maxMarks: libItem?.maxMarks ?? null,
         overallFeedback: latestSub?.tutorFeedback ?? null,
+        tutorAnnotations: latestSub?.tutorAnnotations ?? null,
         questions: shapedQuestions,
       });
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch assignment detail' }); }
@@ -10691,7 +11189,7 @@ Good luck with your assignment!"
         return res.status(400).json({ message: 'Cannot save draft for this allocation status' });
       }
 
-      const { inkData, enteredAnswers } = req.body;
+      const { inkData, enteredAnswers, answerImages } = req.body;
 
       // Check for existing draft submission
       const existing = await db.select().from(assignmentSubmissions)
@@ -10702,6 +11200,7 @@ Good luck with your assignment!"
         await db.update(assignmentSubmissions).set({
           ...(inkData !== undefined && { inkData }),
           ...(enteredAnswers !== undefined && { enteredAnswers }),
+          ...(answerImages !== undefined && { answerImages }),
           updatedAt: new Date(),
         }).where(eq(assignmentSubmissions.id, existing[0].id));
         res.json({ message: 'Draft saved', submissionId: existing[0].id });
@@ -10714,6 +11213,7 @@ Good luck with your assignment!"
           attemptNo: alloc.currentAttempt,
           inkData,
           enteredAnswers,
+          answerImages,
           ocrStatus: 'pending',
           autoMarkStatus: 'pending',
           isLate: false,
@@ -10748,7 +11248,8 @@ Good luck with your assignment!"
 
       const now = new Date();
       const isLate = alloc.dueAt < now;
-      const { inkData, enteredAnswers } = req.body;
+      const { inkData, enteredAnswers, answerImages } = req.body;
+      const imageMap: Record<string, string> = typeof answerImages === 'object' && answerImages ? answerImages : {};
 
       // Create or update submission
       const existing = await db.select().from(assignmentSubmissions)
@@ -10761,6 +11262,7 @@ Good luck with your assignment!"
           submittedAt: now, isLate,
           ...(inkData !== undefined && { inkData }),
           ...(enteredAnswers !== undefined && { enteredAnswers }),
+          ...(answerImages !== undefined && { answerImages }),
           ocrStatus: 'pending',
           autoMarkStatus: 'pending',
           updatedAt: new Date(),
@@ -10771,42 +11273,96 @@ Good luck with your assignment!"
         await db.insert(assignmentSubmissions).values({
           id: newSubId2,
           allocationId, studentId: st.id, attemptNo: alloc.currentAttempt,
-          submittedAt: now, isLate, inkData, enteredAnswers,
+          submittedAt: now, isLate, inkData, enteredAnswers, answerImages,
           ocrStatus: 'pending', autoMarkStatus: 'pending', syncStatus: 'synced',
         });
         submissionId = newSubId2;
       }
 
-      // Simulate OCR – mark complete with placeholder transcriptions
       const questions = await db.select().from(assignmentLibraryQuestions).where(eq(assignmentLibraryQuestions.libraryItemId, alloc.libraryItemId));
       const enteredMap: Record<string, string> = typeof enteredAnswers === 'object' && enteredAnswers ? enteredAnswers : {};
+      const rubricRows = questions.length
+        ? await db.select().from(assignmentLibraryRubrics).where(inArray(assignmentLibraryRubrics.questionId, questions.map(q => q.id)))
+        : [];
+      const { aiService } = await import('./services/ai');
 
       let provisionalTotal = 0;
       for (const q of questions) {
-        // OCR transcription
+        // OCR transcription — if the student uploaded a photo of handwritten work for this
+        // question, transcribe it with Gemini vision; otherwise the typed answer stands as-is.
+        let transcribedText = enteredMap[q.id] ?? '';
+        let ocrConfidence = 100;
+        let ocrStatusForQuestion: 'complete' | 'failed' = 'complete';
+
+        const imageRef = imageMap[q.id];
+        if (imageRef) {
+          try {
+            const file = await readUploadedObject(imageRef);
+            if (!file) throw new Error('Uploaded image not found');
+            const transcription = await aiService.transcribeHandwriting({
+              question: q.questionText,
+              imageBuffer: file.buffer,
+              mimeType: file.mimeType,
+            });
+            transcribedText = transcription.text;
+            ocrConfidence = transcription.confidence;
+          } catch (err) {
+            console.error(`[OCR] Handwriting transcription failed for submission ${submissionId}, question ${q.id}:`, err);
+            transcribedText = '';
+            ocrConfidence = 0;
+            ocrStatusForQuestion = 'failed';
+          }
+        }
+
         await db.insert(submissionTranscriptions).values({
           submissionId,
           questionId: q.id,
-          text: enteredMap[q.id] ?? '',
-          confidence: 95,
-          ocrStatus: 'complete',
+          text: transcribedText,
+          confidence: ocrConfidence,
+          ocrStatus: ocrStatusForQuestion,
         });
 
         // Auto-marking
         let provisional = 0;
         let markSource: 'key' | 'ai' = 'ai';
-        let confidence = 75;
+        let confidence = 0;
+        let provisionalComments: string | null = null;
+        const studentAnswer = transcribedText.trim();
 
         if (q.answerKey) {
-          const answer = (enteredMap[q.id] ?? '').trim().toLowerCase();
+          // Objective question — exact-match against the answer key
           const key = q.answerKey.trim().toLowerCase();
-          provisional = answer === key ? (q.maxMarks ?? 1) : 0;
+          provisional = studentAnswer.toLowerCase() === key ? (q.maxMarks ?? 1) : 0;
           markSource = 'key';
           confidence = 100;
+        } else if (studentAnswer && aiService.isConfigured()) {
+          // Subjective question — AI marks against the rubric (or the question alone if no rubric)
+          const rubricText = rubricRows
+            .filter(r => r.questionId === q.id)
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+            .map(r => `${r.criterion} (${r.maxMarks} marks)${r.descriptor ? `: ${r.descriptor}` : ''}`)
+            .join('\n');
+          try {
+            const grading = await aiService.getGradingSuggestion({
+              question: q.questionText,
+              studentAnswer,
+              rubric: rubricText || undefined,
+              maxPoints: q.maxMarks ?? 1,
+            });
+            provisional = grading.suggestedScore;
+            markSource = 'ai';
+            confidence = 70;
+            provisionalComments = grading.feedback;
+          } catch (err) {
+            console.error(`[AutoMark] AI grading failed for submission ${submissionId}, question ${q.id}:`, err);
+            markSource = 'ai';
+            confidence = 0;
+            provisionalComments = 'AI grading failed — needs manual marking.';
+          }
+        } else if (!studentAnswer) {
+          provisionalComments = 'No answer provided.';
         } else {
-          provisional = Math.round(((q.maxMarks ?? 1) * 0.5));
-          markSource = 'ai';
-          confidence = 75;
+          provisionalComments = 'AI marking is not configured — needs manual marking.';
         }
 
         provisionalTotal += provisional;
@@ -10818,6 +11374,7 @@ Good luck with your assignment!"
           provisionalScore: provisional,
           finalScore: null,
           confidence,
+          provisionalComments,
           isProvisional: true,
         });
       }
@@ -10963,6 +11520,7 @@ Good luck with your assignment!"
       for (const m of marks) { if (m.questionId) marksMap[m.questionId] = m; }
       const enteredAnswers: Record<string, string> = (typeof sub.enteredAnswers === 'object' && sub.enteredAnswers) ? sub.enteredAnswers as Record<string, string> : {};
       const inkData: Record<string, any> = (typeof sub.inkData === 'object' && sub.inkData) ? sub.inkData as Record<string, any> : {};
+      const answerImages: Record<string, string> = (typeof sub.answerImages === 'object' && sub.answerImages) ? sub.answerImages as Record<string, string> : {};
 
       const shapedQuestions = questions.map(q => ({
         questionId: q.id,
@@ -10972,7 +11530,8 @@ Good luck with your assignment!"
         studentAnswer: enteredAnswers[q.id] ?? null,
         ocrTranscription: ocrMap[q.id] ?? null,
         provisionalScore: marksMap[q.id]?.provisionalScore ?? null,
-        isHandwritten: !!inkData[q.id],
+        isHandwritten: !!inkData[q.id] || !!answerImages[q.id],
+        answerImageUrl: answerImages[q.id] ?? null,
       }));
 
       res.json({
@@ -10983,6 +11542,7 @@ Good luck with your assignment!"
         submittedAt: sub.submittedAt?.toISOString() ?? '',
         isLate: sub.isLate ?? false,
         maxMarks: libItem?.maxMarks ?? 0,
+        tutorAnnotations: sub.tutorAnnotations ?? null,
         questions: shapedQuestions,
       });
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch review payload' }); }
@@ -11032,6 +11592,38 @@ Good luck with your assignment!"
 
       res.json({ message: 'Mark updated', runningFinalScore: runningFinal });
     } catch (err: any) { res.status(500).json({ message: 'Failed to update mark' }); }
+  });
+
+  // PATCH /api/submissions/:submissionId/save-progress – Save annotations/feedback without finalising
+  app.patch('/api/submissions/:submissionId/save-progress', isAuthenticated, async (req: any, res: any) => {
+    try {
+      const { submissionId } = req.params;
+      const user = req.user!;
+      if (!['admin', 'company_admin', 'tutor'].includes(user.role)) return res.status(403).json({ message: 'Access denied' });
+
+      const [sub] = await db.select().from(assignmentSubmissions).where(eq(assignmentSubmissions.id, submissionId)).limit(1);
+      if (!sub) return res.status(404).json({ message: 'Submission not found' });
+
+      const [alloc] = await db.select().from(assignmentAllocations).where(eq(assignmentAllocations.id, sub.allocationId)).limit(1);
+      if (!alloc) return res.status(404).json({ message: 'Allocation not found' });
+
+      if (user.role === 'company_admin') {
+        const ca = await storage.getCompanyAdminByUserId(user.id);
+        if (!ca || ca.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
+      } else if (user.role === 'tutor') {
+        const tutor = await storage.getTutorByUserId(user.id);
+        if (!tutor || tutor.companyId !== alloc.companyId) return res.status(403).json({ message: 'Access denied' });
+      }
+
+      const { overallFeedback, tutorAnnotations } = req.body;
+      await db.update(assignmentSubmissions).set({
+        ...(overallFeedback !== undefined ? { tutorFeedback: overallFeedback } : {}),
+        ...(tutorAnnotations !== undefined ? { tutorAnnotations } : {}),
+        updatedAt: new Date(),
+      }).where(eq(assignmentSubmissions.id, submissionId));
+
+      res.json({ message: 'Progress saved' });
+    } catch (err: any) { res.status(500).json({ message: 'Failed to save progress' }); }
   });
 
   // POST /api/submissions/:submissionId/finalise – Finalise marking
@@ -11305,7 +11897,8 @@ Good luck with your assignment!"
         }
       }
 
-      res.json({ allocation: alloc, libraryItem: { ...libItem, questions }, submission, marks });
+      const safeQuestions = questions.map(({ answerKey, ...q }) => q);
+      res.json({ allocation: alloc, libraryItem: { ...libItem, questions: safeQuestions }, submission, marks });
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch allocation detail' }); }
   });
 
@@ -11365,6 +11958,18 @@ Good luck with your assignment!"
 
   // ── 8. DEVICE MANAGEMENT (ESLATE-54) ─────────────────────────
 
+  function currentDeviceSessionRef(userId: string, userAgent: string | undefined): string {
+    return createHash('sha256').update(`${userId}:${userAgent || ''}`).digest('hex').slice(0, 40);
+  }
+  function withDeviceStatusFields<T extends { lastActiveAt: Date | null; sessionTokenRef: string | null }>(devices: T[], currentSessionTokenRef: string) {
+    const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000);
+    return devices.map(d => ({
+      ...d,
+      isOnline: !!d.lastActiveAt && d.lastActiveAt > fiveMinAgo,
+      isCurrentDevice: d.sessionTokenRef === currentSessionTokenRef,
+    }));
+  }
+
   // GET /api/me/devices – List current user's devices
   app.get('/api/me/devices', isAuthenticated, async (req: any, res: any) => {
     try {
@@ -11372,7 +11977,7 @@ Good luck with your assignment!"
       const devices = await db.select().from(userDevices)
         .where(and(eq(userDevices.userId, user.id), ne(userDevices.deviceStatus, 'unlinked')))
         .orderBy(desc(userDevices.lastActiveAt));
-      res.json(devices);
+      res.json(withDeviceStatusFields(devices, currentDeviceSessionRef(user.id, req.headers['user-agent'])));
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch devices' }); }
   });
 
@@ -11400,7 +12005,7 @@ Good luck with your assignment!"
       const devices = await db.select().from(userDevices)
         .where(and(eq(userDevices.userId, userId), ne(userDevices.deviceStatus, 'unlinked')))
         .orderBy(desc(userDevices.lastActiveAt));
-      res.json(devices);
+      res.json(withDeviceStatusFields(devices, ''));
     } catch (err: any) { res.status(500).json({ message: 'Failed to fetch devices' }); }
   });
 

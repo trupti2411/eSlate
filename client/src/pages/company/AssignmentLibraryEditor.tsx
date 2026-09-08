@@ -3,11 +3,17 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
 import { Link, useLocation, useParams } from 'wouter';
 import {
-  ChevronLeft, Plus, Trash2, Edit2, X, BookOpen, FileText, Clock, Award, Upload, CheckCircle,
+  ChevronLeft, Plus, Trash2, Edit2, X, BookOpen, FileText, Clock, Award, Upload, CheckCircle, ListChecks,
 } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 
 interface AdminProfile { userId: string; companyId: string; }
+interface RubricCriterion {
+  id?: string;
+  criterion: string;
+  descriptor: string;
+  maxMarks: number;
+}
 interface Question {
   id: string;
   questionText: string;
@@ -15,6 +21,7 @@ interface Question {
   answerKey: string;
   maxMarks: number;
   orderIndex: number;
+  rubrics?: RubricCriterion[];
 }
 interface LibraryItem {
   id: string;
@@ -188,6 +195,15 @@ export default function AssignmentLibraryEditor() {
     mutationFn: (qId: string) =>
       apiRequest(`/api/assignment-library/questions/${qId}`, 'DELETE', {}),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: [`/api/assignment-library/${params.id}`] }),
+  });
+
+  const saveRubricMutation = useMutation({
+    mutationFn: ({ questionId, criteria }: { questionId: string; criteria: RubricCriterion[] }) =>
+      apiRequest(`/api/assignment-library/questions/${questionId}/rubric`, 'POST', { criteria }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [`/api/assignment-library/${params.id}`] });
+      setEditingQuestion(null);
+    },
   });
 
   const toggleMulti = (arr: string[], val: string, setter: (v: string[]) => void) => {
@@ -449,6 +465,11 @@ export default function AssignmentLibraryEditor() {
                             <span className="text-xs text-gray-500 capitalize">{q.questionType.replace(/_/g, ' ')}</span>
                             <span className="text-xs text-gray-500">{q.maxMarks} marks</span>
                             {q.answerKey && <span className="text-xs text-gray-400 truncate max-w-[160px]">Key: {q.answerKey}</span>}
+                            {!!q.rubrics?.length && (
+                              <span className="text-xs text-indigo-600 font-semibold flex items-center gap-1">
+                                <ListChecks size={11} /> {q.rubrics.length} rubric criteri{q.rubrics.length === 1 ? 'on' : 'a'}
+                              </span>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -510,7 +531,10 @@ export default function AssignmentLibraryEditor() {
               addQuestionMutation.mutate(q as Omit<Question, 'id' | 'orderIndex'>);
             }
           }}
-          isSaving={addQuestionMutation.isPending || updateQuestionMutation.isPending}
+          onSaveRubric={(criteria) => {
+            if (editingQuestion) saveRubricMutation.mutate({ questionId: editingQuestion.id, criteria });
+          }}
+          isSaving={addQuestionMutation.isPending || updateQuestionMutation.isPending || saveRubricMutation.isPending}
         />
       )}
     </div>
@@ -518,23 +542,36 @@ export default function AssignmentLibraryEditor() {
 }
 
 function QuestionModal({
-  question, onClose, onSave, isSaving,
+  question, onClose, onSave, onSaveRubric, isSaving,
 }: {
   question: Question | null;
   onClose: () => void;
   onSave: (q: Partial<Question>) => void;
+  onSaveRubric: (criteria: RubricCriterion[]) => void;
   isSaving: boolean;
 }) {
   const [questionText, setQuestionText] = useState(question?.questionText ?? '');
   const [questionType, setQuestionType] = useState<Question['questionType']>(question?.questionType ?? 'subjective');
   const [answerKey, setAnswerKey] = useState(question?.answerKey ?? '');
   const [maxMarks, setMaxMarks] = useState(question?.maxMarks ? String(question.maxMarks) : '');
+  const [rubric, setRubric] = useState<RubricCriterion[]>(
+    question?.rubrics?.map(r => ({ ...r, descriptor: r.descriptor ?? '', maxMarks: r.maxMarks ?? 1 })) ?? []
+  );
   const [error, setError] = useState('');
+
+  const addCriterion = () => setRubric(prev => [...prev, { criterion: '', descriptor: '', maxMarks: 1 }]);
+  const updateCriterion = (i: number, field: keyof RubricCriterion, value: string) => {
+    setRubric(prev => prev.map((r, idx) => idx === i ? { ...r, [field]: field === 'maxMarks' ? Number(value) || 0 : value } : r));
+  };
+  const removeCriterion = (i: number) => setRubric(prev => prev.filter((_, idx) => idx !== i));
 
   const handleSave = () => {
     if (!questionText.trim()) { setError('Question text is required.'); return; }
     if (!maxMarks || Number(maxMarks) < 1) { setError('Max marks must be at least 1.'); return; }
+    const validRubric = rubric.filter(r => r.criterion.trim());
+    if (validRubric.some(r => !r.maxMarks || r.maxMarks < 1)) { setError('Each rubric criterion needs marks of at least 1.'); return; }
     onSave({ questionText: questionText.trim(), questionType, answerKey, maxMarks: Number(maxMarks) });
+    if (question) onSaveRubric(validRubric);
   };
 
   return (
@@ -588,6 +625,58 @@ function QuestionModal({
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"
             />
           </div>
+
+          {question ? (
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-xs font-bold uppercase tracking-wide text-gray-500 flex items-center gap-1.5">
+                  <ListChecks size={12} /> Marking Rubric (optional)
+                </label>
+                <button type="button" onClick={addCriterion} className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1">
+                  <Plus size={12} /> Add Criterion
+                </button>
+              </div>
+              <p className="text-[11px] text-gray-400 mb-2">Used to guide AI marking when there's no answer key. Leave empty to mark on the question alone.</p>
+              {rubric.length === 0 ? (
+                <p className="text-xs text-gray-400 italic py-2">No rubric criteria yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {rubric.map((r, i) => (
+                    <div key={i} className="flex items-start gap-2 bg-gray-50 border border-gray-200 rounded-lg p-2.5">
+                      <div className="flex-1 space-y-1.5">
+                        <input
+                          type="text"
+                          value={r.criterion}
+                          onChange={e => updateCriterion(i, 'criterion', e.target.value)}
+                          placeholder="Criterion, e.g. Uses correct working"
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        />
+                        <input
+                          type="text"
+                          value={r.descriptor}
+                          onChange={e => updateCriterion(i, 'descriptor', e.target.value)}
+                          placeholder="Descriptor (optional)"
+                          className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        />
+                      </div>
+                      <input
+                        type="number"
+                        value={r.maxMarks}
+                        onChange={e => updateCriterion(i, 'maxMarks', e.target.value)}
+                        min={1}
+                        className="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-xs text-center focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                      />
+                      <button type="button" onClick={() => removeCriterion(i)} className="w-7 h-7 flex-shrink-0 bg-rose-50 hover:bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center">
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-[11px] text-gray-400 italic">Save this question first, then reopen it to add a marking rubric.</p>
+          )}
         </div>
         <div className="flex gap-3 mt-5">
           <button onClick={onClose} className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-4 py-2 rounded-xl text-sm">

@@ -4,10 +4,8 @@ import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import {
-  Building2, Bell, LogOut, ArrowLeft, CalendarDays, Pencil, Save, X,
-  AlertTriangle, ArrowRight, ChevronDown, ChevronUp, FileBadge2, Info,
-} from 'lucide-react';
+import { Building2, LogOut, ArrowLeft, CalendarDays, Pencil, Save, X, AlertTriangle, ArrowRight, ChevronDown, ChevronUp, FileBadge2, Info } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface AdminProfile { userId: string; companyId: string; companyName: string; }
 
@@ -131,9 +129,7 @@ export default function CompanyAcademicManagement() {
               <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"

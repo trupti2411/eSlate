@@ -4,10 +4,8 @@ import { Link } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/queryClient';
-import {
-  Settings as SettingsIcon, Bell, LogOut, ArrowLeft, Save, Building2,
-  BookOpen, Check, Globe, Hash, Image, CreditCard,
-} from 'lucide-react';
+import { Settings as SettingsIcon, LogOut, ArrowLeft, Save, Building2, BookOpen, Check, Globe, Hash, Image, CreditCard } from 'lucide-react';
+import { NotificationBell } from '@/components/NotificationBell';
 
 interface AdminProfile {
   userId: string;
@@ -33,6 +31,16 @@ interface BusinessProfile {
   paymentAccount?: string | null;
   paymentReference?: string | null;
   paymentNotes?: string | null;
+  updatedByName?: string | null;
+  updatedAt?: string | null;
+}
+
+function isValidAbn(rawAbn: string): boolean {
+  const digits = rawAbn.replace(/\s/g, '');
+  if (!/^\d{11}$/.test(digits)) return false;
+  const weights = [10, 1, 3, 5, 7, 9, 11, 13, 15, 17, 19];
+  const sum = digits.split('').reduce((total, d, i) => total + (i === 0 ? Number(d) - 1 : Number(d)) * weights[i], 0);
+  return sum % 89 === 0;
 }
 interface SubjectRow { id: number; code: string; name: string; state_code?: string; }
 
@@ -76,9 +84,7 @@ export default function SettingsPage() {
               <Link href="/" className="hidden md:flex items-center gap-1.5 text-xs font-bold bg-white/15 hover:bg-white/25 text-white px-3 py-2 rounded-xl">
                 <ArrowLeft size={12} /> Dashboard
               </Link>
-              <button className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center" aria-label="Notifications">
-                <Bell size={16} />
-              </button>
+              <NotificationBell />
               <button
                 onClick={() => logoutMutation.mutate()}
                 className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"
@@ -102,6 +108,13 @@ export default function SettingsPage() {
             <PaymentInstructionsSection businessId={companyId} profile={profile} />
             <SubjectsSection businessId={companyId} profile={profile} subjects={subjects} />
             <PlanSection profile={profile} />
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <SectionHeader icon={<SettingsIcon size={16} className="text-indigo-600" />} title="Security" />
+              <Link href="/my-devices" className="mt-3 flex items-center justify-between text-sm font-semibold text-gray-700 hover:text-indigo-700 bg-gray-50 hover:bg-indigo-50 rounded-xl px-4 py-3 transition-colors">
+                My Devices
+                <span className="text-xs text-gray-400">Manage signed-in devices →</span>
+              </Link>
+            </div>
           </>
         )}
       </main>
@@ -133,6 +146,7 @@ function BusinessProfileSection({
   }, [profile]);
 
   const isMultiTutor = profile.type === 'multi_tutor';
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const m = useMutation({
     mutationFn: () =>
@@ -154,7 +168,25 @@ function BusinessProfileSection({
     },
   });
 
-  const valid = name.trim().length >= 2 && (!isMultiTutor || abn.trim().length > 0);
+  const abnValid = !abn.trim() || isValidAbn(abn);
+  const valid = name.trim().length >= 2 && (!isMultiTutor || abn.trim().length > 0) && abnValid;
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingLogo(true);
+    try {
+      const result: any = await apiRequest('/api/objects/upload', 'POST');
+      await fetch(result.uploadURL, { method: 'PUT', body: file, headers: { 'Content-Type': file.type } });
+      const objectId = result.uploadURL.split('?')[0].split('/').filter(Boolean).pop();
+      setLogo(`/objects/${objectId}`);
+    } catch {
+      toast({ title: 'Logo upload failed', variant: 'destructive' });
+    } finally {
+      setUploadingLogo(false);
+      e.target.value = '';
+    }
+  };
 
   return (
     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm">
@@ -184,16 +216,21 @@ function BusinessProfileSection({
               className="w-full bg-transparent focus:outline-none text-sm"
             />
           </IconInput>
+          {!abnValid && <p className="text-xs text-rose-600 mt-1">That doesn't look like a valid 11-digit ABN.</p>}
         </Field>
-        <Field label="Logo URL (optional)" hint="Direct link to your logo image. Uploads come in a later release.">
-          <IconInput icon={<Image size={14} />}>
-            <input
-              value={logo}
-              onChange={(e) => setLogo(e.target.value)}
-              placeholder="https://…"
-              className="w-full bg-transparent focus:outline-none text-sm"
-            />
-          </IconInput>
+        <Field label="Logo (optional)">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex items-center justify-center flex-shrink-0">
+              {logo ? <img src={logo} alt="Logo" className="w-full h-full object-contain" /> : <Image size={18} className="text-gray-300" />}
+            </div>
+            <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" id="company-logo-input" className="hidden" onChange={handleLogoUpload} />
+            <label htmlFor="company-logo-input" className="text-xs font-bold text-indigo-600 hover:text-indigo-800 cursor-pointer">
+              {uploadingLogo ? 'Uploading…' : logo ? 'Change logo' : 'Upload logo'}
+            </label>
+            {logo && (
+              <button type="button" onClick={() => setLogo('')} className="text-xs text-gray-400 hover:text-rose-600">Remove</button>
+            )}
+          </div>
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field label="Timezone">
@@ -221,6 +258,11 @@ function BusinessProfileSection({
             </select>
           </Field>
         </div>
+        {profile.updatedByName && (
+          <p className="text-xs text-gray-400">
+            Last updated by {profile.updatedByName}{profile.updatedAt ? ` on ${new Date(profile.updatedAt).toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
+          </p>
+        )}
       </div>
       <SectionFooter
         onSave={() => m.mutate()}

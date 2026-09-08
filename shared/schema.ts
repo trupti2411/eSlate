@@ -96,6 +96,10 @@ export const tutoringCompanies = mysqlTable("tutoring_companies", {
   name: varchar("name", { length: 255 }).notNull(),
   description: text("description"),
   abn: varchar("abn", { length: 20 }),
+  legalName: varchar("legal_name", { length: 255 }),
+  logo: varchar("logo", { length: 500 }),
+  timezone: varchar("timezone", { length: 50 }),
+  currency: varchar("currency", { length: 10 }),
   contactEmail: varchar("contact_email", { length: 255 }),
   contactPhone: varchar("contact_phone", { length: 50 }),
   address: text("address"),
@@ -106,6 +110,7 @@ export const tutoringCompanies = mysqlTable("tutoring_companies", {
   paymentAccount: varchar("payment_account", { length: 50 }),
   paymentReference: varchar("payment_reference", { length: 100 }),
   paymentNotes: text("payment_notes"),
+  updatedByName: varchar("updated_by_name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -122,6 +127,8 @@ export const courses = mysqlTable("courses", {
   archivedBy: varchar("archived_by", { length: 36 }),
   archivedByName: varchar("archived_by_name", { length: 255 }),
   duplicatedFromId: varchar("duplicated_from_id", { length: 36 }),
+  updatedBy: varchar("updated_by", { length: 36 }),
+  updatedByName: varchar("updated_by_name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -212,6 +219,7 @@ export const tutors = mysqlTable("tutors", {
   status: mysqlEnum("status", ['active', 'inactive']).notNull().default('active'),
   deactivatedAt: timestamp("deactivated_at"),
   deactivatedBy: varchar("deactivated_by", { length: 36 }),
+  deactivatedByName: varchar("deactivated_by_name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -279,6 +287,8 @@ export const classes = mysqlTable("classes", {
   duplicatedFromId: varchar("duplicated_from_id", { length: 36 }),
   feePerSession: decimal("fee_per_session", { precision: 8, scale: 2 }),
   feePerTerm: decimal("fee_per_term", { precision: 8, scale: 2 }),
+  updatedBy: varchar("updated_by", { length: 36 }),
+  updatedByName: varchar("updated_by_name", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -716,6 +726,8 @@ export const invoices = mysqlTable("invoices", {
   voidedAt: timestamp("voided_at"),
   voidReason: varchar("void_reason", { length: 100 }),
   bulkRunId: varchar("bulk_run_id", { length: 36 }),
+  remindersSuppressed: boolean("reminders_suppressed").notNull().default(false),
+  lastOverdueReminderAt: timestamp("last_overdue_reminder_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -832,6 +844,7 @@ export const assignmentAllocations = mysqlTable("asgn_allocations", {
   studentNote: text("student_note"),
   currentAttempt: int("current_attempt").notNull().default(1),
   createdBy: varchar("created_by", { length: 36 }).notNull().references(() => users.id),
+  dueSoonReminderAt: timestamp("due_soon_reminder_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -846,6 +859,7 @@ export const assignmentSubmissions = mysqlTable("asgn_submissions", {
   syncStatus: mysqlEnum("asgn_sync_status", ['synced', 'pending']).notNull().default('synced'),
   inkData: text("ink_data"),
   enteredAnswers: json("entered_answers"),
+  answerImages: json("answer_images").$type<Record<string, string>>(),
   ocrStatus: mysqlEnum("asgn_ocr_status", ['pending', 'processing', 'complete', 'failed', 'unavailable']).notNull().default('pending'),
   autoMarkStatus: mysqlEnum("asgn_auto_mark_status", ['pending', 'processing', 'complete', 'failed']).notNull().default('pending'),
   provisionalScore: int("provisional_score"),

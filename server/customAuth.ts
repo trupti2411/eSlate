@@ -9,6 +9,52 @@ import MemoryStore from 'memorystore';
 import type { RegisterData, LoginData } from '@shared/schema';
 import type { User } from '@shared/schema';
 import { checkLoginRateLimit, recordLoginAttempt, logAudit, getCsrfTokenEndpoint, csrfProtection } from './security';
+import { db } from './db';
+import { userDevices } from '@shared/schema';
+import { and, eq, ne } from 'drizzle-orm';
+
+function parseDevice(userAgent: string): { deviceName: string; deviceType: string } {
+  const ua = userAgent || '';
+  let deviceType = 'desktop';
+  if (/iPad|Tablet/i.test(ua)) deviceType = 'tablet';
+  else if (/Mobile|iPhone|Android/i.test(ua)) deviceType = 'mobile';
+
+  let os = 'Unknown OS';
+  if (/iPhone|iPad/i.test(ua)) os = 'iOS';
+  else if (/Android/i.test(ua)) os = 'Android';
+  else if (/Mac OS X/i.test(ua)) os = 'macOS';
+  else if (/Windows/i.test(ua)) os = 'Windows';
+  else if (/Linux/i.test(ua)) os = 'Linux';
+
+  let browser = 'Browser';
+  if (/Edg\//i.test(ua)) browser = 'Edge';
+  else if (/Chrome\//i.test(ua)) browser = 'Chrome';
+  else if (/Safari\//i.test(ua) && !/Chrome/i.test(ua)) browser = 'Safari';
+  else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+
+  return { deviceName: `${browser} on ${os}`, deviceType };
+}
+
+// Registers (or touches) the device a user is logging in from. A device is identified
+// by (userId, user-agent) since there is no client-generated device id in this web app.
+async function registerDeviceOnLogin(userId: string, userAgent: string) {
+  try {
+    const { deviceName, deviceType } = parseDevice(userAgent);
+    const sessionTokenRef = crypto.createHash('sha256').update(`${userId}:${userAgent}`).digest('hex').slice(0, 40);
+
+    const [existing] = await db.select().from(userDevices)
+      .where(and(eq(userDevices.userId, userId), eq(userDevices.sessionTokenRef, sessionTokenRef), ne(userDevices.deviceStatus, 'unlinked')))
+      .limit(1);
+
+    if (existing) {
+      await db.update(userDevices).set({ lastActiveAt: new Date() }).where(eq(userDevices.id, existing.id));
+    } else {
+      await db.insert(userDevices).values({ userId, deviceName, deviceType, sessionTokenRef, lastActiveAt: new Date() });
+    }
+  } catch (err) {
+    console.error('Failed to register device on login:', err);
+  }
+}
 
 // Session configuration
 export function getSession() {
@@ -339,6 +385,7 @@ export function setupCustomAuth(app: Express) {
 
       // Update last login
       await storage.updateUserLastLogin(user.id);
+      await registerDeviceOnLogin(user.id, req.headers['user-agent'] as string);
 
       // Set session
       (req as any).session.userId = user.id;
